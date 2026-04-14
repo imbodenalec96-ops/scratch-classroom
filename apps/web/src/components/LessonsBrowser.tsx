@@ -747,9 +747,8 @@ export default function LessonsBrowser({ onClose }: { onClose: () => void }) {
   if (selectedLesson) {
     const step = selectedLesson.steps[currentStep];
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-        <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[750px] max-h-[85vh] flex flex-col overflow-hidden"
-          onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+        <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[750px] max-h-[85vh] flex flex-col overflow-hidden">
           {/* Lesson header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
             <div className="flex items-center gap-3">
@@ -844,9 +843,8 @@ export default function LessonsBrowser({ onClose }: { onClose: () => void }) {
 
   // Lesson browser
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[700px] max-h-[80vh] flex flex-col overflow-hidden"
-        onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[700px] max-h-[80vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
           <h2 className="text-white font-bold text-sm">📖 JavaScript Lessons</h2>
           <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg">✕</button>

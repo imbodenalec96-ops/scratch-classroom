@@ -251,9 +251,8 @@ export default function CostumeEditor({ costume, onSave, onClose }: Props) {
   }, [costume, onSave]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[600px] max-h-[90vh] overflow-hidden"
-        onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[600px] max-h-[85vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
           <h2 className="text-white font-bold text-sm">🎨 Costume Editor</h2>

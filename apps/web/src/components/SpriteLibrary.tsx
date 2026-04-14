@@ -271,9 +271,8 @@ export default function SpriteLibrary({ onSelect, onClose, tab: initialTab }: Pr
   }, [onSelect]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[640px] max-h-[80vh] overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[600px] max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
           <h2 className="text-white font-bold text-sm">📚 Library</h2>

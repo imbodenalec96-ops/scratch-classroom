@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import type { Sprite, Asset, StageSettings, ProjectMode, Block } from "@scratch/shared";
+import type { Sprite, Asset, StageSettings, ProjectMode, Block, Shape3D } from "@scratch/shared";
 import BlockEditor from "./BlockEditor.tsx";
 import JSView from "./JSView.tsx";
 import Stage2D from "./Stage2D.tsx";
@@ -159,6 +159,19 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
     setDirty(true);
   }, [selectedSpriteId]);
 
+  const handleAdd3DSprite = useCallback((name: string, shape: Shape3D) => {
+    const id = "s_" + Math.random().toString(36).slice(2, 8);
+    const offset = sprites.length * 60;
+    const newSprite: Sprite = {
+      id, name: `${name}${sprites.length}`, x: offset, y: 0, z: 0,
+      rotation: 0, scale: 1, costumeIndex: 0,
+      costumes: [], sounds: [], blocks: [], visible: true, shape3d: shape,
+    };
+    setSprites((prev) => [...prev, newSprite]);
+    setSelectedSpriteId(id);
+    setDirty(true);
+  }, [sprites.length]);
+
   return (
     <div className="h-screen flex flex-col bg-[#0a0a1a]">
       {/* Toolbar */}
@@ -244,7 +257,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           {mode === "2d" ? (
             <Stage2D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} />
           ) : (
-            <Stage3D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} />
+            <Stage3D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
           )}
 
           {/* Stage settings */}

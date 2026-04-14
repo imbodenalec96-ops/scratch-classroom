@@ -27,8 +27,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function DashboardRedirect() {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  const { user, loading } = useAuth();
+  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0a0a1a] text-white">Loading...</div>;
+  if (!user) return <Navigate to="/playground" replace />;
   if (user.role === "admin") return <Navigate to="/admin" replace />;
   if (user.role === "teacher") return <Navigate to="/teacher" replace />;
   return <Navigate to="/student" replace />;
@@ -70,7 +71,7 @@ export default function App() {
           {/* Public playground — no login required (works on Vercel without backend) */}
           <Route path="/playground" element={<ProjectWorkspace />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/playground" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
