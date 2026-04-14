@@ -311,8 +311,8 @@ export default function Stage2D({ sprites, stage, running, onSpriteMove }: Props
       engine.mouseY = y;
     }
 
-    // Check if we clicked a sprite
-    for (const sprite of [...sprites].reverse()) {
+    // Check if we clicked a sprite (iterate reverse for top-most first)
+    for (const sprite of [...spritesRef.current].reverse()) {
       const rs = engine?.sprites.get(sprite.id);
       const sx = rs?.x ?? sprite.x;
       const sy = rs?.y ?? sprite.y;
@@ -320,14 +320,13 @@ export default function Stage2D({ sprites, stage, running, onSpriteMove }: Props
       const size = 20 * sc;
       if (Math.abs(x - sx) < size && Math.abs(y - sy) < size) {
         if (running && engine) {
-          triggerSpriteClick(engine, sprites, sprite.id);
-        } else {
-          setDragId(sprite.id);
+          triggerSpriteClick(engine, spritesRef.current, sprite.id);
         }
+        setDragId(sprite.id);
         break;
       }
     }
-  }, [sprites, stage, running, getMousePos]);
+  }, [running, getMousePos]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const { x, y } = getMousePos(e);
@@ -337,33 +336,20 @@ export default function Stage2D({ sprites, stage, running, onSpriteMove }: Props
       engine.mouseY = y;
     }
     if (!dragId) return;
-    // When not running, allow dragging sprites
-    if (!running) {
-      const engine2 = engineRef.current;
-      if (engine2) {
-        const state = engine2.sprites.get(dragId);
-        if (state) { state.x = x; state.y = y; }
-      }
-      draw();
+    // Dragging: update both sprite data AND runtime state
+    onSpriteMove?.(dragId, Math.round(x), Math.round(y));
+    if (engine) {
+      const state = engine.sprites.get(dragId);
+      if (state) { state.x = x; state.y = y; }
     }
-  }, [dragId, running, getMousePos, draw]);
+    draw();
+  }, [dragId, getMousePos, draw, onSpriteMove]);
 
   const handleMouseUp = useCallback(() => {
     const engine = engineRef.current;
     if (engine) engine.mouseDown = false;
-    if (dragId && !running) {
-      const { x, y } = { x: 0, y: 0 }; // Use last known position
-      if (onSpriteMove) {
-        // Get from internal state
-        const canvas = canvasRef.current;
-        if (canvas) {
-          // We stored in draw, just use sprite data
-          onSpriteMove(dragId, sprites.find(s => s.id === dragId)?.x ?? 0, sprites.find(s => s.id === dragId)?.y ?? 0);
-        }
-      }
-      setDragId(null);
-    }
-  }, [dragId, onSpriteMove, running, sprites]);
+    setDragId(null);
+  }, []);
 
   return (
     <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black">

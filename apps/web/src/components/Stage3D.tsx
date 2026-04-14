@@ -208,6 +208,7 @@ function Sprite3D({ sprite, engineRef, running, selected, onClick, transformMode
   onTransformChange: (id: string, pos: THREE.Vector3) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null!);
+  const transformRef = useRef<any>(null);
   const [costumeTexture, setCostumeTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
@@ -219,6 +220,18 @@ function Sprite3D({ sprite, engineRef, running, selected, onClick, transformMode
       setCostumeTexture(null);
     }
   }, [sprite.costumes, sprite.costumeIndex]);
+
+  // Persist transform when dragging ends
+  useEffect(() => {
+    const tc = transformRef.current;
+    if (!tc) return;
+    const onDragEnd = () => {
+      if (meshRef.current) onTransformChange(sprite.id, meshRef.current.position);
+    };
+    tc.addEventListener("dragging-changed", (e: any) => {
+      if (!e.value) onDragEnd(); // drag ended
+    });
+  }, [showTransform, sprite.id, onTransformChange]);
 
   // Sync runtime state → mesh every frame
   useFrame(() => {
@@ -263,8 +276,7 @@ function Sprite3D({ sprite, engineRef, running, selected, onClick, transformMode
   return (
     <group>
       {showTransform ? (
-        <TransformControls mode={transformMode} object={meshRef}
-          onObjectChange={() => { if (meshRef.current) onTransformChange(sprite.id, meshRef.current.position); }}>
+        <TransformControls ref={transformRef} mode={transformMode} object={meshRef}>
           {meshEl}
         </TransformControls>
       ) : meshEl}

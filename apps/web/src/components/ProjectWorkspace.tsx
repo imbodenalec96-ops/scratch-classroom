@@ -26,6 +26,78 @@ const DEFAULT_STAGE: StageSettings = {
   backgroundColor: "#0a0a1a",
 };
 
+/* ── Generate the BlockForge Cat (like Scratch Cat) as a data-URL ── */
+function generateCatCostume(size = 96): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const cx = size / 2, cy = size / 2, r = size * 0.38;
+
+  // Body
+  ctx.fillStyle = "#FF8C1A";
+  ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.15, r * 0.72, r, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Belly
+  ctx.fillStyle = "#FFD18C";
+  ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.35, r * 0.42, r * 0.52, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Head
+  ctx.fillStyle = "#FF8C1A";
+  ctx.beginPath(); ctx.arc(cx, cy - r * 0.35, r * 0.62, 0, Math.PI * 2); ctx.fill();
+
+  // Ears (triangles)
+  ctx.fillStyle = "#FF8C1A";
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.5, cy - r * 0.55); ctx.lineTo(cx - r * 0.62, cy - r * 1.1); ctx.lineTo(cx - r * 0.12, cy - r * 0.72); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx + r * 0.5, cy - r * 0.55); ctx.lineTo(cx + r * 0.62, cy - r * 1.1); ctx.lineTo(cx + r * 0.12, cy - r * 0.72); ctx.fill();
+  // Inner ears
+  ctx.fillStyle = "#FFB366";
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.42, cy - r * 0.6); ctx.lineTo(cx - r * 0.52, cy - r * 0.95); ctx.lineTo(cx - r * 0.18, cy - r * 0.72); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx + r * 0.42, cy - r * 0.6); ctx.lineTo(cx + r * 0.52, cy - r * 0.95); ctx.lineTo(cx + r * 0.18, cy - r * 0.72); ctx.fill();
+
+  // Eyes (white sclera + pupil)
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.ellipse(cx - r * 0.22, cy - r * 0.42, r * 0.16, r * 0.19, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + r * 0.22, cy - r * 0.42, r * 0.16, r * 0.19, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#1a1a2e";
+  ctx.beginPath(); ctx.arc(cx - r * 0.18, cy - r * 0.4, r * 0.09, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + r * 0.26, cy - r * 0.4, r * 0.09, 0, Math.PI * 2); ctx.fill();
+  // Eye shine
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(cx - r * 0.15, cy - r * 0.44, r * 0.035, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + r * 0.29, cy - r * 0.44, r * 0.035, 0, Math.PI * 2); ctx.fill();
+
+  // Nose
+  ctx.fillStyle = "#E0604A";
+  ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.22); ctx.lineTo(cx - r * 0.065, cy - r * 0.16); ctx.lineTo(cx + r * 0.065, cy - r * 0.16); ctx.fill();
+
+  // Mouth
+  ctx.strokeStyle = "#C04020";
+  ctx.lineWidth = size * 0.015;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.16); ctx.lineTo(cx, cy - r * 0.1); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx - r * 0.08, cy - r * 0.06, r * 0.08, -Math.PI * 0.7, 0); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + r * 0.08, cy - r * 0.06, r * 0.08, Math.PI, Math.PI * 1.7); ctx.stroke();
+
+  // Whiskers
+  ctx.strokeStyle = "#444";
+  ctx.lineWidth = size * 0.01;
+  const wy = cy - r * 0.15;
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.25, wy - r * 0.06); ctx.lineTo(cx - r * 0.7, wy - r * 0.15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.25, wy + r * 0.02); ctx.lineTo(cx - r * 0.7, wy + r * 0.06); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + r * 0.25, wy - r * 0.06); ctx.lineTo(cx + r * 0.7, wy - r * 0.15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + r * 0.25, wy + r * 0.02); ctx.lineTo(cx + r * 0.7, wy + r * 0.06); ctx.stroke();
+
+  return canvas.toDataURL("image/png");
+}
+
+const CAT_COSTUME: Asset = {
+  id: "costume_cat_default",
+  name: "cat-1",
+  url: "", // filled at runtime
+  type: "image",
+};
+
 const makeSprite = (name: string): Sprite => ({
   id: "s_" + Math.random().toString(36).slice(2, 8),
   name,
@@ -33,9 +105,23 @@ const makeSprite = (name: string): Sprite => ({
   costumes: [], sounds: [], blocks: [], visible: true,
 });
 
+function makeDefaultCat(): Sprite {
+  const url = generateCatCostume(96);
+  return {
+    id: "s_" + Math.random().toString(36).slice(2, 8),
+    name: "Cat",
+    x: 0, y: 0, rotation: 0, scale: 1, costumeIndex: 0,
+    costumes: [{ id: "costume_cat_1", name: "cat-1", url, type: "image" }],
+    sounds: [], blocks: [], visible: true,
+  };
+}
+
 export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props) {
-  const [sprites, setSprites] = useState<Sprite[]>([makeSprite("Sprite1")]);
-  const [selectedSpriteId, setSelectedSpriteId] = useState<string>(sprites[0].id);
+  const [sprites, setSprites] = useState<Sprite[]>(() => [makeDefaultCat()]);
+  const [selectedSpriteId, setSelectedSpriteId] = useState<string>(() => {
+    // will be patched in useEffect below, but init to something stable
+    return "";
+  });
   const [assets, setAssets] = useState<Asset[]>([]);
   const [stage, setStage] = useState<StageSettings>(DEFAULT_STAGE);
   const [mode, setMode] = useState<ProjectMode>("2d");
@@ -55,6 +141,11 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
   const startTime = useRef(Date.now());
 
   const selectedSprite = sprites.find((s) => s.id === selectedSpriteId) || sprites[0];
+
+  // Auto-select first sprite if none selected
+  useEffect(() => {
+    if (!selectedSpriteId && sprites.length > 0) setSelectedSpriteId(sprites[0].id);
+  }, [selectedSpriteId, sprites]);
 
   useEffect(() => {
     if (!projectId) return;
