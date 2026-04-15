@@ -5,7 +5,7 @@
   "framework": "vite",
   "functions": {
     "api/index.ts": {
-      "includesFiles": "apps/api/src/**,packages/shared/src/**"
+      "includeFiles": "apps/api/src/**,packages/shared/src/**"
     }
   },
   "rewrites": [
