@@ -89,6 +89,54 @@ router.post("/generate-project", async (req: AuthRequest, res: Response) => {
   });
 });
 
+// AI block generator
+router.post("/generate-blocks", async (req: AuthRequest, res: Response) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: "prompt is required" });
+
+  // Keyword-based mock block generation
+  const lower = prompt.toLowerCase();
+  const blocks: any[] = [];
+
+  if (lower.includes("game") || lower.includes("move") || lower.includes("platformer") || lower.includes("jump")) {
+    blocks.push(
+      { name: "game_jump", label: "jump (POWER) steps", category: "motion", description: "Make the sprite jump upward", inputs: [{ name: "POWER", type: "number", default: 20 }] },
+      { name: "game_run", label: "run (SPEED) right", category: "motion", description: "Move sprite horizontally", inputs: [{ name: "SPEED", type: "number", default: 5 }] },
+      { name: "game_gravity", label: "apply gravity (FORCE)", category: "motion", description: "Pull sprite downward", inputs: [{ name: "FORCE", type: "number", default: 2 }] },
+    );
+  } else if (lower.includes("color") || lower.includes("rainbow") || lower.includes("effect")) {
+    blocks.push(
+      { name: "color_cycle", label: "cycle colors every (SECS) secs", category: "looks", description: "Gradually shift through rainbow colors", inputs: [{ name: "SECS", type: "number", default: 0.5 }] },
+      { name: "color_flash", label: "flash (COLOR)", category: "looks", description: "Quick color flash effect", inputs: [{ name: "COLOR", type: "string", default: "#ff0000" }] },
+    );
+  } else if (lower.includes("chat") || lower.includes("bot") || lower.includes("respond")) {
+    blocks.push(
+      { name: "chat_greet", label: "greet the user", category: "ai", description: "Say a friendly greeting", inputs: [] },
+      { name: "chat_respond", label: "respond to (INPUT)", category: "ai", description: "Generate a smart response", inputs: [{ name: "INPUT", type: "string", default: "hello" }] },
+      { name: "chat_goodbye", label: "say goodbye", category: "ai", description: "End conversation politely", inputs: [] },
+    );
+  } else if (lower.includes("music") || lower.includes("melody") || lower.includes("note") || lower.includes("sound")) {
+    blocks.push(
+      { name: "music_note", label: "play note (NOTE) for (BEATS) beats", category: "sound", description: "Play a musical note", inputs: [{ name: "NOTE", type: "number", default: 60 }, { name: "BEATS", type: "number", default: 1 }] },
+      { name: "music_rest", label: "rest for (BEATS) beats", category: "sound", description: "Pause between notes", inputs: [{ name: "BEATS", type: "number", default: 1 }] },
+    );
+  } else if (lower.includes("random") || lower.includes("spawn") || lower.includes("event")) {
+    blocks.push(
+      { name: "random_spawn", label: "spawn at random position", category: "motion", description: "Move to a random spot", inputs: [] },
+      { name: "random_size", label: "set random size (MIN) to (MAX)", category: "looks", description: "Randomize sprite size", inputs: [{ name: "MIN", type: "number", default: 50 }, { name: "MAX", type: "number", default: 150 }] },
+      { name: "random_event", label: "if (CHANCE)% chance", category: "control", description: "Run blocks with a probability", inputs: [{ name: "CHANCE", type: "number", default: 30 }] },
+    );
+  } else {
+    // Generic fallback
+    blocks.push(
+      { name: "custom_action", label: "do (ACTION)", category: "control", description: "A custom action block", inputs: [{ name: "ACTION", type: "string", default: "something" }] },
+      { name: "custom_say", label: "say (TEXT) smartly", category: "ai", description: "Use AI to say something", inputs: [{ name: "TEXT", type: "string", default: "hello" }] },
+    );
+  }
+
+  res.json({ blocks });
+});
+
 // AI quiz generator
 router.post("/generate-quiz", async (req: AuthRequest, res: Response) => {
   const { topic, count } = req.body;

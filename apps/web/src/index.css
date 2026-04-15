@@ -97,3 +97,17 @@
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* ── Scrollbar variants ── */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-white/[0.08] rounded-full; }
+
+/* ── Block snap glow ── */
+@keyframes snap-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(250, 204, 21, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(250, 204, 21, 0.7); }
+}
+.snap-glow {
+  animation: snap-glow 0.8s ease-in-out infinite;
+}

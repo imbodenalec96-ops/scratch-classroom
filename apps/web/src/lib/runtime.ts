@@ -10,6 +10,29 @@
 
 import type { Block, Sprite } from "@scratch/shared";
 
+/* ── AI helper: calls the backend AI chat endpoint ── */
+async function callAI(prompt: string): Promise<string> {
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: prompt }],
+        context: "Block runtime execution",
+      }),
+    });
+    if (!res.ok) return "Sorry, I couldn't think of anything right now.";
+    const data = await res.json();
+    return data.content || "Hmm, let me think about that...";
+  } catch {
+    return "I'm having trouble connecting right now.";
+  }
+}
+
 /* ── Sprite runtime state ── */
 export interface SpriteState {
   x: number;
@@ -728,40 +751,115 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
           // Hat block - skip in execution
           thread.pc++;
           break;
-        case "ai_ask":
-          state.sayText = "🤖 Thinking: " + getStr(block, "PROMPT", "...");
-          state.sayTimer = 3;
-          thread.waiting = 1.5;
+        case "ai_ask": {
+          const prompt = getStr(block, "PROMPT", "Tell me something");
+          state.sayText = "🤖 Thinking...";
+          state.sayTimer = 0;
+          thread.waiting = 999; // pause until API returns
+          callAI(prompt).then((reply) => {
+            state.sayText = "🤖 " + reply;
+            state.sayTimer = 6;
+            thread.waiting = 0;
+            thread.pc++;
+          });
           break;
-        case "ai_say_smart":
-          state.sayText = "🤖 " + getStr(block, "TOPIC", "something interesting");
-          state.sayTimer = 4;
-          thread.pc++;
+        }
+        case "ai_say_smart": {
+          const topic = getStr(block, "TOPIC", "something interesting");
+          state.sayText = "🤖 Thinking...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI("Tell me a fun fact about: " + topic).then((reply) => {
+            state.sayText = "🤖 " + reply;
+            state.sayTimer = 5;
+            thread.waiting = 0;
+            thread.pc++;
+          });
           break;
-        case "ai_image_describe":
-          state.sayText = "🎨 Imagining: " + getStr(block, "DESCRIPTION", "something cool");
-          state.sayTimer = 3;
-          thread.pc++;
+        }
+        case "ai_image_describe": {
+          const desc = getStr(block, "DESCRIPTION", "something cool");
+          state.sayText = "🎨 Imagining...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI("Describe this scene vividly in 2 sentences: " + desc).then((reply) => {
+            state.sayText = "🎨 " + reply;
+            state.sayTimer = 5;
+            thread.waiting = 0;
+            thread.pc++;
+          });
           break;
-        case "ai_code_explain":
-          state.sayText = "📝 This code makes me move and act!";
-          state.sayTimer = 4;
-          thread.pc++;
+        }
+        case "ai_code_explain": {
+          state.sayText = "📝 Thinking...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI("Explain what this sprite's code does in 1-2 simple sentences for a student.").then((reply) => {
+            state.sayText = "📝 " + reply;
+            state.sayTimer = 5;
+            thread.waiting = 0;
+            thread.pc++;
+          });
           break;
-        case "ai_suggest_next":
-          state.sayText = "💡 Try adding a 'repeat' block next!";
-          state.sayTimer = 3;
-          thread.pc++;
+        }
+        case "ai_suggest_next": {
+          state.sayText = "💡 Thinking...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI("Suggest one simple next block a student should add to their Scratch program. Keep it to 1 sentence.").then((reply) => {
+            state.sayText = "💡 " + reply;
+            state.sayTimer = 4;
+            thread.waiting = 0;
+            thread.pc++;
+          });
           break;
+        }
+        case "ai_translate": {
+          const text = getStr(block, "TEXT", "Hello");
+          const lang = getStr(block, "LANG", "Spanish");
+          state.sayText = "🌍 Translating...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI(`Translate "${text}" to ${lang}. Reply with ONLY the translation.`).then((reply) => {
+            state.sayText = "🌍 " + reply;
+            state.sayTimer = 4;
+            thread.waiting = 0;
+            thread.pc++;
+          });
+          break;
+        }
+        case "ai_generate_story": {
+          const storyTopic = getStr(block, "TOPIC", "adventure");
+          state.sayText = "📖 Writing...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI("Write a 2-sentence short story about: " + storyTopic).then((reply) => {
+            state.sayText = "📖 " + reply;
+            state.sayTimer = 6;
+            thread.waiting = 0;
+            thread.pc++;
+          });
+          break;
+        }
+        case "ai_rhyme": {
+          const word = getStr(block, "WORD", "cat");
+          state.sayText = "🎵 Thinking...";
+          state.sayTimer = 0;
+          thread.waiting = 999;
+          callAI(`Give me 3 words that rhyme with "${word}". Reply with ONLY the words separated by commas.`).then((reply) => {
+            state.sayText = "🎵 " + reply;
+            state.sayTimer = 4;
+            thread.waiting = 0;
+            thread.pc++;
+          });
+          break;
+        }
         case "ai_response":
         case "ai_complete":
         case "ai_classify":
         case "ai_sentiment":
-        case "ai_translate":
-        case "ai_generate_story":
         case "ai_decide":
         case "ai_emotion":
-        case "ai_rhyme":
           // Reporter/boolean blocks - advance
           thread.pc++;
           break;
