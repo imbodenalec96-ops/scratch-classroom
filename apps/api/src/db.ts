@@ -64,6 +64,21 @@ if (process.env.DATABASE_URL) {
       await pool.end();
     },
   };
+} else if (process.env.VERCEL) {
+  // On Vercel serverless, SQLite is not available — DATABASE_URL is required
+  const errorMsg = "DATABASE_URL environment variable is required on Vercel";
+  db = {
+    prepare(): PreparedStatement {
+      return {
+        async run() { throw new Error(errorMsg); },
+        async get() { throw new Error(errorMsg); },
+        async all() { throw new Error(errorMsg); },
+      };
+    },
+    pragma() {},
+    exec() { throw new Error(errorMsg); },
+    close() {},
+  };
 } else {
   const { default: Database } = await import("better-sqlite3");
   const defaultDbPath = join(__dir, "../../../db/scratch.db");
