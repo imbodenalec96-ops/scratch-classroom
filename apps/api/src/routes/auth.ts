@@ -16,7 +16,7 @@ router.post("/register", async (req: Request, res: Response) => {
     const hash = await bcrypt.hash(password, 10);
     const id = crypto.randomUUID();
     try {
-      db.prepare(
+      await db.prepare(
         `INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)`
       ).run(id, email, hash, name, role);
     } catch (e: any) {
