@@ -27,8 +27,10 @@ const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: "50mb" }));
 
-// File uploads (only for non-serverless, uploads dir won't persist on Vercel)
-const uploadsDir = join(dirname(fileURLToPath(import.meta.url)), "../uploads");
+// File uploads (skip on Vercel — filesystem is read-only and ephemeral)
+const uploadsDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : join(dirname(fileURLToPath(import.meta.url)), "../uploads");
 if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({ dest: uploadsDir });
 
