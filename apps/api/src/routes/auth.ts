@@ -20,10 +20,10 @@ router.post("/register", async (req: Request, res: Response) => {
         `INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)`
       ).run(id, email, hash, name, role);
     } catch (e: any) {
-      if (e.code === "SQLITE_CONSTRAINT_UNIQUE") return res.status(409).json({ error: "Email taken" });
+      if (e.code === "SQLITE_CONSTRAINT_UNIQUE" || e.code === "23505") return res.status(409).json({ error: "Email taken" });
       throw e;
     }
-    const row = db.prepare("SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?").get(id) as any;
+      const row = await db.prepare("SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?").get(id) as any;
     const user: User = {
       id: row.id,
       email: row.email,
@@ -42,7 +42,7 @@ router.post("/register", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+    const row = await db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
     if (!row) return res.status(401).json({ error: "Invalid credentials" });
     const valid = await bcrypt.compare(password, row.password_hash);
     if (!valid) return res.status(401).json({ error: "Invalid credentials" });

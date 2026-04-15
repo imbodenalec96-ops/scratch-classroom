@@ -7,7 +7,7 @@ const router = Router();
 
 // Get chat history for a class
 router.get("/:classId", async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare(
+  const rows = await db.prepare(
     `SELECT cm.*, u.name as sender_name FROM chat_messages cm
      JOIN users u ON cm.sender_id = u.id
      WHERE cm.class_id = ? ORDER BY cm.created_at ASC LIMIT 200`
@@ -20,10 +20,10 @@ router.post("/:classId", async (req: AuthRequest, res: Response) => {
   const { text } = req.body;
   if (!text?.trim()) return res.status(400).json({ error: "Empty message" });
   const id = crypto.randomUUID();
-  db.prepare(
+  await db.prepare(
     "INSERT INTO chat_messages (id, class_id, sender_id, text) VALUES (?, ?, ?, ?)"
   ).run(id, req.params.classId, req.user!.id, text.trim());
-  const row = db.prepare("SELECT * FROM chat_messages WHERE id = ?").get(id);
+  const row = await db.prepare("SELECT * FROM chat_messages WHERE id = ?").get(id);
   res.json(row);
 });
 

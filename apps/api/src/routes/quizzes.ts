@@ -10,17 +10,17 @@ const router = Router();
 router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId, title, questions } = req.body;
   const id = crypto.randomUUID();
-  db.prepare(
+  await db.prepare(
     "INSERT INTO quizzes (id, class_id, teacher_id, title, questions) VALUES (?, ?, ?, ?, ?)"
   ).run(id, classId, req.user!.id, title, JSON.stringify(questions || []));
-  const row = db.prepare("SELECT * FROM quizzes WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM quizzes WHERE id = ?").get(id) as any;
   row.questions = JSON.parse(row.questions);
   res.json(row);
 });
 
 // List quizzes for class
 router.get("/class/:classId", async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare(
+  const rows = await db.prepare(
     "SELECT * FROM quizzes WHERE class_id = ? ORDER BY created_at DESC"
   ).all(req.params.classId) as any[];
   rows.forEach((r) => { r.questions = JSON.parse(r.questions); });
@@ -29,7 +29,7 @@ router.get("/class/:classId", async (req: AuthRequest, res: Response) => {
 
 // Get quiz
 router.get("/:id", async (req: AuthRequest, res: Response) => {
-  const row = db.prepare("SELECT * FROM quizzes WHERE id = ?").get(req.params.id) as any;
+  const row = await db.prepare("SELECT * FROM quizzes WHERE id = ?").get(req.params.id) as any;
   if (!row) return res.status(404).json({ error: "Not found" });
   row.questions = JSON.parse(row.questions);
   if (req.user!.role === "student") {
@@ -44,7 +44,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 
 // Submit quiz attempt
 router.post("/:id/attempt", async (req: AuthRequest, res: Response) => {
-  const quiz = db.prepare("SELECT questions FROM quizzes WHERE id = ?").get(req.params.id) as any;
+  const quiz = await db.prepare("SELECT questions FROM quizzes WHERE id = ?").get(req.params.id) as any;
   if (!quiz) return res.status(404).json({ error: "Not found" });
   const questions = JSON.parse(quiz.questions);
   const { answers } = req.body;
@@ -54,17 +54,17 @@ router.post("/:id/attempt", async (req: AuthRequest, res: Response) => {
   }
   const score = Math.round((correct / questions.length) * 100);
   const id = crypto.randomUUID();
-  db.prepare(
+  await db.prepare(
     "INSERT INTO quiz_attempts (id, quiz_id, student_id, answers, score) VALUES (?, ?, ?, ?, ?)"
   ).run(id, req.params.id, req.user!.id, JSON.stringify(answers), score);
-  const row = db.prepare("SELECT * FROM quiz_attempts WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM quiz_attempts WHERE id = ?").get(id) as any;
   row.answers = JSON.parse(row.answers);
   res.json(row);
 });
 
 // Get attempts for a quiz (teacher)
 router.get("/:id/attempts", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare(
+  const rows = await db.prepare(
     `SELECT qa.*, u.name as student_name FROM quiz_attempts qa
      JOIN users u ON qa.student_id = u.id
      WHERE qa.quiz_id = ? ORDER BY qa.submitted_at DESC`

@@ -48,12 +48,12 @@ export function setupWebSocket(io: IOServer) {
     });
 
     // Chat messages
-    socket.on("chat:message", (data: { classId: string; text: string }) => {
+    socket.on("chat:message", async (data: { classId: string; text: string }) => {
       const id = crypto.randomUUID();
-      db.prepare(
+      await db.prepare(
         "INSERT INTO chat_messages (id, class_id, sender_id, text) VALUES (?, ?, ?, ?)"
       ).run(id, data.classId, user.id, data.text);
-      const row = db.prepare("SELECT * FROM chat_messages WHERE id = ?").get(id) as any;
+      const row = await db.prepare("SELECT * FROM chat_messages WHERE id = ?").get(id) as any;
       io.to(`class:${data.classId}`).emit("chat:message", {
         ...row,
         sender_name: user.name,

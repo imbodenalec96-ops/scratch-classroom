@@ -1,6 +1,7 @@
 {
   "name": "scratch-classroom",
   "private": true,
+  "type": "module",
   "workspaces": [
     "packages/*",
     "apps/*"

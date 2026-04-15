@@ -1,4 +1,3 @@
-import Database, { type Database as DatabaseType } from "better-sqlite3";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
 import dotenv from "dotenv";
@@ -6,13 +5,100 @@ import dotenv from "dotenv";
 const __dir = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dir, "../../../.env") });
 
-const defaultDbPath = join(__dir, "../../../db/scratch.db");
-const rawPath = process.env.SQLITE_PATH || defaultDbPath;
-const dbPath = resolve(rawPath);
-const db: DatabaseType = Database(dbPath);
+export interface PreparedStatement {
+  run(...params: any[]): Promise<{ changes: number }>;
+  get(...params: any[]): Promise<any>;
+  all(...params: any[]): Promise<any[]>;
+}
 
-// Enable WAL mode for better concurrency and foreign keys
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+export interface DB {
+  prepare(sql: string): PreparedStatement;
+  pragma(key: string): void;
+  exec(sql: string): Promise<void> | void;
+  close(): Promise<void> | void;
+}
+
+function convertSqlForPg(sql: string): string {
+  let idx = 0;
+  let result = sql.replace(/\?/g, () => `$${++idx}`);
+  result = result.replace(/datetime\('now'\)/gi, "NOW()");
+  return result;
+}
+
+let db: DB;
+
+if (process.env.DATABASE_URL) {
+  const pg = await import("pg");
+  // Return JSON/JSONB as raw strings to match SQLite behavior
+  pg.default.types.setTypeParser(3802, (val: string) => val); // jsonb
+  pg.default.types.setTypeParser(114, (val: string) => val);  // json
+
+  const pool = new pg.default.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+  });
+
+  db = {
+    prepare(sql: string): PreparedStatement {
+      const pgSql = convertSqlForPg(sql);
+      return {
+        async run(...params: any[]) {
+          const result = await pool.query(pgSql, params);
+          return { changes: result.rowCount ?? 0 };
+        },
+        async get(...params: any[]) {
+          const result = await pool.query(pgSql, params);
+          return result.rows[0] || undefined;
+        },
+        async all(...params: any[]) {
+          const result = await pool.query(pgSql, params);
+          return result.rows;
+        },
+      };
+    },
+    pragma() {},
+    async exec(sql: string) {
+      await pool.query(sql);
+    },
+    async close() {
+      await pool.end();
+    },
+  };
+} else {
+  const { default: Database } = await import("better-sqlite3");
+  const defaultDbPath = join(__dir, "../../../db/scratch.db");
+  const rawPath = process.env.SQLITE_PATH || defaultDbPath;
+  const dbPath = resolve(rawPath);
+  const sqlite = Database(dbPath);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
+
+  db = {
+    prepare(sql: string): PreparedStatement {
+      const stmt = sqlite.prepare(sql);
+      return {
+        async run(...params: any[]) {
+          const result = stmt.run(...params);
+          return { changes: result.changes };
+        },
+        async get(...params: any[]) {
+          return stmt.get(...params);
+        },
+        async all(...params: any[]) {
+          return stmt.all(...params);
+        },
+      };
+    },
+    pragma(key: string) {
+      sqlite.pragma(key);
+    },
+    exec(sql: string) {
+      sqlite.exec(sql);
+    },
+    close() {
+      sqlite.close();
+    },
+  };
+}
 
 export default db;

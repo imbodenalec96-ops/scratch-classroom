@@ -3,7 +3,13 @@
   "buildCommand": "npm -w packages/shared run build && npm -w apps/web run build",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
+  "functions": {
+    "api/index.ts": {
+      "includesFiles": "apps/api/src/**,packages/shared/src/**"
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

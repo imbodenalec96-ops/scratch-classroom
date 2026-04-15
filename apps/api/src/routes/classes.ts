@@ -11,8 +11,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   const { name } = req.body;
   const code = Math.random().toString(36).slice(2, 8).toUpperCase();
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO classes (id, name, teacher_id, code) VALUES (?, ?, ?, ?)").run(id, name, req.user!.id, code);
-  const row = db.prepare("SELECT * FROM classes WHERE id = ?").get(id);
+  await db.prepare("INSERT INTO classes (id, name, teacher_id, code) VALUES (?, ?, ?, ?)").run(id, name, req.user!.id, code);
+  const row = await db.prepare("SELECT * FROM classes WHERE id = ?").get(id);
   res.json(row);
 });
 
@@ -21,9 +21,9 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   const u = req.user!;
   let rows;
   if (u.role === "teacher" || u.role === "admin") {
-    rows = db.prepare("SELECT * FROM classes WHERE teacher_id = ? ORDER BY created_at DESC").all(u.id);
+    rows = await db.prepare("SELECT * FROM classes WHERE teacher_id = ? ORDER BY created_at DESC").all(u.id);
   } else {
-    rows = db.prepare(
+    rows = await db.prepare(
       `SELECT c.* FROM classes c JOIN class_members cm ON c.id = cm.class_id WHERE cm.user_id = ? ORDER BY c.created_at DESC`
     ).all(u.id);
   }
@@ -32,7 +32,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 
 // Get single class
 router.get("/:id", async (req: AuthRequest, res: Response) => {
-  const row = db.prepare("SELECT * FROM classes WHERE id = ?").get(req.params.id);
+  const row = await db.prepare("SELECT * FROM classes WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "Not found" });
   res.json(row);
 });
@@ -40,15 +40,15 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 // Join class by code
 router.post("/join", requireRole("student"), async (req: AuthRequest, res: Response) => {
   const { code } = req.body;
-  const cls = db.prepare("SELECT id FROM classes WHERE code = ?").get(code) as any;
+  const cls = await db.prepare("SELECT id FROM classes WHERE code = ?").get(code) as any;
   if (!cls) return res.status(404).json({ error: "Invalid code" });
-  db.prepare("INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(req.user!.id, cls.id);
+  await db.prepare("INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(req.user!.id, cls.id);
   res.json({ joined: cls.id });
 });
 
 // List students in class
 router.get("/:id/students", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare(
+  const rows = await db.prepare(
     `SELECT u.id, u.email, u.name, u.role, cm.joined_at
      FROM users u JOIN class_members cm ON u.id = cm.user_id
      WHERE cm.class_id = ? ORDER BY u.name`
@@ -66,15 +66,15 @@ router.post("/:id/import", requireRole("teacher", "admin"), async (req: AuthRequ
     const hash = await bcrypt.default.hash(s.password || "password123", 10);
     const id = crypto.randomUUID();
     try {
-      db.prepare(
+      await db.prepare(
         `INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, 'student')`
       ).run(id, s.email, hash, s.name);
     } catch {
       // conflict — look up existing
     }
-    const row = db.prepare("SELECT id, email, name, role FROM users WHERE email = ?").get(s.email) as any;
+    const row = await db.prepare("SELECT id, email, name, role FROM users WHERE email = ?").get(s.email) as any;
     if (row) {
-      db.prepare("INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(row.id, classId);
+      await db.prepare("INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(row.id, classId);
       created.push(row);
     }
   }
@@ -84,11 +84,11 @@ router.post("/:id/import", requireRole("teacher", "admin"), async (req: AuthRequ
 // Teacher controls per student
 router.get("/:classId/controls/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId, studentId } = req.params;
-  let row = db.prepare("SELECT * FROM teacher_controls WHERE class_id = ? AND student_id = ?").get(classId, studentId);
+  let row = await db.prepare("SELECT * FROM teacher_controls WHERE class_id = ? AND student_id = ?").get(classId, studentId);
   if (!row) {
     const id = crypto.randomUUID();
-    db.prepare("INSERT INTO teacher_controls (id, class_id, student_id) VALUES (?, ?, ?)").run(id, classId, studentId);
-    row = db.prepare("SELECT * FROM teacher_controls WHERE id = ?").get(id);
+    await db.prepare("INSERT INTO teacher_controls (id, class_id, student_id) VALUES (?, ?, ?)").run(id, classId, studentId);
+    row = await db.prepare("SELECT * FROM teacher_controls WHERE id = ?").get(id);
   }
   res.json(row);
 });
@@ -96,7 +96,7 @@ router.get("/:classId/controls/:studentId", requireRole("teacher", "admin"), asy
 router.put("/:classId/controls/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId, studentId } = req.params;
   const { ai_enabled, ai_prompt_limit, blocks_disabled, editing_locked, screen_locked } = req.body;
-  db.prepare(
+  await db.prepare(
     `UPDATE teacher_controls SET
        ai_enabled = COALESCE(?, ai_enabled),
        ai_prompt_limit = COALESCE(?, ai_prompt_limit),
@@ -113,7 +113,7 @@ router.put("/:classId/controls/:studentId", requireRole("teacher", "admin"), asy
     classId,
     studentId
   );
-  const row = db.prepare("SELECT * FROM teacher_controls WHERE class_id = ? AND student_id = ?").get(classId, studentId);
+  const row = await db.prepare("SELECT * FROM teacher_controls WHERE class_id = ? AND student_id = ?").get(classId, studentId);
   res.json(row);
 });
 
@@ -126,13 +126,13 @@ router.post("/:id/attendance", requireRole("teacher", "admin"), async (req: Auth
     `INSERT INTO attendance (id, user_id, class_id, date, present) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`
   );
   for (const r of records) {
-    stmt.run(crypto.randomUUID(), r.userId, classId, date, r.present ? 1 : 0);
+    await stmt.run(crypto.randomUUID(), r.userId, classId, date, r.present ? 1 : 0);
   }
   res.json({ saved: records.length });
 });
 
 router.get("/:id/attendance", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare("SELECT * FROM attendance WHERE class_id = ? ORDER BY date DESC").all(req.params.id);
+  const rows = await db.prepare("SELECT * FROM attendance WHERE class_id = ? ORDER BY date DESC").all(req.params.id);
   res.json(rows);
 });
 
@@ -140,13 +140,13 @@ router.get("/:id/attendance", requireRole("teacher", "admin"), async (req: AuthR
 router.post("/:id/behavior", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { studentId, type, note } = req.body;
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO behavior_logs (id, student_id, class_id, type, note) VALUES (?, ?, ?, ?, ?)").run(id, studentId, req.params.id, type, note);
-  const row = db.prepare("SELECT * FROM behavior_logs WHERE id = ?").get(id);
+  await db.prepare("INSERT INTO behavior_logs (id, student_id, class_id, type, note) VALUES (?, ?, ?, ?, ?)").run(id, studentId, req.params.id, type, note);
+  const row = await db.prepare("SELECT * FROM behavior_logs WHERE id = ?").get(id);
   res.json(row);
 });
 
 router.get("/:id/behavior", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const rows = db.prepare("SELECT * FROM behavior_logs WHERE class_id = ? ORDER BY created_at DESC").all(req.params.id);
+  const rows = await db.prepare("SELECT * FROM behavior_logs WHERE class_id = ? ORDER BY created_at DESC").all(req.params.id);
   res.json(rows);
 });
 

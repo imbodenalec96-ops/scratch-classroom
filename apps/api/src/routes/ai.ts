@@ -10,7 +10,7 @@ const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 router.post("/chat", async (req: AuthRequest, res: Response) => {
   // Check if AI is enabled for this student
   if (req.user!.role === "student") {
-    const ctrl = db.prepare(
+    const ctrl = await db.prepare(
       "SELECT ai_enabled, ai_prompt_limit FROM teacher_controls WHERE student_id = ? LIMIT 1"
     ).get(req.user!.id) as any;
     if (ctrl && !ctrl.ai_enabled) {
