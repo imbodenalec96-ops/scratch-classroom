@@ -123,7 +123,8 @@ export type BlockCategory =
   | "lists"
   | "custom"
   | "physics"
-  | "sensing";
+  | "sensing"
+  | "ai";
 
 export interface Block {
   id: string;

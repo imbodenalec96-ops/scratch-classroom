@@ -723,6 +723,49 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
           thread.pc++;
           break;
 
+        /* ── AI Blocks ── */
+        case "ai_whenresponse":
+          // Hat block - skip in execution
+          thread.pc++;
+          break;
+        case "ai_ask":
+          state.sayText = "🤖 Thinking: " + getStr(block, "PROMPT", "...");
+          state.sayTimer = 3;
+          thread.waiting = 1.5;
+          break;
+        case "ai_say_smart":
+          state.sayText = "🤖 " + getStr(block, "TOPIC", "something interesting");
+          state.sayTimer = 4;
+          thread.pc++;
+          break;
+        case "ai_image_describe":
+          state.sayText = "🎨 Imagining: " + getStr(block, "DESCRIPTION", "something cool");
+          state.sayTimer = 3;
+          thread.pc++;
+          break;
+        case "ai_code_explain":
+          state.sayText = "📝 This code makes me move and act!";
+          state.sayTimer = 4;
+          thread.pc++;
+          break;
+        case "ai_suggest_next":
+          state.sayText = "💡 Try adding a 'repeat' block next!";
+          state.sayTimer = 3;
+          thread.pc++;
+          break;
+        case "ai_response":
+        case "ai_complete":
+        case "ai_classify":
+        case "ai_sentiment":
+        case "ai_translate":
+        case "ai_generate_story":
+        case "ai_decide":
+        case "ai_emotion":
+        case "ai_rhyme":
+          // Reporter/boolean blocks - advance
+          thread.pc++;
+          break;
+
         /* ── Hat blocks (skip in execution) ── */
         case "event_whenflagclicked":
         case "event_whenkeypressed":

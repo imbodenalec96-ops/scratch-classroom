@@ -344,6 +344,55 @@ function blockToJSStatement(block: Block, map: Map<string, Block>, level: number
       code = `${ind}${val(block, "NAME").replace(/"/g, "")}(${val(block, "ARGS").replace(/"/g, "")});`;
       break;
 
+    // AI
+    case "ai_whenresponse":
+      code = `${ind}// When AI responds\n${ind}onAIResponse(async () => {`;
+      code += chainToJS(block, map, level + 1);
+      code += `\n${ind}});`;
+      break;
+    case "ai_ask":
+      code = `${ind}await ai.ask(${val(block, "PROMPT")});`;
+      break;
+    case "ai_response":
+      code = `${ind}ai.lastResponse;`;
+      break;
+    case "ai_complete":
+      code = `${ind}await ai.complete(${val(block, "TEXT")});`;
+      break;
+    case "ai_classify":
+      code = `${ind}await ai.classify(${val(block, "TEXT")}, ${val(block, "CATEGORIES")});`;
+      break;
+    case "ai_sentiment":
+      code = `${ind}await ai.sentiment(${val(block, "TEXT")});`;
+      break;
+    case "ai_translate":
+      code = `${ind}await ai.translate(${val(block, "TEXT")}, ${val(block, "LANG")});`;
+      break;
+    case "ai_generate_story":
+      code = `${ind}await ai.generateStory(${val(block, "TOPIC")});`;
+      break;
+    case "ai_image_describe":
+      code = `${ind}sprite.say(await ai.describeImage(${val(block, "DESCRIPTION")}));`;
+      break;
+    case "ai_decide":
+      code = `${ind}await ai.decide(${val(block, "QUESTION")});`;
+      break;
+    case "ai_emotion":
+      code = `${ind}await ai.detectEmotion(${val(block, "TEXT")});`;
+      break;
+    case "ai_rhyme":
+      code = `${ind}await ai.rhyme(${val(block, "WORD")});`;
+      break;
+    case "ai_say_smart":
+      code = `${ind}sprite.say(await ai.generateAbout(${val(block, "TOPIC")}));`;
+      break;
+    case "ai_code_explain":
+      code = `${ind}sprite.say(ai.explainCode(sprite.blocks));`;
+      break;
+    case "ai_suggest_next":
+      code = `${ind}ai.suggestNextBlock(sprite.blocks);`;
+      break;
+
     default:
       code = `${ind}// ${block.type}(${JSON.stringify(block.inputs)})`;
   }

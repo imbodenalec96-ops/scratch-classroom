@@ -8,6 +8,7 @@ import SpritePanel from "./SpritePanel.tsx";
 import AssetManager from "./AssetManager.tsx";
 import Timeline from "./Timeline.tsx";
 import AIAssistant from "./AIAssistant.tsx";
+import AIBlockCreator from "./AIBlockCreator.tsx";
 import CostumeEditor from "./CostumeEditor.tsx";
 import SpriteLibrary from "./SpriteLibrary.tsx";
 import ShapeEditor3D from "./ShapeEditor3D.tsx";
@@ -133,6 +134,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
   const [showSpriteLibrary, setShowSpriteLibrary] = useState(false);
   const [showShapeEditor, setShowShapeEditor] = useState(false);
   const [showLessons, setShowLessons] = useState(false);
+  const [showAICreator, setShowAICreator] = useState(false);
   const [title, setTitle] = useState("Untitled Project");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -307,6 +309,10 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           className="px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border border-white/[0.06] transition-colors">
           {showAssets ? "Hide Assets" : "Assets"}
         </button>
+        <button onClick={() => setShowAICreator(true)}
+          className="px-2.5 py-1 text-xs rounded-lg bg-gradient-to-r from-[#FF6B9D]/20 to-violet-500/20 text-[#FF6B9D] hover:from-[#FF6B9D]/30 hover:to-violet-500/30 border border-[#FF6B9D]/20 transition-colors font-medium">
+          ✧ AI Creator
+        </button>
         <button onClick={() => setShowLessons(true)}
           className="px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border border-white/[0.06] transition-colors">
           📖 Lessons
@@ -406,6 +412,15 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
       )}
       {showLessons && (
         <LessonsBrowser onClose={() => setShowLessons(false)} />
+      )}
+      {showAICreator && (
+        <AIBlockCreator
+          onAddBlock={(block) => {
+            handleBlocksChange([...(selectedSprite?.blocks || []), block]);
+            setShowAICreator(false);
+          }}
+          onClose={() => setShowAICreator(false)}
+        />
       )}
     </div>
   );
