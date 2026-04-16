@@ -40,6 +40,27 @@ export default function Layout() {
             const active =
               location.pathname === item.path ||
               (item.path !== "/" && location.pathname.startsWith(item.path));
+            const isArcade = item.path === "/arcade";
+            if (isArcade) {
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="animate-slide-in flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 mt-1"
+                  style={{
+                    animationDelay: `${i * 40}ms`,
+                    background: active ? "rgba(139,92,246,0.25)" : "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(99,102,241,0.1))",
+                    border: `1px solid rgba(139,92,246,${active ? "0.5" : "0.3"})`,
+                    color: active ? "#a78bfa" : "#c4b5fd",
+                    boxShadow: "0 2px 8px rgba(139,92,246,0.2)",
+                  }}
+                >
+                  <item.icon size={15} className="flex-shrink-0" />
+                  🎮 Arcade
+                  <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.3)", color: "#c4b5fd" }}>NEW</span>
+                </Link>
+              );
+            }
             return (
               <Link
                 key={item.path}

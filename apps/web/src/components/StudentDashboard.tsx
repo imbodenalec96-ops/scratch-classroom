@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSocket } from "../lib/ws.ts";
 import {
   FolderOpen, Users, CheckCircle, Star, Plus, ArrowRight,
-  Lock, Megaphone, Box, Palette, Trophy, Clock,
+  Lock, Megaphone, Box, Palette, Trophy, Clock, Gamepad2, Zap,
 } from "lucide-react";
 
 /* Animate a number from 0 to target with ease-out */
@@ -189,6 +189,36 @@ export default function StudentDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Arcade banner ── */}
+      <Link
+        to="/arcade"
+        className="relative rounded-2xl overflow-hidden flex items-center gap-5 px-6 py-5 group animate-slide-up"
+        style={{
+          background: "linear-gradient(135deg, #1a0a35 0%, #0f0726 100%)",
+          border: "1px solid rgba(139,92,246,0.35)",
+          boxShadow: "0 8px 24px rgba(139,92,246,0.2)",
+          animationDelay: "320ms",
+          textDecoration: "none",
+        }}
+      >
+        {/* Background glow */}
+        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: "radial-gradient(ellipse at 80% 50%, #8b5cf6 0%, transparent 60%)" }} />
+        {/* Floating emoji */}
+        <span className="text-5xl flex-shrink-0 relative z-10 animate-arcade-float" style={{ filter: "drop-shadow(0 0 14px rgba(167,139,250,0.8))" }}>🎮</span>
+        <div className="flex-1 min-w-0 relative z-10">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-0.5">New · Free to Play</div>
+          <div className="text-white font-extrabold text-lg leading-tight">BlockForge Arcade</div>
+          <div className="text-white/50 text-xs mt-0.5">Snake, Pong, Brick Breaker, Memory Match &amp; more — play now!</div>
+        </div>
+        <div
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white flex-shrink-0 relative z-10 transition-all duration-200 group-hover:scale-105"
+          style={{ background: "linear-gradient(135deg, #8b5cf6, #6366f1)", boxShadow: "0 4px 14px rgba(139,92,246,0.5)" }}
+        >
+          <Gamepad2 size={15} />
+          Play Now
+        </div>
+      </Link>
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 gap-4">
