@@ -265,9 +265,13 @@ function PlayerModal({ game, onClose }: { game: Game; onClose: () => void }) {
     setTimeout(onClose, 180);
   }, [onClose]);
 
-  // Close on Escape
+  // Close on Escape; also prevent scroll keys from bubbling to the page while modal is open
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    const SCROLL_KEYS = new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","w","W","s","S","a","A","d","D"]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { close(); return; }
+      if (SCROLL_KEYS.has(e.key)) e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);

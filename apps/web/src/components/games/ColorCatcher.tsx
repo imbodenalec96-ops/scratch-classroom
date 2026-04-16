@@ -182,7 +182,9 @@ export default function ColorCatcher() {
   }, []);
 
   useEffect(() => {
+    const PREVENT_KEYS = new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","a","A","d","D"]);
     const onKey = (e: KeyboardEvent) => {
+      if (PREVENT_KEYS.has(e.key)) e.preventDefault();
       keysRef.current.add(e.key);
       if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
     };

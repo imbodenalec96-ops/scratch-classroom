@@ -132,12 +132,13 @@ export default function PongGame() {
   }
 
   useEffect(() => {
+    const PREVENT_KEYS = new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","w","W","s","S","a","A","d","D"]);
     const onKey = (e: KeyboardEvent) => {
+      if (PREVENT_KEYS.has(e.key)) e.preventDefault();
       keysRef.current.add(e.key);
       if (!stateRef.current.started && ["w","s","W","S","ArrowUp","ArrowDown"].includes(e.key)) {
         stateRef.current.started = true; setStarted(true);
       }
-      if (e.key === " ") e.preventDefault();
     };
     const onKeyUp = (e: KeyboardEvent) => keysRef.current.delete(e.key);
     window.addEventListener("keydown", onKey);
