@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BlockForge Unity Stage</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #07071a; overflow: hidden; width: 100vw; height: 100vh; font-family: system-ui, sans-serif; }
+    canvas { display: block; }
+
+    #hud-top {
+      position: absolute; top: 8px; left: 10px; right: 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      pointer-events: none;
+    }
+    #label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(167,139,250,0.6);
+    }
+    #cmd-pill {
+      font-size: 10px; font-family: monospace;
+      background: rgba(34,211,238,0.15); border: 1px solid rgba(34,211,238,0.3);
+      color: #22d3ee; padding: 2px 10px; border-radius: 20px;
+      opacity: 0; transition: opacity 0.25s;
+    }
+    #say-bubble {
+      position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.95); color: #07071a;
+      padding: 8px 18px; border-radius: 14px; border-bottom-left-radius: 4px;
+      font-size: 13px; font-weight: 700;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      opacity: 0; transition: opacity 0.25s; pointer-events: none;
+      white-space: nowrap; max-width: 80%;
+    }
+    #hint {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      font-size: 9px; color: rgba(255,255,255,0.2); letter-spacing: 0.05em;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud-top">
+    <span id="label">🎮 BlockForge Stage</span>
+    <span id="cmd-pill"></span>
+  </div>
+  <div id="say-bubble"></div>
+  <div id="hint">Use Unity blocks in the editor to control the scene</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script>
+    /* ── Scene ── */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07071a);
+    scene.fog = new THREE.FogExp2(0x07071a, 0.028);
+
+    const W = window.innerWidth, H = window.innerHeight;
+    const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 300);
+    camera.position.set(0, 9, 16);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    /* ── Lights ── */
+    scene.add(new THREE.AmbientLight(0x6366f1, 0.5));
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+    sun.position.set(6, 12, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 80;
+    sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+    sun.shadow.camera.top = 20;  sun.shadow.camera.bottom = -20;
+    scene.add(sun);
+
+    const rimA = new THREE.PointLight(0x22d3ee, 1.2, 35);
+    rimA.position.set(-8, 4, -6);
+    scene.add(rimA);
+    const rimB = new THREE.PointLight(0xa78bfa, 0.8, 30);
+    rimB.position.set(8, 2, 6);
+    scene.add(rimB);
+
+    /* ── Ground ── */
+    const groundMat = new THREE.MeshLambertMaterial({ color: 0x0b0b24 });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Grid with glowing lines
+    const grid = new THREE.GridHelper(60, 40, 0x2e1065, 0x1a103a);
+    grid.position.y = 0.001;
+    scene.add(grid);
+
+    /* ── Player cube ── */
+    const playerMat = new THREE.MeshPhongMaterial({
+      color: 0xa78bfa, emissive: 0x4c1d95, emissiveIntensity: 0.4, shininess: 100
+    });
+    const player = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4), playerMat);
+    player.position.set(0, 0.7, 0);
+    player.castShadow = true;
+    scene.add(player);
+
+    // Shadow disc under player
+    const discMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(1.1, 32), discMat);
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.003;
+    scene.add(disc);
+
+    /* ── Edge glow ring around arena ── */
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const pl = new THREE.PointLight(0x6366f1, 0.3, 18);
+      pl.position.set(Math.cos(angle) * 18, 0.5, Math.sin(angle) * 18);
+      scene.add(pl);
+    }
+
+    /* ── State ── */
+    const spawned = [];
+    let velY = 0;
+    let gravity = 9.8;
+    let bouncing = false;
+    let sayTimer = null;
+    let camAngle = 0;
+    let camAutoOrbit = true;
+
+    /* ── HUD helpers ── */
+    const cmdPill = document.getElementById('cmd-pill');
+    const sayBubble = document.getElementById('say-bubble');
+    let cmdTimer = null;
+
+    function showCmd(method, param) {
+      cmdPill.textContent = method + '(' + param + ')';
+      cmdPill.style.opacity = '1';
+      if (cmdTimer) clearTimeout(cmdTimer);
+      cmdTimer = setTimeout(() => cmdPill.style.opacity = '0', 1800);
+    }
+
+    function spawnParticles(pos, color) {
+      for (let i = 0; i < 12; i++) {
+        const pm = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), pm);
+        p.position.copy(pos);
+        const v = new THREE.Vector3(
+          (Math.random() - 0.5) * 5,
+          Math.random() * 4 + 1,
+          (Math.random() - 0.5) * 5
+        );
+        scene.add(p);
+        let life = 1;
+        const tick = setInterval(() => {
+          life -= 0.05;
+          p.position.addScaledVector(v, 0.03);
+          v.y -= 0.15;
+          pm.opacity = life;
+          if (life <= 0) { scene.remove(p); clearInterval(tick); }
+        }, 16);
+      }
+    }
+
+    /* ── BlockController methods ── */
+    const blockController = {
+      Move(json) {
+        const d = JSON.parse(json);
+        player.position.x += (d.x || 0);
+        player.position.y = Math.max(0.7, player.position.y + (d.y || 0));
+        player.position.z += (d.z || 0);
+        camAutoOrbit = false; setTimeout(() => camAutoOrbit = true, 4000);
+      },
+      SetPosition(json) {
+        const d = JSON.parse(json);
+        player.position.set(d.x || 0, Math.max(0.7, d.y ?? 0.7), d.z || 0);
+        camAutoOrbit = false; setTimeout(() => camAutoOrbit = true, 4000);
+      },
+      Rotate(json) {
+        const d = JSON.parse(json);
+        const rad = (d.degrees || 0) * Math.PI / 180;
+        if (d.axis === 'x') player.rotation.x += rad;
+        else if (d.axis === 'z') player.rotation.z += rad;
+        else player.rotation.y += rad;
+      },
+      SetRotation(json) {
+        const d = JSON.parse(json);
+        player.rotation.set(
+          (d.x || 0) * Math.PI / 180,
+          (d.y || 0) * Math.PI / 180,
+          (d.z || 0) * Math.PI / 180
+        );
+      },
+      SetScale(json) {
+        const d = JSON.parse(json);
+        const s = Math.max(0.1, d.scale || 1);
+        player.scale.setScalar(s);
+      },
+      SetColor(json) {
+        const d = JSON.parse(json);
+        playerMat.color.setRGB(d.r || 0, d.g || 0, d.b || 0);
+        playerMat.emissive.setRGB((d.r || 0) * 0.3, (d.g || 0) * 0.3, (d.b || 0) * 0.3);
+        discMat.color.setRGB(d.r || 0, d.g || 0, d.b || 0);
+        spawnParticles(player.position.clone(), playerMat.color);
+      },
+      Spawn(json) {
+        const d = JSON.parse(json);
+        const colors = [0xf43f5e, 0xfb923c, 0xfacc15, 0x4ade80, 0x60a5fa, 0xe879f9, 0x22d3ee];
+        const col = colors[spawned.length % colors.length];
+        const sm = new THREE.MeshPhongMaterial({ color: col, emissive: col, emissiveIntensity: 0.25, shininess: 80 });
+        const shapes = [
+          new THREE.BoxGeometry(0.9, 0.9, 0.9),
+          new THREE.SphereGeometry(0.5, 12, 12),
+          new THREE.ConeGeometry(0.5, 1, 8),
+          new THREE.CylinderGeometry(0.4, 0.4, 1, 12),
+        ];
+        const obj = new THREE.Mesh(shapes[spawned.length % shapes.length], sm);
+        obj.position.set(d.x || 0, Math.max(0.5, d.y ?? 0.5), d.z || 0);
+        obj.castShadow = true;
+        scene.add(obj);
+        spawned.push(obj);
+        spawnParticles(obj.position.clone(), col);
+      },
+      PlayAnimation(json) {
+        if (bouncing) return;
+        bouncing = true;
+        const startY = player.position.y;
+        let bt = 0;
+        const anim = setInterval(() => {
+          bt += 0.12;
+          player.position.y = startY + Math.abs(Math.sin(bt * 2.5)) * 2.5;
+          player.rotation.y += 0.15;
+          if (bt > Math.PI * 1.2) {
+            player.position.y = startY;
+            bouncing = false;
+            clearInterval(anim);
+          }
+        }, 16);
+      },
+      ApplyForce(json) {
+        const d = JSON.parse(json);
+        velY += (d.y || 0) * 0.12;
+        player.position.x += (d.x || 0) * 0.06;
+        player.position.z += (d.z || 0) * 0.06;
+      },
+      SetGravity(json) {
+        const d = JSON.parse(json);
+        gravity = Math.max(0, d.value || 9.8);
+      },
+      Say(json) {
+        const d = JSON.parse(json);
+        sayBubble.textContent = '"' + (d.text || '') + '"';
+        sayBubble.style.opacity = '1';
+        if (sayTimer) clearTimeout(sayTimer);
+        sayTimer = setTimeout(() => sayBubble.style.opacity = '0', 3500);
+      },
+      Reset() {
+        player.position.set(0, 0.7, 0);
+        player.rotation.set(0, 0, 0);
+        player.scale.setScalar(1);
+        playerMat.color.setHex(0xa78bfa);
+        playerMat.emissive.setHex(0x4c1d95);
+        discMat.color.setHex(0xa78bfa);
+        spawned.forEach(o => scene.remove(o));
+        spawned.length = 0;
+        velY = 0; bouncing = false;
+        sayBubble.style.opacity = '0';
+      },
+    };
+
+    /* ── Unity bridge (this is what the parent frame calls) ── */
+    // The variable name "unityInstance" is intentional — UnityStage.tsx looks
+    // for it to confirm a real build is loaded, and calls SendMessage through it.
+    window.unityInstance = {
+      SendMessage(objectName, method, param) {
+        if (blockController[method]) {
+          try { blockController[method](param || '{}'); } catch(e) {}
+          showCmd(method, param);
+        }
+      }
+    };
+
+    /* ── Resize ── */
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* ── Render loop ── */
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.008;
+
+      // Slow camera orbit
+      if (camAutoOrbit) {
+        camAngle += 0.003;
+        camera.position.x = Math.sin(camAngle) * 16;
+        camera.position.z = Math.cos(camAngle) * 16;
+        camera.position.y = 9 + Math.sin(camAngle * 0.5) * 1.5;
+      }
+      camera.lookAt(player.position.x, player.position.y + 0.5, player.position.z);
+
+      // Gravity / vertical velocity
+      if (!bouncing && (player.position.y > 0.7 || velY > 0)) {
+        velY -= gravity * 0.0015;
+        player.position.y += velY;
+        if (player.position.y <= 0.7) { player.position.y = 0.7; velY *= -0.35; if (Math.abs(velY) < 0.05) velY = 0; }
+      }
+
+      // Shadow disc follows player
+      disc.position.x = player.position.x;
+      disc.position.z = player.position.z;
+      disc.material.opacity = 0.15 + Math.sin(t * 3) * 0.06;
+
+      // Rim lights pulse
+      rimA.intensity = 1.0 + Math.sin(t * 1.3) * 0.3;
+      rimB.intensity = 0.7 + Math.cos(t * 0.9) * 0.2;
+
+      // Spawned objects rotate gently
+      spawned.forEach((o, i) => {
+        o.rotation.y += 0.025 * (i % 2 === 0 ? 1 : -1);
+        o.position.y = (o.userData.baseY || o.position.y) + Math.sin(t * 1.5 + i) * 0.15;
+        if (!o.userData.baseY) o.userData.baseY = o.position.y;
+      });
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
