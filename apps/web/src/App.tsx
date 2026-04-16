@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
+import { ThemeProvider } from "./lib/theme.tsx";
 import LoginPage from "./components/LoginPage.tsx";
 import Layout from "./components/Layout.tsx";
 import AdminDashboard from "./components/AdminDashboard.tsx";
@@ -19,16 +20,43 @@ import Achievements from "./components/Achievements.tsx";
 import ChatPanel from "./components/ChatPanel.tsx";
 import LessonsPage from "./components/LessonsPage.tsx";
 
+function AppLoader() {
+  return (
+    <div className="h-screen flex flex-col items-center justify-center gap-6 relative overflow-hidden" style={{ background: "var(--bg)" }}>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/3 -left-24 w-72 h-72 bg-violet-600/10 rounded-full blur-[80px] animate-pulse-slow" />
+        <div className="absolute bottom-1/3 -right-24 w-72 h-72 bg-indigo-600/10 rounded-full blur-[80px] animate-pulse-slow" style={{ animationDelay: "1.5s" }} />
+      </div>
+      {/* Logo with orbiting dot */}
+      <div className="relative animate-float">
+        <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-600/40">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+        </div>
+        <span className="absolute top-1/2 left-1/2 w-2.5 h-2.5 -mt-1.25 -ml-1.25 rounded-full bg-violet-400/70 shadow shadow-violet-400/50 animate-orbit pointer-events-none" />
+      </div>
+      <div className="flex flex-col items-center gap-2 animate-fade-in" style={{ animationDelay: "150ms" }}>
+        <span className="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-400">BlockForge</span>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce"
+              style={{ animationDelay: `${i * 140}ms` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0a0a1a] text-white">Loading...</div>;
+  if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function DashboardRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0a0a1a] text-white">Loading...</div>;
+  if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/playground" replace />;
   if (user.role === "admin") return <Navigate to="/admin" replace />;
   if (user.role === "teacher") return <Navigate to="/teacher" replace />;
@@ -42,6 +70,7 @@ function ProjectWorkspaceRoute() {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -75,5 +104,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
