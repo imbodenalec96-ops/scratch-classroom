@@ -105,10 +105,16 @@ export default function UnityStage() {
   const [copiedScript, setCopiedScript] = useState(false);
   const [showScript, setShowScript] = useState(false);
 
-  // Check whether the Unity build exists before showing the iframe
+  // Check whether a real Unity build exists (not just the SPA catch-all).
+  // Vercel rewrites all paths to index.html (200), so a HEAD check always
+  // succeeds. Instead, fetch the content and look for Unity-specific strings.
   useEffect(() => {
-    fetch(BUILD_PATH, { method: "HEAD" })
-      .then(r => setBuildFound(r.ok))
+    fetch(BUILD_PATH)
+      .then(r => r.text())
+      .then(text => {
+        const isUnity = text.includes("UnityLoader") || text.includes("unityInstance") || text.includes("UnityWebGL") || text.includes("createUnityInstance");
+        setBuildFound(isUnity);
+      })
       .catch(() => setBuildFound(false));
   }, []);
 
