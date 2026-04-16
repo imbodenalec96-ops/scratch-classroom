@@ -8,6 +8,7 @@ import { mkdirSync, existsSync } from "fs";
 
 dotenv.config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../.env") });
 
+import db from "./db.js";
 import { authMiddleware } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
 import classRoutes from "./routes/classes.js";
@@ -20,6 +21,13 @@ import chatRoutes from "./routes/chat.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import userRoutes from "./routes/users.js";
 import aiRoutes from "./routes/ai.js";
+import studentRoutes from "./routes/students.js";
+import taskRoutes from "./routes/tasks.js";
+import breakRoutes from "./routes/breaks.js";
+import worksheetRoutes from "./routes/worksheets.js";
+import youtubeRoutes from "./routes/youtube.js";
+import adminSettingsRoutes from "./routes/admin-settings.js";
+import aiTasksRoutes from "./routes/ai-tasks.js";
 
 const app = express();
 
@@ -37,6 +45,19 @@ const upload = multer({ dest: uploadsDir });
 // Health check
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
+// Status endpoint (public, no auth)
+const startTime = Date.now();
+app.get("/api/status", async (_req, res) => {
+  try {
+    const studentCount = ((await db.prepare("SELECT COUNT(*) as n FROM students WHERE active=1").get()) as any).n;
+    const worksheetCount = ((await db.prepare("SELECT COUNT(*) as n FROM worksheet_library").get()) as any).n;
+    const breaksToday = ((await db.prepare("SELECT COUNT(*) as n FROM break_log WHERE date=date('now')").get()) as any).n;
+    res.json({ ok: true, uptime: Math.floor((Date.now() - startTime) / 1000), studentCount, worksheetCount, breaksToday });
+  } catch {
+    res.json({ ok: true, uptime: Math.floor((Date.now() - startTime) / 1000) });
+  }
+});
+
 // Auth routes (no middleware)
 app.use("/api/auth", authRoutes);
 
@@ -51,6 +72,13 @@ app.use("/api/chat", authMiddleware, chatRoutes);
 app.use("/api/leaderboard", authMiddleware, leaderboardRoutes);
 app.use("/api/users", authMiddleware, userRoutes);
 app.use("/api/ai", authMiddleware, aiRoutes);
+app.use("/api/students", authMiddleware, studentRoutes);
+app.use("/api/tasks", authMiddleware, taskRoutes);
+app.use("/api/breaks", authMiddleware, breakRoutes);
+app.use("/api/worksheets", authMiddleware, worksheetRoutes);
+app.use("/api/youtube", authMiddleware, youtubeRoutes);
+app.use("/api/admin-settings", authMiddleware, adminSettingsRoutes);
+app.use("/api/ai-tasks", authMiddleware, aiTasksRoutes);
 
 // File upload endpoint
 app.post("/api/upload", authMiddleware, upload.single("file"), (req, res) => {

@@ -1,0 +1,70 @@
+import { Router, Request, Response } from "express";
+import db from "../db.js";
+import { AuthRequest } from "../middleware/auth.js";
+
+const router = Router();
+
+// GET / — return all settings as a flat object
+router.get("/", async (_req: AuthRequest, res: Response) => {
+  try {
+    const rows = await db.prepare("SELECT key, value FROM admin_settings").all() as { key: string; value: string }[];
+    const settings: Record<string, string> = {};
+    for (const row of rows) {
+      settings[row.key] = row.value;
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get admin settings" });
+  }
+});
+
+// PUT / — upsert multiple settings from body object
+router.put("/", async (req: AuthRequest, res: Response) => {
+  try {
+    const body = req.body as Record<string, string>;
+    for (const [key, value] of Object.entries(body)) {
+      await db
+        .prepare("INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)")
+        .run(key, String(value));
+    }
+
+    const rows = await db.prepare("SELECT key, value FROM admin_settings").all() as { key: string; value: string }[];
+    const settings: Record<string, string> = {};
+    for (const row of rows) {
+      settings[row.key] = row.value;
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update admin settings" });
+  }
+});
+
+// GET /check-pin?pin=XXXX — compare to remote_access_pin
+router.get("/check-pin", async (req: Request, res: Response) => {
+  try {
+    const { pin } = req.query;
+    const row = await db
+      .prepare("SELECT value FROM admin_settings WHERE key='remote_access_pin'")
+      .get() as { value: string } | undefined;
+    const valid = row ? row.value === String(pin) : false;
+    res.json({ valid });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to check pin" });
+  }
+});
+
+// POST /check-password — compare to teacher_password
+router.post("/check-password", async (req: Request, res: Response) => {
+  try {
+    const { password } = req.body as { password: string };
+    const row = await db
+      .prepare("SELECT value FROM admin_settings WHERE key='teacher_password'")
+      .get() as { value: string } | undefined;
+    const valid = row ? row.value === password : false;
+    res.json({ valid });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to check password" });
+  }
+});
+
+export default router;

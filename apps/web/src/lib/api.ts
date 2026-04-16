@@ -113,4 +113,61 @@ export const api = {
 
   // Student: get my controls for a class (lock status etc.)
   getMyControls: (classId: string) => request<any>(`/classes/${classId}/my-controls`),
+
+  // Student management
+  getStudentsKiosk: () => request<any[]>('/students'),
+  getStudent: (id: string) => request<any>(`/students/${id}`),
+  createStudent: (data: any) => request<any>('/students', { method: 'POST', body: JSON.stringify(data) }),
+  updateStudent: (id: string, data: any) => request<any>(`/students/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStudent: (id: string) => request<any>(`/students/${id}`, { method: 'DELETE' }),
+  setSkipWorkDay: (id: string) => request<any>(`/students/${id}/skip-work-day`, { method: 'POST' }),
+  clearSkipWorkDay: (id: string) => request<any>(`/students/${id}/skip-work-day`, { method: 'DELETE' }),
+
+  // Tasks
+  getStudentTasks: (studentId: string, date: string) => request<any[]>(`/tasks/${studentId}/${date}`),
+  createTask: (data: any) => request<any>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
+  submitTaskAnswer: (id: string, answer: string) => request<any>(`/tasks/${id}/answer`, { method: 'PUT', body: JSON.stringify({ student_answer: answer }) }),
+  gradeTask: (id: string, data: any) => request<any>(`/tasks/${id}/grade`, { method: 'PUT', body: JSON.stringify(data) }),
+  regenerateTasks: (studentId: string, date: string) => request<any>(`/tasks/student/${studentId}/date/${date}`, { method: 'DELETE' }),
+
+  // Breaks
+  getBreakConfig: () => request<any>('/breaks/config'),
+  updateBreakConfig: (data: any) => request<any>('/breaks/config', { method: 'PUT', body: JSON.stringify(data) }),
+  getBreakGames: () => request<any[]>('/breaks/games'),
+  setBreakGames: (games: any[]) => request<any>('/breaks/games', { method: 'PUT', body: JSON.stringify({ games }) }),
+  logBreak: (data: any) => request<any>('/breaks/log', { method: 'POST', body: JSON.stringify(data) }),
+  getBreakLog: (params?: string) => request<any[]>(`/breaks/log${params ? '?' + params : ''}`),
+
+  // Worksheets
+  getWorksheetLibrary: (params?: string) => request<any[]>(`/worksheets/library${params ? '?' + params : ''}`),
+  addWorksheetToLibrary: (data: any) => request<any>('/worksheets/library', { method: 'POST', body: JSON.stringify(data) }),
+  deleteWorksheetFromLibrary: (id: string) => request<any>(`/worksheets/library/${id}`, { method: 'DELETE' }),
+  getWorksheetAssignments: (params?: string) => request<any[]>(`/worksheets/assignments${params ? '?' + params : ''}`),
+  assignWorksheet: (data: any) => request<any>('/worksheets/assignments', { method: 'POST', body: JSON.stringify(data) }),
+  completeWorksheet: (id: string) => request<any>(`/worksheets/assignments/${id}/complete`, { method: 'PUT' }),
+  deleteWorksheetAssignment: (id: string) => request<any>(`/worksheets/assignments/${id}`, { method: 'DELETE' }),
+
+  // YouTube
+  getYouTubeRequests: (status?: string) => request<any[]>(`/youtube/requests${status ? '?status=' + status : ''}`),
+  createYouTubeRequest: (data: any) => request<any>('/youtube/requests', { method: 'POST', body: JSON.stringify(data) }),
+  approveYouTubeRequest: (id: string, note?: string) => request<any>(`/youtube/requests/${id}/approve`, { method: 'PUT', body: JSON.stringify({ teacher_note: note }) }),
+  denyYouTubeRequest: (id: string, note?: string) => request<any>(`/youtube/requests/${id}/deny`, { method: 'PUT', body: JSON.stringify({ teacher_note: note }) }),
+  getApprovedURLs: () => request<any[]>('/youtube/approved'),
+  addApprovedURL: (data: any) => request<any>('/youtube/approved', { method: 'POST', body: JSON.stringify(data) }),
+  removeApprovedURL: (id: string) => request<any>(`/youtube/approved/${id}`, { method: 'DELETE' }),
+
+  // Admin settings
+  getAdminSettings: () => request<any>('/admin-settings'),
+  updateAdminSettings: (data: any) => request<any>('/admin-settings', { method: 'PUT', body: JSON.stringify(data) }),
+  checkAdminPin: (pin: string) => request<any>(`/admin-settings/check-pin?pin=${encodeURIComponent(pin)}`),
+  checkAdminPassword: (password: string) => request<any>('/admin-settings/check-password', { method: 'POST', body: JSON.stringify({ password }) }),
+
+  // AI Tasks (Step 6)
+  generateTasks: (data: { student_id: string; date: string; subject: string; grade_min: number; grade_max: number }) =>
+    request<any[]>('/ai-tasks/generate', { method: 'POST', body: JSON.stringify(data) }),
+  worksheetSearch: (query: string, grade_min: number, grade_max: number) =>
+    request<any[]>('/ai-tasks/worksheet-search', { method: 'POST', body: JSON.stringify({ query, grade_min, grade_max }) }),
+  getTaskConfig: () => request<any[]>('/ai-tasks/task-config'),
+  updateTaskConfig: (subject: string, base_count: number) =>
+    request<any>(`/ai-tasks/task-config/${subject}`, { method: 'PUT', body: JSON.stringify({ base_count }) }),
 };
