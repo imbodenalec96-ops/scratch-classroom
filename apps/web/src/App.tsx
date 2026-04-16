@@ -19,6 +19,7 @@ import Leaderboard from "./components/Leaderboard.tsx";
 import Achievements from "./components/Achievements.tsx";
 import ChatPanel from "./components/ChatPanel.tsx";
 import LessonsPage from "./components/LessonsPage.tsx";
+import ArcadePage from "./components/ArcadePage.tsx";
 
 function AppLoader() {
   return (
@@ -92,6 +93,7 @@ export default function App() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="achievements" element={<Achievements />} />
             <Route path="lessons" element={<LessonsPage />} />
+            <Route path="arcade" element={<ArcadePage />} />
           </Route>
 
           {/* Full-screen project workspace (no sidebar) */}

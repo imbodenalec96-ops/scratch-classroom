@@ -5,7 +5,7 @@ import { useTheme } from "../lib/theme.tsx";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
-  Sun, Moon, LogOut, Layers,
+  Sun, Moon, LogOut, Layers, Gamepad2,
 } from "lucide-react";
 
 export default function Layout() {
@@ -115,6 +115,7 @@ function getNavItems(role: string) {
     { path: "/",           icon: LayoutDashboard, label: "Dashboard"   },
     { path: "/projects",   icon: FolderOpen,      label: "Projects"    },
     { path: "/lessons",    icon: BookOpen,        label: "Lessons"     },
+    { path: "/arcade",     icon: Gamepad2,        label: "Arcade"      },
   ];
   if (role === "admin") {
     return [...common,
