@@ -371,7 +371,7 @@ function BlockLabel({
                 );
               }}
               onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="inline-block w-14 px-1.5 py-0.5 mx-0.5 rounded-md bg-black/25 text-white text-[12px] text-center border border-white/10 outline-none focus:bg-black/35 focus:ring-1 focus:ring-white/40 font-semibold"
             />
           );
@@ -728,11 +728,18 @@ function DraggableStack({
     onMove(rootBlock.id, next.x, next.y);
   }, [onMove, rootBlock.id]);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  // Active pen pointerId for palm rejection on the workspace
+  const activePenRef = useRef<number | null>(null);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT") return;
+      // Palm rejection: ignore touch if a pen is active
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (e.pointerType === "pen") activePenRef.current = e.pointerId;
       e.stopPropagation();
       e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       setDragging(true);
       const workspace = workspaceRef.current;
       if (!workspace) return;
@@ -747,7 +754,8 @@ function DraggableStack({
         y: e.clientY - (rect.top + scrollT + baseY),
       };
 
-      const handleMove = (me: MouseEvent) => {
+      const handleMove = (me: PointerEvent) => {
+        if (e.pointerType === "touch" && activePenRef.current !== null) return;
         const ws = workspaceRef.current;
         if (!ws) return;
         const wsRect = ws.getBoundingClientRect();
@@ -758,7 +766,9 @@ function DraggableStack({
           rafRef.current = window.requestAnimationFrame(flushMove);
         }
       };
-      const handleUp = () => {
+      const handleUp = (me: PointerEvent) => {
+        if (me.pointerId !== e.pointerId) return;
+        if (e.pointerType === "pen") activePenRef.current = null;
         if (rafRef.current != null) {
           window.cancelAnimationFrame(rafRef.current);
           rafRef.current = null;
@@ -768,11 +778,13 @@ function DraggableStack({
         }
         setDragging(false);
         onMoveEnd(rootBlock.id);
-        document.removeEventListener("mousemove", handleMove);
-        document.removeEventListener("mouseup", handleUp);
+        document.removeEventListener("pointermove", handleMove);
+        document.removeEventListener("pointerup", handleUp);
+        document.removeEventListener("pointercancel", handleUp);
       };
-      document.addEventListener("mousemove", handleMove);
-      document.addEventListener("mouseup", handleUp);
+      document.addEventListener("pointermove", handleMove);
+      document.addEventListener("pointerup", handleUp);
+      document.addEventListener("pointercancel", handleUp);
     },
     [rootBlock.id, currentX, currentY, onMove, onMoveEnd, workspaceRef, flushMove]
   );
@@ -797,8 +809,11 @@ function DraggableStack({
         cursor: dragging ? "grabbing" : "grab",
         filter: isDragTarget ? "brightness(1.15)" : undefined,
         willChange: dragging ? "left, top" : undefined,
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none" as React.CSSProperties["WebkitUserSelect"],
       }}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <BlockStack
         blockId={rootBlock.id}
@@ -855,6 +870,7 @@ function PaletteBlock({
         draggable
         onDragStart={(e) => onDragStart(e, def)}
         className="cursor-grab active:cursor-grabbing hover:brightness-110"
+        style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
       >
         {renderBlockBody(def, <BlockLabel def={def} isPalette />)}
       </div>

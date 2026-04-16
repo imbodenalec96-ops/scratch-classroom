@@ -7,6 +7,9 @@ import MemoryGame from "./games/MemoryGame.tsx";
 import ColorCatcher from "./games/ColorCatcher.tsx";
 import BrickBreaker from "./games/BrickBreaker.tsx";
 import UnityGame from "./games/UnityGame.tsx";
+import WhackAMole from "./games/WhackAMole.tsx";
+import FlappyBird from "./games/FlappyBird.tsx";
+import SpaceShooter from "./games/SpaceShooter.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -113,18 +116,66 @@ const GAMES: Game[] = [
     hint: "The full editor",
   },
   {
-    id: "unity-sandbox",
-    title: "Unity Sandbox",
-    description: "Drop any Unity WebGL build into /public/unity-games/ and it plays here. First Unity slot — coming soon!",
+    id: "fps-microgame",
+    title: "FPS Microgame",
+    description: "Neon sci-fi first-person shooter. Survive 3 waves of humanoid enemies. Click to aim, WASD to move, R to reload!",
     category: "Unity",
     stars: 5,
-    plays: "soon",
+    plays: "NEW",
+    accentColor: "#ef4444",
+    emoji: "🔫",
+    type: "unity",
+    embedUrl: "/unity-games/fps-microgame/index.html",
+    hint: "Click to start · WASD · Mouse look · Click to shoot · R reload",
+  },
+  {
+    id: "unity-sandbox",
+    title: "BlockForge 3D Stage",
+    description: "The full Unity 3D stage — move your character, spawn objects, add enemies and collectibles with blocks.",
+    category: "Unity",
+    stars: 5,
+    plays: "∞",
     accentColor: "#22d3ee",
     emoji: "🎮",
     type: "unity",
-    // embedUrl: "/unity-games/your-game/index.html",   ← uncomment when you add a build
-    comingSoon: true,
-    hint: "Unity WebGL",
+    embedUrl: "/unity-games/blockforge-stage/index.html",
+    hint: "WASD to move · Space to jump",
+  },
+  {
+    id: "whackamole",
+    title: "Whack-a-Mole",
+    description: "Moles pop up — whack them fast! 30 seconds on the clock. Can you beat your own score?",
+    category: "Action",
+    stars: 4,
+    plays: "3K",
+    accentColor: "#84cc16",
+    emoji: "🐹",
+    component: WhackAMole,
+    hint: "Tap / click the moles",
+  },
+  {
+    id: "flappy",
+    title: "Flappy Bird",
+    description: "Tap to flap through the pipes. One touch is all it takes — and one mistake ends it all!",
+    category: "Action",
+    stars: 5,
+    plays: "20K",
+    accentColor: "#facc15",
+    emoji: "🐦",
+    component: FlappyBird,
+    hint: "Tap / click to flap",
+  },
+  {
+    id: "spaceshooter",
+    title: "Space Shooter",
+    description: "Pilot your ship against waves of alien fighters. Move to dodge, auto-fire to survive!",
+    category: "Action",
+    stars: 5,
+    plays: "12K",
+    accentColor: "#38bdf8",
+    emoji: "🚀",
+    component: SpaceShooter,
+    hint: "Arrow keys / WASD · drag on mobile",
   },
 ];
 
@@ -318,14 +369,15 @@ function PlayerModal({ game, onClose }: { game: Game; onClose: () => void }) {
           </div>
           <button
             onClick={close}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-150"
+            className="rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-150"
+            style={{ minWidth: 44, minHeight: 44 }}
           >
             <X size={15} />
           </button>
         </div>
 
         {/* Game area */}
-        <div className="flex-1 overflow-auto" style={{ minHeight: 380 }}>
+        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain" }}>
           {game.comingSoon ? (
             /* Coming-soon slot — Unity placeholder */
             <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
@@ -510,11 +562,13 @@ export default function ArcadePage() {
                 className={active ? "animate-arcade-chip" : ""}
                 style={{
                   display: "flex", alignItems: "center", gap: 5,
-                  padding: "6px 14px",
+                  padding: "10px 14px",
+                  minHeight: 44,
                   borderRadius: 12,
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: "pointer",
+                  touchAction: "manipulation",
                   transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
                   background: active ? "#8b5cf6" : dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)",
                   color: active ? "white" : dk ? "rgba(255,255,255,0.45)" : "#777",

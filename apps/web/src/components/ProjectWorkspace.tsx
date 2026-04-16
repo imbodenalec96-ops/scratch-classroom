@@ -23,6 +23,8 @@ import { createDefaultGameData } from "../lib/game/engine.ts";
 import type { EnvironmentPreset, GameTemplate, UnityTemplate } from "../lib/game/templates.ts";
 import type { GameProjectData } from "../lib/game/types.ts";
 import { getBlockDef } from "../lib/blockDefinitions.ts";
+import { createRuntime, startGreenFlag, stepRuntime, stopRuntime } from "../lib/runtime.ts";
+import type { RuntimeEngine } from "../lib/runtime.ts";
 
 interface Props {
   projectId?: string;
@@ -530,6 +532,8 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
   const [stage, setStage] = useState<StageSettings>(DEFAULT_STAGE);
   const [mode, setMode] = useState<ProjectMode>("2d");
   const [running, setRunning] = useState(false);
+  const unityEngineRef = useRef<RuntimeEngine | null>(null);
+  const unityRafRef = useRef(0);
   const [shaking, setShaking] = useState(false);
   const [viewMode, setViewMode] = useState<"blocks" | "js">("blocks");
   const [showAssets, setShowAssets] = useState(false);
@@ -763,6 +767,46 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
     });
     setDirty(true);
   }, [selectedSpriteId]);
+
+  /* ── Unity mode runtime engine ──
+     When mode=unity and running=true, run the block engine so unity_ blocks
+     fire their unityBridge() calls into the stage iframe.
+  ── */
+  useEffect(() => {
+    if (mode !== "unity") return;
+    if (!running) {
+      // Stop engine when user hits stop
+      cancelAnimationFrame(unityRafRef.current);
+      if (unityEngineRef.current) {
+        stopRuntime(unityEngineRef.current);
+        unityEngineRef.current = null;
+      }
+      return;
+    }
+
+    const engine = createRuntime(sprites, 480, 360);
+    unityEngineRef.current = engine;
+    startGreenFlag(engine, sprites);
+
+    let lastTs = 0;
+    const tick = (ts: number) => {
+      const dt = Math.min((ts - lastTs) / 1000, 0.05);
+      lastTs = ts;
+      if (engine.running) {
+        stepRuntime(engine, sprites, dt);
+        unityRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    unityRafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(unityRafRef.current);
+      stopRuntime(engine);
+      unityEngineRef.current = null;
+    };
+  // sprites changes should not restart the engine mid-run; only running/mode transitions matter
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, running]);
 
   const handleApplyUnityTemplate = useCallback((template: UnityTemplate) => {
     setMode("unity");

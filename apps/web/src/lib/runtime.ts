@@ -2927,6 +2927,22 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
         case "unity_confetti": { unityBridge("Confetti",{}); thread.pc++; break; }
         case "unity_reset": { unityBridge("Reset",{}); thread.pc++; break; }
 
+        /* ══════════════ Unity 3D — Level Design ══════════════ */
+        case "unity_addcheckpoint": { unityBridge("AddCheckpoint",{x:getNum(block,"X",5),z:getNum(block,"Z",0)}); thread.pc++; break; }
+        case "unity_addtrap": { unityBridge("AddTrap",{x:getNum(block,"X",3),z:getNum(block,"Z",3),damage:getNum(block,"DMG",10)}); thread.pc++; break; }
+        case "unity_addboss": { unityBridge("AddBoss",{x:getNum(block,"X",0),z:getNum(block,"Z",8),hp:getNum(block,"HP",200)}); thread.pc++; break; }
+        case "unity_setwind": { unityBridge("SetWind",{x:getNum(block,"X",0),z:getNum(block,"Z",2)}); thread.pc++; break; }
+        case "unity_setfogcolor": { unityBridge("SetFogColor",{color:getStr(block,"COLOR","#334155")}); thread.pc++; break; }
+        case "unity_setsuncolor": { unityBridge("SetSunColor",{color:getStr(block,"COLOR","#fef9c3")}); thread.pc++; break; }
+        case "unity_freeze": { unityBridge("Freeze",{}); thread.pc++; break; }
+        case "unity_unfreeze": { unityBridge("Unfreeze",{}); thread.pc++; break; }
+        case "unity_setmessage": { unityBridge("SetMessage",{text:getStr(block,"TEXT","Collect all coins!")}); thread.pc++; break; }
+        case "unity_setlevel": { unityBridge("SetLevel",{num:getNum(block,"NUM",1)}); thread.pc++; break; }
+        case "unity_nextlevel": { unityBridge("NextLevel",{}); thread.pc++; break; }
+        case "unity_spawn_bullet": { unityBridge("SpawnBullet",{speed:getNum(block,"SPEED",15)}); thread.pc++; break; }
+        case "unity_addlight": { unityBridge("AddLight",{color:getStr(block,"COLOR","#ffffff"),x:getNum(block,"X",0),y:getNum(block,"Y",4),z:getNum(block,"Z",0)}); thread.pc++; break; }
+        case "unity_slowmotion": { unityBridge("SlowMotion",{factor:getNum(block,"FACTOR",0.5)}); thread.pc++; break; }
+
         default:
           thread.pc++;
           break;

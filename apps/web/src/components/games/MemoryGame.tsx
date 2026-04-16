@@ -85,7 +85,7 @@ export default function MemoryGame() {
             key={card.id}
             onClick={() => flip(i)}
             className="relative cursor-pointer"
-            style={{ width: 60, height: 60, perspective: 400, animationDelay: `${i * 30}ms` }}
+            style={{ width: 60, height: 60, minWidth: 44, minHeight: 44, perspective: 400, animationDelay: `${i * 30}ms`, touchAction: "manipulation" }}
           >
             <div
               style={{
@@ -132,7 +132,7 @@ export default function MemoryGame() {
             <div className="text-5xl mb-3">🎉</div>
             <div className="text-white font-extrabold text-2xl mb-1">You won!</div>
             <div className="text-yellow-400 font-bold text-xl mb-4">{moves} moves</div>
-            <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors">Play Again</button>
+            <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors" style={{ minHeight: 44, minWidth: 44 }}>Play Again</button>
           </div>
         </div>
       )}

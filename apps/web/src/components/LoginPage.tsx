@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { Layers, Sun, Moon, ArrowRight, Zap } from "lucide-react";
+import { Layers, Sun, Moon, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
   const { user, login, register } = useAuth();
@@ -49,11 +49,6 @@ function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEm
   const { theme, toggleTheme } = useTheme();
   const dk = theme === "dark";
 
-  const DEMOS = [
-    { email: "admin@school.edu",    label: "Admin",   accent: "from-amber-500 to-orange-500",   bg: "bg-amber-500/10",   text: "text-amber-400"   },
-    { email: "teacher@school.edu",  label: "Teacher", accent: "from-cyan-500 to-blue-500",      bg: "bg-cyan-500/10",    text: "text-cyan-400"    },
-    { email: "student1@school.edu", label: "Student", accent: "from-emerald-500 to-green-500",  bg: "bg-emerald-500/10", text: "text-emerald-400" },
-  ];
 
   return (
     <div className={`min-h-screen flex ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`}>
@@ -225,35 +220,6 @@ function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEm
             </button>
           </form>
 
-          {/* Demo accounts */}
-          <div className={`mt-6 pt-5 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Zap size={12} className={dk ? "text-white/25" : "text-gray-300"} />
-              <p className={`text-xs ${dk ? "text-white/30" : "text-gray-400"}`}>Quick demo access</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {DEMOS.map((d) => (
-                <button
-                  key={d.email}
-                  onClick={async () => {
-                    setError("");
-                    setLoading(true);
-                    try { await login(d.email, "password123"); }
-                    catch (err: any) { setError(err.message); }
-                    setLoading(false);
-                  }}
-                  className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
-                    dk
-                      ? `${d.bg} border-white/[0.06] ${d.text} hover:border-white/[0.12]`
-                      : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${dk ? d.text : "text-gray-600"}`}>{d.label[0]}</span>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <a
             href="/playground"

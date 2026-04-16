@@ -36,6 +36,10 @@ export default function PongGame() {
   const [started, setStarted] = useState(false);
   const rafRef = useRef(0);
 
+  // Touch/pointer tracking for paddle drag
+  const activePenRef = useRef<number | null>(null); // pointerId when pencil is active
+  const touchYRef = useRef<number | null>(null);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -84,9 +88,20 @@ export default function PongGame() {
     if (!s.started || s.paused) return;
     const keys = keysRef.current;
 
-    // P1 controls: W/S
+    // P1 controls: W/S or touch Y
     if (keys.has("w") || keys.has("W") || keys.has("ArrowUp")) s.p1y = Math.max(0, s.p1y - PADDLE_SPEED);
     if (keys.has("s") || keys.has("S") || keys.has("ArrowDown")) s.p1y = Math.min(H - PADDLE_H, s.p1y + PADDLE_SPEED);
+
+    // Touch/pointer drag: move p1 paddle to finger Y position
+    if (touchYRef.current !== null) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleY = H / rect.height;
+        const canvasY = (touchYRef.current - rect.top) * scaleY;
+        s.p1y = Math.max(0, Math.min(H - PADDLE_H, canvasY - PADDLE_H / 2));
+      }
+    }
 
     // P2 AI (follows ball with slight lag)
     const p2center = s.p2y + PADDLE_H / 2;
@@ -149,10 +164,74 @@ export default function PongGame() {
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); cancelAnimationFrame(rafRef.current); };
+
+    // Pointer events for canvas (touch + pencil)
+    const canvas = canvasRef.current;
+    if (!canvas) return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); cancelAnimationFrame(rafRef.current); };
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Palm rejection: if pen is active, ignore touch
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (e.pointerType === "pen") activePenRef.current = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      touchYRef.current = e.clientY;
+      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (touchYRef.current !== null) touchYRef.current = e.clientY;
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "pen") activePenRef.current = null;
+      touchYRef.current = null;
+    };
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      cancelAnimationFrame(rafRef.current);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+    };
   }, [update, draw]);
 
   const startGame = () => { stateRef.current.started = true; stateRef.current.paused = false; setStarted(true); };
+
+  // On-screen paddle buttons
+  const upPressed = useRef(false);
+  const downPressed = useRef(false);
+
+  const onBtnPointerDown = (dir: "up" | "down") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (dir === "up") { keysRef.current.add("ArrowUp"); upPressed.current = true; }
+    else { keysRef.current.add("ArrowDown"); downPressed.current = true; }
+    if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
+  };
+  const onBtnPointerUp = (dir: "up" | "down") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (dir === "up") { keysRef.current.delete("ArrowUp"); upPressed.current = false; }
+    else { keysRef.current.delete("ArrowDown"); downPressed.current = false; }
+  };
+
+  const btnStyle: React.CSSProperties = {
+    width: 52, height: 52,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 12,
+    background: "rgba(167,139,250,0.18)",
+    border: "1px solid rgba(167,139,250,0.35)",
+    color: "white",
+    fontSize: 22,
+    cursor: "pointer",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    touchAction: "none",
+  };
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-3 select-none" style={{ background: "#07071a" }}>
@@ -160,19 +239,53 @@ export default function PongGame() {
         <span className="text-xs text-violet-400 font-bold">🏓 Pong</span>
         <span className="text-xs text-white/50">You <span className="text-violet-400 font-bold">{scores.s1}</span> — <span className="text-green-400 font-bold">{scores.s2}</span> AI</span>
       </div>
-      <div className="relative">
-        <canvas ref={canvasRef} width={W} height={H} style={{ borderRadius: 12, border: "1px solid rgba(139,92,246,0.25)", display: "block", maxWidth: "100%" }} />
-        {!started && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style={{ background: "rgba(7,7,26,0.88)" }}>
-            <div className="text-4xl mb-2">🏓</div>
-            <div className="text-white font-bold text-xl mb-1">Pong</div>
-            <div className="text-white/50 text-sm mb-1">W/S or ↑/↓ to move paddle</div>
-            <div className="text-white/30 text-xs mb-4">You are the left paddle</div>
-            <button onClick={startGame} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Start Game</button>
-          </div>
-        )}
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            width={W}
+            height={H}
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(139,92,246,0.25)",
+              display: "block",
+              maxWidth: "100%",
+              touchAction: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+            }}
+          />
+          {!started && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style={{ background: "rgba(7,7,26,0.88)" }}>
+              <div className="text-4xl mb-2">🏓</div>
+              <div className="text-white font-bold text-xl mb-1">Pong</div>
+              <div className="text-white/50 text-sm mb-1">W/S or ↑/↓ or drag on canvas</div>
+              <div className="text-white/30 text-xs mb-4">You are the left paddle</div>
+              <button onClick={startGame} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors" style={{ minHeight: 44, minWidth: 44 }}>Start Game</button>
+            </div>
+          )}
+        </div>
+        {/* On-screen up/down buttons for thumb play */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <button
+            style={btnStyle}
+            onPointerDown={onBtnPointerDown("up")}
+            onPointerUp={onBtnPointerUp("up")}
+            onPointerLeave={onBtnPointerUp("up")}
+            onPointerCancel={onBtnPointerUp("up")}
+            aria-label="Move paddle up"
+          >▲</button>
+          <button
+            style={btnStyle}
+            onPointerDown={onBtnPointerDown("down")}
+            onPointerUp={onBtnPointerUp("down")}
+            onPointerLeave={onBtnPointerUp("down")}
+            onPointerCancel={onBtnPointerUp("down")}
+            aria-label="Move paddle down"
+          >▼</button>
+        </div>
       </div>
-      <div className="text-xs text-white/30">W/S or Arrow keys • vs AI</div>
+      <div className="text-xs text-white/30">W/S or Arrow keys or drag canvas • vs AI</div>
     </div>
   );
 }

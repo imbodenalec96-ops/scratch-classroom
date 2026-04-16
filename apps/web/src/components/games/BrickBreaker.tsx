@@ -47,13 +47,16 @@ export default function BrickBreaker() {
     score: 0, lives: 3, alive: true, started: false, paused: false,
   });
   const keysRef = useRef<Set<string>>(new Set());
-  const mouseXRef = useRef<number | null>(null);
+  const pointerXRef = useRef<number | null>(null);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [dead, setDead] = useState(false);
   const [won, setWon] = useState(false);
   const [started, setStarted] = useState(false);
   const rafRef = useRef(0);
+
+  // Apple Pencil palm rejection
+  const activePenRef = useRef<number | null>(null);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -113,10 +116,11 @@ export default function BrickBreaker() {
     const s = stateRef.current;
     if (!s.alive || !s.started || s.paused) return;
 
-    // Paddle
+    // Keyboard
     if (keysRef.current.has("ArrowLeft") || keysRef.current.has("a")) s.paddleX = Math.max(PADDLE_W / 2, s.paddleX - 6);
     if (keysRef.current.has("ArrowRight") || keysRef.current.has("d")) s.paddleX = Math.min(W - PADDLE_W / 2, s.paddleX + 6);
-    if (mouseXRef.current !== null) s.paddleX = Math.max(PADDLE_W / 2, Math.min(W - PADDLE_W / 2, mouseXRef.current));
+    // Pointer (touch / mouse / pencil)
+    if (pointerXRef.current !== null) s.paddleX = Math.max(PADDLE_W / 2, Math.min(W - PADDLE_W / 2, pointerXRef.current));
 
     const ball = s.ball;
     ball.x += ball.vx; ball.y += ball.vy;
@@ -177,22 +181,41 @@ export default function BrickBreaker() {
       if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
     };
     const onKeyUp = (e: KeyboardEvent) => keysRef.current.delete(e.key);
-    const onMouse = (e: MouseEvent) => {
-      const canvas = canvasRef.current; if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      mouseXRef.current = (e.clientX - rect.left) * (W / rect.width);
-      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
-    };
-    const onTouch = (e: TouchEvent) => {
-      const canvas = canvasRef.current; if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      mouseXRef.current = (e.touches[0].clientX - rect.left) * (W / rect.width);
-      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
-    };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("mousemove", onMouse);
-    window.addEventListener("touchmove", onTouch, { passive: true });
+
+    // Pointer events (replaces mousemove + touchmove)
+    const canvas = canvasRef.current;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!canvas) return;
+      // Palm rejection
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (e.pointerType === "pen") activePenRef.current = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      pointerXRef.current = (e.clientX - rect.left) * (W / rect.width);
+      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!canvas) return;
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (pointerXRef.current !== null) {
+        const rect = canvas.getBoundingClientRect();
+        pointerXRef.current = (e.clientX - rect.left) * (W / rect.width);
+      }
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "pen") activePenRef.current = null;
+      pointerXRef.current = null;
+    };
+
+    if (canvas) {
+      canvas.addEventListener("pointerdown", onPointerDown);
+      canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerup", onPointerUp);
+      canvas.addEventListener("pointercancel", onPointerUp);
+    }
+
     let last = 0;
     const loop = (ts: number) => {
       if (ts - last > 16) { last = ts; update(); draw(); }
@@ -202,8 +225,12 @@ export default function BrickBreaker() {
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("mousemove", onMouse);
-      window.removeEventListener("touchmove", onTouch);
+      if (canvas) {
+        canvas.removeEventListener("pointerdown", onPointerDown);
+        canvas.removeEventListener("pointermove", onPointerMove);
+        canvas.removeEventListener("pointerup", onPointerUp);
+        canvas.removeEventListener("pointercancel", onPointerUp);
+      }
       cancelAnimationFrame(rafRef.current);
     };
   }, [update, draw]);
@@ -213,22 +240,69 @@ export default function BrickBreaker() {
     setScore(0); setLives(3); setDead(false); setWon(false); setStarted(false);
   };
 
+  // Left/right on-screen buttons
+  const leftPressed = useRef(false);
+  const rightPressed = useRef(false);
+
+  const onBtnPointerDown = (dir: "left" | "right") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (dir === "left") { keysRef.current.add("ArrowLeft"); leftPressed.current = true; }
+    else { keysRef.current.add("ArrowRight"); rightPressed.current = true; }
+    if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
+  };
+  const onBtnPointerUp = (dir: "left" | "right") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (dir === "left") { keysRef.current.delete("ArrowLeft"); leftPressed.current = false; }
+    else { keysRef.current.delete("ArrowRight"); rightPressed.current = false; }
+  };
+
+  const btnStyle: React.CSSProperties = {
+    minWidth: 60, minHeight: 52,
+    padding: "10px 18px",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 12,
+    background: "rgba(167,139,250,0.18)",
+    border: "1px solid rgba(167,139,250,0.35)",
+    color: "white",
+    fontSize: 22,
+    cursor: "pointer",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    touchAction: "none",
+  };
+
   return (
     <div className="flex flex-col items-center gap-2 h-full" style={{ background: "#07071a" }}>
       <div className="flex items-center justify-between w-full px-4 py-2">
         <span className="text-sm font-bold text-violet-400">🧱 Brick Breaker</span>
         <span className="text-sm text-white/60">Score: <span className="text-yellow-400 font-bold">{score}</span></span>
       </div>
-      <div className="relative">
-        <canvas ref={canvasRef} width={W} height={H}
-          style={{ borderRadius: 12, border: "1px solid rgba(139,92,246,0.25)", display: "block", maxWidth: "100%", cursor: "none" }} />
+      <div className="relative" style={{ overscrollBehavior: "contain" }}>
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(139,92,246,0.25)",
+            display: "block",
+            maxWidth: "100%",
+            cursor: "none",
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
+        />
         {!started && !dead && !won && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style={{ background: "rgba(7,7,26,0.88)" }}>
             <div className="text-4xl mb-2">🧱</div>
             <div className="text-white font-bold text-xl mb-1">Brick Breaker</div>
-            <div className="text-white/50 text-sm mb-4">Move mouse or ← → to control the paddle</div>
-            <button onClick={() => { stateRef.current.started = true; setStarted(true); }}
-              className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Launch Ball!</button>
+            <div className="text-white/50 text-sm mb-4">Touch/drag or ← → to control the paddle</div>
+            <button
+              onClick={() => { stateRef.current.started = true; setStarted(true); }}
+              className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors"
+              style={{ minHeight: 44 }}
+            >Launch Ball!</button>
           </div>
         )}
         {(dead || won) && (
@@ -236,11 +310,30 @@ export default function BrickBreaker() {
             <div className="text-4xl mb-2">{won ? "🎉" : "💥"}</div>
             <div className="text-white font-bold text-xl mb-1">{won ? "You cleared it!" : "Game Over!"}</div>
             <div className="text-yellow-400 font-bold text-2xl mb-3">Score: {score}</div>
-            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Play Again</button>
+            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors" style={{ minHeight: 44 }}>Play Again</button>
           </div>
         )}
       </div>
-      <div className="text-xs text-white/30 pb-2">Move mouse or ← → • Harder bricks need more hits</div>
+      {/* On-screen left/right buttons */}
+      <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+        <button
+          style={btnStyle}
+          onPointerDown={onBtnPointerDown("left")}
+          onPointerUp={onBtnPointerUp("left")}
+          onPointerLeave={onBtnPointerUp("left")}
+          onPointerCancel={onBtnPointerUp("left")}
+          aria-label="Move paddle left"
+        >◀</button>
+        <button
+          style={btnStyle}
+          onPointerDown={onBtnPointerDown("right")}
+          onPointerUp={onBtnPointerUp("right")}
+          onPointerLeave={onBtnPointerUp("right")}
+          onPointerCancel={onBtnPointerUp("right")}
+          aria-label="Move paddle right"
+        >▶</button>
+      </div>
+      <div className="text-xs text-white/30 pb-2">Touch/drag or ← → • Harder bricks need more hits</div>
     </div>
   );
 }

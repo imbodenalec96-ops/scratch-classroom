@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import UnityModelMaker from "./UnityModelMaker";
+import { getSocket } from "../lib/ws.ts";
 
 const BUILD_PATH = "/unity-games/blockforge-stage/index.html";
 
@@ -106,6 +107,9 @@ export default function UnityStage() {
   const [copiedScript, setCopiedScript] = useState(false);
   const [showScript, setShowScript] = useState(false);
   const [showModelMaker, setShowModelMaker] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [mpRoom, setMpRoom] = useState("global");
+  const stageRef = useRef<HTMLDivElement>(null);
 
   // Check whether a real Unity build exists (not just the SPA catch-all).
   // Vercel rewrites all paths to index.html (200), so a HEAD check always
@@ -120,20 +124,65 @@ export default function UnityStage() {
       .catch(() => setBuildFound(false));
   }, []);
 
-  // Register the global bridge so runtime.ts can call into Unity
+  // Register the global bridge so runtime.ts can call into Unity.
+  // Commands are queued if the iframe isn't ready yet and flushed on load.
   useEffect(() => {
+    const queue: Array<[string, string, string]> = [];
+
+    function trySend(objectName: string, method: string, param: string): boolean {
+      try {
+        const iwin = iframeRef.current?.contentWindow as any;
+        if (iwin?.unityInstance?.SendMessage) {
+          iwin.unityInstance.SendMessage(objectName, method, param);
+          return true;
+        }
+      } catch { /* cross-origin guard */ }
+      return false;
+    }
+
     window.__unityStage = {
       send: (objectName: string, method: string, param: string) => {
-        try {
-          const iwin = iframeRef.current?.contentWindow as any;
-          if (iwin?.unityInstance?.SendMessage) {
-            iwin.unityInstance.SendMessage(objectName, method, param);
-          }
-        } catch { /* cross-origin guard */ }
+        if (!trySend(objectName, method, param)) {
+          queue.push([objectName, method, param]);
+        }
       },
     };
-    return () => { delete window.__unityStage; };
+
+    // Flush the queue once iframe fires onLoad
+    const flushQueue = () => {
+      // Small delay so the iframe's JS fully initialises before we fire
+      setTimeout(() => {
+        while (queue.length > 0) {
+          const [o, m, p] = queue.shift()!;
+          trySend(o, m, p);
+        }
+      }, 300);
+    };
+
+    const iframe = iframeRef.current;
+    iframe?.addEventListener("load", flushQueue);
+    return () => {
+      iframe?.removeEventListener("load", flushQueue);
+      delete window.__unityStage;
+    };
   }, []);
+
+  const copyMpLink = () => {
+    try {
+      const iwin = iframeRef.current?.contentWindow as any;
+      const room = iwin?.__mpRoomCode || mpRoom;
+      const link = iwin?.__mpGetLink?.(room) ||
+        `${window.location.origin}/unity-games/blockforge-stage/index.html?room=${encodeURIComponent(room)}`;
+      navigator.clipboard.writeText(link).then(() => {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+      });
+    } catch { /* cross-origin */ }
+  };
+
+  const enterFullscreen = () => {
+    stageRef.current?.requestFullscreen?.().catch(() => {});
+  };
 
   const copyScript = () => {
     navigator.clipboard.writeText(CS_TEMPLATE).then(() => {
@@ -216,7 +265,8 @@ export default function UnityStage() {
   return (
     <>
     {showModelMaker && <UnityModelMaker onClose={() => setShowModelMaker(false)} />}
-    <div className="relative rounded-xl overflow-hidden flex flex-col" style={{ height: 360, background: "#07071a", border: "1px solid rgba(34,211,238,0.3)" }}>
+
+    <div ref={stageRef} className="relative rounded-xl overflow-hidden flex flex-col" style={{ height: 360, background: "#07071a", border: "1px solid rgba(34,211,238,0.3)" }}>
       {!loaded && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10" style={{ background: "#07071a" }}>
           <div className="text-3xl">🎮</div>
@@ -231,13 +281,37 @@ export default function UnityStage() {
       <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style={{ background: "rgba(34,211,238,0.08)", borderBottom: "1px solid rgba(34,211,238,0.12)" }}>
         <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" style={{ boxShadow: "0 0 6px #22d3ee" }} />
         <span className="text-[10px] font-bold" style={{ color: "#22d3ee" }}>Unity Stage — Live</span>
-        <button
-          onClick={() => setShowModelMaker(true)}
-          className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all"
-          style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}
-        >
-          🎨 Model Maker
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {loaded && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold"
+              style={{ background: "rgba(34,211,238,0.15)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.3)" }}>
+              👥 Room: {mpRoom}
+            </span>
+          )}
+          <button
+            onClick={copyMpLink}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all"
+            style={{ background: linkCopied ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.07)", color: linkCopied ? "#4ade80" : "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.1)" }}
+            title="Copy join link — share with classmates"
+          >
+            {linkCopied ? "✓ Copied!" : "🔗 Share Link"}
+          </button>
+          <button
+            onClick={() => setShowModelMaker(true)}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all"
+            style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}
+          >
+            🎨 Model Maker
+          </button>
+          <button
+            onClick={enterFullscreen}
+            className="flex items-center justify-center w-6 h-6 rounded text-[11px] transition-all"
+            style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.1)" }}
+            title="Fullscreen"
+          >
+            ⛶
+          </button>
+        </div>
       </div>
 
       <iframe
@@ -247,7 +321,29 @@ export default function UnityStage() {
         style={{ border: "none", opacity: loaded ? 1 : 0, transition: "opacity 0.4s ease" }}
         allow="autoplay; fullscreen; microphone; pointer-lock"
         sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+        setLoaded(true);
+        // Read the room the iframe auto-joined + notify teacher
+        setTimeout(() => {
+          try {
+            const iwin = iframeRef.current?.contentWindow as any;
+            const room = iwin?.__mpRoomCode;
+            if (room) {
+              setMpRoom(room);
+              // Tell teacher monitoring that this student is in Unity
+              try {
+                const stored = localStorage.getItem("user");
+                const u = stored ? JSON.parse(stored) : null;
+                getSocket().emit("unity:join", {
+                  room,
+                  userId:   u?.id   ?? "",
+                  userName: u?.name ?? "",
+                });
+              } catch { /* ignore */ }
+            }
+          } catch { /* cross-origin */ }
+        }, 800);
+      }}
         title="Unity Stage"
       />
     </div>

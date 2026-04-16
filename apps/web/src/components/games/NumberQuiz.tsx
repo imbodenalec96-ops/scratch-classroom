@@ -149,6 +149,8 @@ export default function NumberQuiz() {
                     background: bg, border: `1px solid ${border}`,
                     transform: isChosen ? "scale(0.97)" : "scale(1)",
                     cursor: chosen !== null ? "default" : "pointer",
+                    minHeight: 56,
+                    touchAction: "manipulation",
                   }}
                 >
                   {c}
@@ -165,7 +167,7 @@ export default function NumberQuiz() {
           </div>
           <div className="text-yellow-400 font-bold text-3xl mb-1">{score} pts</div>
           <div className="text-white/40 text-sm mb-6">out of {TOTAL} questions</div>
-          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors">Play Again</button>
+          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors" style={{ minHeight: 44, minWidth: 44 }}>Play Again</button>
         </div>
       )}
     </div>

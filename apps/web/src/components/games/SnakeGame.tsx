@@ -35,6 +35,11 @@ export default function SnakeGame() {
   const rafRef = useRef(0);
   const lastTickRef = useRef(0);
 
+  // Apple Pencil palm rejection
+  const activePenRef = useRef<number | null>(null);
+  // Swipe tracking
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,20 +116,55 @@ export default function SnakeGame() {
     rafRef.current = requestAnimationFrame(tick);
   }, [draw]);
 
+  function changeDir(nd: Dir) {
+    const s = stateRef.current;
+    const opp: Record<Dir, Dir> = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
+    if (nd !== opp[s.dir]) s.nextDir = nd;
+    if (!s.started) { s.started = true; setStarted(true); }
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const s = stateRef.current;
       const map: Record<string, Dir> = { ArrowUp: "UP", ArrowDown: "DOWN", ArrowLeft: "LEFT", ArrowRight: "RIGHT", w: "UP", s: "DOWN", a: "LEFT", d: "RIGHT" };
       const nd = map[e.key];
       if (!nd) return;
       e.preventDefault();
-      const opp: Record<Dir, Dir> = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
-      if (nd !== opp[s.dir]) s.nextDir = nd;
-      if (!s.started) { s.started = true; setStarted(true); }
+      changeDir(nd);
     };
     window.addEventListener("keydown", onKey);
     rafRef.current = requestAnimationFrame(tick);
-    return () => { window.removeEventListener("keydown", onKey); cancelAnimationFrame(rafRef.current); };
+
+    // Pointer events on canvas for swipe
+    const canvas = canvasRef.current;
+    if (!canvas) return () => { window.removeEventListener("keydown", onKey); cancelAnimationFrame(rafRef.current); };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (e.pointerType === "pen") activePenRef.current = e.pointerId;
+      touchStart.current = { x: e.clientX, y: e.clientY };
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "pen") activePenRef.current = null;
+      if (!touchStart.current) return;
+      const dx = e.clientX - touchStart.current.x;
+      const dy = e.clientY - touchStart.current.y;
+      touchStart.current = null;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; // tap, not swipe
+      const nd: Dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "RIGHT" : "LEFT") : (dy > 0 ? "DOWN" : "UP");
+      changeDir(nd);
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(rafRef.current);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+    };
   }, [tick]);
 
   const restart = () => {
@@ -135,18 +175,24 @@ export default function SnakeGame() {
     setScore(0); setDead(false); setStarted(false);
   };
 
-  // Touch controls
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart.current) return;
-    const dx = e.changedTouches[0].clientX - touchStart.current.x;
-    const dy = e.changedTouches[0].clientY - touchStart.current.y;
-    const s = stateRef.current;
-    const opp: Record<Dir, Dir> = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
-    let nd: Dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "RIGHT" : "LEFT") : (dy > 0 ? "DOWN" : "UP");
-    if (nd !== opp[s.dir]) s.nextDir = nd;
-    if (!s.started) { s.started = true; setStarted(true); }
+  // D-pad button style
+  const dpadBtnStyle: React.CSSProperties = {
+    width: 60, height: 60,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 14,
+    background: "rgba(139,92,246,0.18)",
+    border: "1px solid rgba(139,92,246,0.35)",
+    color: "white",
+    fontSize: 24,
+    cursor: "pointer",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    touchAction: "none",
+  };
+
+  const onDpad = (dir: Dir) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    changeDir(dir);
   };
 
   return (
@@ -155,14 +201,34 @@ export default function SnakeGame() {
         <div className="text-sm font-bold text-violet-400">🐍 Snake XL</div>
         <div className="text-sm font-bold text-white">Score: <span className="text-yellow-400">{score}</span></div>
       </div>
-      <div className="relative" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <canvas ref={canvasRef} width={W} height={H} style={{ borderRadius: 12, border: "1px solid rgba(139,92,246,0.3)", display: "block", maxWidth: "100%", touchAction: "none" }} />
+      <div
+        className="relative"
+        style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" as any }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(139,92,246,0.3)",
+            display: "block",
+            maxWidth: "100%",
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
+        />
         {!started && !dead && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style={{ background: "rgba(7,7,26,0.85)" }}>
             <div className="text-4xl mb-2">🐍</div>
             <div className="text-white font-bold text-lg mb-1">Snake XL</div>
-            <div className="text-white/50 text-sm">Arrow keys / WASD / swipe to move</div>
-            <button onClick={() => { stateRef.current.started = true; setStarted(true); }} className="mt-4 px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Start Game</button>
+            <div className="text-white/50 text-sm">Arrow keys / WASD / swipe / D-pad</div>
+            <button
+              onClick={() => { stateRef.current.started = true; setStarted(true); }}
+              className="mt-4 px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors"
+              style={{ minHeight: 44 }}
+            >Start Game</button>
           </div>
         )}
         {dead && (
@@ -170,11 +236,23 @@ export default function SnakeGame() {
             <div className="text-4xl mb-2">💀</div>
             <div className="text-white font-bold text-lg mb-1">Game Over!</div>
             <div className="text-yellow-400 font-bold text-2xl mb-3">Score: {score}</div>
-            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Play Again</button>
+            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors" style={{ minHeight: 44 }}>Play Again</button>
           </div>
         )}
       </div>
-      <div className="text-xs text-white/30 text-center">Arrow keys / WASD / Swipe to steer</div>
+
+      {/* D-pad for touch play */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: 4 }}>
+        <button style={dpadBtnStyle} onPointerDown={onDpad("UP")} aria-label="Up">▲</button>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button style={dpadBtnStyle} onPointerDown={onDpad("LEFT")} aria-label="Left">◀</button>
+          <div style={{ width: 60, height: 60 }} />
+          <button style={dpadBtnStyle} onPointerDown={onDpad("RIGHT")} aria-label="Right">▶</button>
+        </div>
+        <button style={dpadBtnStyle} onPointerDown={onDpad("DOWN")} aria-label="Down">▼</button>
+      </div>
+
+      <div className="text-xs text-white/30 text-center">Arrow keys / WASD / Swipe / D-pad to steer</div>
     </div>
   );
 }

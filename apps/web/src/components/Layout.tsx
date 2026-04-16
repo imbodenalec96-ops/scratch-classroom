@@ -2,6 +2,7 @@ import React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
+import VideoOverlay from "./VideoOverlay.tsx";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -127,6 +128,9 @@ export default function Layout() {
       <main className="flex-1 overflow-auto animate-page-enter min-w-0">
         <Outlet />
       </main>
+
+      {/* Video lockdown overlay for students */}
+      <VideoOverlay />
     </div>
   );
 }

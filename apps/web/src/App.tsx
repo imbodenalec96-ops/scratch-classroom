@@ -15,6 +15,7 @@ import QuizBuilder from "./components/QuizBuilder.tsx";
 import GradingPanel from "./components/GradingPanel.tsx";
 import AnalyticsPanel from "./components/AnalyticsPanel.tsx";
 import MonitorPanel from "./components/MonitorPanel.tsx";
+import MonitorPage from "./components/MonitorPage.tsx";
 import Leaderboard from "./components/Leaderboard.tsx";
 import Achievements from "./components/Achievements.tsx";
 import ChatPanel from "./components/ChatPanel.tsx";
@@ -91,7 +92,8 @@ export default function App() {
             <Route path="quizzes" element={<QuizBuilder />} />
             <Route path="grading" element={<GradingPanel />} />
             <Route path="analytics" element={<AnalyticsPanel />} />
-            <Route path="monitor" element={<MonitorPanel />} />
+            <Route path="monitor" element={<MonitorPage />} />
+            <Route path="monitor-legacy" element={<MonitorPanel />} />
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="achievements" element={<Achievements />} />
             <Route path="lessons" element={<LessonsPage />} />

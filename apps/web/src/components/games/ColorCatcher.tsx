@@ -60,8 +60,11 @@ export default function ColorCatcher() {
   const [dead, setDead] = useState(false);
   const [started, setStarted] = useState(false);
   const rafRef = useRef(0);
-  const mouseRef = useRef<{ x: number } | null>(null);
+  const pointerXRef = useRef<number | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
+
+  // Apple Pencil palm rejection
+  const activePenRef = useRef<number | null>(null);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -136,8 +139,8 @@ export default function ColorCatcher() {
     const keys = keysRef.current;
     if (keys.has("ArrowLeft") || keys.has("a")) s.bucketX = Math.max(BUCKET_W / 2, s.bucketX - 6);
     if (keys.has("ArrowRight") || keys.has("d")) s.bucketX = Math.min(W - BUCKET_W / 2, s.bucketX + 6);
-    // Mouse/touch
-    if (mouseRef.current) s.bucketX = Math.max(BUCKET_W / 2, Math.min(W - BUCKET_W / 2, mouseRef.current.x));
+    // Pointer (mouse / touch / pencil)
+    if (pointerXRef.current !== null) s.bucketX = Math.max(BUCKET_W / 2, Math.min(W - BUCKET_W / 2, pointerXRef.current));
 
     // Spawn
     if (s.frameCount % s.spawnRate === 0) {
@@ -189,26 +192,42 @@ export default function ColorCatcher() {
       if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
     };
     const onKeyUp = (e: KeyboardEvent) => keysRef.current.delete(e.key);
-    const onMouseMove = (e: MouseEvent) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = W / rect.width;
-      mouseRef.current = { x: (e.clientX - rect.left) * scaleX };
-      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
-    };
-    const onTouch = (e: TouchEvent) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = W / rect.width;
-      mouseRef.current = { x: (e.touches[0].clientX - rect.left) * scaleX };
-      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
-    };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("touchmove", onTouch, { passive: true });
+
+    // Pointer events (replaces mousemove + touchmove)
+    const canvas = canvasRef.current;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!canvas) return;
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (e.pointerType === "pen") activePenRef.current = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      pointerXRef.current = (e.clientX - rect.left) * scaleX;
+      if (!stateRef.current.started) { stateRef.current.started = true; setStarted(true); }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!canvas) return;
+      if (e.pointerType === "touch" && activePenRef.current !== null) return;
+      if (pointerXRef.current !== null) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = W / rect.width;
+        pointerXRef.current = (e.clientX - rect.left) * scaleX;
+      }
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "pen") activePenRef.current = null;
+      pointerXRef.current = null;
+    };
+
+    if (canvas) {
+      canvas.addEventListener("pointerdown", onPointerDown);
+      canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerup", onPointerUp);
+      canvas.addEventListener("pointercancel", onPointerUp);
+    }
+
     let last = 0;
     const loop = (ts: number) => {
       if (ts - last > 16) { last = ts; update(); draw(); }
@@ -218,8 +237,12 @@ export default function ColorCatcher() {
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("touchmove", onTouch);
+      if (canvas) {
+        canvas.removeEventListener("pointerdown", onPointerDown);
+        canvas.removeEventListener("pointermove", onPointerMove);
+        canvas.removeEventListener("pointerup", onPointerUp);
+        canvas.removeEventListener("pointercancel", onPointerUp);
+      }
       cancelAnimationFrame(rafRef.current);
     };
   }, [update, draw]);
@@ -235,18 +258,34 @@ export default function ColorCatcher() {
         <span className="text-sm font-bold text-violet-400">🎨 Color Catcher</span>
         <span className="text-sm font-bold text-white">Score: <span className="text-yellow-400">{score}</span></span>
       </div>
-      <div className="relative">
-        <canvas ref={canvasRef} width={W} height={H}
-          style={{ borderRadius: 12, border: "1px solid rgba(139,92,246,0.25)", display: "block", maxWidth: "100%", cursor: "none" }} />
+      <div className="relative" style={{ overscrollBehavior: "contain" }}>
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(139,92,246,0.25)",
+            display: "block",
+            maxWidth: "100%",
+            cursor: "none",
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
+        />
         {!started && !dead && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style={{ background: "rgba(7,7,26,0.88)" }}>
             <div className="text-4xl mb-2">🎨</div>
             <div className="text-white font-bold text-xl mb-1">Color Catcher</div>
             <div className="text-white/50 text-sm mb-1">Move the bucket to catch falling colors</div>
-            <div className="text-white/30 text-xs mb-1">Mouse / Arrow keys / touch to move</div>
+            <div className="text-white/30 text-xs mb-1">Drag finger / Mouse / Arrow keys</div>
             <div className="text-red-400/70 text-xs mb-4">Avoid 💣🔥☠️ — they cost a life!</div>
-            <button onClick={() => { stateRef.current.started = true; setStarted(true); }}
-              className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Start!</button>
+            <button
+              onClick={() => { stateRef.current.started = true; setStarted(true); }}
+              className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors"
+              style={{ minHeight: 44 }}
+            >Start!</button>
           </div>
         )}
         {dead && (
@@ -254,11 +293,11 @@ export default function ColorCatcher() {
             <div className="text-4xl mb-2">💥</div>
             <div className="text-white font-bold text-xl mb-1">Game Over!</div>
             <div className="text-yellow-400 font-bold text-2xl mb-3">Score: {score}</div>
-            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">Try Again</button>
+            <button onClick={restart} className="px-5 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors" style={{ minHeight: 44 }}>Try Again</button>
           </div>
         )}
       </div>
-      <div className="text-xs text-white/30">Move mouse or ← → to catch • Level up each 8 spawns</div>
+      <div className="text-xs text-white/30">Drag or ← → to catch • Level up each 8 spawns</div>
     </div>
   );
 }

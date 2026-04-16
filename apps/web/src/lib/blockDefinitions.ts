@@ -476,6 +476,22 @@ export const BLOCK_DEFS: BlockDef[] = [
   { type: "unity_spawnparticles",category: "unity", label: "3D spawn particles at x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", group: "Scene", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 1 }, { name: "Z", type: "number", default: 0 }] },
   { type: "unity_confetti",      category: "unity", label: "3D confetti burst!",                        color: C.unity, shape: "stack", group: "Scene" },
   { type: "unity_reset",         category: "unity", label: "3D reset scene",                            color: C.unity, shape: "stack", group: "Scene" },
+
+  /* ═══════════════ Unity 3D — Level Design (new) ═══════════════ */
+  { type: "unity_addcheckpoint", category: "unity", label: "3D add checkpoint at x: (X) z: (Z)", color: C.unity, shape: "stack", group: "Objects", inputs: [{ name: "X", type: "number", default: 5 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_addtrap",       category: "unity", label: "3D add spike trap at x: (X) z: (Z) damage: (DMG)", color: C.unity, shape: "stack", group: "Objects", inputs: [{ name: "X", type: "number", default: 3 }, { name: "Z", type: "number", default: 3 }, { name: "DMG", type: "number", default: 10 }] },
+  { type: "unity_addboss",       category: "unity", label: "3D add boss at x: (X) z: (Z) hp: (HP)", color: C.unity, shape: "stack", group: "Enemies", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Z", type: "number", default: 8 }, { name: "HP", type: "number", default: 200 }] },
+  { type: "unity_setwind",       category: "unity", label: "3D set wind x: (X) z: (Z)", color: C.unity, shape: "stack", group: "Scene", hint: "Pushes player continuously", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Z", type: "number", default: 2 }] },
+  { type: "unity_setfogcolor",   category: "unity", label: "3D set fog color (COLOR)", color: C.unity, shape: "stack", group: "Scene", inputs: [{ name: "COLOR", type: "string", default: "#334155" }] },
+  { type: "unity_setsuncolor",   category: "unity", label: "3D set sun color (COLOR)", color: C.unity, shape: "stack", group: "Scene", inputs: [{ name: "COLOR", type: "string", default: "#fef9c3" }] },
+  { type: "unity_freeze",        category: "unity", label: "3D freeze player", color: C.unity, shape: "stack", group: "Player" },
+  { type: "unity_unfreeze",      category: "unity", label: "3D unfreeze player", color: C.unity, shape: "stack", group: "Player" },
+  { type: "unity_setmessage",    category: "unity", label: "3D set HUD message (TEXT)", color: C.unity, shape: "stack", group: "Game", inputs: [{ name: "TEXT", type: "string", default: "Collect all coins!" }] },
+  { type: "unity_setlevel",      category: "unity", label: "3D set level (NUM)", color: C.unity, shape: "stack", group: "Game", inputs: [{ name: "NUM", type: "number", default: 1 }] },
+  { type: "unity_nextlevel",     category: "unity", label: "3D go to next level", color: C.unity, shape: "stack", group: "Game" },
+  { type: "unity_spawn_bullet",  category: "unity", label: "3D shoot bullet (SPEED)", color: C.unity, shape: "stack", group: "Objects", inputs: [{ name: "SPEED", type: "number", default: 15 }] },
+  { type: "unity_addlight",      category: "unity", label: "3D add point light (COLOR) at x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", group: "Scene", inputs: [{ name: "COLOR", type: "string", default: "#ffffff" }, { name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 4 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_slowmotion",    category: "unity", label: "3D slow motion (FACTOR)", color: C.unity, shape: "stack", group: "Scene", hint: "1=normal, 0.5=half speed", inputs: [{ name: "FACTOR", type: "number", default: 0.5 }] },
 ];
 
 export function getBlockDef(type: string): BlockDef | undefined {
