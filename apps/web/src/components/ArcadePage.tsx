@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "../lib/theme.tsx";
-import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2 } from "lucide-react";
+import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
 import MemoryGame from "./games/MemoryGame.tsx";
 import ColorCatcher from "./games/ColorCatcher.tsx";
 import BrickBreaker from "./games/BrickBreaker.tsx";
+import UnityGame from "./games/UnityGame.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -19,7 +20,10 @@ interface Game {
   emoji: string;
   component?: React.ComponentType;
   embedUrl?: string;
+  /** "unity" means render via UnityGame iframe embedder */
+  type?: "unity" | "iframe" | "component";
   hint?: string;
+  comingSoon?: boolean;
 }
 
 /* ── Game catalogue ─────────────────────────────────────────── */
@@ -108,15 +112,30 @@ const GAMES: Game[] = [
     embedUrl: "/playground",
     hint: "The full editor",
   },
+  {
+    id: "unity-sandbox",
+    title: "Unity Sandbox",
+    description: "Drop any Unity WebGL build into /public/unity-games/ and it plays here. First Unity slot — coming soon!",
+    category: "Unity",
+    stars: 5,
+    plays: "soon",
+    accentColor: "#22d3ee",
+    emoji: "🎮",
+    type: "unity",
+    // embedUrl: "/unity-games/your-game/index.html",   ← uncomment when you add a build
+    comingSoon: true,
+    hint: "Unity WebGL",
+  },
 ];
 
-const CATEGORIES = ["All", "Action", "Puzzle", "Education", "Creative"];
+const CATEGORIES = ["All", "Action", "Puzzle", "Education", "Creative", "Unity"];
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   All: <Grid3X3 size={13} />,
   Action: <Sword size={13} />,
   Puzzle: <Puzzle size={13} />,
   Education: <GraduationCap size={13} />,
   Creative: <Wand2 size={13} />,
+  Unity: <Package size={13} />,
 };
 
 /* ── Star rating ─────────────────────────────────────────────── */
@@ -201,8 +220,16 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
           </div>
         </div>
 
+        {/* Coming-soon badge */}
+        {game.comingSoon && (
+          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[9px] font-bold"
+            style={{ background: "rgba(34,211,238,0.2)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.4)" }}>
+            SOON
+          </div>
+        )}
+
         {/* Idle glow pulse dot */}
-        {!hov && (
+        {!hov && !game.comingSoon && (
           <div
             className="absolute bottom-2.5 right-2.5 w-2 h-2 rounded-full animate-glow-pulse"
             style={{ background: game.accentColor, boxShadow: `0 0 6px ${game.accentColor}` }}
@@ -295,7 +322,32 @@ function PlayerModal({ game, onClose }: { game: Game; onClose: () => void }) {
 
         {/* Game area */}
         <div className="flex-1 overflow-auto" style={{ minHeight: 380 }}>
-          {game.component ? (
+          {game.comingSoon ? (
+            /* Coming-soon slot — Unity placeholder */
+            <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
+              <div className="text-5xl animate-arcade-float">🎮</div>
+              <div className="text-white font-extrabold text-xl">Unity WebGL — Coming Soon</div>
+              <div className="text-white/45 text-sm max-w-sm leading-relaxed">
+                Export any Unity project as <strong className="text-white/70">WebGL</strong>, drop the build output into
+                <code className="mx-1 px-1.5 py-0.5 rounded text-cyan-400" style={{ background: "rgba(34,211,238,0.1)", fontSize: "0.75rem" }}>
+                  /public/unity-games/&lt;name&gt;/
+                </code>
+                and register it in <code className="text-violet-400" style={{ fontSize: "0.75rem" }}>ArcadePage.tsx</code>.
+              </div>
+              <div className="rounded-xl p-4 text-left text-xs font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#a78bfa", maxWidth: 380, width: "100%" }}>
+                <div className="text-white/30 mb-1">{`// ArcadePage.tsx → GAMES array`}</div>
+                <div>{`{`}</div>
+                <div className="pl-4 text-cyan-400">id: <span className="text-green-400">"my-unity-game"</span>,</div>
+                <div className="pl-4 text-cyan-400">type: <span className="text-green-400">"unity"</span>,</div>
+                <div className="pl-4 text-cyan-400">embedUrl: <span className="text-green-400">"/unity-games/my-game/index.html"</span>,</div>
+                <div className="pl-4 text-cyan-400">title: <span className="text-green-400">"My Unity Game"</span>,</div>
+                <div>{`}`}</div>
+              </div>
+              <div className="text-white/25 text-xs">See <code className="text-cyan-400">/public/unity-games/README.md</code> for full instructions</div>
+            </div>
+          ) : game.type === "unity" && game.embedUrl ? (
+            <UnityGame src={game.embedUrl} title={game.title} />
+          ) : game.component ? (
             <React.Suspense fallback={
               <div className="h-80 flex items-center justify-center">
                 <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
