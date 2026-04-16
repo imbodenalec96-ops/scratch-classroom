@@ -20,6 +20,8 @@ import Achievements from "./components/Achievements.tsx";
 import ChatPanel from "./components/ChatPanel.tsx";
 import LessonsPage from "./components/LessonsPage.tsx";
 import ArcadePage from "./components/ArcadePage.tsx";
+import LandingPage from "./components/LandingPage.tsx";
+import PublicLayout from "./components/PublicLayout.tsx";
 
 function AppLoader() {
   return (
@@ -58,7 +60,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function DashboardRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <AppLoader />;
-  if (!user) return <Navigate to="/playground" replace />;
+  if (!user) return <Navigate to="/home" replace />;
   if (user.role === "admin") return <Navigate to="/admin" replace />;
   if (user.role === "teacher") return <Navigate to="/teacher" replace />;
   return <Navigate to="/student" replace />;
@@ -93,16 +95,21 @@ export default function App() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="achievements" element={<Achievements />} />
             <Route path="lessons" element={<LessonsPage />} />
-            <Route path="arcade" element={<ArcadePage />} />
           </Route>
 
           {/* Full-screen project workspace (no sidebar) */}
           <Route path="/project/:id" element={<ProtectedRoute><ProjectWorkspaceRoute /></ProtectedRoute>} />
 
-          {/* Public playground — no login required (works on Vercel without backend) */}
+          {/* ── Public routes — no login needed ── */}
+          <Route element={<PublicLayout />}>
+            <Route path="/home" element={<LandingPage />} />
+            <Route path="/arcade" element={<ArcadePage />} />
+          </Route>
+
+          {/* Public playground — no login required */}
           <Route path="/playground" element={<ProjectWorkspace />} />
 
-          <Route path="*" element={<Navigate to="/playground" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
