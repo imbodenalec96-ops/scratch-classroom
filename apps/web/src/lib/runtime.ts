@@ -2869,63 +2869,63 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
           thread.pc++;
           break;
 
-        /* ── Unity 3D blocks ── */
-        case "unity_move": {
-          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
-          unityBridge("Move", { x, y, z });
-          thread.pc++; break;
-        }
-        case "unity_setposition": {
-          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
-          unityBridge("SetPosition", { x, y, z });
-          thread.pc++; break;
-        }
-        case "unity_rotate": {
-          const axis = getStr(block, "AXIS", "y"); const degrees = getNum(block, "DEGREES");
-          unityBridge("Rotate", { axis, degrees });
-          thread.pc++; break;
-        }
-        case "unity_setrotation": {
-          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
-          unityBridge("SetRotation", { x, y, z });
-          thread.pc++; break;
-        }
-        case "unity_setscale": {
-          unityBridge("SetScale", { scale: getNum(block, "SCALE", 1) });
-          thread.pc++; break;
-        }
-        case "unity_setcolor": {
-          const r = getNum(block, "R"); const g = getNum(block, "G"); const b = getNum(block, "B");
-          unityBridge("SetColor", { r, g, b, a: 1 });
-          thread.pc++; break;
-        }
-        case "unity_spawn": {
-          const prefab = getStr(block, "PREFAB", "enemy");
-          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
-          unityBridge("Spawn", { prefab, x, y, z });
-          thread.pc++; break;
-        }
-        case "unity_playanimation": {
-          unityBridge("PlayAnimation", { name: getStr(block, "NAME", "run") });
-          thread.pc++; break;
-        }
-        case "unity_applyforce": {
-          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
-          unityBridge("ApplyForce", { x, y, z });
-          thread.pc++; break;
-        }
-        case "unity_setgravity": {
-          unityBridge("SetGravity", { value: getNum(block, "VALUE", 9.8) });
-          thread.pc++; break;
-        }
-        case "unity_say": {
-          unityBridge("Say", { text: getStr(block, "TEXT", "") });
-          thread.pc++; break;
-        }
-        case "unity_reset": {
-          unityBridge("Reset", {});
-          thread.pc++; break;
-        }
+        /* ══════════════ Unity 3D — Player ══════════════ */
+        case "unity_move": { const x=getNum(block,"X"),y=getNum(block,"Y"),z=getNum(block,"Z"); unityBridge("Move",{x,y,z}); thread.pc++; break; }
+        case "unity_setposition": { const x=getNum(block,"X"),y=getNum(block,"Y"),z=getNum(block,"Z"); unityBridge("SetPosition",{x,y,z}); thread.pc++; break; }
+        case "unity_rotate": { unityBridge("Rotate",{axis:getStr(block,"AXIS","y"),degrees:getNum(block,"DEGREES")}); thread.pc++; break; }
+        case "unity_setrotation": { const x=getNum(block,"X"),y=getNum(block,"Y"),z=getNum(block,"Z"); unityBridge("SetRotation",{x,y,z}); thread.pc++; break; }
+        case "unity_setscale": { unityBridge("SetScale",{scale:getNum(block,"SCALE",1)}); thread.pc++; break; }
+        case "unity_setcolor": { unityBridge("SetColor",{r:getNum(block,"R"),g:getNum(block,"G"),b:getNum(block,"B"),a:1}); thread.pc++; break; }
+        case "unity_setspeed": { unityBridge("SetSpeed",{value:getNum(block,"VALUE",5)}); thread.pc++; break; }
+        case "unity_setjumpforce": { unityBridge("SetJumpForce",{value:getNum(block,"VALUE",7)}); thread.pc++; break; }
+        case "unity_jump": { unityBridge("Jump",{}); thread.pc++; break; }
+        case "unity_applyforce": { const x=getNum(block,"X"),y=getNum(block,"Y"),z=getNum(block,"Z"); unityBridge("ApplyForce",{x,y,z}); thread.pc++; break; }
+        case "unity_setgravity": { unityBridge("SetGravity",{value:getNum(block,"VALUE",9.8)}); thread.pc++; break; }
+        case "unity_playanimation": { unityBridge("PlayAnimation",{name:getStr(block,"NAME","run")}); thread.pc++; break; }
+
+        /* ══════════════ Unity 3D — Game ══════════════ */
+        case "unity_setscore": { unityBridge("SetScore",{value:getNum(block,"VALUE",0)}); thread.pc++; break; }
+        case "unity_addscore": { unityBridge("AddScore",{value:getNum(block,"VALUE",10)}); thread.pc++; break; }
+        case "unity_setlives": { unityBridge("SetLives",{value:getNum(block,"VALUE",3)}); thread.pc++; break; }
+        case "unity_loselife": { unityBridge("LoseLife",{}); thread.pc++; break; }
+        case "unity_addlife": { unityBridge("AddLife",{value:getNum(block,"VALUE",1)}); thread.pc++; break; }
+        case "unity_sethealth": { unityBridge("SetHealth",{value:getNum(block,"VALUE",100),max:getNum(block,"MAX",100)}); thread.pc++; break; }
+        case "unity_addhealth": { unityBridge("AddHealth",{value:getNum(block,"VALUE",-10)}); thread.pc++; break; }
+        case "unity_starttimer": { unityBridge("StartTimer",{seconds:getNum(block,"SECONDS",30)}); thread.pc++; break; }
+        case "unity_stoptimer": { unityBridge("StopTimer",{}); thread.pc++; break; }
+        case "unity_gameover": { unityBridge("GameOver",{reason:getStr(block,"REASON","Better luck next time!")}); thread.pc++; break; }
+        case "unity_wingame": { unityBridge("WinGame",{message:getStr(block,"MESSAGE","You did it!")}); thread.pc++; break; }
+        case "unity_setgamemode": { unityBridge("SetGameMode",{mode:getStr(block,"MODE","top-down")}); thread.pc++; break; }
+
+        /* ══════════════ Unity 3D — Objects ══════════════ */
+        case "unity_createobject": { unityBridge("CreateObject",{shape:getStr(block,"SHAPE","cube"),name:getStr(block,"NAME","block1"),x:getNum(block,"X"),y:getNum(block,"Y",0.5),z:getNum(block,"Z")}); thread.pc++; break; }
+        case "unity_destroyobject": { unityBridge("DestroyObject",{name:getStr(block,"NAME","block1")}); thread.pc++; break; }
+        case "unity_moveobject": { unityBridge("MoveObject",{name:getStr(block,"NAME","block1"),x:getNum(block,"X"),y:getNum(block,"Y"),z:getNum(block,"Z")}); thread.pc++; break; }
+        case "unity_setobjectpos": { unityBridge("SetObjectPosition",{name:getStr(block,"NAME","block1"),x:getNum(block,"X"),y:getNum(block,"Y"),z:getNum(block,"Z")}); thread.pc++; break; }
+        case "unity_setobjectcolor": { unityBridge("SetObjectColor",{name:getStr(block,"NAME","block1"),color:getStr(block,"COLOR","#f43f5e")}); thread.pc++; break; }
+        case "unity_rotateobject": { unityBridge("RotateObject",{name:getStr(block,"NAME","block1"),axis:getStr(block,"AXIS","y"),degrees:getNum(block,"DEGREES",90)}); thread.pc++; break; }
+        case "unity_setobjectscale": { unityBridge("SetObjectScale",{name:getStr(block,"NAME","block1"),scale:getNum(block,"SCALE",2)}); thread.pc++; break; }
+        case "unity_spawn": { const x=getNum(block,"X"),y=getNum(block,"Y"),z=getNum(block,"Z"); unityBridge("Spawn",{x,y,z}); thread.pc++; break; }
+        case "unity_addplatform": { unityBridge("AddPlatform",{x:getNum(block,"X"),y:getNum(block,"Y",2),z:getNum(block,"Z"),w:getNum(block,"W",5),d:getNum(block,"D",5)}); thread.pc++; break; }
+        case "unity_addwall": { unityBridge("AddWall",{x:getNum(block,"X"),y:getNum(block,"Y",2),z:getNum(block,"Z"),w:getNum(block,"W",1),h:getNum(block,"H",4)}); thread.pc++; break; }
+        case "unity_clearobjects": { unityBridge("ClearObjects",{}); thread.pc++; break; }
+
+        /* ══════════════ Unity 3D — Enemies & Collectibles ══════════════ */
+        case "unity_addenemy": { unityBridge("AddEnemy",{type:getStr(block,"TYPE","chaser"),x:getNum(block,"X",5),z:getNum(block,"Z",5),speed:getNum(block,"SPEED",2)}); thread.pc++; break; }
+        case "unity_addcollectible": { unityBridge("AddCollectible",{type:getStr(block,"TYPE","coin"),x:getNum(block,"X"),y:getNum(block,"Y",1),z:getNum(block,"Z")}); thread.pc++; break; }
+
+        /* ══════════════ Unity 3D — Scene & FX ══════════════ */
+        case "unity_setbg": { unityBridge("SetBg",{r:getNum(block,"R",0.07),g:getNum(block,"G",0.07),b:getNum(block,"B",0.4)}); thread.pc++; break; }
+        case "unity_setsky": { unityBridge("SetSky",{color:getStr(block,"COLOR","#07071a")}); thread.pc++; break; }
+        case "unity_setfog": { unityBridge("SetFog",{density:getNum(block,"DENSITY",0.02)}); thread.pc++; break; }
+        case "unity_setambient": { unityBridge("SetAmbient",{value:getNum(block,"VALUE",0.6)}); thread.pc++; break; }
+        case "unity_camerashake": { unityBridge("CameraShake",{intensity:getNum(block,"INTENSITY",0.5)}); thread.pc++; break; }
+        case "unity_showtext": { unityBridge("ShowText",{text:getStr(block,"TEXT",""),duration:getNum(block,"DURATION",2)}); thread.pc++; break; }
+        case "unity_say": { unityBridge("Say",{text:getStr(block,"TEXT","")}); thread.pc++; break; }
+        case "unity_playsound": { unityBridge("PlaySound",{type:getStr(block,"TYPE","coin")}); thread.pc++; break; }
+        case "unity_spawnparticles": { unityBridge("SpawnParticles",{x:getNum(block,"X"),y:getNum(block,"Y",1),z:getNum(block,"Z")}); thread.pc++; break; }
+        case "unity_confetti": { unityBridge("Confetti",{}); thread.pc++; break; }
+        case "unity_reset": { unityBridge("Reset",{}); thread.pc++; break; }
 
         default:
           thread.pc++;

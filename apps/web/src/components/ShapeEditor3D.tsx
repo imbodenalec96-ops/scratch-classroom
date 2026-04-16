@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { Shape3D } from "@scratch/shared";
+import { useTheme } from "../lib/theme.tsx";
 
 interface Props {
   currentShape: Shape3D;
@@ -84,6 +85,8 @@ function PreviewMesh({ shape, color, scaleX, scaleY, scaleZ, roughness, metalnes
 }
 
 export default function ShapeEditor3D({ currentShape, currentColor, onSave, onClose }: Props) {
+  const { theme } = useTheme();
+  const dk = theme === "dark";
   const [shape, setShape] = useState<Shape3D>(currentShape);
   const [color, setColor] = useState(currentColor || "#8b5cf6");
   const [emissive, setEmissive] = useState("#000000");
@@ -100,20 +103,20 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[700px] max-h-[85vh] overflow-hidden">
+      <div className="ai-panel w-[700px] max-h-[85vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-          <h2 className="text-white font-bold text-sm">🧊 3D Shape Editor</h2>
+        <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+          <h2 className="text-t1 font-bold text-sm">3D Shape Editor</h2>
           <div className="flex gap-2">
-            <button onClick={handleSave} className="px-3 py-1 text-xs rounded-lg bg-violet-600 text-white hover:bg-violet-500 font-medium">
-              ✓ Apply Shape
+            <button onClick={handleSave} className="btn-primary px-3 py-1 text-xs font-medium">
+              Apply Shape
             </button>
-            <button onClick={onClose} className="px-2 py-1 text-xs rounded-lg text-white/40 hover:text-white/70">✕</button>
+            <button onClick={onClose} className="btn-ghost px-2 py-1 text-xs">✕</button>
           </div>
         </div>
 
         <div className="flex">
-          {/* 3D Preview */}
+          {/* 3D Preview — intentionally dark viewport */}
           <div className="flex-1 h-[400px] bg-black/40">
             <Canvas camera={{ position: [2, 2, 3], fov: 50 }} shadows>
               <Suspense fallback={<Html center><div className="text-white text-xs">Loading...</div></Html>}>
@@ -137,15 +140,15 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
           </div>
 
           {/* Controls */}
-          <div className="w-56 bg-black/20 border-l border-white/[0.06] p-3 overflow-y-auto max-h-[400px] space-y-4">
+          <div className="w-56 p-3 overflow-y-auto max-h-[400px] space-y-4 border-l scrollbar-thin" style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}>
             {/* Shape picker */}
             <div>
-              <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Shape</span>
+              <span className="text-[10px] text-t3 font-medium uppercase tracking-wider">Shape</span>
               <div className="grid grid-cols-4 gap-1 mt-1.5">
                 {SHAPES.map(s => (
                   <button key={s.id} onClick={() => setShape(s.id)}
-                    className={`py-1.5 rounded-lg text-center transition-all ${
-                      shape === s.id ? "bg-violet-600 text-white" : "bg-white/[0.04] text-white/50 hover:bg-white/[0.08]"
+                    className={`py-1.5 rounded-lg text-center transition-all cursor-pointer ${
+                      shape === s.id ? "bg-violet-600 text-white" : "btn-ghost text-t3"
                     }`}>
                     <div className="text-sm">{s.icon}</div>
                     <div className="text-[8px]">{s.label}</div>
@@ -156,35 +159,37 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
 
             {/* Color */}
             <div>
-              <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Color</span>
+              <span className="text-[10px] text-t3 font-medium uppercase tracking-wider">Color</span>
               <div className="flex items-center gap-2 mt-1.5">
-                <div className="w-8 h-8 rounded-lg border border-white/20" style={{ backgroundColor: color }} />
+                <div className="w-8 h-8 rounded-lg border" style={{ backgroundColor: color, borderColor: "var(--border-md)" }} />
                 <input type="color" value={color} onChange={e => setColor(e.target.value)}
                   className="w-8 h-8 rounded cursor-pointer" />
               </div>
               <div className="grid grid-cols-8 gap-1 mt-1.5">
                 {COLOR_PRESETS.map(c => (
                   <button key={c.name} onClick={() => setColor(c.color)}
-                    className={`w-5 h-5 rounded-md border transition-all ${
-                      color === c.color ? "border-white scale-110" : "border-white/10 hover:border-white/30"
-                    }`} style={{ backgroundColor: c.color }} title={c.name} />
+                    className={`w-5 h-5 rounded-md border transition-all cursor-pointer ${
+                      color === c.color ? "scale-110" : ""
+                    }`}
+                    style={{ backgroundColor: c.color, borderColor: color === c.color ? "var(--text-1)" : "var(--border-md)" }}
+                    title={c.name} />
                 ))}
               </div>
             </div>
 
             {/* Glow color */}
             <div>
-              <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Glow</span>
+              <span className="text-[10px] text-t3 font-medium uppercase tracking-wider">Glow</span>
               <div className="flex items-center gap-2 mt-1">
                 <input type="color" value={emissive} onChange={e => setEmissive(e.target.value)}
                   className="w-6 h-6 rounded cursor-pointer" />
-                <button onClick={() => setEmissive("#000000")} className="text-[10px] text-white/40 hover:text-white/60">Reset</button>
+                <button onClick={() => setEmissive("#000000")} className="text-[10px] text-t3 hover:text-t1 cursor-pointer">Reset</button>
               </div>
             </div>
 
             {/* Scale */}
             <div>
-              <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Scale</span>
+              <span className="text-[10px] text-t3 font-medium uppercase tracking-wider">Scale</span>
               <div className="space-y-1 mt-1.5">
                 {[
                   { label: "X", value: scaleX, set: setScaleX },
@@ -192,11 +197,11 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
                   { label: "Z", value: scaleZ, set: setScaleZ },
                 ].map(({ label, value, set }) => (
                   <div key={label} className="flex items-center gap-2">
-                    <span className="text-[10px] text-white/40 w-3">{label}</span>
+                    <span className="text-[10px] text-t3 w-3">{label}</span>
                     <input type="range" min={0.1} max={4} step={0.1} value={value}
                       onChange={e => set(Number(e.target.value))}
                       className="flex-1 accent-violet-500" />
-                    <span className="text-[10px] text-white/50 w-6 text-right">{value.toFixed(1)}</span>
+                    <span className="text-[10px] text-t3 w-6 text-right">{value.toFixed(1)}</span>
                   </div>
                 ))}
               </div>
@@ -204,25 +209,25 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
 
             {/* Material */}
             <div>
-              <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Material</span>
+              <span className="text-[10px] text-t3 font-medium uppercase tracking-wider">Material</span>
               <div className="grid grid-cols-3 gap-1 mt-1.5">
                 {MATERIAL_PRESETS.map(m => (
                   <button key={m.name} onClick={() => { setRoughness(m.roughness); setMetalness(m.metalness); }}
-                    className={`text-[9px] py-1 rounded-md transition-all ${
+                    className={`text-[9px] py-1 rounded-md transition-all cursor-pointer ${
                       roughness === m.roughness && metalness === m.metalness
-                        ? "bg-violet-600 text-white" : "bg-white/[0.04] text-white/40 hover:bg-white/[0.08]"
+                        ? "bg-violet-600 text-white" : "btn-ghost text-t3"
                     }`}>{m.name}</button>
                 ))}
               </div>
               <div className="space-y-1 mt-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-12">Rough</span>
+                  <span className="text-[9px] text-t3 w-12">Rough</span>
                   <input type="range" min={0} max={1} step={0.1} value={roughness}
                     onChange={e => setRoughness(Number(e.target.value))}
                     className="flex-1 accent-violet-500" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-12">Metal</span>
+                  <span className="text-[9px] text-t3 w-12">Metal</span>
                   <input type="range" min={0} max={1} step={0.1} value={metalness}
                     onChange={e => setMetalness(Number(e.target.value))}
                     className="flex-1 accent-violet-500" />
@@ -234,7 +239,7 @@ export default function ShapeEditor3D({ currentShape, currentColor, onSave, onCl
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={wireframe} onChange={e => setWireframe(e.target.checked)}
                 className="accent-violet-500" />
-              <span className="text-xs text-white/50">Wireframe</span>
+              <span className="text-xs text-t3">Wireframe</span>
             </label>
           </div>
         </div>

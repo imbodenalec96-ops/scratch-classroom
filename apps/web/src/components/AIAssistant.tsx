@@ -1,13 +1,28 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { AIMessage } from "@scratch/shared";
 import { api } from "../lib/api.ts";
+import { useTheme } from "../lib/theme.tsx";
+import { Sparkles, X, ArrowUp } from "lucide-react";
 
 interface Props {
   projectContext?: string;
   enabled?: boolean;
 }
 
+const QUICK_PROMPTS = [
+  { text: "How do I make a sprite move with WASD?", label: "WASD move" },
+  { text: "Help me add jumping to my game", label: "Jumping" },
+  { text: "How do I use operators with variables?", label: "Operators" },
+  { text: "Give me a game project idea", label: "Project idea" },
+  { text: "How do I make 3D environments work?", label: "3D worlds" },
+  { text: "Help me draw with Pen+ blocks", label: "Pen drawing" },
+  { text: "How do I make music with blocks?", label: "Music" },
+  { text: "Explain if/else and loops", label: "If / loops" },
+];
+
 export default function AIAssistant({ projectContext, enabled = true }: Props) {
+  const { theme } = useTheme();
+  const dk = theme === "dark";
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,19 +49,10 @@ export default function AIAssistant({ projectContext, enabled = true }: Props) {
     setLoading(false);
   };
 
-  const quickPrompts = [
-    { text: "How do I make a sprite move?", icon: "→" },
-    { text: "Help me debug my code", icon: "🔧" },
-    { text: "Give me a project idea", icon: "💡" },
-    { text: "Explain loops", icon: "🔄" },
-    { text: "How do 3D shapes work?", icon: "🧊" },
-    { text: "Add physics to my project", icon: "⚡" },
-  ];
-
   if (!enabled) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
-        <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-xl p-4 text-sm text-white/40">
+        <div className="card text-sm px-4 py-3" style={{ color: "var(--text-3)" }}>
           AI Assistant is disabled by your teacher
         </div>
       </div>
@@ -56,44 +62,69 @@ export default function AIAssistant({ projectContext, enabled = true }: Props) {
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {!isOpen && (
-        <button onClick={() => setIsOpen(true)}
+        <button
+          onClick={() => setIsOpen(true)}
           className="w-14 h-14 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500
-                     rounded-2xl shadow-xl shadow-violet-600/25 flex items-center justify-center text-xl transition-all
-                     duration-300 hover:scale-110 hover:shadow-violet-600/40 active:scale-95 border border-white/10">
-          ✦
+                     rounded-2xl shadow-xl shadow-violet-600/25 flex items-center justify-center transition-all
+                     duration-300 hover:scale-110 hover:shadow-violet-600/40 active:scale-95 border border-white/10 cursor-pointer"
+          title="AI Assistant"
+        >
+          <Sparkles size={22} className="text-white" />
         </button>
       )}
 
       {isOpen && (
-        <div className="w-80 h-[500px] bg-[#0d0d1a]/95 backdrop-blur-xl rounded-2xl border border-white/[0.08]
-                        shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-fade-in">
+        <div className="ai-panel w-80 h-[500px] animate-fade-in">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-600/90 to-indigo-600/90 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-600/90 to-indigo-600/90 border-b"
+            style={{ borderColor: "rgba(255,255,255,0.08)" }}>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-sm">✦</div>
+              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                <Sparkles size={14} className="text-white" />
+              </div>
               <div>
                 <span className="font-semibold text-white text-sm">AI Assistant</span>
                 <span className="block text-[10px] text-white/50">Powered by BlockForge</span>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)}
-              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors text-xs">
-              ✕
+            <button
+              onClick={() => setIsOpen(false)}
+              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={13} />
             </button>
           </div>
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
             {messages.length === 0 && (
               <div className="space-y-3">
-                <p className="text-sm text-white/40">Hi! I can help you code. Try asking:</p>
+                <p className="text-sm" style={{ color: "var(--text-3)" }}>
+                  Hi! I can help you code. Try asking:
+                </p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {quickPrompts.map((p) => (
-                    <button key={p.text} onClick={() => setInput(p.text)}
-                      className="text-left text-[11px] bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-2.5 py-2
-                                 text-white/50 hover:text-violet-300 transition-colors border border-white/[0.04]
-                                 leading-tight">
-                      <span className="mr-1">{p.icon}</span> {p.text}
+                  {QUICK_PROMPTS.map((p) => (
+                    <button
+                      key={p.text}
+                      onClick={() => setInput(p.text)}
+                      className="text-left text-[11px] rounded-lg px-2.5 py-2 leading-tight transition-colors cursor-pointer border"
+                      style={{
+                        background: "var(--bg-muted)",
+                        color: "var(--text-3)",
+                        borderColor: "var(--border)",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-light)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "var(--text-accent)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-focus)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-muted)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "var(--text-3)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
+                      }}
+                    >
+                      {p.label}
                     </button>
                   ))}
                 </div>
@@ -101,22 +132,23 @@ export default function AIAssistant({ projectContext, enabled = true }: Props) {
             )}
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
-                    : "bg-white/[0.06] text-white/80 border border-white/[0.06]"
-                }`}>
-                  {msg.content}
-                </div>
+                {msg.role === "user" ? (
+                  <div className="bubble-me max-w-[85%]">{msg.content}</div>
+                ) : (
+                  <div className="bubble-other max-w-[85%]">{msg.content}</div>
+                )}
               </div>
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white/[0.06] rounded-xl px-4 py-2.5 border border-white/[0.06]">
-                  <div className="flex gap-1.5">
+                <div className="bubble-other">
+                  <div className="flex gap-1.5 py-0.5">
                     {[0, 1, 2].map((i) => (
-                      <span key={i} className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"
-                        style={{ animationDelay: `${i * 120}ms` }} />
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"
+                        style={{ animationDelay: `${i * 120}ms` }}
+                      />
                     ))}
                   </div>
                 </div>
@@ -125,17 +157,21 @@ export default function AIAssistant({ projectContext, enabled = true }: Props) {
           </div>
 
           {/* Input */}
-          <div className="p-3 border-t border-white/[0.06]">
+          <div className="p-3 border-t" style={{ borderColor: "var(--border)" }}>
             <div className="flex gap-2">
-              <input value={input} onChange={(e) => setInput(e.target.value)}
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Ask about coding..."
-                className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20
-                           focus:border-violet-500/50 focus:outline-none" />
-              <button onClick={sendMessage} disabled={loading}
-                className="w-9 h-9 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center
-                           disabled:opacity-40 transition-colors text-sm font-bold">
-                ↑
+                className="input flex-1"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={loading}
+                className="btn-primary w-9 h-9 p-0 flex-shrink-0"
+              >
+                <ArrowUp size={15} />
               </button>
             </div>
           </div>

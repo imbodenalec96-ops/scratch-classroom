@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useTheme } from "../lib/theme.tsx";
 
 /* ── Lesson Data Structure ── */
 interface Lesson {
@@ -748,91 +749,85 @@ export default function LessonsBrowser({ onClose }: { onClose: () => void }) {
     const step = selectedLesson.steps[currentStep];
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-        <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[750px] max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="ai-panel w-[750px] max-h-[85vh]">
           {/* Lesson header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
             <div className="flex items-center gap-3">
               <button onClick={() => { setSelectedLesson(null); setCurrentStep(0); }}
-                className="text-white/40 hover:text-white/70 text-sm">← Back</button>
-              <span className="text-white font-bold text-sm">{selectedLesson.icon} {selectedLesson.title}</span>
+                className="text-t3 hover:text-t2 text-sm cursor-pointer transition-colors">← Back</button>
+              <span className="text-t1 font-bold text-sm">{selectedLesson.icon} {selectedLesson.title}</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full text-white ${diffColors[selectedLesson.difficulty]}`}>
                 {selectedLesson.difficulty}
               </span>
             </div>
-            <span className="text-white/40 text-xs">Step {currentStep + 1} / {selectedLesson.steps.length}</span>
+            <span className="text-t3 text-xs">Step {currentStep + 1} / {selectedLesson.steps.length}</span>
           </div>
 
           {/* Progress bar */}
-          <div className="h-1 bg-white/[0.04]">
+          <div className="h-1" style={{ background: "var(--bg-hover)" }}>
             <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-300"
               style={{ width: `${((currentStep + 1) / selectedLesson.steps.length) * 100}%` }} />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {/* Step title */}
-            <h3 className="text-white font-bold text-lg">{step.title}</h3>
-            
-            {/* Explanation */}
-            <p className="text-white/60 text-sm leading-relaxed">{step.explanation}</p>
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
+            <h3 className="text-t1 font-bold text-lg">{step.title}</h3>
+            <p className="text-t2 text-sm leading-relaxed">{step.explanation}</p>
 
-            {/* Code block */}
-            <div className="bg-black/40 rounded-xl border border-white/[0.06] overflow-hidden">
+            {/* Code block — intentionally always dark */}
+            <div className="bg-[#0d0d1a] rounded-xl border border-white/[0.08] overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06]">
                 <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">JavaScript</span>
                 <button onClick={() => navigator.clipboard.writeText(step.code)}
-                  className="text-[10px] text-violet-400 hover:text-violet-300">📋 Copy</button>
+                  className="text-[10px] text-violet-400 hover:text-violet-300 cursor-pointer">📋 Copy</button>
               </div>
-              <pre className="p-4 text-sm leading-relaxed overflow-x-auto">
+              <pre className="p-4 text-sm leading-relaxed overflow-x-auto scrollbar-thin">
                 <code className="text-emerald-300/90">{step.code}</code>
               </pre>
             </div>
 
-            {/* Block equivalent */}
             {step.blockEquivalent && (
               <div className="bg-violet-500/10 rounded-xl border border-violet-500/20 p-4">
-                <div className="text-[10px] text-violet-300 font-medium uppercase tracking-wider mb-2">🧩 Scratch Equivalent</div>
-                <pre className="text-xs text-violet-200/70 whitespace-pre-wrap font-mono">{step.blockEquivalent}</pre>
+                <div className="text-[10px] text-violet-400 font-medium uppercase tracking-wider mb-2">🧩 Scratch Equivalent</div>
+                <pre className="text-xs text-violet-400/70 whitespace-pre-wrap font-mono">{step.blockEquivalent}</pre>
               </div>
             )}
-
-            {/* Hint */}
             {step.hint && (
               <div className="bg-amber-500/10 rounded-xl border border-amber-500/20 p-3 flex gap-2">
-                <span className="text-amber-400">💡</span>
-                <span className="text-xs text-amber-200/70">{step.hint}</span>
+                <span className="text-amber-500">💡</span>
+                <span className="text-xs text-amber-600 dark:text-amber-300/80">{step.hint}</span>
               </div>
             )}
-
-            {/* Challenge */}
             {step.challenge && (
               <div className="bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-3 flex gap-2">
-                <span className="text-emerald-400">🏆</span>
-                <span className="text-xs text-emerald-200/70"><strong>Challenge:</strong> {step.challenge}</span>
+                <span className="text-emerald-500">🏆</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-300/80"><strong>Challenge:</strong> {step.challenge}</span>
               </div>
             )}
           </div>
 
           {/* Navigation */}
-          <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06]">
+          <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: "var(--border)" }}>
             <button onClick={() => setCurrentStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0}
-              className="px-4 py-1.5 text-xs rounded-lg bg-white/[0.06] text-white/60 hover:bg-white/[0.1] disabled:opacity-30 transition-all">
+              className="btn-secondary text-xs px-4 py-1.5 disabled:opacity-30">
               ← Previous
             </button>
             <div className="flex gap-1">
               {selectedLesson.steps.map((_, i) => (
                 <button key={i} onClick={() => setCurrentStep(i)}
-                  className={`w-2 h-2 rounded-full transition-all ${i === currentStep ? "bg-violet-500 scale-125" : i < currentStep ? "bg-violet-500/40" : "bg-white/10"}`} />
+                  className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                    i === currentStep ? "bg-violet-500 scale-125" : i < currentStep ? "bg-violet-500/40" : ""
+                  }`}
+                  style={i >= currentStep && i !== currentStep ? { background: "var(--border-md)" } : {}}
+                />
               ))}
             </div>
-            <button onClick={() => {
-              if (currentStep < selectedLesson.steps.length - 1) {
-                setCurrentStep(currentStep + 1);
-              } else {
-                setSelectedLesson(null);
-                setCurrentStep(0);
-              }
-            }}
-              className="px-4 py-1.5 text-xs rounded-lg bg-violet-600 text-white hover:bg-violet-500 font-medium transition-all">
+            <button
+              onClick={() => {
+                if (currentStep < selectedLesson.steps.length - 1) setCurrentStep(currentStep + 1);
+                else { setSelectedLesson(null); setCurrentStep(0); }
+              }}
+              className="btn-primary text-xs px-4 py-1.5"
+            >
               {currentStep < selectedLesson.steps.length - 1 ? "Next →" : "✓ Complete"}
             </button>
           </div>
@@ -844,42 +839,50 @@ export default function LessonsBrowser({ onClose }: { onClose: () => void }) {
   // Lesson browser
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[700px] max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-          <h2 className="text-white font-bold text-sm">📖 JavaScript Lessons</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg">✕</button>
+      <div className="ai-panel w-[700px] max-h-[80vh]">
+        <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+          <h2 className="text-t1 font-bold text-sm">JavaScript Lessons</h2>
+          <button onClick={onClose} className="text-t3 hover:text-t1 text-lg cursor-pointer transition-colors">✕</button>
         </div>
 
-        {/* Difficulty filter */}
-        <div className="flex gap-2 px-5 py-2 border-b border-white/[0.06]">
+        <div className="flex gap-2 px-5 py-2 border-b" style={{ borderColor: "var(--border)" }}>
           {(["all", "beginner", "intermediate", "advanced"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
-                filter === f ? "bg-violet-600 text-white" : "bg-white/[0.04] text-white/40 hover:text-white/70"
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                filter === f ? "bg-violet-600 text-white" : "btn-ghost py-1 px-3"
               }`}>
               {f === "all" ? "All Levels" : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin">
           {Object.entries(groupedLessons).map(([category, lessons]) => (
             <div key={category}>
-              <h3 className="text-xs text-white/30 font-bold uppercase tracking-wider mb-2">{category}</h3>
+              <h3 className="table-header mb-2">{category}</h3>
               <div className="grid grid-cols-2 gap-2">
                 {lessons.map(lesson => (
                   <button key={lesson.id} onClick={() => setSelectedLesson(lesson)}
-                    className="group text-left p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-violet-500/30 transition-all">
+                    className="group text-left p-3 rounded-xl border transition-all cursor-pointer"
+                    style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                      (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)";
+                      (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                    }}>
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{lesson.icon}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-white/80 font-medium group-hover:text-white">{lesson.title}</div>
-                        <div className="text-[10px] text-white/30 mt-0.5 line-clamp-2">{lesson.description}</div>
+                        <div className="text-sm text-t2 font-medium group-hover:text-t1 transition-colors">{lesson.title}</div>
+                        <div className="text-[10px] text-t3 mt-0.5 line-clamp-2">{lesson.description}</div>
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full text-white ${diffColors[lesson.difficulty]}`}>
                             {lesson.difficulty}
                           </span>
-                          <span className="text-[9px] text-white/20">{lesson.steps.length} steps</span>
+                          <span className="text-[9px] text-t3">{lesson.steps.length} steps</span>
                         </div>
                       </div>
                     </div>

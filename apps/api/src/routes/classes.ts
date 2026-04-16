@@ -20,7 +20,14 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
 router.get("/", async (req: AuthRequest, res: Response) => {
   const u = req.user!;
   let rows;
-  if (u.role === "teacher" || u.role === "admin") {
+  if (u.role === "admin") {
+    rows = await db.prepare(
+      `SELECT c.*, u.name as teacher_name
+       FROM classes c
+       LEFT JOIN users u ON u.id = c.teacher_id
+       ORDER BY c.created_at DESC`
+    ).all();
+  } else if (u.role === "teacher") {
     rows = await db.prepare("SELECT * FROM classes WHERE teacher_id = ? ORDER BY created_at DESC").all(u.id);
   } else {
     rows = await db.prepare(
@@ -28,6 +35,20 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     ).all(u.id);
   }
   res.json(rows);
+});
+
+// Delete class (admin can delete any, teacher can delete own)
+router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const u = req.user!;
+
+  if (u.role === "teacher") {
+    const own = await db.prepare("SELECT id FROM classes WHERE id = ? AND teacher_id = ?").get(id, u.id) as any;
+    if (!own) return res.status(403).json({ error: "Forbidden" });
+  }
+
+  await db.prepare("DELETE FROM classes WHERE id = ?").run(id);
+  res.json({ deleted: true });
 });
 
 // Get single class
@@ -81,6 +102,17 @@ router.post("/:id/import", requireRole("teacher", "admin"), async (req: AuthRequ
   res.json({ imported: created.length, students: created });
 });
 
+// Student: get own controls (lock status etc.)
+router.get("/:classId/my-controls", async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id;
+  const classId = req.params.classId;
+  const row = await db.prepare(
+    "SELECT * FROM teacher_controls WHERE class_id = ? AND student_id = ?"
+  ).get(classId, userId);
+  if (!row) return res.json({ screen_locked: false, editing_locked: false, ai_enabled: true });
+  res.json(row);
+});
+
 // Teacher controls per student
 router.get("/:classId/controls/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId, studentId } = req.params;
@@ -96,6 +128,13 @@ router.get("/:classId/controls/:studentId", requireRole("teacher", "admin"), asy
 router.put("/:classId/controls/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId, studentId } = req.params;
   const { ai_enabled, ai_prompt_limit, blocks_disabled, editing_locked, screen_locked } = req.body;
+
+  // Ensure a controls row exists so updates never no-op.
+  const existing = await db.prepare("SELECT id FROM teacher_controls WHERE class_id = ? AND student_id = ?").get(classId, studentId) as { id: string } | undefined;
+  if (!existing) {
+    await db.prepare("INSERT INTO teacher_controls (id, class_id, student_id) VALUES (?, ?, ?)").run(crypto.randomUUID(), classId, studentId);
+  }
+
   await db.prepare(
     `UPDATE teacher_controls SET
        ai_enabled = COALESCE(?, ai_enabled),

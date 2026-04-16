@@ -1,15 +1,24 @@
-const BASE = "/api";
+const BASE =
+  (import.meta as any)?.env?.VITE_API_BASE ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:4000/api"
+    : "/api");
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem("token");
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options?.headers,
+      },
+    });
+  } catch {
+    throw new Error("Cannot reach server. If running locally, start API with npm run dev:api.");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || res.statusText);
@@ -27,6 +36,7 @@ export const api = {
   getClasses: () => request<any[]>("/classes"),
   createClass: (name: string) => request<any>("/classes", { method: "POST", body: JSON.stringify({ name }) }),
   getClass: (id: string) => request<any>(`/classes/${id}`),
+  deleteClass: (id: string) => request<any>(`/classes/${id}`, { method: "DELETE" }),
   joinClass: (code: string) => request<any>("/classes/join", { method: "POST", body: JSON.stringify({ code }) }),
   getStudents: (classId: string) => request<any[]>(`/classes/${classId}/students`),
   importStudents: (classId: string, students: any[]) => request<any>(`/classes/${classId}/import`, { method: "POST", body: JSON.stringify({ students }) }),
@@ -39,6 +49,8 @@ export const api = {
 
   // Projects
   getProjects: () => request<any[]>("/projects"),
+  getAllProjects: () => request<any[]>("/projects/all"),
+  getStudentProjectsByClass: (classId: string) => request<any[]>(`/projects/class/${classId}/student-projects`),
   createProject: (title: string, mode: string, data?: any) => request<any>("/projects", { method: "POST", body: JSON.stringify({ title, mode, data }) }),
   getProject: (id: string) => request<any>(`/projects/${id}`),
   saveProject: (id: string, data: any) => request<any>(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -98,4 +110,7 @@ export const api = {
     });
     return res.json();
   },
+
+  // Student: get my controls for a class (lock status etc.)
+  getMyControls: (classId: string) => request<any>(`/classes/${classId}/my-controls`),
 };

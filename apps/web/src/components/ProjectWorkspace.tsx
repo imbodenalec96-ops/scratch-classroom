@@ -20,7 +20,7 @@ import { getSocket } from "../lib/ws.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { createDefaultGameData } from "../lib/game/engine.ts";
-import type { EnvironmentPreset, GameTemplate } from "../lib/game/templates.ts";
+import type { EnvironmentPreset, GameTemplate, UnityTemplate } from "../lib/game/templates.ts";
 import type { GameProjectData } from "../lib/game/types.ts";
 import { getBlockDef } from "../lib/blockDefinitions.ts";
 
@@ -293,6 +293,123 @@ function makeTemplateSpecs(template: GameTemplate): TemplateStackSpec[] {
       ],
     },
     ...movementStacks(12, 24, 18),
+  ];
+}
+
+function makeUnityTemplateSpecs(template: UnityTemplate): TemplateStackSpec[] {
+  if (template === "unity_fps") {
+    return [
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_setgamemode", inputs: { MODE: "fps" } },
+        { type: "unity_setlives", inputs: { VALUE: 3 } },
+        { type: "unity_sethealth", inputs: { VALUE: 100, MAX: 100 } },
+        { type: "unity_setscore", inputs: { VALUE: 0 } },
+        { type: "unity_starttimer", inputs: { SECONDS: 60 } },
+        { type: "unity_setbg", inputs: { R: 0.02, G: 0.05, B: 0.15 } },
+        { type: "unity_showtext", inputs: { TEXT: "FPS Microgame\nClick to Shoot!", DURATION: 2 } },
+        { type: "unity_playsound", inputs: { TYPE: "start" } },
+      ]},
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_addenemy", inputs: { TYPE: "chaser", X: 8, Z: 8, SPEED: 2.5 } },
+        { type: "unity_addenemy", inputs: { TYPE: "chaser", X: -8, Z: 6, SPEED: 2 } },
+        { type: "unity_addenemy", inputs: { TYPE: "spinner", X: 5, Z: -8, SPEED: 3 } },
+        { type: "unity_addenemy", inputs: { TYPE: "ghost", X: -6, Z: -10, SPEED: 1.5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "heart", X: 0, Y: 1, Z: 5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "powerup", X: 5, Y: 1, Z: 0 } },
+      ]},
+    ];
+  }
+  if (template === "unity_platformer") {
+    return [
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_setgamemode", inputs: { MODE: "platformer" } },
+        { type: "unity_setlives", inputs: { VALUE: 3 } },
+        { type: "unity_setscore", inputs: { VALUE: 0 } },
+        { type: "unity_setsky", inputs: { COLOR: "#0ea5e9" } },
+        { type: "unity_showtext", inputs: { TEXT: "3D Platformer\nCollect all coins!", DURATION: 2 } },
+        { type: "unity_playsound", inputs: { TYPE: "start" } },
+      ]},
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_addplatform", inputs: { X: 4, Y: 2, Z: 0, W: 4, D: 4 } },
+        { type: "unity_addplatform", inputs: { X: 8, Y: 4, Z: 4, W: 4, D: 4 } },
+        { type: "unity_addplatform", inputs: { X: 0, Y: 6, Z: 8, W: 5, D: 5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin", X: 4, Y: 3, Z: 0 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin", X: 8, Y: 5, Z: 4 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "star", X: 0, Y: 7.5, Z: 8 } },
+      ]},
+    ];
+  }
+  if (template === "unity_collect") {
+    return [
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_setscore", inputs: { VALUE: 0 } },
+        { type: "unity_setlives", inputs: { VALUE: 5 } },
+        { type: "unity_starttimer", inputs: { SECONDS: 45 } },
+        { type: "unity_setsky", inputs: { COLOR: "#1e003f" } },
+        { type: "unity_showtext", inputs: { TEXT: "Collect-a-thon!\nGrab everything!", DURATION: 2 } },
+        { type: "unity_playsound", inputs: { TYPE: "start" } },
+      ]},
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin",    X: 3,  Y: 1, Z: 3  } },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin",    X: -3, Y: 1, Z: 3  } },
+        { type: "unity_addcollectible", inputs: { TYPE: "gem",     X: 5,  Y: 1, Z: -5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "star",    X: -5, Y: 1, Z: -5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "diamond", X: 0,  Y: 1, Z: 7  } },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin",    X: 7,  Y: 1, Z: 0  } },
+        { type: "unity_addcollectible", inputs: { TYPE: "coin",    X: -7, Y: 1, Z: 0  } },
+        { type: "unity_addenemy", inputs: { TYPE: "patrol", X: 0, Z: 0, SPEED: 2.5 } },
+      ]},
+    ];
+  }
+  if (template === "unity_survival") {
+    return [
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_setlives", inputs: { VALUE: 1 } },
+        { type: "unity_sethealth", inputs: { VALUE: 100, MAX: 100 } },
+        { type: "unity_setscore", inputs: { VALUE: 0 } },
+        { type: "unity_setbg", inputs: { R: 0.05, G: 0.1, B: 0.05 } },
+        { type: "unity_showtext", inputs: { TEXT: "Survival Arena\nStay Alive!", DURATION: 2 } },
+        { type: "unity_playsound", inputs: { TYPE: "start" } },
+      ]},
+      { blocks: [
+        { type: "event_whenflagclicked" },
+        { type: "unity_addenemy", inputs: { TYPE: "chaser",  X: 8,  Z: 0,  SPEED: 2   } },
+        { type: "unity_addenemy", inputs: { TYPE: "chaser",  X: -8, Z: 0,  SPEED: 2   } },
+        { type: "unity_addenemy", inputs: { TYPE: "spinner", X: 0,  Z: 8,  SPEED: 3   } },
+        { type: "unity_addenemy", inputs: { TYPE: "ghost",   X: 0,  Z: -8, SPEED: 1.5 } },
+        { type: "unity_addcollectible", inputs: { TYPE: "heart",  X: 5,  Y: 1, Z: 5  } },
+        { type: "unity_addcollectible", inputs: { TYPE: "heart",  X: -5, Y: 1, Z: -5 } },
+      ]},
+    ];
+  }
+  // unity_arena
+  return [
+    { blocks: [
+      { type: "event_whenflagclicked" },
+      { type: "unity_setlives", inputs: { VALUE: 3 } },
+      { type: "unity_sethealth", inputs: { VALUE: 120, MAX: 120 } },
+      { type: "unity_setscore", inputs: { VALUE: 0 } },
+      { type: "unity_setbg", inputs: { R: 0.2, G: 0.01, B: 0.01 } },
+      { type: "unity_showtext", inputs: { TEXT: "Battle Arena!\nDefeat all enemies!", DURATION: 2 } },
+      { type: "unity_playsound", inputs: { TYPE: "start" } },
+    ]},
+    { blocks: [
+      { type: "event_whenflagclicked" },
+      { type: "unity_addenemy", inputs: { TYPE: "chaser",  X: 8,  Z: 8,  SPEED: 3   } },
+      { type: "unity_addenemy", inputs: { TYPE: "chaser",  X: -8, Z: 8,  SPEED: 3   } },
+      { type: "unity_addenemy", inputs: { TYPE: "spinner", X: 8,  Z: -8, SPEED: 4   } },
+      { type: "unity_addenemy", inputs: { TYPE: "spinner", X: -8, Z: -8, SPEED: 4   } },
+      { type: "unity_addenemy", inputs: { TYPE: "ghost",   X: 0,  Z: 10, SPEED: 2   } },
+      { type: "unity_addwall", inputs: { X: 12, Y: 2, Z: 0, W: 1, H: 4 } },
+      { type: "unity_addwall", inputs: { X: -12, Y: 2, Z: 0, W: 1, H: 4 } },
+    ]},
   ];
 }
 
@@ -641,6 +758,46 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           });
         });
 
+        return { ...sprite, blocks: [...sprite.blocks, ...injected] };
+      });
+    });
+    setDirty(true);
+  }, [selectedSpriteId]);
+
+  const handleApplyUnityTemplate = useCallback((template: UnityTemplate) => {
+    setMode("unity");
+    const specs = makeUnityTemplateSpecs(template);
+    setSprites((prev) => {
+      const targetId = getPlayableSpriteId(prev, selectedSpriteId) || prev[0]?.id;
+      if (!targetId) return prev;
+      return prev.map((sprite) => {
+        if (sprite.id !== targetId) return sprite;
+        const baseStackCount = Math.max(1, Math.ceil(sprite.blocks.filter((b) => b.x != null && b.y != null).length));
+        const injected: Block[] = [];
+        specs.forEach((stack, stackIndex) => {
+          let parentId: string | undefined;
+          const stackNumber = baseStackCount + stackIndex;
+          const x = 36 + (stackNumber % 2) * 220;
+          const y = 36 + Math.floor(stackNumber / 2) * 120;
+          stack.blocks.forEach((spec, blockIndex) => {
+            const def = getBlockDef(spec.type);
+            if (!def) return;
+            const block: Block = {
+              id: "b_" + Math.random().toString(36).slice(2, 11),
+              type: def.type,
+              category: def.category,
+              inputs: Object.fromEntries(
+                (def.inputs || []).map((inp) => [
+                  inp.name,
+                  { type: "value" as const, value: spec.inputs?.[inp.name] ?? inp.default },
+                ])
+              ),
+            };
+            if (blockIndex === 0) { block.x = x; block.y = y; } else if (parentId) { block.parent = parentId; }
+            parentId = block.id;
+            injected.push(block);
+          });
+        });
         return { ...sprite, blocks: [...sprite.blocks, ...injected] };
       });
     });
@@ -1016,6 +1173,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           gameData={gameData}
           onChange={(next) => { setGameData(next); setDirty(true); }}
           onApplyTemplateBlocks={handleApplyTemplateBlocks}
+          onApplyUnityTemplate={handleApplyUnityTemplate}
           onApplyEnvironment={handleApplyEnvironment}
           onClose={() => setShowGameSystems(false)}
         />

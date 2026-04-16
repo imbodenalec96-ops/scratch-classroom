@@ -62,13 +62,39 @@ export default function AIBlockCreator({ onAddBlock, onClose }: Props) {
 
   const handleAddGenerated = useCallback(
     (gen: GeneratedBlock) => {
+      // AI may return brand new block names; map them to an existing block type
+      // so the editor can render and execute the added block immediately.
+      const normalizeId = (value: string) => value.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase();
+      const slug = normalizeId(gen.name);
+      const preferredType = `${gen.category}_${slug}`;
+      const resolvedDef =
+        BLOCK_DEFS.find((d) => d.type === preferredType) ||
+        BLOCK_DEFS.find((d) => normalizeId(d.type) === normalizeId(preferredType)) ||
+        BLOCK_DEFS.find((d) => d.category === gen.category && normalizeId(d.type.replace(`${gen.category}_`, "")) === slug) ||
+        BLOCK_DEFS.find((d) => d.category === gen.category && d.shape === "stack") ||
+        BLOCK_DEFS.find((d) => d.shape === "stack") ||
+        BLOCK_DEFS[0];
+
+      const defaultInputs = Object.fromEntries(
+        (resolvedDef.inputs || []).map((inp) => [inp.name, { type: "value" as const, value: inp.default }])
+      );
+
+      // Copy AI input defaults into matching real inputs (case-insensitive match).
+      const incomingInputs = gen.inputs || [];
+      for (const inp of incomingInputs) {
+        const targetKey = Object.keys(defaultInputs).find(
+          (k) => k.toLowerCase() === inp.name.toLowerCase()
+        );
+        if (targetKey) {
+          defaultInputs[targetKey] = { type: "value", value: inp.default };
+        }
+      }
+
       const newBlock: Block = {
         id: "b_" + Math.random().toString(36).slice(2, 11),
-        type: `custom_ai_${gen.name.replace(/\s+/g, "_").toLowerCase()}`,
-        category: gen.category,
-        inputs: Object.fromEntries(
-          (gen.inputs || []).map((inp) => [inp.name, { type: "value" as const, value: inp.default }])
-        ),
+        type: resolvedDef.type,
+        category: resolvedDef.category,
+        inputs: defaultInputs,
         x: 80,
         y: 80,
       };
@@ -80,19 +106,19 @@ export default function AIBlockCreator({ onAddBlock, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[600px] max-h-[80vh] bg-[#1a1a30] rounded-2xl border border-white/[0.1] shadow-2xl shadow-violet-500/10 overflow-hidden flex flex-col"
+        className="ai-panel w-[600px] max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/[0.06] bg-gradient-to-r from-[#FF6B9D]/20 to-violet-500/20">
+        <div className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-[#FF6B9D]/20 to-violet-500/20" style={{ borderColor: "var(--border)" }}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B9D] to-violet-500 flex items-center justify-center text-lg shadow-lg shadow-[#FF6B9D]/30">
             ✧
           </div>
           <div className="flex-1">
-            <h2 className="text-white font-bold text-lg">AI Block Creator</h2>
-            <p className="text-white/40 text-xs">Describe what you want and AI will create custom blocks for you</p>
+            <h2 className="text-t1 font-bold text-lg">AI Block Creator</h2>
+            <p className="text-t3 text-xs">Describe what you want and AI will create custom blocks for you</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white/40 hover:text-white flex items-center justify-center transition-all">
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer text-t3 hover:text-t1" style={{ background: "var(--bg-hover)" }}>
             ✕
           </button>
         </div>
@@ -102,43 +128,35 @@ export default function AIBlockCreator({ onAddBlock, onClose }: Props) {
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the blocks you want to create... e.g., 'Make blocks for a gravity simulator' or 'Create blocks that make sprites talk to each other'"
-            className="w-full h-24 px-4 py-3 bg-white/[0.06] border border-white/[0.08] rounded-xl text-white text-sm placeholder-white/25 resize-none focus:outline-none focus:ring-2 focus:ring-[#FF6B9D]/50 focus:border-[#FF6B9D]/50 transition-all"
+            placeholder="Describe the blocks you want to create... e.g., 'Make blocks for a gravity simulator'"
+            className="input w-full h-24 resize-none focus:ring-2 focus:ring-[#FF6B9D]/50 focus:border-[#FF6B9D]/50"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleGenerate();
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
             }}
           />
           <div className="flex gap-2">
             <button
               onClick={handleGenerate}
               disabled={loading || !prompt.trim()}
-              className="px-5 py-2 bg-gradient-to-r from-[#FF6B9D] to-violet-500 text-white font-bold text-sm rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-lg shadow-[#FF6B9D]/20 flex items-center gap-2"
+              className="px-5 py-2 bg-gradient-to-r from-[#FF6B9D] to-violet-500 text-white font-bold text-sm rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-lg shadow-[#FF6B9D]/20 flex items-center gap-2 cursor-pointer"
             >
-              {loading ? (
-                <>
-                  <span className="animate-spin">⟳</span> Generating...
-                </>
-              ) : (
-                <>✧ Create Blocks</>
-              )}
+              {loading ? <><span className="animate-spin">⟳</span> Generating...</> : <>✧ Create Blocks</>}
             </button>
             {prompt && (
-              <button onClick={() => { setPrompt(""); setGeneratedBlocks([]); }} className="px-3 py-2 text-white/40 hover:text-white text-sm transition-colors">
+              <button onClick={() => { setPrompt(""); setGeneratedBlocks([]); }} className="btn-ghost text-sm">
                 Clear
               </button>
             )}
           </div>
-
-          {/* Quick prompts */}
           <div className="flex flex-wrap gap-1.5">
             {QUICK_PROMPTS.map((qp) => (
               <button
                 key={qp.label}
-                onClick={() => { setPrompt(qp.prompt); }}
-                className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-lg text-[11px] text-white/50 hover:text-white/80 transition-all"
+                onClick={() => setPrompt(qp.prompt)}
+                className="px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer border"
+                style={{ background: "var(--bg-muted)", borderColor: "var(--border)", color: "var(--text-3)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent-light)"; (e.currentTarget as HTMLElement).style.color = "var(--text-accent)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; }}
               >
                 {qp.label}
               </button>
@@ -146,21 +164,20 @@ export default function AIBlockCreator({ onAddBlock, onClose }: Props) {
           </div>
         </div>
 
-        {/* Error */}
         {error && (
-          <div className="mx-4 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-300 text-xs">
-            {error}
-          </div>
+          <div className="mx-4 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs">{error}</div>
         )}
 
-        {/* Generated blocks */}
         {generatedBlocks.length > 0 && (
-          <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-2">
-            <p className="text-white/40 text-xs font-medium uppercase tracking-wider">Generated Blocks</p>
+          <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-2 scrollbar-thin">
+            <p className="table-header mb-1">Generated Blocks</p>
             {generatedBlocks.map((gen, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 bg-white/[0.04] hover:bg-white/[0.06] border border-white/[0.06] rounded-xl transition-all group"
+                className="flex items-center gap-3 p-3 rounded-xl transition-all border"
+                style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}
+                onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"}
+                onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"}
               >
                 <div
                   className="px-3 py-1.5 rounded-lg text-white font-bold text-xs min-w-[140px] text-center"
@@ -169,16 +186,14 @@ export default function AIBlockCreator({ onAddBlock, onClose }: Props) {
                   {gen.label}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white/70 text-xs truncate">{gen.description}</p>
+                  <p className="text-t2 text-xs truncate">{gen.description}</p>
                   {gen.inputs && gen.inputs.length > 0 && (
-                    <p className="text-white/30 text-[10px] mt-0.5">
-                      Inputs: {gen.inputs.map((i) => i.name).join(", ")}
-                    </p>
+                    <p className="text-t3 text-[10px] mt-0.5">Inputs: {gen.inputs.map((i) => i.name).join(", ")}</p>
                   )}
                 </div>
                 <button
                   onClick={() => handleAddGenerated(gen)}
-                  className="px-3 py-1.5 bg-[#FF6B9D]/20 hover:bg-[#FF6B9D]/30 text-[#FF6B9D] font-bold text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap"
+                  className="px-3 py-1.5 bg-[#FF6B9D]/20 hover:bg-[#FF6B9D]/30 text-[#FF6B9D] font-bold text-xs rounded-lg transition-all whitespace-nowrap cursor-pointer"
                 >
                   + Add
                 </button>
@@ -196,15 +211,37 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
   const lower = prompt.toLowerCase();
   const blocks: GeneratedBlock[] = [];
 
-  if (lower.includes("game") || lower.includes("jump") || lower.includes("platform")) {
+  const hasAny = (...terms: string[]) => terms.some((t) => lower.includes(t));
+
+  if (hasAny("flashlight", "torch", "light") && hasAny("enemy", "enemies", "monster", "zombie", "chase", "running")) {
     blocks.push(
-      { name: "jump", label: "jump (HEIGHT)", category: "motion", description: "Make the sprite jump up", inputs: [{ name: "HEIGHT", type: "number", default: 50 }] },
-      { name: "fall", label: "apply gravity (STRENGTH)", category: "motion", description: "Pull sprite downward", inputs: [{ name: "STRENGTH", type: "number", default: 2 }] },
-      { name: "land", label: "land on ground at (Y)", category: "motion", description: "Stop falling at ground level", inputs: [{ name: "Y", type: "number", default: -120 }] }
+      { name: "follow_mouse", label: "follow mouse speed (SPEED)", category: "motion", description: "Aim flashlight toward mouse", inputs: [{ name: "SPEED", type: "number", default: 3 }] },
+      { name: "distance_check", label: "distance to player (DIST)", category: "sensing", description: "Measure enemy distance", inputs: [{ name: "DIST", type: "number", default: 80 }] },
+      { name: "push_away", label: "push enemy away (POWER)", category: "motion", description: "Repel enemies when flashlight hits", inputs: [{ name: "POWER", type: "number", default: 6 }] },
+      { name: "threat_loop", label: "enemy chase loop", category: "control", description: "Run enemy AI continuously" },
+      { name: "flash_effect", label: "flashlight glow (VALUE)", category: "looks", description: "Set brightness to show flashlight cone", inputs: [{ name: "VALUE", type: "number", default: 30 }] }
     );
   }
 
-  if (lower.includes("color") || lower.includes("rainbow") || lower.includes("effect")) {
+  if (hasAny("game", "jump", "platform", "enemy", "chase")) {
+    blocks.push(
+      { name: "setstate", label: "set game state to (STATE)", category: "game", description: "Switch the game into play, pause, menu, or battle mode", inputs: [{ name: "STATE", type: "string", default: "playing" }] },
+      { name: "setplayerstat", label: "set player (STAT) to (VALUE)", category: "game", description: "Track player health, score, ammo, or speed", inputs: [{ name: "STAT", type: "string", default: "health" }, { name: "VALUE", type: "number", default: 100 }] },
+      { name: "spawnenemy", label: "spawn enemy (TYPE) at x: (X) y: (Y)", category: "game", description: "Spawn an enemy for the current scene", inputs: [{ name: "TYPE", type: "string", default: "slime" }, { name: "X", type: "number", default: 120 }, { name: "Y", type: "number", default: -100 }] },
+      { name: "setworldgravity", label: "set world gravity to (GRAVITY)", category: "game", description: "Control platformer or physics movement", inputs: [{ name: "GRAVITY", type: "number", default: 0.8 }] }
+    );
+  }
+
+  if (hasAny("inventory", "quest", "save", "checkpoint", "hud", "objective", "rpg")) {
+    blocks.push(
+      { name: "additem", label: "add item (ITEM)", category: "game", description: "Add a reward or pickup to the inventory", inputs: [{ name: "ITEM", type: "string", default: "key" }] },
+      { name: "setquest", label: "set quest (QUEST) to (STATUS)", category: "game", description: "Track quest progress", inputs: [{ name: "QUEST", type: "string", default: "Open the gate" }, { name: "STATUS", type: "string", default: "active" }] },
+      { name: "save", label: "save game slot (SLOT)", category: "game", description: "Store game progress locally", inputs: [{ name: "SLOT", type: "string", default: "slot1" }] },
+      { name: "showhud", label: "show HUD message (TEXT)", category: "game", description: "Display the next objective or hint", inputs: [{ name: "TEXT", type: "string", default: "Find the exit" }] }
+    );
+  }
+
+  if (hasAny("color", "rainbow", "effect", "flashlight", "light")) {
     blocks.push(
       { name: "rainbow", label: "rainbow cycle speed (SPEED)", category: "looks", description: "Cycle through rainbow colors", inputs: [{ name: "SPEED", type: "number", default: 5 }] },
       { name: "glow", label: "glow color (COLOR)", category: "looks", description: "Add a glowing effect", inputs: [{ name: "COLOR", type: "string", default: "#ff00ff" }] },
@@ -212,7 +249,7 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
     );
   }
 
-  if (lower.includes("chat") || lower.includes("talk") || lower.includes("respond")) {
+  if (hasAny("chat", "talk", "respond", "ai", "npc")) {
     blocks.push(
       { name: "greet", label: "greet user with (MSG)", category: "ai", description: "Say hello to the user", inputs: [{ name: "MSG", type: "string", default: "Hi there!" }] },
       { name: "respond_to", label: "respond to (INPUT)", category: "ai", description: "Generate a smart reply", inputs: [{ name: "INPUT", type: "string", default: "hello" }] },
@@ -220,7 +257,7 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
     );
   }
 
-  if (lower.includes("music") || lower.includes("note") || lower.includes("melody") || lower.includes("song")) {
+  if (hasAny("music", "note", "melody", "song", "sound")) {
     blocks.push(
       { name: "play_note", label: "play note (NOTE) for (BEATS) beats", category: "sound", description: "Play a musical note", inputs: [{ name: "NOTE", type: "number", default: 60 }, { name: "BEATS", type: "number", default: 1 }] },
       { name: "set_tempo", label: "set tempo to (BPM)", category: "sound", description: "Change how fast the music plays", inputs: [{ name: "BPM", type: "number", default: 120 }] },
@@ -228,7 +265,7 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
     );
   }
 
-  if (lower.includes("random") || lower.includes("spawn") || lower.includes("item")) {
+  if (hasAny("random", "spawn", "item", "event")) {
     blocks.push(
       { name: "spawn_at_random", label: "spawn at random position", category: "motion", description: "Place sprite at a random spot" },
       { name: "random_costume", label: "switch to random costume", category: "looks", description: "Pick a random look" },
@@ -236,7 +273,7 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
     );
   }
 
-  if (lower.includes("follow") || lower.includes("chase") || lower.includes("ai") || lower.includes("smart")) {
+  if (hasAny("follow", "chase", "ai", "smart", "enemy")) {
     blocks.push(
       { name: "follow_mouse", label: "follow mouse speed (SPEED)", category: "motion", description: "Move toward mouse pointer", inputs: [{ name: "SPEED", type: "number", default: 3 }] },
       { name: "avoid_sprite", label: "avoid (SPRITE) distance (DIST)", category: "motion", description: "Run away from a sprite", inputs: [{ name: "SPRITE", type: "string", default: "Cat" }, { name: "DIST", type: "number", default: 50 }] },
@@ -253,7 +290,13 @@ function generateLocalBlocks(prompt: string): GeneratedBlock[] {
     );
   }
 
-  return blocks;
+  // Keep only unique names and avoid overwhelming the list
+  const seen = new Set<string>();
+  return blocks.filter((b) => {
+    if (seen.has(b.name)) return false;
+    seen.add(b.name);
+    return true;
+  }).slice(0, 12);
 }
 
 function getCatColor(cat: BlockCategory): string {
@@ -265,6 +308,7 @@ function getCatColor(cat: BlockCategory): string {
     control: "#FFAB19",
     operators: "#59C059",
     variables: "#FF8C1A",
+    game: "#E85D2A",
     ai: "#FF6B9D",
   };
   return colors[cat] || "#888";

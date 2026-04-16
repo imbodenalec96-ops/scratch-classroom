@@ -1,10 +1,13 @@
 import React, { useState, useCallback } from "react";
 import type { Sprite } from "@scratch/shared";
+import { useTheme } from "../lib/theme.tsx";
 
 interface Keyframe { id: string; spriteId: string; time: number; x: number; y: number; rotation: number; scale: number; }
 interface Props { sprites: Sprite[]; duration: number; onPlay: (keyframes: Keyframe[]) => void; }
 
 export default function Timeline({ sprites, duration = 10, onPlay }: Props) {
+  const { theme } = useTheme();
+  const dk = theme === "dark";
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -19,32 +22,29 @@ export default function Timeline({ sprites, duration = 10, onPlay }: Props) {
   }, [selectedSprite, currentTime, sprites]);
 
   const deleteKeyframe = useCallback((id: string) => { setKeyframes((prev) => prev.filter((k) => k.id !== id)); }, []);
-
   const handlePlay = () => { setPlaying(true); onPlay(keyframes); setTimeout(() => setPlaying(false), duration * 1000); };
-
   const spriteKeyframes = keyframes.filter((k) => k.spriteId === selectedSprite);
   const timeMarkers = Array.from({ length: duration + 1 }, (_, i) => i);
 
   return (
-    <div className="bg-white/[0.04] rounded-xl border border-white/[0.06] p-3 animate-fade-in">
+    <div className="card p-3 animate-fade-in">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-white">Timeline</h3>
+        <h3 className="text-sm font-semibold text-t1">Timeline</h3>
         <div className="flex gap-2">
           <select value={selectedSprite} onChange={(e) => setSelectedSprite(e.target.value)}
-            className="text-xs py-1 w-28 bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 text-white">
+            className="input text-xs py-1 w-28">
             {sprites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <button onClick={addKeyframe} className="text-xs py-1 px-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors">+ Keyframe</button>
-          <button onClick={handlePlay} disabled={playing}
-            className="text-xs py-1 px-2 rounded-lg bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border border-white/[0.06] transition-colors disabled:opacity-40">
+          <button onClick={addKeyframe} className="btn-primary text-xs py-1 px-2">+ Keyframe</button>
+          <button onClick={handlePlay} disabled={playing} className="btn-secondary text-xs py-1 px-2 disabled:opacity-40">
             {playing ? "▶ Playing..." : "▶ Play"}
           </button>
         </div>
       </div>
-      <div className="relative bg-white/[0.02] rounded-lg overflow-hidden border border-white/[0.04]" style={{ height: 60 }}>
+      <div className="relative rounded-lg overflow-hidden border" style={{ height: 60, background: "var(--bg-muted)", borderColor: "var(--border)" }}>
         <div className="absolute inset-0 flex">
           {timeMarkers.map((t) => (
-            <div key={t} className="flex-1 border-r border-white/[0.04] text-[9px] text-white/20 pl-0.5 pt-0.5">{t}s</div>
+            <div key={t} className="flex-1 border-r text-[9px] text-t3 pl-0.5 pt-0.5" style={{ borderColor: "var(--border)" }}>{t}s</div>
           ))}
         </div>
         <div className="absolute top-0 bottom-0 w-0.5 bg-violet-500 z-10 transition-all" style={{ left: `${(currentTime / duration) * 100}%` }} />
@@ -57,7 +57,7 @@ export default function Timeline({ sprites, duration = 10, onPlay }: Props) {
       </div>
       <input type="range" min={0} max={duration} step={0.1} value={currentTime}
         onChange={(e) => setCurrentTime(Number(e.target.value))} className="w-full mt-2 accent-violet-500" />
-      <div className="text-xs text-white/30 text-center">{currentTime.toFixed(1)}s / {duration}s</div>
+      <div className="text-xs text-t3 text-center">{currentTime.toFixed(1)}s / {duration}s</div>
     </div>
   );
 }

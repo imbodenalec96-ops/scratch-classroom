@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import type { Asset } from "@scratch/shared";
+import { useTheme } from "../lib/theme.tsx";
 
 interface Props {
   onSelect: (asset: Asset) => void;
@@ -272,19 +273,19 @@ export default function SpriteLibrary({ onSelect, onClose, tab: initialTab }: Pr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#12122a] rounded-2xl border border-white/[0.08] shadow-2xl w-[600px] max-h-[80vh] overflow-hidden">
+      <div className="ai-panel w-[600px] max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-          <h2 className="text-white font-bold text-sm">📚 Library</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg">✕</button>
+        <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+          <h2 className="text-t1 font-bold text-sm">Library</h2>
+          <button onClick={onClose} className="text-t3 hover:text-t1 text-lg cursor-pointer transition-colors">✕</button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 px-5 py-2 border-b border-white/[0.06]">
+        <div className="flex gap-2 px-5 py-2 border-b" style={{ borderColor: "var(--border)" }}>
           {(["sprites", "sounds", "backgrounds"] as const).map(t => (
             <button key={t} onClick={() => { setTab(t); setSelectedCategory("All"); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                tab === t ? "bg-violet-600 text-white" : "bg-white/[0.04] text-white/40 hover:text-white/70"
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                tab === t ? "bg-violet-600 text-white" : "btn-ghost py-1.5 px-3"
               }`}>
               {t === "sprites" ? "🎭 Sprites" : t === "sounds" ? "🔊 Sounds" : "🖼 Backgrounds"}
             </button>
@@ -295,29 +296,32 @@ export default function SpriteLibrary({ onSelect, onClose, tab: initialTab }: Pr
         <div className="px-5 py-2 flex gap-2 items-center">
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder={`Search ${tab}...`}
-            className="flex-1 text-xs py-1.5 px-3 bg-white/[0.06] border border-white/[0.08] rounded-lg text-white placeholder:text-white/20" />
-          <div className="flex gap-1 overflow-x-auto">
+            className="input flex-1 text-xs py-1.5" />
+          <div className="flex gap-1 overflow-x-auto scrollbar-none">
             {categories.map(c => (
               <button key={c} onClick={() => setSelectedCategory(c)}
-                className={`px-2 py-1 text-[10px] rounded-md whitespace-nowrap transition-all ${
-                  selectedCategory === c ? "bg-violet-600 text-white" : "bg-white/[0.04] text-white/40 hover:text-white/60"
+                className={`px-2 py-1 text-[10px] rounded-md whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCategory === c ? "bg-violet-600 text-white" : "btn-ghost py-1 px-2 text-[10px]"
                 }`}>{c}</button>
             ))}
           </div>
         </div>
 
         {/* Grid */}
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        <div className="flex-1 overflow-y-auto px-5 py-3 scrollbar-thin">
           {tab === "sprites" && (
             <div className="grid grid-cols-5 gap-2">
               {filteredSprites.map(item => (
                 <button key={item.name} onClick={() => handleSelectSprite(item)}
-                  className="group flex flex-col items-center gap-1 p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-violet-500/30 transition-all">
+                  className="group flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer"
+                  style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.3)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}>
                   <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl"
                     style={{ backgroundColor: item.color + "20" }}>
                     {item.emoji}
                   </div>
-                  <span className="text-[10px] text-white/50 group-hover:text-white/80">{item.name}</span>
+                  <span className="text-[10px] text-t3 group-hover:text-t1 transition-colors">{item.name}</span>
                 </button>
               ))}
             </div>
@@ -327,11 +331,14 @@ export default function SpriteLibrary({ onSelect, onClose, tab: initialTab }: Pr
             <div className="grid grid-cols-3 gap-2">
               {filteredSounds.map(item => (
                 <button key={item.name} onClick={() => handleSelectSound(item)}
-                  className="group flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-violet-500/30 transition-all text-left">
+                  className="group flex items-center gap-2 p-2.5 rounded-xl border transition-all text-left cursor-pointer"
+                  style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.3)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}>
                   <span className="text-xl w-8 text-center">{item.emoji}</span>
                   <div>
-                    <div className="text-xs text-white/70 group-hover:text-white font-medium">{item.name}</div>
-                    <div className="text-[10px] text-white/30">{item.description}</div>
+                    <div className="text-xs text-t2 group-hover:text-t1 transition-colors font-medium">{item.name}</div>
+                    <div className="text-[10px] text-t3">{item.description}</div>
                   </div>
                 </button>
               ))}
@@ -342,12 +349,15 @@ export default function SpriteLibrary({ onSelect, onClose, tab: initialTab }: Pr
             <div className="grid grid-cols-3 gap-2">
               {filteredBgs.map(item => (
                 <button key={item.name} onClick={() => handleSelectBg(item)}
-                  className="group flex flex-col items-center gap-1 p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-violet-500/30 transition-all">
+                  className="group flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer"
+                  style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.3)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}>
                   <div className="w-full h-16 rounded-lg flex items-center justify-center text-2xl"
                     style={{ backgroundColor: item.color }}>
                     {item.emoji}
                   </div>
-                  <span className="text-[10px] text-white/50 group-hover:text-white/80">{item.name}</span>
+                  <span className="text-[10px] text-t3 group-hover:text-t1 transition-colors">{item.name}</span>
                 </button>
               ))}
             </div>

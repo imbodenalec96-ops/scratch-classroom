@@ -94,47 +94,67 @@ router.post("/generate-blocks", async (req: AuthRequest, res: Response) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
-  // Keyword-based mock block generation
+  // Keyword-based block generation with multi-intent matching
   const lower = prompt.toLowerCase();
   const blocks: any[] = [];
+  const addBlock = (b: any) => {
+    if (!blocks.some((x) => x.name === b.name)) blocks.push(b);
+  };
 
-  if (lower.includes("game") || lower.includes("move") || lower.includes("platformer") || lower.includes("jump")) {
-    blocks.push(
-      { name: "game_jump", label: "jump (POWER) steps", category: "motion", description: "Make the sprite jump upward", inputs: [{ name: "POWER", type: "number", default: 20 }] },
-      { name: "game_run", label: "run (SPEED) right", category: "motion", description: "Move sprite horizontally", inputs: [{ name: "SPEED", type: "number", default: 5 }] },
-      { name: "game_gravity", label: "apply gravity (FORCE)", category: "motion", description: "Pull sprite downward", inputs: [{ name: "FORCE", type: "number", default: 2 }] },
-    );
-  } else if (lower.includes("color") || lower.includes("rainbow") || lower.includes("effect")) {
-    blocks.push(
-      { name: "color_cycle", label: "cycle colors every (SECS) secs", category: "looks", description: "Gradually shift through rainbow colors", inputs: [{ name: "SECS", type: "number", default: 0.5 }] },
-      { name: "color_flash", label: "flash (COLOR)", category: "looks", description: "Quick color flash effect", inputs: [{ name: "COLOR", type: "string", default: "#ff0000" }] },
-    );
-  } else if (lower.includes("chat") || lower.includes("bot") || lower.includes("respond")) {
-    blocks.push(
-      { name: "chat_greet", label: "greet the user", category: "ai", description: "Say a friendly greeting", inputs: [] },
-      { name: "chat_respond", label: "respond to (INPUT)", category: "ai", description: "Generate a smart response", inputs: [{ name: "INPUT", type: "string", default: "hello" }] },
-      { name: "chat_goodbye", label: "say goodbye", category: "ai", description: "End conversation politely", inputs: [] },
-    );
-  } else if (lower.includes("music") || lower.includes("melody") || lower.includes("note") || lower.includes("sound")) {
-    blocks.push(
-      { name: "music_note", label: "play note (NOTE) for (BEATS) beats", category: "sound", description: "Play a musical note", inputs: [{ name: "NOTE", type: "number", default: 60 }, { name: "BEATS", type: "number", default: 1 }] },
-      { name: "music_rest", label: "rest for (BEATS) beats", category: "sound", description: "Pause between notes", inputs: [{ name: "BEATS", type: "number", default: 1 }] },
-    );
-  } else if (lower.includes("random") || lower.includes("spawn") || lower.includes("event")) {
-    blocks.push(
-      { name: "random_spawn", label: "spawn at random position", category: "motion", description: "Move to a random spot", inputs: [] },
-      { name: "random_size", label: "set random size (MIN) to (MAX)", category: "looks", description: "Randomize sprite size", inputs: [{ name: "MIN", type: "number", default: 50 }, { name: "MAX", type: "number", default: 150 }] },
-      { name: "random_event", label: "if (CHANCE)% chance", category: "control", description: "Run blocks with a probability", inputs: [{ name: "CHANCE", type: "number", default: 30 }] },
-    );
-  } else {
-    // Generic fallback
-    blocks.push(
-      { name: "custom_action", label: "do (ACTION)", category: "control", description: "A custom action block", inputs: [{ name: "ACTION", type: "string", default: "something" }] },
-      { name: "custom_say", label: "say (TEXT) smartly", category: "ai", description: "Use AI to say something", inputs: [{ name: "TEXT", type: "string", default: "hello" }] },
-    );
+  const hasAny = (...terms: string[]) => terms.some((t) => lower.includes(t));
+
+  // Specific scenario: flashlight + enemies/chase/push-away
+  if (hasAny("flashlight", "torch", "light") && hasAny("enemy", "enemies", "monster", "zombie", "chase", "running")) {
+    addBlock({ name: "event_whenflagclicked", label: "when 🟢 flag clicked", category: "events", description: "Start the game loop", inputs: [] });
+    addBlock({ name: "control_forever", label: "forever", category: "control", description: "Continuously run enemy AI", inputs: [] });
+    addBlock({ name: "sensing_distanceto", label: "distance to (OBJECT)", category: "sensing", description: "Measure enemy distance to player/light", inputs: [{ name: "OBJECT", type: "string", default: "mouse" }] });
+    addBlock({ name: "control_if", label: "if ◇ then", category: "control", description: "Branch behavior based on distance", inputs: [{ name: "CONDITION", type: "string", default: "distance < 80" }] });
+    addBlock({ name: "motion_pointtowards", label: "point towards (TARGET)", category: "motion", description: "Enemy faces player", inputs: [{ name: "TARGET", type: "string", default: "mouse" }] });
+    addBlock({ name: "motion_movesteps", label: "move (STEPS) steps", category: "motion", description: "Enemy moves toward or away", inputs: [{ name: "STEPS", type: "number", default: 3 }] });
+    addBlock({ name: "looks_seteffect", label: "set (EFFECT) effect to (VALUE)", category: "looks", description: "Use brightness/color for flashlight feel", inputs: [{ name: "EFFECT", type: "string", default: "brightness" }, { name: "VALUE", type: "number", default: 30 }] });
+    addBlock({ name: "sound_play", label: "play sound (SOUND)", category: "sound", description: "Add tension when enemies are near", inputs: [{ name: "SOUND", type: "string", default: "pop" }] });
   }
 
-  res.json({ blocks });
+  if (hasAny("game", "move", "platformer", "jump", "enemy", "chase")) {
+    addBlock({ name: "setstate", label: "set game state to (STATE)", category: "game", description: "Switch the game flow to menu, playing, paused, or combat", inputs: [{ name: "STATE", type: "string", default: "playing" }] });
+    addBlock({ name: "setplayerstat", label: "set player (STAT) to (VALUE)", category: "game", description: "Track health, ammo, score, or mana", inputs: [{ name: "STAT", type: "string", default: "health" }, { name: "VALUE", type: "number", default: 100 }] });
+    addBlock({ name: "spawnenemy", label: "spawn enemy (TYPE) at x: (X) y: (Y)", category: "game", description: "Spawn an enemy into the current encounter", inputs: [{ name: "TYPE", type: "string", default: "slime" }, { name: "X", type: "number", default: 120 }, { name: "Y", type: "number", default: -100 }] });
+    addBlock({ name: "setworldgravity", label: "set world gravity to (GRAVITY)", category: "game", description: "Tune the feel of a platformer or physics section", inputs: [{ name: "GRAVITY", type: "number", default: 0.8 }] });
+  }
+
+  if (hasAny("inventory", "quest", "save", "checkpoint", "hud", "objective", "rpg")) {
+    addBlock({ name: "additem", label: "add item (ITEM)", category: "game", description: "Give the player an inventory item", inputs: [{ name: "ITEM", type: "string", default: "key" }] });
+    addBlock({ name: "setquest", label: "set quest (QUEST) to (STATUS)", category: "game", description: "Track quest progress", inputs: [{ name: "QUEST", type: "string", default: "Find the crystal" }, { name: "STATUS", type: "string", default: "active" }] });
+    addBlock({ name: "save", label: "save game slot (SLOT)", category: "game", description: "Store local game progress", inputs: [{ name: "SLOT", type: "string", default: "slot1" }] });
+    addBlock({ name: "showhud", label: "show HUD message (TEXT)", category: "game", description: "Display a quest or combat message", inputs: [{ name: "TEXT", type: "string", default: "Quest updated" }] });
+  }
+
+  if (hasAny("color", "rainbow", "effect", "flashlight", "light")) {
+    addBlock({ name: "color_cycle", label: "cycle colors every (SECS) secs", category: "looks", description: "Gradually shift through rainbow colors", inputs: [{ name: "SECS", type: "number", default: 0.5 }] });
+    addBlock({ name: "color_flash", label: "flash (COLOR)", category: "looks", description: "Quick color flash effect", inputs: [{ name: "COLOR", type: "string", default: "#ff0000" }] });
+  }
+
+  if (hasAny("chat", "bot", "respond", "ai", "npc")) {
+    addBlock({ name: "chat_greet", label: "greet the user", category: "ai", description: "Say a friendly greeting", inputs: [] });
+    addBlock({ name: "chat_respond", label: "respond to (INPUT)", category: "ai", description: "Generate a smart response", inputs: [{ name: "INPUT", type: "string", default: "hello" }] });
+  }
+
+  if (hasAny("music", "melody", "note", "sound")) {
+    addBlock({ name: "music_note", label: "play note (NOTE) for (BEATS) beats", category: "sound", description: "Play a musical note", inputs: [{ name: "NOTE", type: "number", default: 60 }, { name: "BEATS", type: "number", default: 1 }] });
+    addBlock({ name: "music_rest", label: "rest for (BEATS) beats", category: "sound", description: "Pause between notes", inputs: [{ name: "BEATS", type: "number", default: 1 }] });
+  }
+
+  if (hasAny("random", "spawn", "event")) {
+    addBlock({ name: "random_spawn", label: "spawn at random position", category: "motion", description: "Move to a random spot", inputs: [] });
+    addBlock({ name: "random_event", label: "if (CHANCE)% chance", category: "control", description: "Run blocks with a probability", inputs: [{ name: "CHANCE", type: "number", default: 30 }] });
+  }
+
+  if (blocks.length === 0) {
+    addBlock({ name: "custom_action", label: "do (ACTION)", category: "control", description: "A custom action block", inputs: [{ name: "ACTION", type: "string", default: "something" }] });
+    addBlock({ name: "custom_say", label: "say (TEXT) smartly", category: "ai", description: "Use AI to say something", inputs: [{ name: "TEXT", type: "string", default: "hello" }] });
+  }
+
+  res.json({ blocks: blocks.slice(0, 10) });
 });
 
 // AI quiz generator

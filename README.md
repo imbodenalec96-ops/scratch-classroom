@@ -1,6 +1,6 @@
-# Scratch Classroom — Full-Stack Coding Platform
+# CodeForge — Full-Stack Creative Coding Platform
 
-A comprehensive Scratch-inspired classroom coding platform with drag-and-drop blocks, 2D/3D stages, real-time collaboration, AI assistance, and full teacher/student/admin role management.
+A comprehensive creative coding platform with drag-and-drop blocks, 2D/3D stages, real-time collaboration, AI assistance, and full teacher/student/admin role management.
 
 ## Tech Stack
 
@@ -46,7 +46,7 @@ npm install
 ### 2. Create database
 
 ```bash
-createdb scratch_classroom
+createdb codeforge
 ```
 
 ### 3. Configure environment
@@ -54,7 +54,7 @@ createdb scratch_classroom
 ```bash
 cp .env.example .env
 # Edit .env with your PostgreSQL connection string:
-# DATABASE_URL=postgresql://user:password@localhost:5432/scratch_classroom
+# DATABASE_URL=postgresql://user:password@localhost:5432/codeforge
 # JWT_SECRET=your-random-secret-key
 # OPENAI_API_KEY=sk-... (optional — AI features have mock fallback)
 ```
@@ -62,7 +62,7 @@ cp .env.example .env
 ### 4. Run schema + seed
 
 ```bash
-psql scratch_classroom < db/schema.sql
+psql codeforge < db/schema.sql
 npx tsx apps/api/src/data/seed.ts
 ```
 
@@ -124,6 +124,11 @@ After seeding, these accounts are available (password: `password123`):
 ### Student Tools
 - Join class by code
 - Project workspace with 2D/3D toggle
+- Modular Game Systems Builder in workspace (scenes, states, checkpoints, respawn, player/enemy/combat/world/UI/audio/export)
+- Game templates: Platformer, FPS, RPG
+- Local save/load game progress + checkpoint testing
+- Project performance indicators (size + block count warnings)
+- Shareable publish link and embed code generator
 - Quiz participation with instant scoring
 - Assignment submission with auto-grade preview
 - Personal analytics
@@ -141,6 +146,38 @@ After seeding, these accounts are available (password: `password123`):
 - Chat-based coding assistant (OpenAI or mock)
 - AI project generator
 - AI quiz generator
+
+## Game Creation System (Student Workspace)
+
+Open any student project and click `Game Systems` in the top toolbar.
+
+Included systems:
+- Scene manager with level list and active scene selection
+- Game states: menu, playing, paused, game over
+- Save/load game progress (local) + clear save
+- Checkpoints + respawn test
+- Player stats: health, stamina, movement tuning
+- Enemy AI state controls: idle, patrol, chase, attack
+- Combat tuning: melee/ranged, cooldown, damage type
+- World controls: weather, day/night, water toggle
+- UI controls: minimap, notifications, health/inventory toggles
+- Dev tools toggles: show FPS, show hitboxes
+- Inventory/quests editor
+- Publish helper: share link + embed code
+
+### Demo Game Templates
+- Platformer template
+- FPS arena template
+- RPG town/forest template
+
+### Setup Guide (In-App)
+1. Open project workspace.
+2. Click `Game Systems`.
+3. Apply a template (Platformer/FPS/RPG).
+4. Configure scenes, states, checkpoints, and systems.
+5. Build gameplay with blocks.
+6. Click `Run` to test play.
+7. Save project and use `Copy Share Link` for publishing.
 
 ### Security
 - JWT authentication with bcrypt password hashing
