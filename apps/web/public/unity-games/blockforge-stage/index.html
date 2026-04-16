@@ -257,6 +257,32 @@
         if (sayTimer) clearTimeout(sayTimer);
         sayTimer = setTimeout(() => sayBubble.style.opacity = '0', 3500);
       },
+      SpawnModel(json) {
+        const d = JSON.parse(json);
+        const voxels = d.voxels || [];
+        const group = new THREE.Group();
+        const VSIZE = 0.35;
+        voxels.forEach(v => {
+          const col = new THREE.Color(v.color || '#a78bfa');
+          const mat = new THREE.MeshPhongMaterial({ color: col, emissive: col, emissiveIntensity: 0.2, shininess: 60 });
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(VSIZE, VSIZE, VSIZE), mat);
+          mesh.position.set(v.x * VSIZE, v.y * VSIZE, v.z * VSIZE);
+          mesh.castShadow = true;
+          group.add(mesh);
+        });
+        // center the model
+        const box = new THREE.Box3().setFromObject(group);
+        const center = box.getCenter(new THREE.Vector3());
+        group.position.set(
+          player.position.x + 3 - center.x,
+          0.5 - center.y + box.getSize(new THREE.Vector3()).y / 2,
+          player.position.z - center.z
+        );
+        group.userData.baseY = group.position.y;
+        scene.add(group);
+        spawned.push(group);
+        spawnParticles(group.position.clone(), 0xa78bfa);
+      },
       Reset() {
         player.position.set(0, 0.7, 0);
         player.rotation.set(0, 0, 0);

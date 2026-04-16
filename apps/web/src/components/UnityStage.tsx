@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import UnityModelMaker from "./UnityModelMaker";
 
 const BUILD_PATH = "/unity-games/blockforge-stage/index.html";
 
@@ -104,6 +105,7 @@ export default function UnityStage() {
   const [loaded, setLoaded] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  const [showModelMaker, setShowModelMaker] = useState(false);
 
   // Check whether a real Unity build exists (not just the SPA catch-all).
   // Vercel rewrites all paths to index.html (200), so a HEAD check always
@@ -212,6 +214,8 @@ export default function UnityStage() {
 
   // Build found — show the Unity iframe
   return (
+    <>
+    {showModelMaker && <UnityModelMaker onClose={() => setShowModelMaker(false)} />}
     <div className="relative rounded-xl overflow-hidden flex flex-col" style={{ height: 360, background: "#07071a", border: "1px solid rgba(34,211,238,0.3)" }}>
       {!loaded && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10" style={{ background: "#07071a" }}>
@@ -227,7 +231,13 @@ export default function UnityStage() {
       <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style={{ background: "rgba(34,211,238,0.08)", borderBottom: "1px solid rgba(34,211,238,0.12)" }}>
         <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" style={{ boxShadow: "0 0 6px #22d3ee" }} />
         <span className="text-[10px] font-bold" style={{ color: "#22d3ee" }}>Unity Stage — Live</span>
-        <span className="text-[9px] text-white/25 ml-auto">Blocks send to BlockController via SendMessage</span>
+        <button
+          onClick={() => setShowModelMaker(true)}
+          className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all"
+          style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" }}
+        >
+          🎨 Model Maker
+        </button>
       </div>
 
       <iframe
@@ -241,5 +251,6 @@ export default function UnityStage() {
         title="Unity Stage"
       />
     </div>
+    </>
   );
 }
