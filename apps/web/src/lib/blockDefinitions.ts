@@ -29,6 +29,7 @@ const C: Record<string, string> = {
   pen: "#59A1AA",
   ai: "#FF6B9D",
   environment: "#2ECC71",
+  unity: "#22d3ee",
 };
 
 export const BLOCK_DEFS: BlockDef[] = [
@@ -417,6 +418,20 @@ export const BLOCK_DEFS: BlockDef[] = [
   { type: "motion_orbit", category: "motion", label: "orbit x: (CX) y: (CY) radius (R) speed (SPD)", color: C.motion, shape: "stack", inputs: [{ name: "CX", type: "number", default: 0 }, { name: "CY", type: "number", default: 0 }, { name: "R", type: "number", default: 80 }, { name: "SPD", type: "number", default: 2 }] },
   { type: "motion_followmouse", category: "motion", label: "follow mouse speed (SPEED)", color: C.motion, shape: "stack", inputs: [{ name: "SPEED", type: "number", default: 5 }] },
   { type: "motion_patrol", category: "motion", label: "patrol from x: (X1) to x: (X2) speed (SPEED)", color: C.motion, shape: "stack", inputs: [{ name: "X1", type: "number", default: -100 }, { name: "X2", type: "number", default: 100 }, { name: "SPEED", type: "number", default: 3 }] },
+
+  /* ═══════════════ Unity 3D (12 blocks) ═══════════════ */
+  { type: "unity_move", category: "unity", label: "Unity move x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", hint: "Moves the target object by these amounts", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 0 }, { name: "Z", type: "number", default: 1 }] },
+  { type: "unity_setposition", category: "unity", label: "Unity set position x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 0 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_rotate", category: "unity", label: "Unity rotate (AXIS) axis by (DEGREES)°", color: C.unity, shape: "stack", hint: "AXIS: x, y, or z", inputs: [{ name: "AXIS", type: "string", default: "y" }, { name: "DEGREES", type: "number", default: 45 }] },
+  { type: "unity_setrotation", category: "unity", label: "Unity set rotation x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 0 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_setscale", category: "unity", label: "Unity set scale (SCALE)", color: C.unity, shape: "stack", inputs: [{ name: "SCALE", type: "number", default: 1 }] },
+  { type: "unity_setcolor", category: "unity", label: "Unity set color r: (R) g: (G) b: (B)", color: C.unity, shape: "stack", hint: "Values 0–1", inputs: [{ name: "R", type: "number", default: 1 }, { name: "G", type: "number", default: 0.5 }, { name: "B", type: "number", default: 0 }] },
+  { type: "unity_spawn", category: "unity", label: "Unity spawn (PREFAB) at x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", hint: "PREFAB must be in a Resources/ folder", inputs: [{ name: "PREFAB", type: "string", default: "enemy" }, { name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 0 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_playanimation", category: "unity", label: "Unity play animation (NAME)", color: C.unity, shape: "stack", inputs: [{ name: "NAME", type: "string", default: "run" }] },
+  { type: "unity_applyforce", category: "unity", label: "Unity apply force x: (X) y: (Y) z: (Z)", color: C.unity, shape: "stack", hint: "Requires a Rigidbody on the target", inputs: [{ name: "X", type: "number", default: 0 }, { name: "Y", type: "number", default: 10 }, { name: "Z", type: "number", default: 0 }] },
+  { type: "unity_setgravity", category: "unity", label: "Unity set gravity (VALUE)", color: C.unity, shape: "stack", inputs: [{ name: "VALUE", type: "number", default: 9.8 }] },
+  { type: "unity_say", category: "unity", label: "Unity say (TEXT)", color: C.unity, shape: "stack", hint: "Logs text and triggers Say event in Unity", inputs: [{ name: "TEXT", type: "string", default: "Hello from BlockForge!" }] },
+  { type: "unity_reset", category: "unity", label: "Unity reset scene", color: C.unity, shape: "stack" },
 ];
 
 export function getBlockDef(type: string): BlockDef | undefined {
@@ -443,4 +458,5 @@ export const CATEGORIES: { id: BlockCategory; label: string; color: string; icon
   { id: "custom", label: "My Blocks", color: C.custom, icon: "✦" },
   { id: "pen", label: "Pen+", color: C.pen, icon: "✏" },
   { id: "ai", label: "AI", color: C.ai, icon: "✧" },
+  { id: "unity", label: "Unity 3D", color: C.unity, icon: "🎮" },
 ];

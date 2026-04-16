@@ -41,7 +41,7 @@ export interface ClassMember {
 }
 
 /* ── Projects ── */
-export type ProjectMode = "2d" | "3d";
+export type ProjectMode = "2d" | "3d" | "unity";
 
 export interface Sprite {
   id: string;
@@ -113,6 +113,7 @@ export type Shape3D = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane"
 
 /* ── Block coding ── */
 export type BlockCategory =
+  | "game"
   | "motion"
   | "looks"
   | "sound"
@@ -124,7 +125,10 @@ export type BlockCategory =
   | "custom"
   | "physics"
   | "sensing"
-  | "ai";
+  | "pen"
+  | "ai"
+  | "environment"
+  | "unity";
 
 export interface Block {
   id: string;

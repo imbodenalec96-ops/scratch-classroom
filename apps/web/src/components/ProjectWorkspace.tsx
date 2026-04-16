@@ -4,6 +4,7 @@ import BlockEditor from "./BlockEditor.tsx";
 import JSView from "./JSView.tsx";
 import Stage2D from "./Stage2D.tsx";
 import Stage3D from "./Stage3D.tsx";
+import UnityStage from "./UnityStage.tsx";
 import SpritePanel from "./SpritePanel.tsx";
 import AssetManager from "./AssetManager.tsx";
 import Timeline from "./Timeline.tsx";
@@ -760,10 +761,14 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
 
         {/* Mode toggle */}
         <div className={`flex rounded-lg overflow-hidden border ${dk ? "border-white/[0.08]" : "border-gray-200"}`}>
-          {(["2d", "3d"] as const).map((m) => (
+          {(["2d", "3d", "unity"] as const).map((m) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`px-3 py-1 text-xs font-medium transition-all ${mode === m ? "bg-violet-600 text-white" : dk ? "text-white/40 hover:text-white/60" : "text-gray-500 hover:text-gray-700"}`}>
-              {m.toUpperCase()}
+              className={`px-3 py-1 text-xs font-medium transition-all ${
+                mode === m
+                  ? m === "unity" ? "bg-cyan-500 text-white" : "bg-violet-600 text-white"
+                  : dk ? "text-white/40 hover:text-white/60" : "text-gray-500 hover:text-gray-700"
+              }`}>
+              {m === "unity" ? "🎮 Unity" : m.toUpperCase()}
             </button>
           ))}
         </div>
@@ -875,8 +880,10 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         <div className="w-[500px] flex flex-col border-l border-white/[0.06] p-2 gap-2 overflow-y-auto bg-white/[0.01]">
           {mode === "2d" ? (
             <Stage2D sprites={sprites} stage={stage} running={running} selectedSpriteId={selectedSpriteId} onRunningChange={setRunning} onSpriteMove={handleSpriteMove} />
-          ) : (
+          ) : mode === "3d" ? (
             <Stage3D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
+          ) : (
+            <UnityStage />
           )}
 
           {/* Sprite info panel (character info bar below stage) */}

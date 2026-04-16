@@ -503,6 +503,13 @@ function getBool(block: Block, key: string, fallback: boolean = false): boolean 
   return Boolean(v);
 }
 
+/* ── Unity bridge: send a command to the Unity WebGL stage ── */
+function unityBridge(method: string, params: Record<string, unknown>): void {
+  try {
+    (window as any).__unityStage?.send("BlockController", method, JSON.stringify(params));
+  } catch { /* Unity stage not loaded */ }
+}
+
 /* ── Evaluate a boolean condition from a block's CONDITION input ──
    The condition can be:
    - A static boolean value from block.inputs.CONDITION
@@ -2861,6 +2868,64 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
         case "event_whenvariable":
           thread.pc++;
           break;
+
+        /* ── Unity 3D blocks ── */
+        case "unity_move": {
+          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
+          unityBridge("Move", { x, y, z });
+          thread.pc++; break;
+        }
+        case "unity_setposition": {
+          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
+          unityBridge("SetPosition", { x, y, z });
+          thread.pc++; break;
+        }
+        case "unity_rotate": {
+          const axis = getStr(block, "AXIS", "y"); const degrees = getNum(block, "DEGREES");
+          unityBridge("Rotate", { axis, degrees });
+          thread.pc++; break;
+        }
+        case "unity_setrotation": {
+          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
+          unityBridge("SetRotation", { x, y, z });
+          thread.pc++; break;
+        }
+        case "unity_setscale": {
+          unityBridge("SetScale", { scale: getNum(block, "SCALE", 1) });
+          thread.pc++; break;
+        }
+        case "unity_setcolor": {
+          const r = getNum(block, "R"); const g = getNum(block, "G"); const b = getNum(block, "B");
+          unityBridge("SetColor", { r, g, b, a: 1 });
+          thread.pc++; break;
+        }
+        case "unity_spawn": {
+          const prefab = getStr(block, "PREFAB", "enemy");
+          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
+          unityBridge("Spawn", { prefab, x, y, z });
+          thread.pc++; break;
+        }
+        case "unity_playanimation": {
+          unityBridge("PlayAnimation", { name: getStr(block, "NAME", "run") });
+          thread.pc++; break;
+        }
+        case "unity_applyforce": {
+          const x = getNum(block, "X"); const y = getNum(block, "Y"); const z = getNum(block, "Z");
+          unityBridge("ApplyForce", { x, y, z });
+          thread.pc++; break;
+        }
+        case "unity_setgravity": {
+          unityBridge("SetGravity", { value: getNum(block, "VALUE", 9.8) });
+          thread.pc++; break;
+        }
+        case "unity_say": {
+          unityBridge("Say", { text: getStr(block, "TEXT", "") });
+          thread.pc++; break;
+        }
+        case "unity_reset": {
+          unityBridge("Reset", {});
+          thread.pc++; break;
+        }
 
         default:
           thread.pc++;
