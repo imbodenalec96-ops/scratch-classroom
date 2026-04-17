@@ -328,46 +328,63 @@ router.post("/:classId/ping", async (req: AuthRequest, res: Response) => {
   res.json({ ok: true });
 });
 
-// Teacher: get presence for all students in a class
-// Uses COALESCE of class-specific presence + global heartbeat as source of truth.
-// Either signal counts as "online" — much more robust than class-specific alone.
+// Teacher: get presence for all students in a class.
+// Two-step approach (more robust than one big JOIN) to survive partial
+// table state + make errors visible when debugging.
 router.get("/:classId/presence", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensurePresenceTable();
   await ensureHeartbeatTable();
+  const debug = req.query.debug === '1';
   try {
-    const rows = await db.prepare(
-      `SELECT u.id, u.name, u.email,
-        sp.last_seen AS sp_last_seen, sp.activity AS sp_activity,
-        h.last_seen  AS h_last_seen,  h.activity  AS h_activity
-       FROM users u
-       JOIN class_members cm ON u.id = cm.user_id
-       LEFT JOIN student_presence sp ON sp.user_id = u.id AND sp.class_id = ?
-       LEFT JOIN user_heartbeats h ON h.user_id = u.id
-       WHERE cm.class_id = ?
-       ORDER BY u.name`
-    ).all(req.params.classId, req.params.classId);
+    // Step 1: students in this class (same as /students endpoint — known good)
+    const students = await db.prepare(
+      `SELECT u.id, u.name, u.email
+       FROM users u JOIN class_members cm ON u.id = cm.user_id
+       WHERE cm.class_id = ? ORDER BY u.name`
+    ).all(req.params.classId) as any[];
+
+    if (students.length === 0) return res.json([]);
+
+    // Step 2: presence rows for this class
+    let presenceMap: Record<string, any> = {};
+    try {
+      const presenceRows = await db.prepare(
+        `SELECT user_id, last_seen, activity FROM student_presence WHERE class_id = ?`
+      ).all(req.params.classId) as any[];
+      for (const p of presenceRows) presenceMap[p.user_id] = p;
+    } catch (e) { console.error('presence rows error:', e); }
+
+    // Step 3: global heartbeats (for all users — cheap, small table)
+    let heartbeatMap: Record<string, any> = {};
+    try {
+      const hbRows = await db.prepare(
+        `SELECT user_id, last_seen, activity FROM user_heartbeats`
+      ).all() as any[];
+      for (const h of hbRows) heartbeatMap[h.user_id] = h;
+    } catch (e) { console.error('heartbeat rows error:', e); }
+
     const now = Date.now();
     const FIVE_MIN = 5 * 60 * 1000;
-    const result = (rows as any[]).map((r: any) => {
-      // Use whichever is more recent
-      const spTs = r.sp_last_seen ? new Date(r.sp_last_seen).getTime() : 0;
-      const hTs  = r.h_last_seen  ? new Date(r.h_last_seen).getTime()  : 0;
-      const last_seen = spTs >= hTs
-        ? (r.sp_last_seen || r.h_last_seen)
-        : (r.h_last_seen  || r.sp_last_seen);
-      const activity  = spTs >= hTs
-        ? (r.sp_activity || r.h_activity || 'online')
-        : (r.h_activity  || r.sp_activity || 'online');
-      const bestTs = Math.max(spTs, hTs);
+    const result = students.map((s: any) => {
+      const p = presenceMap[s.id];
+      const h = heartbeatMap[s.id];
+      const pTs = p?.last_seen ? new Date(p.last_seen).getTime() : 0;
+      const hTs = h?.last_seen ? new Date(h.last_seen).getTime() : 0;
+      const bestTs = Math.max(pTs, hTs);
+      const last_seen = pTs >= hTs ? (p?.last_seen || h?.last_seen || null) : (h?.last_seen || p?.last_seen || null);
+      const activity  = pTs >= hTs ? (p?.activity || h?.activity || 'online') : (h?.activity || p?.activity || 'online');
       return {
-        id: r.id, name: r.name, email: r.email,
+        id: s.id, name: s.name, email: s.email,
         last_seen, activity,
         isOnline: bestTs > 0 ? (now - bestTs < FIVE_MIN) : false,
+        ...(debug ? { _debug: { pTs, hTs, bestTs, ageMs: bestTs ? now - bestTs : null } } : {}),
       };
     });
     res.json(result);
-  } catch (e) {
+  } catch (e: any) {
     console.error('presence get error:', e);
+    // Surface the error in debug mode so we can diagnose
+    if (debug) return res.status(500).json({ error: String(e?.message || e), stack: e?.stack });
     res.json([]);
   }
 });
