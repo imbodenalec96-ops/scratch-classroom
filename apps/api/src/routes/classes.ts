@@ -821,11 +821,73 @@ router.post("/:classId/unlock", requireRole("teacher", "admin"), async (req: Aut
   }
 });
 
+// Student: delete a command row after acting on it (fire-and-forget from client).
+// Prevents the same MESSAGE / NAVIGATE / etc. from re-firing on subsequent polls.
+router.delete("/:classId/commands/:commandId/consume", async (req: AuthRequest, res: Response) => {
+  const { classId, commandId } = req.params;
+  await ensureClassStateTables();
+  try {
+    await db.prepare(
+      "DELETE FROM class_commands WHERE id = ? AND class_id = ? AND (target_user_id IS NULL OR target_user_id = ?)"
+    ).run(commandId, classId, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('consume command error:', e);
+    res.status(500).json({ error: 'Failed to consume command' });
+  }
+});
+
+// Teacher: end a single student's break early (Feature 35)
+router.post("/end-break/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  await ensureClassStateTables();
+  try {
+    const memberships = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    const now = new Date().toISOString();
+    for (const m of memberships) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at)
+         VALUES (?, ?, ?, 'END_BREAK', '/student', ?)`
+      ).run(id, m.class_id, studentId, now).catch(() => {});
+    }
+    res.json({ ok: true, classesAffected: memberships.length });
+  } catch (e) {
+    console.error('end-break error:', e);
+    res.status(500).json({ error: 'Failed to end break' });
+  }
+});
+
+// Teacher: end every active break in a class (bulk action on Monitor page)
+router.post("/:classId/end-all-breaks", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  await ensureClassStateTables();
+  try {
+    const members = await db.prepare(
+      "SELECT cm.user_id AS id FROM class_members cm JOIN users u ON u.id = cm.user_id WHERE cm.class_id = ? AND u.role = 'student'"
+    ).all(classId) as any[];
+    const now = new Date().toISOString();
+    for (const m of members) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at)
+         VALUES (?, ?, ?, 'END_BREAK', '/student', ?)`
+      ).run(id, classId, m.id, now).catch(() => {});
+    }
+    res.json({ ok: true, studentsNotified: members.length });
+  } catch (e) {
+    console.error('end-all-breaks error:', e);
+    res.status(500).json({ error: 'Failed to end all breaks' });
+  }
+});
+
 // Teacher: send a command to all or one student (NAVIGATE, MESSAGE, KICK)
 router.post("/:classId/command", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId } = req.params;
   const { type, payload = '', targetUserId } = req.body;
-  if (!["NAVIGATE", "MESSAGE", "KICK", "GRANT_FREE_TIME", "REVOKE_FREE_TIME", "LOCK", "UNLOCK", "FOCUS", "UNFOCUS"].includes(type)) {
+  if (!["NAVIGATE", "MESSAGE", "KICK", "GRANT_FREE_TIME", "REVOKE_FREE_TIME", "LOCK", "UNLOCK", "FOCUS", "UNFOCUS", "END_BREAK"].includes(type)) {
     return res.status(400).json({ error: "Invalid command type" });
   }
   await ensureClassStateTables();
@@ -880,11 +942,20 @@ router.post("/:classId/video", requireRole("teacher", "admin"), async (req: Auth
   res.json({ ok: true, videoId, videoTitle });
 });
 
-// Teacher: stop sharing video
+// Teacher: stop sharing video.
+// We used to silently `.catch(() => {})` the DELETE, which meant the teacher's
+// Stop Video button appeared to "do nothing" whenever the query failed — the
+// row stayed in class_video, so students' 3s poll kept showing the overlay.
+// Now we surface failures so the client can retry.
 router.delete("/:classId/video", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await ensureVideoTable();
-  await db.prepare("DELETE FROM class_video WHERE class_id = ?").run(req.params.classId).catch(() => {});
-  res.json({ ok: true });
+  try {
+    await ensureVideoTable();
+    const r = await db.prepare("DELETE FROM class_video WHERE class_id = ?").run(req.params.classId);
+    res.json({ ok: true, changes: r.changes });
+  } catch (e: any) {
+    console.error("stop video DELETE failed:", e);
+    res.status(500).json({ error: "Failed to stop video", detail: e?.message });
+  }
 });
 
 // Anyone in the class: get current video

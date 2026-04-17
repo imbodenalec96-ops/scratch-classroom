@@ -364,11 +364,21 @@ export default function MonitorPage() {
     setActiveVideo(id); setShowVideoInput(false); setVideoUrl(""); setVideoTitle("");
   };
 
-  const handleStopVideo = () => {
+  const handleStopVideo = async () => {
     if (!selectedClass) return;
-    getSocket().emit("class:video:stop", { classId: selectedClass.id });
-    api.stopClassVideo(selectedClass.id).catch(() => {});
-    setActiveVideo(null);
+    // Fire socket notification immediately for fast student dismiss,
+    // but ONLY clear local "Stop Video" UI state after the server DELETE
+    // succeeds — otherwise the teacher sees the button disappear while the
+    // broadcast is still live in the DB (the bug users were hitting).
+    try {
+      getSocket().emit("class:video:stop", { classId: selectedClass.id });
+      await api.stopClassVideo(selectedClass.id);
+      setActiveVideo(null);
+    } catch (e: any) {
+      console.error("stopClassVideo failed:", e);
+      alert("Failed to stop video: " + (e?.message || "unknown error") + "\n\nThe broadcast may still be live — please try again or refresh.");
+      // Do NOT clear activeVideo here; leave the button so the teacher can retry.
+    }
   };
 
   const onlineCount  = Object.values(presence).filter(p => p.isOnline).length;
