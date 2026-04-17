@@ -569,7 +569,7 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
 }
 
 /* ── Embedded player modal ───────────────────────────────────── */
-function PlayerModal({ game, onClose }: { game: Game; onClose: () => void }) {
+function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: () => void; showBrowseLink?: boolean }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
 
@@ -629,13 +629,24 @@ function PlayerModal({ game, onClose }: { game: Game; onClose: () => void }) {
               <div className="text-[11px] font-medium" style={{ color: game.accentColor }}>{game.category}</div>
             </div>
           </div>
-          <button
-            onClick={close}
-            className="rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-150"
-            style={{ minWidth: 44, minHeight: 44 }}
-          >
-            <X size={15} />
-          </button>
+          <div className="flex items-center gap-2">
+            {showBrowseLink && (
+              <button
+                onClick={close}
+                className="text-[11px] font-semibold text-white/60 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                title="Open the game picker"
+              >
+                Play something else →
+              </button>
+            )}
+            <button
+              onClick={close}
+              className="rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-150"
+              style={{ minWidth: 44, minHeight: 44 }}
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Game area */}
@@ -766,6 +777,13 @@ export default function ArcadePage() {
   const [prevCategory, setPrevCategory] = useState("All");
   const [playingGame, setPlayingGame] = useState<Game | null>(null);
   const [cardKey, setCardKey] = useState(0); // remount grid to re-trigger entrance anims
+  // Auto-launch indicator — only true on the initial mount when we restored
+  // the last-played game from localStorage. Controls the "Play something
+  // else →" link in the modal header so the student can still get to the grid.
+  const [autoLaunched, setAutoLaunched] = useState(false);
+  // Per-student last-played key. Falls back to a shared key for anon/teacher
+  // tabs — teachers skip auto-launch anyway via the role gate below.
+  const lastPlayedKey = `arcade.lastGameId.${user?.id || "anon"}`;
 
   // Presence ping — students show as "Playing in Arcade 🎮" in teacher monitor
   const arcadeActivity = playingGame
@@ -795,12 +813,13 @@ export default function ArcadePage() {
     });
   };
 
-  const breakGated = (games: Game[]) =>
-    (user?.role === "student" && onBreak) ? games.filter(g => BREAK_ALLOWED_GAME_IDS.has(g.id)) : games;
+  // During a break, show ALL games (no filter) — break-mode access is
+  // intentionally broad. Class-config gates still apply.
+  void onBreak; // retained for future use (e.g. badge in header)
 
-  const filtered = breakGated(configGated(
+  const filtered = configGated(
     activeCategory === "All" ? GAMES : GAMES.filter(g => g.category === activeCategory)
-  ));
+  );
 
   // If teacher has disabled the arcade wholesale, show a block message
   const arcadeHardDisabled = user?.role === "student" && !classConfig.arcadeEnabled;
@@ -814,7 +833,39 @@ export default function ArcadePage() {
     setCardKey(k => k + 1); // re-trigger entrance animations
   };
 
-  const handlePlay = useCallback((game: Game) => setPlayingGame(game), []);
+  const handlePlay = useCallback((game: Game) => {
+    // Persist per-student so the next /arcade visit skips the browse grid.
+    // Teachers/admins also write the key but auto-launch is role-gated below,
+    // so it only affects them if they later become a student.
+    try { localStorage.setItem(lastPlayedKey, game.id); } catch { /* storage quota / private mode */ }
+    setPlayingGame(game);
+  }, [lastPlayedKey]);
+
+  // One-shot auto-launch: on first mount, if the student has a saved last-
+  // played game that still exists in the catalog (and passes config gating),
+  // open it directly instead of making them scroll through the grid.
+  // Teachers/admins skip this entirely. Deliberately NOT in a ref-guarded
+  // loop — the dependency array includes `user?.id` only so remounts under
+  // the same student don't re-fire after a Close.
+  const didAutoLaunchRef = useRef(false);
+  useEffect(() => {
+    if (didAutoLaunchRef.current) return;
+    if (user?.role !== "student") return;
+    // Respect the same gates the grid uses — arcade hard-disabled or game
+    // removed from the allow-list should NOT auto-launch.
+    if (arcadeHardDisabled) return;
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(lastPlayedKey); } catch { stored = null; }
+    if (!stored) return;
+    const match = GAMES.find(g => g.id === stored);
+    if (!match) return;
+    const gated = configGated([match]);
+    if (gated.length === 0) return;
+    didAutoLaunchRef.current = true;
+    setPlayingGame(match);
+    setAutoLaunched(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role, arcadeHardDisabled, classConfig]);
 
   // Teacher disabled the arcade entirely — show a blocking page
   if (arcadeHardDisabled) {
@@ -929,7 +980,11 @@ export default function ArcadePage() {
 
       {/* ── Player modal ── */}
       {playingGame && (
-        <PlayerModal game={playingGame} onClose={() => setPlayingGame(null)} />
+        <PlayerModal
+          game={playingGame}
+          onClose={() => { setPlayingGame(null); setAutoLaunched(false); }}
+          showBrowseLink={autoLaunched}
+        />
       )}
     </div>
   );
