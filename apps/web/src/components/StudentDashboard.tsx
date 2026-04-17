@@ -288,25 +288,29 @@ function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
   const ss = String(secs % 60).padStart(2, "0");
   const pct = ((BREAK_SECONDS - secs) / BREAK_SECONDS) * 100;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8"
-      style={{ background: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)" }}>
-      <div className="text-center space-y-2">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8" style={{ background: "var(--bg)" }}>
+      <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+      <div className="relative z-10 text-center space-y-3">
         <div className="text-5xl">☕</div>
-        <h2 className="text-3xl font-extrabold text-white font-student">Break Time!</h2>
-        <p className="text-white/50 text-sm">Relax, stretch, grab some water</p>
+        <div className="section-label">— Pause —</div>
+        <h2 className="font-display text-5xl leading-tight" style={{ color: "var(--text-1)" }}>
+          Break<em style={{ color: "var(--accent)", fontStyle: "italic" }}> time.</em>
+        </h2>
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>Relax, stretch, grab some water.</p>
       </div>
-      <div className="relative w-48 h-48">
+      <div className="relative w-48 h-48 z-10">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-          <circle cx="50" cy="50" r="44" fill="none" stroke="#22d3ee" strokeWidth="8"
+          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--border)" strokeWidth="4" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--accent)" strokeWidth="4"
             strokeDasharray={`${2 * Math.PI * 44}`}
             strokeDashoffset={`${2 * Math.PI * 44 * (1 - pct / 100)}`}
             strokeLinecap="round"
             style={{ transition: "stroke-dashoffset 1s linear" }} />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-4xl font-mono font-bold text-white">{mm}:{ss}</span>
-          <span className="text-white/50 text-xs mt-1">remaining</span>
+          <span className="font-display text-5xl tabular-nums leading-none" style={{ color: "var(--text-1)" }}>{mm}:{ss}</span>
+          <span className="text-[10px] uppercase tracking-wider mt-2" style={{ color: "var(--text-3)" }}>remaining</span>
         </div>
       </div>
       <div className="relative flex items-center justify-center">
@@ -1085,65 +1089,73 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      {/* ── Stats ── */}
+      {/* ── Stats — editorial Fraunces numerals with semantic left border ── */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Classes", value: c0, icon: Users, color: "#06b6d4", bg: dk ? "rgba(6,182,212,0.1)" : "#ecfeff" },
-          { label: "Submitted", value: c1, icon: CheckCircle, color: "#10b981", bg: dk ? "rgba(16,185,129,0.1)" : "#ecfdf5" },
-          { label: "Graded", value: c2, icon: Star, color: "#f59e0b", bg: dk ? "rgba(245,158,11,0.1)" : "#fffbeb" },
+          { label: "Classes",   value: c0, icon: Users,       accent: "var(--info)" },
+          { label: "Submitted", value: c1, icon: CheckCircle, accent: "var(--success)" },
+          { label: "Graded",    value: c2, icon: Star,        accent: "var(--accent)" },
         ].map((s, i) => (
-          <div key={s.label} className="card flex items-center gap-3 animate-slide-up" style={{ animationDelay: `${80 + i * 60}ms` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
-              <s.icon size={17} style={{ color: s.color }} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold leading-none tabular-nums" style={{ color: dk ? "white" : "#1e293b" }}>{s.value}</div>
-              <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>{s.label}</div>
+          <div key={s.label} className="card flex items-baseline gap-3 animate-slide-up"
+            style={{ padding: "14px 16px", borderLeft: `3px solid ${s.accent}`, animationDelay: `${80 + i * 60}ms` }}>
+            <div style={{ color: s.accent }}><s.icon size={15}/></div>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{s.label}</div>
+              <div className="font-display text-3xl leading-none mt-1 tabular-nums" style={{ color: "var(--text-1)" }}>{s.value}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Free Time Unlocked ── */}
+      {/* ── Free Time Unlocked — editorial tile set ── */}
       {unlocked && (
         <div className="animate-spring-in" style={{ animationDelay: "200ms" }}>
-          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: dk ? "#34d399" : "#059669" }}>
-            🎉 Free Time Unlocked!
+          <div className="section-label mb-3" style={{ color: "var(--success)" }}>
+            — Free time earned —
           </div>
-          {/* Responsive grid: 1 col mobile, 2 col 640+, keeps working at all iPad + Chromebook sizes */}
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
             <Link to="/arcade"
-              className="group flex flex-col items-center justify-center gap-3 py-8 rounded-3xl border-2 text-center transition-all arcade-card-press animate-spring-in"
+              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
               style={{
                 animationDelay: "240ms",
-                background: dk ? "linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.08))" : "linear-gradient(135deg, #f5f3ff, #ede9fe)",
-                borderColor: dk ? "rgba(139,92,246,0.3)" : "#c4b5fd",
-                boxShadow: dk ? "none" : "0 4px 0 rgba(139,92,246,0.15), 0 8px 20px rgba(139,92,246,0.08)",
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderLeft: "3px solid var(--accent)",
+                borderRadius: "var(--r-xl)",
+                textDecoration: "none",
               }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-md"
-                style={{ background: dk ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.1)" }}>
+              <div className="w-12 h-12 flex items-center justify-center text-2xl"
+                style={{ background: "var(--accent-light)", borderRadius: "var(--r-md)" }}>
                 🎮
               </div>
               <div>
-                <div className="font-student font-bold text-base" style={{ color: dk ? "#c4b5fd" : "#5b21b6" }}>Arcade</div>
-                <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#7c3aed" }}>Play games!</div>
+                <div className="section-label mb-1">— Arcade —</div>
+                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
+                  Play some<em style={{ color: "var(--accent)", fontStyle: "italic" }}> games.</em>
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>29 games · keep it fun</div>
               </div>
             </Link>
             <Link to="/projects"
-              className="group flex flex-col items-center justify-center gap-3 py-8 rounded-3xl border-2 text-center transition-all arcade-card-press animate-spring-in"
+              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
               style={{
                 animationDelay: "310ms",
-                background: dk ? "linear-gradient(135deg, rgba(16,185,129,0.10), rgba(5,150,105,0.06))" : "linear-gradient(135deg, #ecfdf5, #d1fae5)",
-                borderColor: dk ? "rgba(16,185,129,0.25)" : "#6ee7b7",
-                boxShadow: dk ? "none" : "0 4px 0 rgba(16,185,129,0.15), 0 8px 20px rgba(16,185,129,0.08)",
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderLeft: "3px solid var(--accent-sage)",
+                borderRadius: "var(--r-xl)",
+                textDecoration: "none",
               }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-md"
-                style={{ background: dk ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.1)" }}>
+              <div className="w-12 h-12 flex items-center justify-center text-2xl"
+                style={{ background: "color-mix(in srgb, var(--accent-sage) 14%, transparent)", borderRadius: "var(--r-md)" }}>
                 💻
               </div>
               <div>
-                <div className="font-student font-bold text-base" style={{ color: dk ? "#6ee7b7" : "#065f46" }}>Projects</div>
-                <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#059669" }}>Build something!</div>
+                <div className="section-label mb-1" style={{ color: "var(--accent-sage)" }}>— Projects —</div>
+                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
+                  Build<em style={{ color: "var(--accent-sage)", fontStyle: "italic" }}> something.</em>
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>BlockForge · 2D & 3D stages</div>
               </div>
             </Link>
           </div>

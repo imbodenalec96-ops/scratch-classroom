@@ -1019,76 +1019,49 @@ export default function LessonsPage() {
         </div>
       )}
 
-      {/* ── Lesson Modal ── */}
+      {/* ── Lesson Full-Screen Editorial ── */}
       {activeLesson && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
-          onClick={() => { setActiveLesson(null); resetQuiz(); }}
-        >
-          <div
-            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
-            style={{
-              background: dk ? "#0d0e24" : "#fff",
-              border: "1px solid rgba(139,92,246,0.25)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
+        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "var(--bg)" }}>
+          {/* Subtle paper grid */}
+          <div className="fixed inset-0 pointer-events-none opacity-[0.04]"
+            style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+          <div className="relative max-w-3xl mx-auto px-6 py-8">
+            {/* Editorial header with back button */}
             <div
-              className="sticky top-0 z-10 flex items-start justify-between gap-4 px-6 pt-6 pb-4"
-              style={{
-                background: dk ? "#0d0e24" : "#fff",
-                borderBottom: "1px solid rgba(139,92,246,0.12)",
-              }}
+              className="sticky top-0 z-10 -mx-6 px-6 py-4 backdrop-blur-md border-b"
+              style={{ background: "color-mix(in srgb, var(--bg) 85%, transparent)", borderColor: "var(--border)" }}
             >
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-3xl">{activeLesson.emoji}</span>
-                  <h2 className="text-xl font-bold text-t1 leading-tight">{activeLesson.title}</h2>
-                </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {activeLesson.grades.map((g) => (
-                    <span
-                      key={g}
-                      className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-                      style={{
-                        background: "rgba(139,92,246,0.15)",
-                        color: "#c4b5fd",
-                        border: "1px solid rgba(139,92,246,0.3)",
-                      }}
-                    >
-                      Grade {g}
-                    </span>
-                  ))}
-                  <span
-                    className="text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize"
-                    style={{
-                      background: "rgba(99,102,241,0.12)",
-                      color: "#a5b4fc",
-                      border: "1px solid rgba(99,102,241,0.25)",
-                    }}
-                  >
-                    {activeLesson.subject}
-                  </span>
-                  {quizMode && (
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full" style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.3)" }}>
-                      🧠 Quiz Mode
-                    </span>
-                  )}
+              <div className="flex items-center justify-between gap-4">
+                <button onClick={() => { setActiveLesson(null); resetQuiz(); }} className="btn-ghost text-xs gap-1.5" style={{ padding: "6px 10px" }}>
+                  ← Back to lessons
+                </button>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-3)" }}>
+                  <span style={{ fontSize: 16 }}>{activeLesson.emoji}</span>
+                  <span>{activeLesson.subject}</span>
+                  <span style={{ color: "var(--border-md)" }}>·</span>
+                  <span>Grade {activeLesson.grades.join("/")}</span>
                 </div>
               </div>
-              <button
-                onClick={() => { setActiveLesson(null); resetQuiz(); }}
-                className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-t3 hover:text-t1 transition-colors cursor-pointer"
-                style={{ background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)" }}
-              >
-                ✕
-              </button>
             </div>
 
-            {/* Modal body */}
-            <div className="px-6 pb-6 space-y-5 mt-4">
+            {/* Masthead */}
+            <div className="py-6">
+              <div>
+                <div className="section-label mb-2">— Today's reading —</div>
+                <h2 className="font-display text-4xl sm:text-5xl leading-[1.05]" style={{ color: "var(--text-1)" }}>
+                  {activeLesson.title}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+                </h2>
+                <p className="text-sm mt-3 max-w-xl" style={{ color: "var(--text-2)" }}>
+                  {activeLesson.description}
+                </p>
+                {quizMode && (
+                  <div className="stamp mt-3">🧠 Quiz Mode</div>
+                )}
+              </div>
+            </div>
+
+            {/* Lesson body */}
+            <div className="pb-10 space-y-5 mt-4">
               {/* Lesson sections (not in quiz mode) */}
               {!quizMode && !quizDone && activeLesson.sections.map((section, i) => (
                 section.isActivity ? (
