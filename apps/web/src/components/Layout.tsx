@@ -2,6 +2,7 @@ import React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
+import { isWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
@@ -142,6 +143,7 @@ function getNavItems(role: string) {
     { path: "/lessons",    icon: BookOpen,        label: "Lessons"     },
     { path: "/arcade",     icon: Gamepad2,        label: "Arcade"      },
   ];
+  const workDone = isWorkUnlocked();
   if (role === "admin") {
     return [...common,
       { path: "/monitor",    icon: Monitor,   label: "Monitor"    },
@@ -159,9 +161,19 @@ function getNavItems(role: string) {
       { path: "/leaderboard", icon: Trophy,        label: "Leaderboard" },
     ];
   }
-  return [...common,
-    { path: "/assignments",  icon: ClipboardList, label: "Assignments" },
-    { path: "/leaderboard",  icon: Trophy,        label: "Leaderboard" },
-    { path: "/achievements", icon: Medal,         label: "Achievements"},
+  // Students: base nav + arcade/projects unlocked after completing work
+  const studentBase = [
+    { path: "/",             icon: LayoutDashboard, label: "Dashboard"   },
+    { path: "/lessons",      icon: BookOpen,        label: "Lessons"     },
+    { path: "/assignments",  icon: ClipboardList,   label: "Assignments" },
+    { path: "/leaderboard",  icon: Trophy,          label: "Leaderboard" },
+    { path: "/achievements", icon: Medal,           label: "Achievements"},
   ];
+  if (workDone) {
+    studentBase.push(
+      { path: "/arcade",    icon: Gamepad2,   label: "🎮 Arcade"  },
+      { path: "/projects",  icon: FolderOpen, label: "💻 Projects" },
+    );
+  }
+  return studentBase;
 }

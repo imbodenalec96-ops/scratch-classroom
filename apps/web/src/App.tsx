@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { isWorkUnlocked } from "./lib/workUnlock.ts";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
 import LoginPage from "./components/LoginPage.tsx";
@@ -64,14 +65,24 @@ function DashboardRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/home" replace />;
-  if (user.role === "admin") return <Navigate to="/admin" replace />;
+  if (user.role === "admin") return <Navigate to="/teacher" replace />;
   if (user.role === "teacher") return <Navigate to="/teacher" replace />;
   return <Navigate to="/student" replace />;
 }
 
 function ProjectWorkspaceRoute() {
+  const { user } = useAuth();
   const { id } = useParams();
+  // Students can access projects only after completing today's work
+  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
   return <ProjectWorkspace projectId={id} />;
+}
+
+function ArcadeGuard() {
+  const { user } = useAuth();
+  // Students can access arcade only after completing today's work
+  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  return <ArcadePage />;
 }
 
 export default function App() {
@@ -107,7 +118,7 @@ export default function App() {
           {/* ── Public routes — no login needed ── */}
           <Route element={<PublicLayout />}>
             <Route path="/home" element={<LandingPage />} />
-            <Route path="/arcade" element={<ArcadePage />} />
+            <Route path="/arcade" element={<ArcadeGuard />} />
           </Route>
 
           {/* Public playground — no login required */}

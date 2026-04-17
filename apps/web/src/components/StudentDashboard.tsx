@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
-import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock } from "lucide-react";
+import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
+import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2, FolderOpen } from "lucide-react";
 
 type Phase = 'welcome' | 'loading' | 'working' | 'break' | 'done';
 
@@ -515,6 +517,9 @@ export default function StudentDashboard() {
         await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
       } catch {}
     }
+    // Unlock arcade + projects for the rest of the day
+    setWorkUnlocked();
+    spawnConfetti();
     try {
       const subs = await api.getMySubmissions();
       setSubmissions(subs);
@@ -622,6 +627,47 @@ export default function StudentDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Free time unlocked section */}
+      {isWorkUnlocked() && (
+        <div className="animate-slide-up" style={{ animationDelay: "200ms" }}>
+          <div className={`text-xs font-bold uppercase tracking-widest mb-3 ${dk ? "text-emerald-400" : "text-emerald-600"}`}>
+            🎉 Free Time Unlocked!
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Link to="/arcade"
+              className="card-hover group flex flex-col items-center justify-center gap-3 py-7 rounded-2xl border-2 text-center transition-all"
+              style={{
+                background: dk ? "linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.08))" : "linear-gradient(135deg, #f5f3ff, #eef2ff)",
+                borderColor: dk ? "rgba(139,92,246,0.3)" : "#c4b5fd",
+              }}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: dk ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.1)" }}>
+                🎮
+              </div>
+              <div>
+                <div className={`font-bold text-sm ${dk ? "text-violet-300" : "text-violet-700"}`}>Arcade</div>
+                <div className={`text-xs mt-0.5 ${dk ? "text-white/30" : "text-gray-400"}`}>Play games!</div>
+              </div>
+            </Link>
+            <Link to="/projects"
+              className="card-hover group flex flex-col items-center justify-center gap-3 py-7 rounded-2xl border-2 text-center transition-all"
+              style={{
+                background: dk ? "linear-gradient(135deg, rgba(16,185,129,0.10), rgba(5,150,105,0.06))" : "linear-gradient(135deg, #ecfdf5, #d1fae5)",
+                borderColor: dk ? "rgba(16,185,129,0.25)" : "#6ee7b7",
+              }}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: dk ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.1)" }}>
+                💻
+              </div>
+              <div>
+                <div className={`font-bold text-sm ${dk ? "text-emerald-300" : "text-emerald-700"}`}>Projects</div>
+                <div className={`text-xs mt-0.5 ${dk ? "text-white/30" : "text-gray-400"}`}>Build something!</div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {classVideo && (
         <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: "280ms" }}>
