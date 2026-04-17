@@ -299,8 +299,8 @@ router.post("/heartbeat", async (req: AuthRequest, res: Response) => {
 router.post("/snapshot", async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const { data = '', path = '' } = req.body || {};
-  // Hard cap to prevent accidental giant payloads (compressed JPEG should be < 40KB)
-  if (typeof data !== 'string' || data.length > 60_000) {
+  // Hard cap — normal thumbnails are <55KB, focused high-res up to ~200KB
+  if (typeof data !== 'string' || data.length > 240_000) {
     return res.status(413).json({ error: 'snapshot too large' });
   }
   const now = new Date().toISOString();
@@ -617,41 +617,72 @@ router.post("/force-unlock-all", requireRole("teacher", "admin"), async (req: Au
   }
 });
 
-// Teacher: lock a SINGLE student (adds a targeted NAVIGATE + sets teacher_controls.screen_locked)
+// Teacher: lock a SINGLE student via the class_commands pipe (client polls this)
 router.post("/lock-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { studentId } = req.params;
   const { message = '' } = req.body;
+  await ensureClassStateTables();
   try {
-    // Flip the per-student lock flag in teacher_controls (exists across all classes)
     const rows = await db.prepare(
       "SELECT class_id FROM class_members WHERE user_id = ?"
     ).all(studentId) as any[];
+    const now = new Date().toISOString();
     for (const r of rows) {
-      const existing = await db.prepare(
-        "SELECT id FROM teacher_controls WHERE class_id = ? AND student_id = ?"
-      ).get(r.class_id, studentId) as any;
-      if (!existing) {
-        await db.prepare(
-          "INSERT INTO teacher_controls (id, class_id, student_id, screen_locked) VALUES (?, ?, ?, 1)"
-        ).run(crypto.randomUUID(), r.class_id, studentId).catch(() => {});
-      } else {
-        await db.prepare(
-          "UPDATE teacher_controls SET screen_locked = 1 WHERE id = ?"
-        ).run(existing.id).catch(() => {});
-      }
-      // Also drop a targeted MESSAGE command so they see something immediately
-      if (message) {
-        const id = crypto.randomUUID();
-        const now = new Date().toISOString();
-        await db.prepare(
-          "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'MESSAGE', ?, ?)"
-        ).run(id, r.class_id, studentId, message, now).catch(() => {});
-      }
+      const id = crypto.randomUUID();
+      // Payload is the lock message (optional). Client OR's this with class-wide lock.
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'LOCK', ?, ?)"
+      ).run(id, r.class_id, studentId, message || '', now).catch(() => {});
     }
     res.json({ ok: true, classesAffected: rows.length });
   } catch (e) {
     console.error('lock-student error:', e);
     res.status(500).json({ error: 'Failed to lock student' });
+  }
+});
+
+// Teacher: unlock a single student (clears the per-student lock command)
+router.post("/unlock-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  await ensureClassStateTables();
+  try {
+    const rows = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'UNLOCK', '', ?)"
+      ).run(id, r.class_id, studentId, now).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('unlock-student error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Teacher: focus a student (send FOCUS command → client captures high-res)
+router.post("/focus-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  const { focused } = req.body;
+  await ensureClassStateTables();
+  try {
+    const rows = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, ?, '', ?)"
+      ).run(id, r.class_id, studentId, focused ? 'FOCUS' : 'UNFOCUS', now).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('focus-student error:', e);
+    res.status(500).json({ error: 'Failed' });
   }
 });
 
@@ -774,7 +805,7 @@ router.post("/:classId/unlock", requireRole("teacher", "admin"), async (req: Aut
 router.post("/:classId/command", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId } = req.params;
   const { type, payload = '', targetUserId } = req.body;
-  if (!["NAVIGATE", "MESSAGE", "KICK", "GRANT_FREE_TIME", "REVOKE_FREE_TIME"].includes(type)) {
+  if (!["NAVIGATE", "MESSAGE", "KICK", "GRANT_FREE_TIME", "REVOKE_FREE_TIME", "LOCK", "UNLOCK", "FOCUS", "UNFOCUS"].includes(type)) {
     return res.status(400).json({ error: "Invalid command type" });
   }
   await ensureClassStateTables();

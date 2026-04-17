@@ -41,14 +41,23 @@ export interface ClassroomState {
   lockMessage: string;
   lockedBy: string;
   pendingMessage: string | null;
+  /** True when teacher has focused this student → capture high-res previews */
+  isFocused: boolean;
 }
+
+// Module-level flag for screenshot capture hook to read
+let _focusedMode = false;
+export function isScreenshotFocused(): boolean { return _focusedMode; }
 
 export function useClassCommands(enabled = true): ClassroomState & { dismissMessage: () => void } {
   const navigate = useNavigate();
   const [isLocked, setIsLocked] = useState(false);
+  const [studentLocked, setStudentLocked] = useState(false);
+  const [studentLockMsg, setStudentLockMsg] = useState("");
   const [lockMessage, setLockMessage] = useState("");
   const [lockedBy, setLockedBy] = useState("");
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   const lastCmdAtRef = useRef(new Date(0).toISOString());
   const dismissMessage = useCallback(() => setPendingMessage(null), []);
@@ -100,6 +109,22 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
               setPendingMessage(cmd.payload || "");
               setTimeout(() => setPendingMessage(null), 15_000);
               break;
+            case "LOCK":
+              setStudentLocked(true);
+              setStudentLockMsg(cmd.payload || "");
+              break;
+            case "UNLOCK":
+              setStudentLocked(false);
+              setStudentLockMsg("");
+              break;
+            case "FOCUS":
+              _focusedMode = true;
+              setIsFocused(true);
+              break;
+            case "UNFOCUS":
+              _focusedMode = false;
+              setIsFocused(false);
+              break;
             case "GRANT_FREE_TIME":
               try {
                 localStorage.setItem("workDoneDate", new Date().toISOString().slice(0, 10));
@@ -132,5 +157,16 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
     };
   }, [navigate, enabled]);
 
-  return { isLocked, lockMessage, lockedBy, pendingMessage, dismissMessage };
+  // OR class-wide lock with per-student lock — either triggers the overlay
+  const effectiveLocked = isLocked || studentLocked;
+  const effectiveMsg = studentLocked && studentLockMsg ? studentLockMsg : lockMessage;
+
+  return {
+    isLocked: effectiveLocked,
+    lockMessage: effectiveMsg,
+    lockedBy,
+    pendingMessage,
+    isFocused,
+    dismissMessage,
+  };
 }

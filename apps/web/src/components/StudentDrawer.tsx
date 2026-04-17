@@ -40,9 +40,14 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   }, []);
 
   // Poll snapshot at 2s in the drawer (faster than the tile's 6s refresh)
+  // + send FOCUS to the student so they capture at high-res. UNFOCUS on close.
   useEffect(() => {
     if (!open || !student) return;
     let cancelled = false;
+
+    // Tell the student client to switch to high-res capture
+    api.focusStudent(student.id, true).catch(() => {});
+
     const fetchIt = async () => {
       try {
         const d = await api.getStudentSnapshot(student.id);
@@ -51,7 +56,13 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
     };
     fetchIt();
     const iv = setInterval(fetchIt, 2000);
-    return () => { cancelled = true; clearInterval(iv); };
+
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      // Tell the student client to go back to thumbnail mode
+      api.focusStudent(student.id, false).catch(() => {});
+    };
   }, [open, student]);
 
   // Escape closes
@@ -69,8 +80,13 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
     catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleUnlock = async () => {
-    try { await api.forceUnlockStudent(student.id); setKidLocked(false); showFlash("🔓 Unlocked"); }
-    catch (e: any) { alert("Failed: " + e.message); }
+    try {
+      // Send UNLOCK command AND clear any class-wide lock for safety
+      await api.unlockStudent(student.id);
+      await api.forceUnlockStudent(student.id).catch(() => {});
+      setKidLocked(false);
+      showFlash("🔓 Unlocked");
+    } catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleSendMsg = async () => {
     if (!msg.trim()) return;

@@ -15,11 +15,19 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "./api.ts";
+import { isScreenshotFocused } from "./useClassCommands.ts";
 
-const CAPTURE_INTERVAL_MS = 6_000;
-const THUMB_WIDTH = 240;
-const THUMB_HEIGHT = 160;
-const JPEG_QUALITY = 0.55;
+// Standard low-res capture (thumbnail on Monitor grid)
+const NORMAL_INTERVAL_MS = 6_000;
+const NORMAL_WIDTH = 240;
+const NORMAL_HEIGHT = 160;
+const NORMAL_JPEG_Q = 0.55;
+
+// Focused capture (teacher has drawer open on this student)
+const FOCUSED_INTERVAL_MS = 2_000;
+const FOCUSED_WIDTH = 1280;
+const FOCUSED_HEIGHT = 720;
+const FOCUSED_JPEG_Q = 0.72;
 
 export function useScreenshotCapture(enabled: boolean) {
   const location = useLocation();
@@ -34,34 +42,36 @@ export function useScreenshotCapture(enabled: boolean) {
     async function capture() {
       if (cancelled) return;
       if (document.visibilityState !== "visible") return;
-      // Skip if the lock overlay is showing — teacher doesn't need to see the lock screen
       if (document.querySelector('[aria-label="Screen locked by teacher"]')) return;
+
+      const focused = isScreenshotFocused();
+      const tgtW = focused ? FOCUSED_WIDTH  : NORMAL_WIDTH;
+      const tgtH = focused ? FOCUSED_HEIGHT : NORMAL_HEIGHT;
+      const q    = focused ? FOCUSED_JPEG_Q : NORMAL_JPEG_Q;
+      const maxBytes = focused ? 180_000 : 55_000;
 
       try {
         const mod = await import("html-to-image").catch(() => null);
         if (!mod || cancelled) return;
 
-        // Capture the main content area, fall back to documentElement
         const node = (document.querySelector("main") as HTMLElement | null)
           || document.documentElement;
 
-        // Compute scale so output fits THUMB_WIDTH
         const rect = node.getBoundingClientRect();
         const scale = Math.min(
-          THUMB_WIDTH / Math.max(rect.width, 1),
-          THUMB_HEIGHT / Math.max(rect.height, 1),
+          tgtW / Math.max(rect.width, 1),
+          tgtH / Math.max(rect.height, 1),
         );
 
         const dataUrl = await mod.toJpeg(node, {
-          quality: JPEG_QUALITY,
+          quality: q,
           cacheBust: false,
           skipFonts: true,
           pixelRatio: scale,
-          width: Math.min(rect.width, 2000),
-          height: Math.min(rect.height, 2000),
+          width: Math.min(rect.width, 2400),
+          height: Math.min(rect.height, 2400),
           backgroundColor: "#07071a",
           filter: (el: Element) => {
-            // Don't capture iframes / canvases (CORS-tainted) or the lock overlay
             if (el instanceof HTMLIFrameElement) return false;
             if (el instanceof HTMLCanvasElement) return false;
             return true;
@@ -69,19 +79,29 @@ export function useScreenshotCapture(enabled: boolean) {
         }).catch(() => null);
 
         if (!dataUrl || cancelled) return;
-
-        // Hard client-side size cap
-        if (dataUrl.length > 55_000) return;
+        if (dataUrl.length > maxBytes) return;
 
         api.postSnapshot(dataUrl, pathRef.current).catch(() => {});
-      } catch {
-        // Silent no-op — capture failures shouldn't break the student's session
-      }
+      } catch {}
     }
 
     // First capture after 3s so layout has settled
     const first = setTimeout(capture, 3_000);
-    timer = setInterval(capture, CAPTURE_INTERVAL_MS);
+
+    // Dynamic interval — re-check focus state every loop so switching
+    // to/from focused mode takes effect immediately.
+    let lastInterval = NORMAL_INTERVAL_MS;
+    const scheduleNext = () => {
+      const want = isScreenshotFocused() ? FOCUSED_INTERVAL_MS : NORMAL_INTERVAL_MS;
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        capture();
+        const newWant = isScreenshotFocused() ? FOCUSED_INTERVAL_MS : NORMAL_INTERVAL_MS;
+        if (newWant !== lastInterval) { lastInterval = newWant; scheduleNext(); }
+      }, want);
+      lastInterval = want;
+    };
+    scheduleNext();
 
     return () => {
       cancelled = true;
