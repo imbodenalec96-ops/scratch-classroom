@@ -520,6 +520,89 @@ router.get("/:classId/classroom-state", async (req: AuthRequest, res: Response) 
   }
 });
 
+// Teacher: bulk Grant Free Time to every student in a class
+router.post("/:classId/grant-free-time-all", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassStateTables();
+  try {
+    const students = await db.prepare(
+      "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    ).all(req.params.classId) as any[];
+    const now = new Date().toISOString();
+    for (const s of students) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'GRANT_FREE_TIME', '', ?)"
+      ).run(id, req.params.classId, s.id, now).catch(() => {});
+    }
+    res.json({ ok: true, studentsAffected: students.length });
+  } catch (e) {
+    console.error('grant-all error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Teacher: bulk Revoke Free Time
+router.post("/:classId/revoke-free-time-all", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassStateTables();
+  try {
+    const students = await db.prepare(
+      "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    ).all(req.params.classId) as any[];
+    const now = new Date().toISOString();
+    for (const s of students) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'REVOKE_FREE_TIME', '/student', ?)"
+      ).run(id, req.params.classId, s.id, now).catch(() => {});
+    }
+    res.json({ ok: true, studentsAffected: students.length });
+  } catch (e) {
+    console.error('revoke-all error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Free-time config (per class) — stored in a small KV table
+let configTableReady = false;
+async function ensureConfigTable() {
+  if (configTableReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS class_config (
+        class_id TEXT PRIMARY KEY,
+        config TEXT NOT NULL DEFAULT '{}',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    `);
+    configTableReady = true;
+  } catch (e) { console.error('ensureConfigTable error:', e); }
+}
+
+router.get("/:classId/config", async (req: AuthRequest, res: Response) => {
+  await ensureConfigTable();
+  try {
+    const row = await db.prepare("SELECT config FROM class_config WHERE class_id = ?").get(req.params.classId) as any;
+    if (!row) return res.json({});
+    try { res.json(JSON.parse(row.config)); } catch { res.json({}); }
+  } catch { res.json({}); }
+});
+
+router.put("/:classId/config", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureConfigTable();
+  const payload = JSON.stringify(req.body || {});
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      `INSERT INTO class_config (class_id, config, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET config = excluded.config, updated_at = excluded.updated_at`
+    ).run(req.params.classId, payload, now);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('config put error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 // Admin: Force-unlock every class (panic button)
 router.post("/force-unlock-all", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureClassStateTables();

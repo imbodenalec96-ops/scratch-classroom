@@ -146,6 +146,10 @@ export const api = {
   lockStudent: (studentId: string, message?: string) => request<any>(`/classes/lock-student/${studentId}`, { method: "POST", body: JSON.stringify({ message: message || '' }) }),
   grantFreeTime: (studentId: string) => request<any>(`/classes/grant-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
   revokeFreeTime: (studentId: string) => request<any>(`/classes/revoke-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
+  grantFreeTimeAll: (classId: string) => request<any>(`/classes/${classId}/grant-free-time-all`, { method: "POST", body: JSON.stringify({}) }),
+  revokeFreeTimeAll: (classId: string) => request<any>(`/classes/${classId}/revoke-free-time-all`, { method: "POST", body: JSON.stringify({}) }),
+  getClassConfig: (classId: string) => request<any>(`/classes/${classId}/config`),
+  updateClassConfig: (classId: string, config: any) => request<any>(`/classes/${classId}/config`, { method: "PUT", body: JSON.stringify(config) }),
 
   // DOM preview thumbnails
   postSnapshot: (data: string, path: string) =>
@@ -220,6 +224,12 @@ export const api = {
     request<any[]>('/ai-tasks/generate', { method: 'POST', body: JSON.stringify(data) }),
   generateClasswideTasks: (data: { class_id: string; date: string; subject: string; grade_min: number; grade_max: number; focus?: string }) =>
     request<any>('/ai-tasks/generate-classwide', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Lesson views (Feature 22)
+  viewLesson: (lessonId: string) => request<{ok:boolean}>(`/lessons/view/${encodeURIComponent(lessonId)}`, { method: "POST", body: JSON.stringify({}) }),
+  markLessonRead: (lessonId: string) => request<any>(`/lessons/mark-read/${encodeURIComponent(lessonId)}`, { method: "POST", body: JSON.stringify({}) }),
+  getMyLessonViews: () => request<Array<{lesson_id: string; opened_at: string; marked_read_at: string}>>("/lessons/my-views"),
+  getClassLessonViews: (classId: string) => request<any[]>(`/lessons/class/${classId}/views`),
   worksheetSearch: (query: string, grade_min: number, grade_max: number) =>
     request<any[]>('/ai-tasks/worksheet-search', { method: 'POST', body: JSON.stringify({ query, grade_min, grade_max }) }),
   getTaskConfig: () => request<any[]>('/ai-tasks/task-config'),

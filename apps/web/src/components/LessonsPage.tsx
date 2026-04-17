@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import LessonsBrowser from "./LessonsBrowser.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { usePresencePing } from "../lib/presence.ts";
+import { api } from "../lib/api.ts";
 
 // ─── Coding lessons (original 11 JS lessons) ────────────────────────────────
 const CODING_LESSONS = [
@@ -765,6 +766,30 @@ export default function LessonsPage() {
   const [gradeFilter, setGradeFilter] = useState<number>(0); // 0 = All
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [markedRead, setMarkedRead] = useState<Set<string>>(new Set());
+  const [markFlash, setMarkFlash] = useState(false);
+
+  // Track lesson opens + keep marked-read set in sync with server
+  useEffect(() => {
+    api.getMyLessonViews().then(views => {
+      const ids = views.filter((v: any) => v.marked_read_at).map((v: any) => v.lesson_id);
+      setMarkedRead(new Set(ids));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeLesson?.id) api.viewLesson(activeLesson.id).catch(() => {});
+  }, [activeLesson?.id]);
+
+  const handleMarkAsRead = async () => {
+    if (!activeLesson) return;
+    try {
+      await api.markLessonRead(activeLesson.id);
+      setMarkedRead(prev => new Set([...prev, activeLesson.id]));
+      setMarkFlash(true);
+      setTimeout(() => setMarkFlash(false), 2000);
+    } catch (e: any) { alert("Couldn't save: " + e.message); }
+  };
 
   // Presence ping
   const lessonActivity = activeLesson
@@ -1212,10 +1237,10 @@ export default function LessonsPage() {
                     ← Back
                   </button>
                   <button
-                    onClick={() => markComplete(activeLesson.id)}
+                    onClick={() => { markComplete(activeLesson.id); handleMarkAsRead(); }}
                     className="flex-1 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all"
                     style={
-                      completed.has(activeLesson.id)
+                      markedRead.has(activeLesson.id) || markFlash
                         ? {
                             background: "rgba(34,197,94,0.15)",
                             color: "#4ade80",
@@ -1228,7 +1253,7 @@ export default function LessonsPage() {
                           }
                     }
                   >
-                    {completed.has(activeLesson.id) ? "✓ Completed!" : "Mark as Complete ✓"}
+                    {markFlash ? "✓ Saved!" : markedRead.has(activeLesson.id) ? "✓ Marked as read" : "📖 Mark as Read"}
                   </button>
                   {/* Take the Quiz button */}
                   {activeLesson.quiz.length > 0 && (

@@ -84,6 +84,43 @@ export default function MonitorPage() {
   const [snapshots, setSnapshots]           = useState<Record<string, { data: string; path: string; capturedAt: string }>>({});
   const [zoomedSnapshot, setZoomedSnapshot] = useState<{ name: string; data: string; path: string } | null>(null);
   const [drawerStudent, setDrawerStudent]   = useState<any>(null);
+  const [period, setPeriod]                 = useState<string>(() => localStorage.getItem("monitor_period") || "None");
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [freeTimeConfig, setFreeTimeConfig] = useState<any>({
+    arcadeEnabled: true, projectsEnabled: true, unityEnabled: true,
+    blockforgeEnabled: true, youtubeEnabled: true, dailyCapMinutes: 0,
+  });
+
+  useEffect(() => { localStorage.setItem("monitor_period", period); }, [period]);
+
+  // Load per-class config
+  useEffect(() => {
+    if (!selectedClass) return;
+    api.getClassConfig(selectedClass.id).then((cfg: any) => {
+      if (cfg && typeof cfg === 'object') setFreeTimeConfig((prev: any) => ({ ...prev, ...cfg }));
+    }).catch(() => {});
+  }, [selectedClass]);
+
+  const saveConfig = useCallback(async () => {
+    if (!selectedClass) return;
+    try {
+      await api.updateClassConfig(selectedClass.id, freeTimeConfig);
+      alert("✓ Free-time config saved");
+    } catch (e: any) { alert("Failed: " + e.message); }
+  }, [selectedClass, freeTimeConfig]);
+
+  const handleGrantAll = async () => {
+    if (!selectedClass) return;
+    if (!confirm(`Grant free time to every student in ${selectedClass.name}?`)) return;
+    try { const r = await api.grantFreeTimeAll(selectedClass.id); alert(`✓ Free time granted to ${r.studentsAffected} students`); }
+    catch (e: any) { alert("Failed: " + e.message); }
+  };
+  const handleRevokeAll = async () => {
+    if (!selectedClass) return;
+    if (!confirm(`Revoke free time for every student in ${selectedClass.name}? They'll be pushed back to assignments.`)) return;
+    try { const r = await api.revokeFreeTimeAll(selectedClass.id); alert(`⛔ Free time revoked for ${r.studentsAffected} students`); }
+    catch (e: any) { alert("Failed: " + e.message); }
+  };
   const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
   const [msgText, setMsgText]               = useState("");
   const [showPushMenu, setShowPushMenu]     = useState(false);
@@ -408,6 +445,16 @@ export default function MonitorPage() {
           >
             <LockOpen size={11}/> Force Unlock All
           </button>
+          {/* Period selector — label-only, doesn't auto-trigger (per user spec) */}
+          <select value={period} onChange={e => setPeriod(e.target.value)}
+            className="input py-2 text-xs w-36"
+            title="Class period — just a label to scope your current settings"
+          >
+            <option value="None">No period</option>
+            {["Period 1","Period 2","Period 3","Period 4","Period 5","Period 6","Free Time"].map(p =>
+              <option key={p} value={p}>{p}</option>
+            )}
+          </select>
           {classes.length > 1 && (
             <select value={selectedClass?.id ?? ""} onChange={e => handleClassChange(e.target.value)} className="input py-2 text-sm w-44">
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -497,6 +544,66 @@ export default function MonitorPage() {
               <MessageSquare size={13}/> Message All
             </button>
           </div>
+
+          {/* Bulk free-time actions + config toggle */}
+          <div className={`flex flex-wrap gap-2 items-center pt-2 border-t ${dk?"border-white/[0.05]":"border-gray-100"}`}>
+            <span className={`text-xs font-semibold ${dk?"text-white/50":"text-gray-600"}`}>Free Time:</span>
+            <button onClick={handleGrantAll}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border-yellow-500/25":"bg-yellow-50 hover:bg-yellow-100 text-yellow-600 border-yellow-200"}`}>
+              🎁 Grant All
+            </button>
+            <button onClick={handleRevokeAll}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25":"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
+              ⛔ Revoke All
+            </button>
+            <button onClick={() => setShowConfigPanel(v => !v)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${showConfigPanel ? (dk?"bg-blue-500/20 text-blue-300 border-blue-500/40":"bg-blue-100 text-blue-700 border-blue-300") : (dk?"bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/25":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200")}`}>
+              ⚙️ Free Time Settings
+            </button>
+            {period !== "None" && (
+              <span className={`ml-auto text-[10px] font-semibold px-2 py-1 rounded-full ${dk?"bg-white/[0.04] text-white/45":"bg-gray-100 text-gray-600"}`}>
+                Scope: {period}
+              </span>
+            )}
+          </div>
+
+          {/* Free-time config panel */}
+          {showConfigPanel && (
+            <div className={`mt-3 p-4 rounded-xl space-y-3 animate-slide-in ${dk ? "bg-white/[0.03] border border-white/[0.06]" : "bg-gray-50 border border-gray-200"}`}>
+              <div className={`text-xs font-bold uppercase tracking-wider ${dk?"text-white/40":"text-gray-500"}`}>
+                Free Time includes:
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { key: "arcadeEnabled",    label: "🎮 Arcade" },
+                  { key: "projectsEnabled",  label: "💻 Projects" },
+                  { key: "unityEnabled",     label: "🎮 Unity 3D" },
+                  { key: "blockforgeEnabled",label: "🔮 BlockForge" },
+                  { key: "youtubeEnabled",   label: "📺 YouTube" },
+                ].map(f => (
+                  <label key={f.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-xs font-semibold ${freeTimeConfig[f.key] ? (dk?"bg-emerald-500/10 text-emerald-400":"bg-emerald-50 text-emerald-700") : (dk?"bg-white/[0.03] text-white/40":"bg-white text-gray-400")}`}>
+                    <input type="checkbox" checked={!!freeTimeConfig[f.key]}
+                      onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, [f.key]: e.target.checked }))} />
+                    {f.label}
+                  </label>
+                ))}
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${dk?"bg-white/[0.03] text-white/50":"bg-white text-gray-500"}`}>
+                  <span>Daily cap (min):</span>
+                  <input type="number" value={freeTimeConfig.dailyCapMinutes || 0} min={0} max={240}
+                    onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, dailyCapMinutes: parseInt(e.target.value) || 0 }))}
+                    className="input text-xs w-16 py-1" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={saveConfig} className="btn-primary gap-1.5 px-4 text-xs">
+                  Save & Apply
+                </button>
+                <span className={`text-[10px] ${dk?"text-white/25":"text-gray-400"}`}>
+                  Applies to all students in {selectedClass?.name} on next poll
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Row 2: Announce */}
           <div className="flex gap-2">
