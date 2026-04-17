@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
@@ -416,6 +416,9 @@ export default function AssignmentBuilder() {
   const [fullWeekStart, setFullWeekStart] = useState<string>("");
   const [fullWeekGenerating, setFullWeekGenerating] = useState(false);
   const [fullWeekResult, setFullWeekResult] = useState<any>(null);
+  // Real-time progress
+  const [fwProgress, setFwProgress] = useState<{ done: number; failed: number; total: number; current?: string; elapsed: number }>({ done: 0, failed: 0, total: 0, elapsed: 0 });
+  const fwCancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
 
   // Edit modal state
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
@@ -511,10 +514,17 @@ export default function AssignmentBuilder() {
     if (!classId) return;
     const subjects = Object.entries(fullWeekSubjects).filter(([, v]) => v).map(([k]) => k);
     if (subjects.length === 0) { alert("Pick at least one subject."); return; }
+
     setFullWeekGenerating(true);
     setFullWeekResult(null);
+    fwCancelRef.current.cancelled = false;
+
+    const CONCURRENCY = 10; // max parallel AI calls — stays well under Anthropic rate limits
+    const t0 = Date.now();
+
     try {
-      const r = await api.generateFullWeek({
+      // 1) Plan (fast, no AI — returns slot list)
+      const plan = await api.planFullWeek({
         classId,
         weekStarting: fullWeekStart || undefined,
         subjects,
@@ -522,12 +532,62 @@ export default function AssignmentBuilder() {
         difficultyTweak: fullWeekDifficulty,
         varietyLevel: fullWeekVariety,
       });
-      setFullWeekResult(r);
+      if (!plan?.slots || plan.slots.length === 0) throw new Error("Nothing to generate.");
+
+      setFwProgress({ done: 0, failed: 0, total: plan.total, elapsed: 0 });
+
+      // 2) Run a simple p-limit style pool
+      let done = 0, failed = 0;
+      const slots = [...plan.slots];
+      const errors: any[] = [];
+
+      const worker = async () => {
+        while (true) {
+          if (fwCancelRef.current.cancelled) return;
+          const slot = slots.shift();
+          if (!slot) return;
+          const tickLabel = `${slot.studentName} · ${slot.subject} · ${slot.dayName}`;
+          setFwProgress(p => ({ ...p, current: tickLabel }));
+          try {
+            await api.generateAssignmentSlot(slot);
+            done++;
+          } catch (e: any) {
+            // Retry once
+            try { await api.generateAssignmentSlot(slot); done++; }
+            catch (e2: any) { failed++; errors.push({ slot: tickLabel, err: e2?.message || String(e2) }); }
+          }
+          setFwProgress(p => ({
+            ...p,
+            done, failed,
+            elapsed: Math.round((Date.now() - t0) / 1000),
+          }));
+        }
+      };
+      const pool = Array.from({ length: Math.min(CONCURRENCY, plan.slots.length) }, () => worker());
+      await Promise.all(pool);
+
+      setFullWeekResult({
+        created: done,
+        failed,
+        expected: plan.total,
+        studentsAffected: plan.students,
+        subjectsPerStudent: plan.subjects,
+        elapsed: Math.round((Date.now() - t0) / 1000),
+        errors: errors.slice(0, 10),
+      });
       loadAssignments(classId);
     } catch (e: any) {
-      alert("Failed: " + (e?.message || e));
-    } finally { setFullWeekGenerating(false); }
+      if (e?.message?.includes("AI_NOT_CONFIGURED") || e?.message?.includes("ANTHROPIC_API_KEY")) {
+        alert("⚠️ AI is not configured.\n\nAdd ANTHROPIC_API_KEY in your Vercel environment variables to enable weekly generation.");
+      } else {
+        alert("Failed: " + (e?.message || e));
+      }
+    } finally {
+      setFullWeekGenerating(false);
+    }
   };
+
+  const cancelFullWeek = () => { fwCancelRef.current.cancelled = true; };
 
   const handleAdjust = async (id: string, direction: "easier"|"harder") => {
     setAdjusting(a => ({ ...a, [id]: direction }));
@@ -647,26 +707,80 @@ export default function AssignmentBuilder() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button onClick={handleGenerateFullWeek} disabled={fullWeekGenerating} className="btn-primary gap-2">
-              {fullWeekGenerating ? "Generating… this may take 60–90s" : "🚀 Generate Full Week"}
+              {fullWeekGenerating ? "Generating…" : "🚀 Generate Full Week"}
             </button>
-            <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
-              Approx. {Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × {classes.find(c => c.id === classId)?.name ? "all students" : "students"} AI calls
-            </span>
+            {fullWeekGenerating && (
+              <button onClick={cancelFullWeek} className="btn-ghost text-xs" style={{ color: "var(--danger)" }}>
+                Cancel
+              </button>
+            )}
+            {!fullWeekGenerating && (
+              <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                ~{Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × students, 10 AI calls in parallel
+              </span>
+            )}
           </div>
 
+          {/* Real progress bar — only while running */}
+          {fullWeekGenerating && fwProgress.total > 0 && (
+            <div className="p-3 space-y-2" style={{
+              background: "var(--bg-muted)",
+              border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--accent)",
+              borderRadius: "var(--r-md)",
+            }}>
+              <div className="flex items-baseline justify-between gap-2 text-xs font-semibold" style={{ color: "var(--text-2)" }}>
+                <span>
+                  <span className="font-display text-lg tabular-nums" style={{ color: "var(--accent)" }}>
+                    {fwProgress.done + fwProgress.failed}
+                  </span>
+                  <span style={{ color: "var(--text-3)" }}> of </span>
+                  <span className="font-display text-lg tabular-nums" style={{ color: "var(--text-1)" }}>
+                    {fwProgress.total}
+                  </span>
+                  <span className="ml-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                    generated
+                  </span>
+                </span>
+                <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                  {fwProgress.elapsed}s elapsed
+                  {fwProgress.failed > 0 && <span style={{ color: "var(--danger)", marginLeft: 8 }}>· {fwProgress.failed} failed</span>}
+                </span>
+              </div>
+              <div style={{ height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${((fwProgress.done + fwProgress.failed) / fwProgress.total) * 100}%`,
+                  background: "var(--accent)",
+                  transition: "width 0.25s ease",
+                }} />
+              </div>
+              {fwProgress.current && (
+                <div className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
+                  Currently: {fwProgress.current}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Final result summary */}
           {fullWeekResult && (
-            <div className="p-3 border-l-2" style={{
-              background: "color-mix(in srgb, var(--success) 10%, transparent)",
-              borderLeftColor: "var(--success)",
-              color: "var(--success)",
+            <div className="p-3" style={{
+              background: fullWeekResult.failed > 0 ? "color-mix(in srgb, var(--warning) 10%, transparent)" : "color-mix(in srgb, var(--success) 10%, transparent)",
+              borderLeft: `3px solid ${fullWeekResult.failed > 0 ? "var(--warning)" : "var(--success)"}`,
+              color: fullWeekResult.failed > 0 ? "var(--warning)" : "var(--success)",
               borderRadius: "var(--r-md)",
               fontSize: 13, fontWeight: 600,
             }}>
-              ✓ Created {fullWeekResult.created} / {fullWeekResult.expected} assignments
+              ✓ Created {fullWeekResult.created} / {fullWeekResult.expected} in {fullWeekResult.elapsed}s
               ({fullWeekResult.studentsAffected} students × {fullWeekResult.subjectsPerStudent} subjects × 5 days)
-              {fullWeekResult.failed > 0 && <span style={{ color: "var(--danger)", marginLeft: 6 }}>· {fullWeekResult.failed} failed</span>}
+              {fullWeekResult.failed > 0 && (
+                <div className="mt-1 text-xs" style={{ color: "var(--danger)" }}>
+                  {fullWeekResult.failed} failed. Click '✨ Regenerate fresh' on each missing day to retry.
+                </div>
+              )}
             </div>
           )}
         </div>

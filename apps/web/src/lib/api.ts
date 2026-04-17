@@ -77,6 +77,19 @@ export const api = {
     varietyLevel?: "low" | "medium" | "high";
     studentIds?: string[];
   }) => request<any>(`/assignments/generate-full-week`, { method: "POST", body: JSON.stringify(data) }),
+  planFullWeek: (data: {
+    classId: string;
+    weekStarting?: string;
+    subjects?: string[];
+    themeBySubject?: Record<string, string>;
+    difficultyTweak?: "match" | "easier" | "harder";
+    varietyLevel?: "low" | "medium" | "high";
+    studentIds?: string[];
+  }) => request<{ slots: any[]; total: number; students: number; subjects: number; days: number }>(
+    `/assignments/plan-full-week`, { method: "POST", body: JSON.stringify(data) }),
+  generateAssignmentSlot: (slot: any) => request<any>(`/assignments/generate-slot`, {
+    method: "POST", body: JSON.stringify(slot)
+  }),
   adjustAssignmentDifficulty: (id: string, direction: "easier" | "harder") =>
     request<any>(`/assignments/${id}/adjust-difficulty`, { method: "POST", body: JSON.stringify({ direction }) }),
   regenerateAssignment: (id: string) =>

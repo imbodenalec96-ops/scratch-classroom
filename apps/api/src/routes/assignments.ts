@@ -544,6 +544,185 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
   });
 });
 
+// Feature 29 v2: client-orchestrated full-week generation
+// 1) POST /plan-full-week — returns the slot list (no AI). Fast, never
+//    hits a serverless timeout, tells the client exactly what to render
+//    in the progress bar.
+// 2) POST /generate-slot — generates ONE student × subject × day. One AI
+//    call (~5-10s), stays under every serverless budget. Client fires
+//    these in parallel with its own concurrency limit.
+router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const {
+    classId, weekStarting,
+    subjects = ["reading", "writing", "spelling", "math", "sel"],
+    themeBySubject = {},
+    difficultyTweak = "match",
+    varietyLevel = "medium",
+    studentIds,
+  } = req.body;
+  await ensureGradeCols();
+
+  // Fail fast if no API key — client shows a clear error instead of grinding
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({
+      error: "AI features not configured. Add ANTHROPIC_API_KEY in Vercel env vars to enable weekly generation.",
+      code: "AI_NOT_CONFIGURED",
+    });
+  }
+
+  const start = weekStarting ? new Date(weekStarting) : (() => {
+    const t = new Date();
+    const d = t.getDay();
+    const plus = d === 0 ? 1 : d === 1 ? 0 : 8 - d;
+    const m = new Date(t); m.setDate(t.getDate() + plus);
+    return m;
+  })();
+  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const dates: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  const roster = await db.prepare(
+    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+  ).all(classId) as any[];
+  const students = (Array.isArray(studentIds) && studentIds.length)
+    ? roster.filter(s => studentIds.includes(s.id))
+    : roster;
+  if (students.length === 0) return res.status(400).json({ error: "No students in this class" });
+
+  // Grades lookup
+  const gradeRows = await db.prepare(
+    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id IN (" +
+    students.map(() => "?").join(",") + ")"
+  ).all(...students.map(s => String(s.id))).catch(() => [] as any[]) as any[];
+  const gradesById: Record<string, any> = {};
+  for (const g of gradeRows) gradesById[String(g.user_id)] = g;
+
+  const subjectKey = (s: string): "reading" | "math" | "writing" => {
+    const L = s.toLowerCase();
+    if (L.includes("math")) return "math";
+    if (L.includes("writ") || L.includes("spell")) return "writing";
+    return "reading";
+  };
+  const gradeFor = (studentId: string, subject: string): number => {
+    const g = gradesById[String(studentId)];
+    const raw = g ? Number(g[subjectKey(subject) + "_grade"] ?? 3) : 3;
+    if (difficultyTweak === "easier") return Math.max(0, raw - 1);
+    if (difficultyTweak === "harder") return Math.min(12, raw + 1);
+    return raw;
+  };
+
+  const varietyHint = varietyLevel === "high"
+    ? "Make this dramatically different from other days and past weeks."
+    : varietyLevel === "low"
+    ? "Keep this similar in style to recent work."
+    : "Mix it up — somewhat different format or angle.";
+
+  const slots: any[] = [];
+  for (const s of students) {
+    for (const subj of subjects) {
+      for (let i = 0; i < 5; i++) {
+        const grade = gradeFor(s.id, subj);
+        slots.push({
+          classId,
+          studentId: s.id,
+          studentName: s.name,
+          subject: subj,
+          subjectKey: subjectKey(subj),
+          date: dates[i],
+          dayName: dayNames[i],
+          gradeMin: grade,
+          gradeMax: grade,
+          weekTheme: [themeBySubject[subj] || themeBySubject[subjectKey(subj)] || "", varietyHint].filter(Boolean).join(". "),
+        });
+      }
+    }
+  }
+
+  res.json({
+    slots,
+    total: slots.length,
+    students: students.length,
+    subjects: subjects.length,
+    days: 5,
+    estimatedSecondsAtConcurrency: (s: number) => Math.ceil(slots.length / s * 6),
+  });
+});
+
+// Generate ONE slot. One AI call per request. Client calls this N times
+// in parallel with its own concurrency limit — always stays under the
+// serverless function timeout regardless of class size.
+router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const client = getAnthropic();
+  if (!client) {
+    return res.status(503).json({
+      error: "ANTHROPIC_API_KEY not set",
+      code: "AI_NOT_CONFIGURED",
+    });
+  }
+  await ensureGradeCols();
+
+  const {
+    classId, studentId, subject, subjectKey = subject, date, dayName,
+    gradeMin, gradeMax, weekTheme, teacherNotes, focusKeywords,
+    learningObjective, questionType, questionCount, estimatedMinutes,
+    hintsAllowed,
+  } = req.body;
+
+  if (!classId || !studentId || !subject || !date || gradeMin == null) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Recent prompts for dedup (bounded, fast)
+  let recent: string[] = [];
+  try {
+    const rows = await db.prepare(
+      "SELECT prompt FROM daily_tasks WHERE student_id = ? AND subject = ? AND date >= date('now','-14 day')"
+    ).all(studentId, subjectKey) as any[];
+    recent = rows.map((r: any) => r.prompt || "").slice(0, 6);
+  } catch { /* ignore */ }
+
+  const gen = await generateDailyAssignmentContent(client, {
+    studentId, date: `${date}|${subject}`, subject: subjectKey,
+    gradeMin: Number(gradeMin), gradeMax: Number(gradeMax ?? gradeMin),
+    weekTheme, recentPrompts: recent,
+    questionCount, teacherNotes, focusKeywords, questionType, learningObjective,
+  });
+  if (!gen) return res.status(500).json({ error: "Generation failed" });
+
+  const id = crypto.randomUUID();
+  try {
+    await db.prepare(
+      `INSERT INTO assignments (id, class_id, teacher_id, student_id, title, description, due_date, rubric, content, scheduled_date, target_subject, target_grade_min, target_grade_max, week_theme, teacher_notes, question_count, estimated_minutes, focus_keywords, learning_objective, hints_allowed, question_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id, classId, req.user!.id, studentId,
+      `${String(subject).charAt(0).toUpperCase() + String(subject).slice(1)} — ${dayName}`,
+      gen.content?.instructions || "",
+      date,
+      JSON.stringify([{ label: "Correctness", maxPoints: 15 }]),
+      JSON.stringify(gen.content),
+      date,
+      subjectKey,
+      Number(gradeMin), Number(gradeMax ?? gradeMin),
+      weekTheme || null,
+      teacherNotes || null,
+      questionCount != null ? Number(questionCount) : null,
+      estimatedMinutes != null ? Number(estimatedMinutes) : null,
+      focusKeywords || null,
+      learningObjective || null,
+      hintsAllowed != null ? (hintsAllowed ? 1 : 0) : 1,
+      questionType || null,
+    );
+    res.json({ ok: true, id, student: studentId, date, subject });
+  } catch (e: any) {
+    console.error('generate-slot insert', e?.message);
+    res.status(500).json({ error: 'Insert failed', detail: e?.message });
+  }
+});
+
 // Get all pending (unsubmitted) assignments for current student in a class.
 // Honors per-assignment grade targeting:
 //   - If target_grade_min IS NULL → assignment shows to everyone in class
