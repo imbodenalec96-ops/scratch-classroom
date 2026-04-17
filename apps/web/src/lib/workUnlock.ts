@@ -1,6 +1,8 @@
 // Work-unlock helpers
 // Students get arcade + projects unlocked for the rest of the day once they submit all assignments.
 
+import { isOnBreak } from "./breakSystem.ts";
+
 const KEY = "workDoneDate";
 
 function todayStr() {
@@ -13,6 +15,10 @@ export function isWorkUnlocked(): boolean {
   } catch {
     return false;
   }
+}
+
+export function isAccessAllowed(): boolean {
+  return isWorkUnlocked() || isOnBreak();
 }
 
 export function setWorkUnlocked(): void {

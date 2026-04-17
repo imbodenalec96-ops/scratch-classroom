@@ -37,7 +37,8 @@ export default function Layout() {
   // GoGuardian: students poll for lock/commands; teachers/admin skip
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
-  // New per-student command pipe. LOCK/UNLOCK wired; other actions follow
+  const [studentPendingMsg, setStudentPendingMsg] = useState<string | null>(null);
+  // New per-student command pipe. LOCK/UNLOCK/MESSAGE wired; other actions follow
   // in subsequent commits. The hook auto-consumes each row after its handler
   // runs, so the poll keeps running while locked (UNLOCK can still arrive).
   useStudentCommands(isStudent, {
@@ -47,6 +48,12 @@ export default function Layout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      let text = "";
+      try { text = JSON.parse(row.payload || "{}").text ?? ""; } catch { text = row.payload || ""; }
+      setStudentPendingMsg(text);
+      setTimeout(() => setStudentPendingMsg(null), 15_000);
+    },
   });
   // Subscribe to the new lock store and OR it into the existing overlay
   // props. Legacy class_commands lock (from useClassCommands) stays
@@ -188,8 +195,8 @@ export default function Layout() {
           isLocked={classCommands.isLocked || newLock.locked}
           message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
-          pendingMessage={classCommands.pendingMessage}
-          onDismissMessage={classCommands.dismissMessage}
+          pendingMessage={classCommands.pendingMessage ?? studentPendingMsg}
+          onDismissMessage={() => { classCommands.dismissMessage(); setStudentPendingMsg(null); }}
         />
       )}
 
