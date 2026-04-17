@@ -23,6 +23,8 @@ import ChatPanel from "./components/ChatPanel.tsx";
 import LessonsPage from "./components/LessonsPage.tsx";
 import ArcadePage from "./components/ArcadePage.tsx";
 import YouTubeManager from "./components/YouTubeManager.tsx";
+import LessonAnalytics from "./components/LessonAnalytics.tsx";
+import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
 import StudentKiosk from "./components/StudentKiosk.tsx";
@@ -88,8 +90,21 @@ function ArcadeGuard() {
 
 function ProjectsGuard() {
   const { user } = useAuth();
+  const cfg = useClassConfig();
   // Students can access projects only after completing today's work
   if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  // Teacher-set config: projects disabled
+  if (user?.role === 'student' && !cfg.projectsEnabled) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center" style={{ background: "var(--bg)" }}>
+        <div className="text-6xl mb-4">🔒</div>
+        <h1 className="text-2xl font-bold mb-2 text-t1">Projects are paused</h1>
+        <p className="text-sm max-w-sm text-t3">
+          Your teacher has turned off Projects for now. You'll see them again when they're turned back on.
+        </p>
+      </div>
+    );
+  }
   return <ProjectsList />;
 }
 
@@ -119,6 +134,7 @@ export default function App() {
             <Route path="achievements" element={<Achievements />} />
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="youtube" element={<YouTubeManager />} />
+            <Route path="lesson-analytics" element={<LessonAnalytics />} />
           </Route>
 
           {/* Full-screen project workspace (no sidebar) */}

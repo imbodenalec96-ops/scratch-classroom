@@ -35,6 +35,7 @@ const TOOLS = (dk: boolean) => [
   { path: "/analytics",   icon: BarChart3,    label: "Analytics",    desc: "View reports",      color: "text-amber-400",   bg: dk ? "bg-amber-500/10"   : "bg-amber-50",   accent: "border-l-amber-400"   },
   { path: "/youtube",     icon: Youtube,      label: "YouTube Queue",desc: "Library + requests",color: "text-red-400",     bg: dk ? "bg-red-500/10"     : "bg-red-50",     accent: "border-l-red-400" },
   { path: "/leaderboard", icon: Trophy,       label: "Leaderboard",  desc: "Student rankings",  color: "text-yellow-400",  bg: dk ? "bg-yellow-500/10"  : "bg-yellow-50",  accent: "border-l-yellow-400"  },
+  { path: "/lesson-analytics", icon: ClipboardList, label: "Lesson Views", desc: "Who read what",  color: "text-indigo-400",  bg: dk ? "bg-indigo-500/10"  : "bg-indigo-50",  accent: "border-l-indigo-400"  },
 ];
 
 const PUSH_PAGES = [

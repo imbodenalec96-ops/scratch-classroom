@@ -6,6 +6,7 @@ import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
 import { isOnBreak } from "../lib/breakSystem.ts";
+import { useClassConfig } from "../lib/useClassConfig.ts";
 import { usePresencePing } from "../lib/presence.ts";
 import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
 import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
@@ -809,6 +810,7 @@ export default function StudentDashboard() {
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
+  const classConfig = useClassConfig();
 
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
@@ -1145,11 +1147,9 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library — gated by unlock state + break state
-          - Work NOT done, NOT on break → HIDDEN
-          - On break                    → library visible, no request form
-          - Work done / full access     → library + request form */}
-      {(unlocked || isOnBreak()) && (
+      {/* YouTube Library — gated by unlock/break state + teacher config
+          Hidden unless: student is unlocked OR on a break, AND teacher hasn't disabled YouTube */}
+      {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
       <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
         <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
           📺 Video Library

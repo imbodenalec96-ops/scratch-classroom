@@ -3,6 +3,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { usePresencePing } from "../lib/presence.ts";
 import { isOnBreak, BREAK_ALLOWED_GAME_IDS, breakSecondsRemaining } from "../lib/breakSystem.ts";
+import { useClassConfig, isGameAllowed } from "../lib/useClassConfig.ts";
 import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
@@ -781,12 +782,28 @@ export default function ArcadePage() {
     return () => { clearInterval(iv); window.removeEventListener("breakstate-change", onChange); };
   }, []);
 
+  // Teacher-set feature flags (allowedGameIds, unityEnabled, blockforgeEnabled)
+  const classConfig = useClassConfig();
+
+  const configGated = (games: Game[]) => {
+    if (user?.role !== "student") return games;
+    return games.filter(g => {
+      if (g.type === "unity" && !classConfig.unityEnabled) return false;
+      if (g.id === "playground" && !classConfig.blockforgeEnabled) return false;
+      if (!isGameAllowed(classConfig, g.id)) return false;
+      return true;
+    });
+  };
+
   const breakGated = (games: Game[]) =>
     (user?.role === "student" && onBreak) ? games.filter(g => BREAK_ALLOWED_GAME_IDS.has(g.id)) : games;
 
-  const filtered = breakGated(
+  const filtered = breakGated(configGated(
     activeCategory === "All" ? GAMES : GAMES.filter(g => g.category === activeCategory)
-  );
+  ));
+
+  // If teacher has disabled the arcade wholesale, show a block message
+  const arcadeHardDisabled = user?.role === "student" && !classConfig.arcadeEnabled;
 
   const featured = GAMES.find(g => g.id === "brickbreaker") ?? GAMES[0];
 
@@ -798,6 +815,19 @@ export default function ArcadePage() {
   };
 
   const handlePlay = useCallback((game: Game) => setPlayingGame(game), []);
+
+  // Teacher disabled the arcade entirely — show a blocking page
+  if (arcadeHardDisabled) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center" style={{ background: dk ? "#07071a" : "#f0f1f8" }}>
+        <div className="text-6xl mb-4">🔒</div>
+        <h1 className={`text-2xl font-bold mb-2 ${dk ? "text-white" : "text-gray-900"}`}>Arcade is paused</h1>
+        <p className={`text-sm max-w-sm ${dk ? "text-white/45" : "text-gray-500"}`}>
+          Your teacher has turned off the arcade for now. You'll see it come back when they turn it on.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

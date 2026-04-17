@@ -61,6 +61,41 @@ const PUSH_PAGES = [
   { label: "Arcade",     path: "/arcade",   icon: Gamepad2 },
 ];
 
+// Catalog for the per-game whitelist UI in Free Time Settings. Kept in sync
+// with ArcadePage GAMES manually since we don't want to import the whole
+// game registry (which pulls in all games + Unity iframes).
+const ARCADE_GAME_CATALOG = [
+  { id: "snake",          emoji: "🐍", label: "Snake XL" },
+  { id: "pong",           emoji: "🏓", label: "Pong vs AI" },
+  { id: "brickbreaker",   emoji: "🧱", label: "Brick Breaker" },
+  { id: "colorcatcher",   emoji: "🎨", label: "Color Catcher" },
+  { id: "memory",         emoji: "🃏", label: "Memory Match" },
+  { id: "mathblitz",      emoji: "🧠", label: "Math Blitz" },
+  { id: "playground",     emoji: "🔮", label: "BlockForge Studio" },
+  { id: "whackamole",     emoji: "🐹", label: "Whack-a-Mole" },
+  { id: "flappy",         emoji: "🐦", label: "Flappy Bird" },
+  { id: "space",          emoji: "🚀", label: "Space Shooter" },
+  { id: "tetris",         emoji: "🟦", label: "Tetris" },
+  { id: "2048",           emoji: "🔢", label: "2048" },
+  { id: "tictactoe",      emoji: "❌", label: "Tic-Tac-Toe" },
+  { id: "connect4",       emoji: "🔴", label: "Connect Four" },
+  { id: "runner",         emoji: "🏃", label: "Endless Runner" },
+  { id: "bubble",         emoji: "🫧", label: "Bubble Shooter" },
+  { id: "coloringbook",   emoji: "🖍️", label: "Coloring Book" },
+  { id: "dressup",        emoji: "👕", label: "Dress Up" },
+  { id: "pixelart",       emoji: "🎨", label: "Pixel Art" },
+  { id: "bridge",         emoji: "🌉", label: "Bridge Builder" },
+  { id: "basketball",     emoji: "🏀", label: "Basketball" },
+  { id: "simon",          emoji: "🟢", label: "Simon Says" },
+  { id: "towerdefense",   emoji: "🌹", label: "Tower Defense" },
+  { id: "racing",         emoji: "🏎️", label: "Racing" },
+  { id: "minesweeper",    emoji: "💣", label: "Minesweeper" },
+  { id: "wordsearch",     emoji: "🔤", label: "Word Search" },
+  { id: "sudoku",         emoji: "🔢", label: "Sudoku" },
+  { id: "sandbox",        emoji: "🏗️", label: "Sandbox" },
+  { id: "sandbox-3d",     emoji: "🎮", label: "3D Stage" },
+];
+
 /* ── main component ────────────────────────────────────────── */
 
 export default function MonitorPage() {
@@ -594,6 +629,37 @@ export default function MonitorPage() {
                     className="input text-xs w-16 py-1" />
                 </div>
               </div>
+              {/* Per-game whitelist — collapsible */}
+              <details className={`rounded-lg p-2 text-xs ${dk?"bg-white/[0.02]":"bg-white"}`}>
+                <summary className={`cursor-pointer font-semibold select-none ${dk?"text-white/60":"text-gray-600"}`}>
+                  🎮 Allowed arcade games {freeTimeConfig.allowedGameIds?.length ? `(${freeTimeConfig.allowedGameIds.length} picked)` : "(all)"}
+                </summary>
+                <div className="pt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                  {ARCADE_GAME_CATALOG.map(g => {
+                    const whitelist: string[] | undefined = freeTimeConfig.allowedGameIds;
+                    const checked = !whitelist || whitelist.length === 0 || whitelist.includes(g.id);
+                    return (
+                      <label key={g.id} className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer text-[11px] ${checked ? (dk?"bg-emerald-500/8 text-emerald-400":"bg-emerald-50 text-emerald-700") : (dk?"bg-white/[0.02] text-white/30":"bg-gray-50 text-gray-400")}`}>
+                        <input type="checkbox" checked={checked}
+                          onChange={e => {
+                            setFreeTimeConfig((cfg: any) => {
+                              const cur: string[] = cfg.allowedGameIds || ARCADE_GAME_CATALOG.map(x => x.id);
+                              if (e.target.checked) return { ...cfg, allowedGameIds: [...cur.filter(x => x !== g.id), g.id] };
+                              return { ...cfg, allowedGameIds: cur.filter(x => x !== g.id) };
+                            });
+                          }} />
+                        <span>{g.emoji}</span>
+                        <span className="truncate">{g.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <button onClick={() => setFreeTimeConfig((cfg: any) => ({ ...cfg, allowedGameIds: null }))}
+                  className={`mt-2 text-[10px] font-medium px-2 py-1 rounded cursor-pointer ${dk?"text-white/40 hover:text-white/60":"text-gray-400 hover:text-gray-600"}`}>
+                  ↺ Reset — allow all games
+                </button>
+              </details>
+
               <div className="flex items-center gap-2">
                 <button onClick={saveConfig} className="btn-primary gap-1.5 px-4 text-xs">
                   Save & Apply
