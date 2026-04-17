@@ -25,6 +25,10 @@ import BridgeBuilder from "./games/BridgeBuilder.tsx";
 import Basketball from "./games/Basketball.tsx";
 import SimonSays from "./games/SimonSays.tsx";
 import TowerDefense from "./games/TowerDefense.tsx";
+import RacingGame from "./games/RacingGame.tsx";
+import Minesweeper from "./games/Minesweeper.tsx";
+import WordSearch from "./games/WordSearch.tsx";
+import Sudoku from "./games/Sudoku.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -351,6 +355,55 @@ const GAMES: Game[] = [
     emoji: "🌻",
     component: TowerDefense,
     hint: "Click lanes to place towers · send waves to battle!",
+  },
+  // ── Batch 5 ──────────────────────────────────────────────────
+  {
+    id: "racing",
+    title: "Road Rush",
+    description: "Dodge traffic at high speed — collect lightning boosts and survive as long as you can!",
+    category: "Sports",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#f97316",
+    emoji: "🚗",
+    component: RacingGame,
+    hint: "← → / A D keys · tap sides · collect ⚡ boosts",
+  },
+  {
+    id: "minesweeper",
+    title: "Flower Field",
+    description: "Uncover the field without hitting a hidden bomb! Use numbers to find safe squares.",
+    category: "Puzzle",
+    stars: 4,
+    plays: "NEW",
+    accentColor: "#22c55e",
+    emoji: "🌸",
+    component: Minesweeper,
+    hint: "Click to reveal · right-click to flag · avoid 💣",
+  },
+  {
+    id: "wordsearch",
+    title: "Word Search",
+    description: "Find hidden words in the letter grid — drag to select, any direction, 4 themes!",
+    category: "Education",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#a855f7",
+    emoji: "🔤",
+    component: WordSearch,
+    hint: "Click-drag to select · words go any direction",
+  },
+  {
+    id: "sudoku",
+    title: "Sudoku",
+    description: "Fill the grid so every row, column and box has each number exactly once. 4×4 and 9×9!",
+    category: "Education",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#3b82f6",
+    emoji: "🔢",
+    component: Sudoku,
+    hint: "Tap cell · tap number · 💡 hint if you're stuck",
   },
 ];
 
