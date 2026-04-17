@@ -30,6 +30,9 @@ async function ensureGradeCols() {
       "ALTER TABLE assignments ADD COLUMN learning_objective TEXT",
       "ALTER TABLE assignments ADD COLUMN hints_allowed INTEGER",
       "ALTER TABLE assignments ADD COLUMN question_type TEXT",
+      // JSON-encoded array of user_ids; NULL => broadcast per legacy rules,
+      // populated => only those student_ids see this assignment.
+      "ALTER TABLE assignments ADD COLUMN target_student_ids TEXT",
     ]) {
       try { await db.exec(col); } catch { /* column already exists */ }
     }
@@ -132,6 +135,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   const {
     classId, title, description, dueDate, rubric, starterProjectId, content, scheduledDate,
     targetGradeMin, targetGradeMax, targetSubject,
+    targetStudentIds,
     teacherNotes, questionCount, estimatedMinutes, focusKeywords,
     learningObjective, hintsAllowed, questionType,
   } = req.body;
@@ -140,6 +144,11 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   const tMin = targetGradeMin != null ? Number(targetGradeMin) : null;
   const tMax = targetGradeMax != null ? Number(targetGradeMax) : (tMin != null ? tMin : null);
   const tSub = targetSubject || null;
+  // Specific-students targeting: stored as JSON text. Only written when a
+  // non-empty array is provided — empty/missing = legacy class/grade rules.
+  const tStudents = Array.isArray(targetStudentIds) && targetStudentIds.length > 0
+    ? JSON.stringify(targetStudentIds.filter((x: any) => typeof x === "string" && x))
+    : null;
 
   try {
     await db.prepare(
@@ -148,8 +157,9 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
         starter_project_id, content, scheduled_date,
         target_grade_min, target_grade_max, target_subject,
         teacher_notes, question_count, estimated_minutes,
-        focus_keywords, learning_objective, hints_allowed, question_type
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        focus_keywords, learning_objective, hints_allowed, question_type,
+        target_student_ids
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []),
       starterProjectId, content ?? null, scheduledDate ?? null,
@@ -161,6 +171,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
       learningObjective || null,
       hintsAllowed != null ? (hintsAllowed ? 1 : 0) : 1,
       questionType || null,
+      tStudents,
     );
   } catch (e: any) {
     console.error('assignment insert error:', e?.message);
@@ -193,9 +204,22 @@ async function ensureClassSettings() {
         updated_at TEXT NOT NULL DEFAULT ''
       )
     `);
+    // Idempotent: per-subject "This Week's Focus" strings. Empty/null = no
+    // directive (e.g. Math defaults to "Based Off Grade Level" → null).
+    try { await db.exec("ALTER TABLE class_settings ADD COLUMN weekly_focus TEXT"); } catch { /* exists */ }
     classSettingsReady = true;
   } catch (e) { console.error('ensureClassSettings error:', e); }
 }
+
+// Default focus plan the user supplied. Applied to any class that hasn't
+// explicitly saved its own weekly_focus yet.
+const DEFAULT_WEEKLY_FOCUS: Record<string, string> = {
+  reading: "phonics and beginning sounds",
+  writing: "sentence structure",
+  spelling: "weekly word list focus",
+  math: "",                      // "Based Off Grade Level" → no directive
+  sel: "theme: resilience",
+};
 
 router.get("/settings/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureClassSettings();
@@ -208,30 +232,35 @@ router.get("/settings/:classId", requireRole("teacher", "admin"), async (req: Au
         default_question_count: 3,
         default_estimated_minutes: 5,
         default_hints_allowed: true,
+        weekly_focus: DEFAULT_WEEKLY_FOCUS,
       });
     }
+    let focus: any = DEFAULT_WEEKLY_FOCUS;
+    try { if (row.weekly_focus) focus = JSON.parse(row.weekly_focus); } catch {}
     res.json({
       ...row,
       enabled_subjects: (() => { try { return JSON.parse(row.enabled_subjects); } catch { return ["reading","writing","spelling","math","sel"]; } })(),
       default_hints_allowed: !!row.default_hints_allowed,
+      weekly_focus: focus,
     });
   } catch { res.json({}); }
 });
 
 router.put("/settings/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureClassSettings();
-  const { enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed } = req.body;
+  const { enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed, weekly_focus } = req.body;
   const now = new Date().toISOString();
   try {
     await db.prepare(
-      `INSERT INTO class_settings (class_id, enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO class_settings (class_id, enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed, weekly_focus, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (class_id) DO UPDATE SET
          enabled_subjects = excluded.enabled_subjects,
          default_variety_level = excluded.default_variety_level,
          default_question_count = excluded.default_question_count,
          default_estimated_minutes = excluded.default_estimated_minutes,
          default_hints_allowed = excluded.default_hints_allowed,
+         weekly_focus = excluded.weekly_focus,
          updated_at = excluded.updated_at`
     ).run(
       req.params.classId,
@@ -240,6 +269,7 @@ router.put("/settings/:classId", requireRole("teacher", "admin"), async (req: Au
       default_question_count != null ? Number(default_question_count) : 3,
       default_estimated_minutes != null ? Number(default_estimated_minutes) : 5,
       default_hints_allowed ? 1 : 0,
+      weekly_focus ? JSON.stringify(weekly_focus) : JSON.stringify(DEFAULT_WEEKLY_FOCUS),
       now,
     );
     res.json({ ok: true });
@@ -788,7 +818,15 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
 
     const filtered = rows.filter((r: any) => {
       r.rubric = JSON.parse(r.rubric || "[]");
-      // If no target set, assignment is for everyone
+      // Direct-assign to specific students takes precedence: if the column is
+      // populated, ONLY those student_ids see this assignment. NULL/empty =>
+      // fall through to the legacy class/grade rules below.
+      if (r.target_student_ids) {
+        let ids: string[] = [];
+        try { const parsed = JSON.parse(r.target_student_ids); if (Array.isArray(parsed)) ids = parsed; } catch {}
+        if (ids.length > 0) return ids.includes(userId);
+      }
+      // If no grade target set, assignment is for everyone in class
       if (r.target_grade_min == null) return true;
       const tMin = Number(r.target_grade_min);
       const tMax = r.target_grade_max != null ? Number(r.target_grade_max) : tMin;

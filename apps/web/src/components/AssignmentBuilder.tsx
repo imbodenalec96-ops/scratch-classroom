@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
@@ -394,10 +395,13 @@ export default function AssignmentBuilder() {
   const [dueDate, setDueDate] = useState("");
 
   // Per-assignment grade targeting
-  const [targetMode, setTargetMode] = useState<"all" | "single" | "range">("all");
+  const [targetMode, setTargetMode] = useState<"all" | "single" | "range" | "students">("all");
   const [targetGradeMin, setTargetGradeMin] = useState<number>(3);
   const [targetGradeMax, setTargetGradeMax] = useState<number>(3);
   const [targetSubject, setTargetSubject] = useState<"reading" | "math" | "writing">("reading");
+  // Direct-assign: roster of students in the selected class + the checked set.
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+  const [targetStudentIds, setTargetStudentIds] = useState<string[]>([]);
 
   // Rich customization (Feature 28 — same fields as Edit modal)
   const [customQuestionCount, setCustomQuestionCount] = useState<number | "">("");
@@ -460,6 +464,13 @@ export default function AssignmentBuilder() {
   const loadAssignments = async (cid: string) => {
     const a = await api.getAssignments(cid);
     setAssignments(a);
+    // Refresh roster for the direct-assign picker. Silent fail — picker just
+    // shows an empty list on error.
+    try { const s = await api.getStudents(cid); setClassStudents(s || []); }
+    catch { setClassStudents([]); }
+    // Reset any previously-checked ids when switching class — student ids
+    // from a different class would silently broadcast to nobody.
+    setTargetStudentIds([]);
   };
 
   // Load per-class defaults when mega-button opens or class changes
@@ -529,6 +540,10 @@ export default function AssignmentBuilder() {
       targeting.targetGradeMin = Math.min(targetGradeMin, targetGradeMax);
       targeting.targetGradeMax = Math.max(targetGradeMin, targetGradeMax);
       targeting.targetSubject = targetSubject;
+    } else if (targetMode === "students" && targetStudentIds.length > 0) {
+      // Direct-assign — overrides grade targeting. Only these student_ids
+      // will see the assignment in their pending list.
+      targeting.targetStudentIds = targetStudentIds;
     }
     const customization: any = {};
     if (customQuestionCount !== "") customization.questionCount = Number(customQuestionCount);
@@ -545,6 +560,7 @@ export default function AssignmentBuilder() {
     setCustomQuestionCount(""); setCustomEstimatedMinutes(""); setCustomQuestionType("");
     setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
     setShowAdvanced(false);
+    setTargetMode("all"); setTargetStudentIds([]);
     loadAssignments(classId);
   };
 
@@ -1059,15 +1075,17 @@ export default function AssignmentBuilder() {
               <div className="stamp">{
                 targetMode === "all" ? "All students" :
                 targetMode === "single" ? `${targetSubject} · Gr ${targetGradeMin}` :
-                `${targetSubject} · Gr ${Math.min(targetGradeMin, targetGradeMax)}–${Math.max(targetGradeMin, targetGradeMax)}`
+                targetMode === "range"  ? `${targetSubject} · Gr ${Math.min(targetGradeMin, targetGradeMax)}–${Math.max(targetGradeMin, targetGradeMax)}` :
+                targetStudentIds.length > 0 ? `${targetStudentIds.length} student${targetStudentIds.length === 1 ? "" : "s"}` : "Pick students"
               }</div>
             </div>
 
             <div className="flex gap-2 mb-3 flex-wrap">
               {([
-                ["all",    "All students in class"],
-                ["single", "Specific grade"],
-                ["range",  "Grade range"],
+                ["all",      "Entire class"],
+                ["students", "Specific students"],
+                ["single",   "Specific grade"],
+                ["range",    "Grade range"],
               ] as const).map(([mode, label]) => (
                 <button key={mode} onClick={() => setTargetMode(mode)} type="button"
                   className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer"
@@ -1080,7 +1098,54 @@ export default function AssignmentBuilder() {
               ))}
             </div>
 
-            {targetMode !== "all" && (
+            {targetMode === "students" && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                    Pick students in this class ({targetStudentIds.length}/{classStudents.length} selected)
+                  </label>
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => setTargetStudentIds(classStudents.map((s: any) => s.id))}
+                      className="text-[10px] font-semibold uppercase tracking-wider cursor-pointer"
+                      style={{ color: "var(--text-accent)" }}>Select all</button>
+                    <button type="button"
+                      onClick={() => setTargetStudentIds([])}
+                      className="text-[10px] font-semibold uppercase tracking-wider cursor-pointer"
+                      style={{ color: "var(--text-3)" }}>Clear</button>
+                  </div>
+                </div>
+                {classStudents.length === 0 ? (
+                  <div className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                    No students enrolled in this class yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-auto p-2 border"
+                    style={{ background: "var(--bg)", borderColor: "var(--border)", borderRadius: "var(--r-md)" }}>
+                    {classStudents.map((s: any) => {
+                      const checked = targetStudentIds.includes(s.id);
+                      return (
+                        <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer px-2 py-1.5 rounded"
+                          style={{ background: checked ? "var(--accent-light)" : "transparent", color: "var(--text-1)" }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) setTargetStudentIds([...targetStudentIds, s.id]);
+                              else setTargetStudentIds(targetStudentIds.filter(id => id !== s.id));
+                            }}
+                            className="cursor-pointer" />
+                          <span className="truncate">{s.name || s.email}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="text-[11px] mt-2" style={{ color: "var(--text-3)" }}>
+                  Only the checked students will see this assignment in their pending list. Grade targeting is ignored when direct-assigning.
+                </div>
+              </div>
+            )}
+
+            {(targetMode === "single" || targetMode === "range") && (
               <div className="flex items-center gap-3 flex-wrap">
                 <div>
                   <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Subject</label>
@@ -1296,17 +1361,32 @@ export default function AssignmentBuilder() {
                         📅 {a.scheduled_date}
                       </span>
                     )}
-                    {a.target_grade_min != null ? (
-                      <span className="stamp" style={{ background: "color-mix(in srgb, var(--info) 14%, transparent)", color: "var(--info)", borderLeftColor: "var(--info)" }}>
-                        🎯 {a.target_subject || "any"} · {
-                          a.target_grade_max != null && a.target_grade_max !== a.target_grade_min
-                            ? `Gr ${a.target_grade_min}–${a.target_grade_max}`
-                            : `Gr ${a.target_grade_min}`
-                        }
-                      </span>
-                    ) : (
-                      <span className="chip">All students</span>
-                    )}
+                    {(() => {
+                      // Parse direct-assign list once (JSON text column).
+                      let tStudents: string[] = [];
+                      if (a.target_student_ids) {
+                        try { const p = JSON.parse(a.target_student_ids); if (Array.isArray(p)) tStudents = p; } catch {}
+                      }
+                      if (tStudents.length > 0) {
+                        return (
+                          <span className="stamp" style={{ background: "color-mix(in srgb, var(--info) 14%, transparent)", color: "var(--info)", borderLeftColor: "var(--info)" }}>
+                            🎯 → {tStudents.length} student{tStudents.length === 1 ? "" : "s"}
+                          </span>
+                        );
+                      }
+                      if (a.target_grade_min != null) {
+                        return (
+                          <span className="stamp" style={{ background: "color-mix(in srgb, var(--info) 14%, transparent)", color: "var(--info)", borderLeftColor: "var(--info)" }}>
+                            🎯 {a.target_subject || "any"} · {
+                              a.target_grade_max != null && a.target_grade_max !== a.target_grade_min
+                                ? `Gr ${a.target_grade_min}–${a.target_grade_max}`
+                                : `Gr ${a.target_grade_min}`
+                            }
+                          </span>
+                        );
+                      }
+                      return <span className="chip">→ Whole class</span>;
+                    })()}
                   </div>
                   <p className={`text-sm mt-0.5 line-clamp-1 ${dk ? "text-white/40" : "text-gray-500"}`}>{a.description}</p>
                 </div>
@@ -1435,6 +1515,43 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     try { return assignment.content ? JSON.stringify(JSON.parse(assignment.content), null, 2) : ""; }
     catch { return assignment.content || ""; }
   });
+  // Structured question editor state
+  const [sections, setSections] = useState<any[]>(() => {
+    try {
+      const c = assignment.content ? JSON.parse(assignment.content) : null;
+      if (c?.sections?.length) return c.sections;
+    } catch {}
+    return [];
+  });
+  const updateQuestion = (si: number, qi: number, patch: any) => {
+    setSections(prev => prev.map((s, i) => i !== si ? s : {
+      ...s, questions: s.questions.map((q: any, j: number) => j === qi ? { ...q, ...patch } : q),
+    }));
+  };
+  const updateOption = (si: number, qi: number, oi: number, val: string) => {
+    setSections(prev => prev.map((s, i) => i !== si ? s : {
+      ...s, questions: s.questions.map((q: any, j: number) => {
+        if (j !== qi) return q;
+        const options = [...(q.options || [])];
+        options[oi] = val;
+        return { ...q, options };
+      }),
+    }));
+  };
+  const deleteQuestion = (si: number, qi: number) => {
+    if (!confirm("Delete this question?")) return;
+    setSections(prev => prev.map((s, i) => i !== si ? s : {
+      ...s, questions: s.questions.filter((_: any, j: number) => j !== qi),
+    }));
+  };
+  const addQuestion = (si: number) => {
+    setSections(prev => prev.map((s, i) => i !== si ? s : {
+      ...s, questions: [...(s.questions || []), {
+        type: "multiple_choice", text: "New question?",
+        options: ["A. ", "B. ", "C. ", "D. "], correctIndex: 0, points: 5, hint: "",
+      }],
+    }));
+  };
   const [submissionCount, setSubmissionCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -1458,6 +1575,14 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     if (showRawJson && contentText.trim()) {
       try { parsedContent = JSON.parse(contentText); }
       catch { alert("Content JSON is invalid. Fix it or leave raw-JSON toggle off to skip."); return; }
+    } else if (sections.length) {
+      // Build content from structured editor
+      try {
+        const original = assignment.content ? JSON.parse(assignment.content) : {};
+        parsedContent = { ...original, sections };
+      } catch {
+        parsedContent = { title, instructions: description, sections };
+      }
     }
     setSaving(true);
     try {
@@ -1473,9 +1598,9 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
-  return (
+  return createPortal(
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div className="card" style={{ maxWidth: 780, width: "100%", maxHeight: "92vh", overflowY: "auto",
         borderLeft: "3px solid var(--accent)" }}>
@@ -1569,6 +1694,85 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
             </div>
           </div>
 
+          {/* Structured question editor */}
+          {sections.length > 0 && !showRawJson && (
+            <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <div className="section-label mb-3">— Questions —</div>
+              {sections.map((sec: any, si: number) => (
+                <div key={si} className="mb-4">
+                  {sec.title && (
+                    <div className="text-xs font-semibold mb-2" style={{ color: "var(--text-2)" }}>
+                      {sec.title}
+                    </div>
+                  )}
+                  {(sec.questions || []).map((q: any, qi: number) => (
+                    <div key={qi} className="p-3 mb-2" style={{
+                      background: "var(--surface-2)", borderRadius: "var(--r-md)",
+                      border: "1px solid var(--border)",
+                    }}>
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-[10px] font-bold mt-1.5" style={{ color: "var(--text-3)" }}>
+                          Q{qi + 1}
+                        </span>
+                        <textarea value={q.text || ""} onChange={e => updateQuestion(si, qi, { text: e.target.value })}
+                          rows={2} className="input text-sm flex-1 resize-none"
+                          placeholder="Question text" />
+                        <button type="button" onClick={() => deleteQuestion(si, qi)}
+                          className="btn-ghost text-xs" style={{ color: "var(--danger)" }}>✕</button>
+                      </div>
+
+                      <div className="mb-2">
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Type</label>
+                        <select value={q.type || "multiple_choice"} onChange={e => updateQuestion(si, qi, { type: e.target.value })}
+                          className="input text-xs">
+                          <option value="multiple_choice">Multiple choice</option>
+                          <option value="short_answer">Short answer</option>
+                          <option value="fill_blank">Fill in blank</option>
+                        </select>
+                      </div>
+
+                      {q.type === "multiple_choice" && (
+                        <div className="space-y-1.5 mb-2">
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                            Options (click radio for correct answer)
+                          </label>
+                          {(q.options || ["", "", "", ""]).map((opt: string, oi: number) => (
+                            <div key={oi} className="flex items-center gap-2">
+                              <input type="radio" name={`q-${si}-${qi}`} checked={q.correctIndex === oi}
+                                onChange={() => updateQuestion(si, qi, { correctIndex: oi })}
+                                style={{ accentColor: "var(--success)" }} />
+                              <input value={opt} onChange={e => updateOption(si, qi, oi, e.target.value)}
+                                className="input text-sm flex-1" placeholder={`Option ${oi + 1}`} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {(q.type === "short_answer" || q.type === "fill_blank") && (
+                        <div className="mb-2">
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>
+                            Correct answer
+                          </label>
+                          <input value={q.correctAnswer || q.answer || ""}
+                            onChange={e => updateQuestion(si, qi, { correctAnswer: e.target.value })}
+                            className="input text-sm w-full" placeholder="Expected answer" />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Hint</label>
+                        <input value={q.hint || ""} onChange={e => updateQuestion(si, qi, { hint: e.target.value })}
+                          className="input text-xs w-full" placeholder="Optional gentle hint" />
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => addQuestion(si)}
+                    className="btn-ghost text-xs mt-1">+ Add question</button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Raw JSON toggle — collapsed by default */}
           <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
             <button type="button" onClick={() => setShowRawJson(v => !v)}
@@ -1594,6 +1798,7 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
