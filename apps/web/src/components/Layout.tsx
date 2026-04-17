@@ -26,14 +26,17 @@ export default function Layout() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  // Re-compute nav whenever location changes OR break state flips so
-  // arcade/projects appear immediately after submitting work or starting a break.
+  // Re-compute nav whenever location, freetime, or break state changes.
+  const freetimeSnap = useSyncExternalStore(
+    studentFreetimeStore.subscribe,
+    studentFreetimeStore.getSnapshot,
+    studentFreetimeStore.getSnapshot,
+  );
   const [accessAllowed, setAccessAllowed] = useState(isAccessAllowed);
-  useEffect(() => { setAccessAllowed(isAccessAllowed()); }, [location.pathname]);
+  useEffect(() => { setAccessAllowed(isAccessAllowed()); }, [location.pathname, freetimeSnap]);
   useEffect(() => {
     const refresh = () => setAccessAllowed(isAccessAllowed());
     window.addEventListener("breakstate-change", refresh);
-    // Also poll every second — break state expires client-side via Date.now().
     const iv = setInterval(refresh, 1000);
     return () => { window.removeEventListener("breakstate-change", refresh); clearInterval(iv); };
   }, []);

@@ -17,16 +17,21 @@ type Listener = () => void;
 
 interface FreetimeSnapshot {
   granted: boolean;
-  until: number | null; // ms epoch, or null when granted=false
+  until: number | null;      // ms epoch grant expires, or null
+  revokedUntil: number | null; // ms epoch revoke guard expires, or null
 }
 
-let _state: FreetimeSnapshot = { granted: false, until: null };
+let _state: FreetimeSnapshot = { granted: false, until: null, revokedUntil: null };
 let _expireTimer: ReturnType<typeof setTimeout> | null = null;
+let _revokeTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<Listener>();
 
 function emit() { for (const l of listeners) l(); }
 function clearTimer() {
   if (_expireTimer) { clearTimeout(_expireTimer); _expireTimer = null; }
+}
+function clearRevokeTimer() {
+  if (_revokeTimer) { clearTimeout(_revokeTimer); _revokeTimer = null; }
 }
 
 export const studentFreetimeStore = {
@@ -40,21 +45,28 @@ export const studentFreetimeStore = {
     const untilMs = untilIso ? Date.parse(untilIso) : NaN;
     const valid = Number.isFinite(untilMs) && untilMs > Date.now();
     clearTimer();
-    _state = { granted: true, until: valid ? untilMs : null };
+    clearRevokeTimer();
+    _state = { granted: true, until: valid ? untilMs : null, revokedUntil: null };
     if (valid) {
       _expireTimer = setTimeout(() => {
-        _state = { granted: false, until: null };
+        _state = { granted: false, until: null, revokedUntil: null };
         _expireTimer = null;
         emit();
       }, untilMs - Date.now());
     }
     emit();
   },
-  /** REVOKE_FREETIME or local expiry: clear the flag */
+  /** REVOKE_FREETIME: clear grant and set a 60s guard so revoke wins over stale grants */
   setRevoked() {
-    if (!_state.granted && _state.until === null) return;
     clearTimer();
-    _state = { granted: false, until: null };
+    clearRevokeTimer();
+    const revokedUntil = Date.now() + 60_000;
+    _state = { granted: false, until: null, revokedUntil };
+    _revokeTimer = setTimeout(() => {
+      _state = { ..._state, revokedUntil: null };
+      _revokeTimer = null;
+      emit();
+    }, 60_000);
     emit();
   },
 };
