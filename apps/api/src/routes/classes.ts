@@ -1162,20 +1162,30 @@ async function seedStarSchedule() {
     await ensureClassScheduleTable();
     const star = await db.prepare("SELECT id FROM classes WHERE name = ? LIMIT 1").get("Star") as any;
     if (!star?.id) { console.log("[schedule-seed] Star class not found — skipping"); starSeedRan = true; return; }
+    // Fill-in idempotent: ON CONFLICT (class_id, block_number) DO NOTHING lets
+    // a re-run complete a partial seed (e.g. serverless cold-start cut short
+    // the initial fire-and-forget loop) without double-inserting.
     const existing = await db.prepare(
       "SELECT COUNT(*) AS n FROM class_schedule WHERE class_id = ?"
     ).get(star.id) as any;
-    const n = Number(existing?.n ?? 0);
-    if (n > 0) { console.log(`[schedule-seed] Star already has ${n} blocks — skipping`); starSeedRan = true; return; }
+    const had = Number(existing?.n ?? 0);
+    let inserted = 0;
     for (let i = 0; i < STAR_SCHEDULE_SEED.length; i++) {
       const [start, end, label, subject, isBreak, breakType] = STAR_SCHEDULE_SEED[i];
-      await db.prepare(
+      const r = await db.prepare(
         `INSERT INTO class_schedule (id, class_id, block_number, start_time, end_time, label, subject, is_break, break_type, active_days, content_source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(crypto.randomUUID(), star.id, i + 1, start, end, label, subject, isBreak, breakType, "Mon,Tue,Wed,Thu,Fri", null);
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (class_id, block_number) DO NOTHING`
+      ).run(crypto.randomUUID(), star.id, i + 1, start, end, label, subject, isBreak, breakType, "Mon,Tue,Wed,Thu,Fri", null) as any;
+      if (r?.changes ?? r?.rowCount ?? 0) inserted++;
     }
-    console.log(`[schedule-seed] Seeded ${STAR_SCHEDULE_SEED.length} blocks for Star class (${star.id})`);
-    starSeedRan = true;
+    console.log(`[schedule-seed] Star class (${star.id}): had ${had} blocks, inserted ${inserted} new, total target ${STAR_SCHEDULE_SEED.length}`);
+    // Only mark done once we're sure all blocks are present — otherwise let a
+    // later request retry.
+    const after = await db.prepare(
+      "SELECT COUNT(*) AS n FROM class_schedule WHERE class_id = ?"
+    ).get(star.id) as any;
+    if (Number(after?.n ?? 0) >= STAR_SCHEDULE_SEED.length) starSeedRan = true;
   } catch (e) {
     console.error("[schedule-seed] error:", e);
     // Don't flip starSeedRan — next request may retry.
