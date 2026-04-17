@@ -5,7 +5,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
-import { isOnBreak } from "../lib/breakSystem.ts";
+import { isOnBreak, chooseBreak } from "../lib/breakSystem.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
 import { usePresencePing } from "../lib/presence.ts";
 import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
@@ -811,6 +811,25 @@ export default function StudentDashboard() {
   const dk = theme === "dark";
 
   const [phase, setPhase] = useState<Phase>('welcome');
+  // Reactive unlock state — students get dashboard access when on a 10-min
+  // break OR after teacher-granted free time OR after submitting all work.
+  // Re-polled every second + on `breakstate-change` + on `storage` so the
+  // UI flips without a refresh when any of those flags change.
+  const [accessUnlocked, setAccessUnlocked] = useState<boolean>(() => isWorkUnlocked() || isOnBreak());
+  useEffect(() => {
+    const refresh = () => setAccessUnlocked(isWorkUnlocked() || isOnBreak());
+    const onStorage = (e: StorageEvent) => { if (e.key === "workDoneDate" || e.key === null) refresh(); };
+    window.addEventListener("breakstate-change", refresh);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("blockforge:workdone-change", refresh);
+    const iv = setInterval(refresh, 1000);
+    return () => {
+      window.removeEventListener("breakstate-change", refresh);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("blockforge:workdone-change", refresh);
+      clearInterval(iv);
+    };
+  }, []);
   const [classes, setClasses] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -1005,7 +1024,16 @@ export default function StudentDashboard() {
     setPhase('done');
   }, [pendingAssignment]);
 
-  const handleTakeBreak = useCallback(() => setPhase('break'), []);
+  // "Take Break" from inside WorkScreen → use the REAL break system
+  // (chooseBreak writes localStorage + fires breakstate-change). The
+  // accessUnlocked listener above will flip within ~1s and the dashboard
+  // falls through to the playground render. No more setPhase('break') → the
+  // legacy full-screen BreakScreen just dropped the student right back into
+  // WorkScreen when it exited (= "restarted the assignments" bug).
+  const handleTakeBreak = useCallback(() => {
+    chooseBreak();
+    setAccessUnlocked(true); // optimistic — don't wait for 1s poll
+  }, []);
   const handleBreakDone = useCallback(() => setPhase('working'), []);
 
   const myEntry = leaderboard.find((e: any) => e.user_id === user?.id);
@@ -1039,24 +1067,31 @@ export default function StudentDashboard() {
     </div>
   );
 
-  if (phase === 'working' && pendingAssignment && parsedAssignment) {
-    return (
-      <WorkScreen
-        assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
-        onComplete={handleWorkComplete} onBreak={handleTakeBreak}
-        questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
-      />
-    );
-  }
+  // Access-unlocked short-circuit: while the student is on a 10-min break OR
+  // after teacher granted free time / all work submitted, skip the "do your
+  // work" gate and render the full dashboard so Arcade/Projects/YouTube are
+  // reachable. This is what makes the dashboard flip in real-time when the
+  // teacher clicks Grant Free Time or the student starts a break.
+  if (!accessUnlocked) {
+    if (phase === 'working' && pendingAssignment && parsedAssignment) {
+      return (
+        <WorkScreen
+          assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
+          onComplete={handleWorkComplete} onBreak={handleTakeBreak}
+          questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
+        />
+      );
+    }
 
-  if (phase === 'working' && pendingAssignment && !parsedAssignment) {
-    return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
-  }
+    if (phase === 'working' && pendingAssignment && !parsedAssignment) {
+      return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
+    }
 
-  if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
+    if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
+  }
 
   // ── DONE / DASHBOARD ──
-  const unlocked = isWorkUnlocked();
+  const unlocked = accessUnlocked;
   // Editorial date line "Thursday, April 17" style
   const dateLine = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
