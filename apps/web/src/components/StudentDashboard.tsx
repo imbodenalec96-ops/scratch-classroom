@@ -5,6 +5,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
+import { isOnBreak } from "../lib/breakSystem.ts";
 import { usePresencePing } from "../lib/presence.ts";
 import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
 import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
@@ -1144,7 +1145,11 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library — curated videos from teacher (always shown) */}
+      {/* YouTube Library — gated by unlock state + break state
+          - Work NOT done, NOT on break → HIDDEN
+          - On break                    → library visible, no request form
+          - Work done / full access     → library + request form */}
+      {(unlocked || isOnBreak()) && (
       <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
         <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
           📺 Video Library
@@ -1209,11 +1214,14 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Request a video */}
-        <div className={`mt-4 pt-4 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
-          <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => { /* toast or refresh */ }} />
-        </div>
+        {/* Request a video — only when fully unlocked (not during a break) */}
+        {unlocked && !isOnBreak() && (
+          <div className={`mt-4 pt-4 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
+            <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => { /* toast or refresh */ }} />
+          </div>
+        )}
       </div>
+      )}
 
       {/* Join a class */}
       <div className="card animate-slide-up" style={{ animationDelay: "320ms" }}>

@@ -6,6 +6,7 @@ import { useClassCommands } from "../lib/useClassCommands.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
+import BreakChoiceModal from "./BreakChoiceModal.tsx";
 
 export default function PublicLayout() {
   const { user } = useAuth();
@@ -97,6 +98,9 @@ export default function PublicLayout() {
           onDismissMessage={classCommands.dismissMessage}
         />
       )}
+
+      {/* Break system — same modal + banner work everywhere */}
+      {isStudent && <BreakChoiceModal />}
     </div>
   );
 }

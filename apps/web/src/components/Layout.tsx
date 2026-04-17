@@ -5,9 +5,11 @@ import { useTheme } from "../lib/theme.tsx";
 import { isWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
+import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
+import { markWorkStart } from "../lib/breakSystem.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -30,6 +32,8 @@ export default function Layout() {
   usePresencePing(user ? activityFromPath(location.pathname) : "");
   // Screenshot thumbnails for teacher monitor (students only)
   useScreenshotCapture(isStudent);
+  // Break system: start the work timer the first time a student loads the app
+  useEffect(() => { if (isStudent) markWorkStart(); }, [isStudent]);
 
   if (!user) return null;
   const navItems = getNavItems(user.role, workUnlocked);
@@ -160,6 +164,9 @@ export default function Layout() {
           onDismissMessage={classCommands.dismissMessage}
         />
       )}
+
+      {/* Break system: modal + countdown banner */}
+      {isStudent && <BreakChoiceModal />}
     </div>
   );
 }

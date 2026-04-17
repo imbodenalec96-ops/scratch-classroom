@@ -5,23 +5,13 @@ import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { Plus, FolderOpen, Box, Palette, Trash2, ExternalLink, X } from "lucide-react";
 
+// Route-level ProjectsGuard in App.tsx already enforces access — only students
+// who have completed their work OR teachers/admins reach this component.
 export default function ProjectsList() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
   const navigate = useNavigate();
-
-  // Students have no access to projects
-  if (user?.role === "student") {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-32 text-center">
-        <FolderOpen size={40} className={`mb-3 ${dk ? "text-white/15" : "text-gray-300"}`} />
-        <p className={`text-sm ${dk ? "text-white/30" : "text-gray-400"}`}>
-          Projects are not available here. Ask your teacher for access.
-        </p>
-      </div>
-    );
-  }
   const [projects, setProjects] = useState<any[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { usePresencePing } from "../lib/presence.ts";
+import { isOnBreak, BREAK_ALLOWED_GAME_IDS, breakSecondsRemaining } from "../lib/breakSystem.ts";
 import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
@@ -771,9 +772,21 @@ export default function ArcadePage() {
     : "Browsing Arcade 🎮";
   usePresencePing(user?.role === "student" ? arcadeActivity : "");
 
-  const filtered = activeCategory === "All"
-    ? GAMES
-    : GAMES.filter(g => g.category === activeCategory);
+  // Break-mode gating: students on a 10-min break only see approved games
+  const [onBreak, setOnBreak] = useState(isOnBreak());
+  useEffect(() => {
+    const iv = setInterval(() => setOnBreak(isOnBreak()), 2000);
+    const onChange = () => setOnBreak(isOnBreak());
+    window.addEventListener("breakstate-change", onChange);
+    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", onChange); };
+  }, []);
+
+  const breakGated = (games: Game[]) =>
+    (user?.role === "student" && onBreak) ? games.filter(g => BREAK_ALLOWED_GAME_IDS.has(g.id)) : games;
+
+  const filtered = breakGated(
+    activeCategory === "All" ? GAMES : GAMES.filter(g => g.category === activeCategory)
+  );
 
   const featured = GAMES.find(g => g.id === "brickbreaker") ?? GAMES[0];
 
