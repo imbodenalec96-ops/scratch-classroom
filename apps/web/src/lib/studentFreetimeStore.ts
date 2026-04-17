@@ -17,10 +17,11 @@ type Listener = () => void;
 
 interface FreetimeSnapshot {
   granted: boolean;
-  until: number | null; // ms epoch, or null when granted=false
+  until: number | null;       // ms epoch, or null when granted=false
+  revokedUntil: number | null; // ms epoch lock-out until (~60s after revoke)
 }
 
-let _state: FreetimeSnapshot = { granted: false, until: null };
+let _state: FreetimeSnapshot = { granted: false, until: null, revokedUntil: null };
 let _expireTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<Listener>();
 
@@ -40,21 +41,20 @@ export const studentFreetimeStore = {
     const untilMs = untilIso ? Date.parse(untilIso) : NaN;
     const valid = Number.isFinite(untilMs) && untilMs > Date.now();
     clearTimer();
-    _state = { granted: true, until: valid ? untilMs : null };
+    _state = { granted: true, until: valid ? untilMs : null, revokedUntil: null };
     if (valid) {
       _expireTimer = setTimeout(() => {
-        _state = { granted: false, until: null };
+        _state = { granted: false, until: null, revokedUntil: null };
         _expireTimer = null;
         emit();
       }, untilMs - Date.now());
     }
     emit();
   },
-  /** REVOKE_FREETIME or local expiry: clear the flag */
+  /** REVOKE_FREETIME: clear grant and set 60s revoke-lock */
   setRevoked() {
-    if (!_state.granted && _state.until === null) return;
     clearTimer();
-    _state = { granted: false, until: null };
+    _state = { granted: false, until: null, revokedUntil: Date.now() + 60_000 };
     emit();
   },
 };
