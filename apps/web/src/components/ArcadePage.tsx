@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { usePresencePing } from "../lib/presence.ts";
-import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package } from "lucide-react";
+import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
 import MemoryGame from "./games/MemoryGame.tsx";
@@ -12,6 +12,10 @@ import UnityGame from "./games/UnityGame.tsx";
 import WhackAMole from "./games/WhackAMole.tsx";
 import FlappyBird from "./games/FlappyBird.tsx";
 import SpaceShooter from "./games/SpaceShooter.tsx";
+import TetrisGame from "./games/TetrisGame.tsx";
+import Game2048 from "./games/Game2048.tsx";
+import TicTacToe from "./games/TicTacToe.tsx";
+import ConnectFour from "./games/ConnectFour.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -179,11 +183,61 @@ const GAMES: Game[] = [
     component: SpaceShooter,
     hint: "Arrow keys / WASD · drag on mobile",
   },
+  // ── Classic games ────────────────────────────────────────────
+  {
+    id: "tetris",
+    title: "Tetris",
+    description: "Stack falling tetrominoes and clear lines before they reach the top. A timeless classic!",
+    category: "Classic",
+    stars: 5,
+    plays: "30K",
+    accentColor: "#67e8f9",
+    emoji: "🟦",
+    component: TetrisGame,
+    hint: "← → move · ↑ rotate · ↓ soft drop · Space = hard drop",
+  },
+  {
+    id: "2048",
+    title: "2048",
+    description: "Slide tiles to merge matching numbers. Reach 2048 to win — but can you go further?",
+    category: "Classic",
+    stars: 5,
+    plays: "25K",
+    accentColor: "#fde68a",
+    emoji: "🔢",
+    component: Game2048,
+    hint: "Arrow keys / WASD / swipe to slide",
+  },
+  {
+    id: "tictactoe",
+    title: "Tic-Tac-Toe",
+    description: "Get three in a row to beat the AI. Sounds easy — but can you outsmart it?",
+    category: "Classic",
+    stars: 4,
+    plays: "10K",
+    accentColor: "#d8b4fe",
+    emoji: "⭕",
+    component: TicTacToe,
+    hint: "Click / tap a square · You = X",
+  },
+  {
+    id: "connect4",
+    title: "Connect Four",
+    description: "Drop tokens to get four in a row — horizontally, vertically, or diagonally. Beat the AI!",
+    category: "Classic",
+    stars: 5,
+    plays: "18K",
+    accentColor: "#fbbf24",
+    emoji: "🔴",
+    component: ConnectFour,
+    hint: "Click a column to drop · 4 in a row wins",
+  },
 ];
 
-const CATEGORIES = ["All", "Action", "Puzzle", "Education", "Creative", "Unity"];
+const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Unity"];
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   All: <Grid3X3 size={13} />,
+  Classic: <Gamepad2 size={13} />,
   Action: <Sword size={13} />,
   Puzzle: <Puzzle size={13} />,
   Education: <GraduationCap size={13} />,
