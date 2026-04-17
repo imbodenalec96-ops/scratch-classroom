@@ -143,6 +143,14 @@ export const api = {
     request<any>(`/classes/${classId}/command`, { method: "POST", body: JSON.stringify({ type, payload: payload || '', targetUserId }) }),
   forceUnlockAll: () => request<any>(`/classes/force-unlock-all`, { method: "POST", body: JSON.stringify({}) }),
   forceUnlockStudent: (studentId: string) => request<any>(`/classes/force-unlock-student/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
+
+  // DOM preview thumbnails
+  postSnapshot: (data: string, path: string) =>
+    request<{ok:boolean}>(`/classes/snapshot`, { method: "POST", body: JSON.stringify({ data, path }) }),
+  getStudentSnapshot: (userId: string) =>
+    request<{data: string | null; path?: string; capturedAt?: string}>(`/classes/snapshot/${userId}`),
+  getClassSnapshots: (classId: string) =>
+    request<Array<{userId: string; data: string; path: string; capturedAt: string}>>(`/classes/${classId}/snapshots`),
   heartbeat: (activity?: string) => request<{ok:boolean}>(`/classes/heartbeat`, { method: "POST", body: JSON.stringify({ activity: activity || 'online' }) }),
   debugMe: () => request<any>(`/classes/debug/me`),
 

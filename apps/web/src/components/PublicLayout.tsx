@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
+import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 
 export default function PublicLayout() {
@@ -17,6 +18,8 @@ export default function PublicLayout() {
   const classCommands = useClassCommands(isStudent);
   // Rich activity labels for authenticated users
   usePresencePing(user ? activityFromPath(loc.pathname) : "");
+  // Screenshot thumbnails for teacher monitor (students on public routes too)
+  useScreenshotCapture(isStudent);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#07071a" }}>

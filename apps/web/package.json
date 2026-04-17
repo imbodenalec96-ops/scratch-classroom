@@ -9,16 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/drei": "^9.106.0",
+    "@react-three/fiber": "^8.16.8",
     "@scratch/shared": "*",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^0.379.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1",
     "socket.io-client": "^4.7.5",
     "three": "^0.165.0",
-    "@react-three/fiber": "^8.16.8",
-    "@react-three/drei": "^9.106.0",
-    "zustand": "^4.5.2",
-    "lucide-react": "^0.379.0"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

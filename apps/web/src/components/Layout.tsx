@@ -7,6 +7,7 @@ import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
+import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -27,6 +28,8 @@ export default function Layout() {
   const classCommands = useClassCommands(isStudent);
   // Rich activity labels tied to pathname — every route change re-pings
   usePresencePing(user ? activityFromPath(location.pathname) : "");
+  // Screenshot thumbnails for teacher monitor (students only)
+  useScreenshotCapture(isStudent);
 
   if (!user) return null;
   const navItems = getNavItems(user.role, workUnlocked);

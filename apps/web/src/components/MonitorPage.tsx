@@ -80,6 +80,8 @@ export default function MonitorPage() {
   const [lockMsg, setLockMsg]               = useState("");
   const [pollOk, setPollOk]                 = useState(false);
   const [lastPollAt, setLastPollAt]         = useState<number>(0);
+  const [snapshots, setSnapshots]           = useState<Record<string, { data: string; path: string; capturedAt: string }>>({});
+  const [zoomedSnapshot, setZoomedSnapshot] = useState<{ name: string; data: string; path: string } | null>(null);
   const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
   const [msgText, setMsgText]               = useState("");
   const [showPushMenu, setShowPushMenu]     = useState(false);
@@ -159,6 +161,24 @@ export default function MonitorPage() {
     };
     fetchPresence();
     const iv = setInterval(fetchPresence, 5000);
+    return () => clearInterval(iv);
+  }, [selectedClass]);
+
+  // Poll snapshot thumbnails every 6 seconds
+  useEffect(() => {
+    if (!selectedClass) return;
+    const fetchSnaps = async () => {
+      try {
+        const data = await api.getClassSnapshots(selectedClass.id);
+        setSnapshots(() => {
+          const next: Record<string, any> = {};
+          for (const s of data) next[s.userId] = s;
+          return next;
+        });
+      } catch { /* silent */ }
+    };
+    fetchSnaps();
+    const iv = setInterval(fetchSnaps, 6000);
     return () => clearInterval(iv);
   }, [selectedClass]);
 
@@ -276,6 +296,22 @@ export default function MonitorPage() {
 
   return (
     <div className="p-6 space-y-5 animate-page-enter">
+
+      {/* Zoomed snapshot modal */}
+      {zoomedSnapshot && (
+        <div onClick={() => setZoomedSnapshot(null)}
+          style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,cursor:"pointer" }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 960, width:"100%", cursor:"default" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 16px", background:"rgba(139,92,246,0.1)", borderRadius:"12px 12px 0 0", border:"1px solid rgba(139,92,246,0.25)", borderBottom:"none" }}>
+              <div style={{ width:8, height:8, borderRadius:"50%", background:"#10b981", boxShadow:"0 0 8px #10b981", animation:"pulse 2s infinite" }} />
+              <span style={{ color:"white", fontWeight:700, fontSize:13 }}>{zoomedSnapshot.name}'s screen</span>
+              <span style={{ color:"rgba(255,255,255,0.4)", fontSize:11 }}>{zoomedSnapshot.path}</span>
+              <button onClick={() => setZoomedSnapshot(null)} style={{ marginLeft:"auto", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:8, padding:"4px 12px", cursor:"pointer", fontSize:12, fontWeight:600 }}>✕ Close</button>
+            </div>
+            <img src={zoomedSnapshot.data} alt="student screen" style={{ width:"100%", display:"block", borderRadius:"0 0 12px 12px", border:"1px solid rgba(139,92,246,0.25)" }} />
+          </div>
+        </div>
+      )}
 
       {/* Unity live view modal */}
       {watchingRoom && (
@@ -516,17 +552,20 @@ export default function MonitorPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {students.map((s, i) => {
             const pr = presence[s.id] ?? { isOnline:false, lastActive:0, lastAction:"No activity yet" };
+            const snap = snapshots[s.id];
             return (
               <StudentTile
                 key={s.id}
                 student={s}
                 presence={pr}
+                snapshot={snap}
                 dk={dk}
                 tick={tick}
                 animDelay={i * 40}
                 onWatchUnity={(room, name) => { setWatchingRoom(room); setWatchingName(name); }}
                 onMessage={() => setShowMsgModal(s.id)}
                 onKick={() => handleKick(s.id)}
+                onZoom={snap?.data ? () => setZoomedSnapshot({ name: s.name, data: snap.data, path: snap.path }) : undefined}
               />
             );
           })}
@@ -541,18 +580,22 @@ export default function MonitorPage() {
 interface TileProps {
   student: any;
   presence: any;
+  snapshot?: { data: string; path: string; capturedAt: string };
   dk: boolean;
   tick: number;
   animDelay: number;
   onWatchUnity: (room: string, name: string) => void;
   onMessage: () => void;
   onKick: () => void;
+  onZoom?: () => void;
 }
 
-function StudentTile({ student, presence, dk, tick, animDelay, onWatchUnity, onMessage, onKick }: TileProps) {
+function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatchUnity, onMessage, onKick, onZoom }: TileProps) {
   const gradient = avatarGradient(student.name || "?");
   const initials = (student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
   const { emoji, label, color } = activityPreview(presence.lastAction || "");
+  const hasSnap = !!snapshot?.data;
+  const snapAgeSec = snapshot?.capturedAt ? Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 1000) : null;
 
   return (
     <div
@@ -566,18 +609,46 @@ function StudentTile({ student, presence, dk, tick, animDelay, onWatchUnity, onM
       {/* Online accent stripe */}
       {presence.isOnline && <div className="h-0.5 bg-gradient-to-r from-emerald-500/60 via-emerald-400 to-emerald-500/60" />}
 
-      {/* Activity preview pane */}
-      <div style={{
-        height: 72,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexDirection: "column", gap: 4,
-        background: presence.isOnline ? `${color}12` : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-        borderBottom: dk ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(0,0,0,0.05)",
-      }}>
-        {presence.isOnline ? (
+      {/* Screenshot preview pane — click to zoom */}
+      <div
+        onClick={hasSnap && onZoom ? onZoom : undefined}
+        style={{
+          position: "relative",
+          height: 140,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexDirection: "column", gap: 4,
+          background: hasSnap ? "#07071a" : presence.isOnline ? `${color}12` : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+          borderBottom: dk ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(0,0,0,0.05)",
+          cursor: hasSnap && onZoom ? "zoom-in" : "default",
+          overflow: "hidden",
+        }}>
+        {hasSnap ? (
+          <>
+            <img src={snapshot!.data} alt={`${student.name}'s screen`}
+              style={{ width:"100%", height:"100%", objectFit:"cover", display:"block",
+                filter: presence.isOnline ? "none" : "grayscale(60%) brightness(0.5)",
+                transition: "filter 0.25s" }} />
+            {/* Activity badge overlay */}
+            <div style={{ position:"absolute", bottom: 4, left: 4, right: 4,
+              display:"flex", alignItems:"center", gap:4,
+              background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
+              padding:"2px 6px", borderRadius: 6,
+              fontSize: 9, fontWeight: 700, color:"white", letterSpacing:"0.03em" }}>
+              <span>{emoji}</span>
+              <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>
+              {snapAgeSec !== null && (
+                <span style={{ marginLeft:"auto", color:"rgba(255,255,255,0.6)", fontSize:9 }}>{snapAgeSec}s</span>
+              )}
+            </div>
+            {!presence.isOnline && (
+              <div style={{ position:"absolute", top: 6, right: 6, background:"rgba(239,68,68,0.75)", color:"white", fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:4, letterSpacing:"0.05em" }}>AWAY</div>
+            )}
+          </>
+        ) : presence.isOnline ? (
           <>
             <span style={{ fontSize: 28 }}>{emoji}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
+            <span style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>Preview loading…</span>
           </>
         ) : (
           <span style={{ fontSize: 24, opacity: 0.2 }}>💤</span>

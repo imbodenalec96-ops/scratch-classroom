@@ -195,6 +195,22 @@ let presenceTableReady = false;
 let heartbeatTableReady = false;
 let classStateTableReady = false;
 let commandTableReady = false;
+let snapshotTableReady = false;
+
+async function ensureSnapshotTable() {
+  if (snapshotTableReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS student_snapshots (
+        user_id TEXT PRIMARY KEY,
+        data TEXT NOT NULL DEFAULT '',
+        path TEXT NOT NULL DEFAULT '',
+        captured_at TEXT NOT NULL DEFAULT ''
+      )
+    `);
+    snapshotTableReady = true;
+  } catch (e) { console.error('ensureSnapshotTable error:', e); }
+}
 
 async function ensurePresenceTable() {
   if (presenceTableReady) return;
@@ -275,6 +291,62 @@ router.post("/heartbeat", async (req: AuthRequest, res: Response) => {
   } catch (e) {
     console.error('heartbeat error:', e);
     res.status(200).json({ ok: false, error: String(e) });
+  }
+});
+
+// Student: POST a DOM screenshot (tiny JPEG base64). Called every ~5s from
+// the student client. Upserts one row per student — only the latest is kept.
+router.post("/snapshot", async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id;
+  const { data = '', path = '' } = req.body || {};
+  // Hard cap to prevent accidental giant payloads (compressed JPEG should be < 40KB)
+  if (typeof data !== 'string' || data.length > 60_000) {
+    return res.status(413).json({ error: 'snapshot too large' });
+  }
+  const now = new Date().toISOString();
+  await ensureSnapshotTable();
+  try {
+    await db.prepare(
+      `INSERT INTO student_snapshots (user_id, data, path, captured_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET
+         data = excluded.data, path = excluded.path, captured_at = excluded.captured_at`
+    ).run(userId, data, String(path || ''), now);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('snapshot upsert error:', e);
+    res.status(200).json({ ok: false });
+  }
+});
+
+// Teacher: get one student's latest snapshot
+router.get("/snapshot/:userId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureSnapshotTable();
+  try {
+    const row = await db.prepare(
+      `SELECT * FROM student_snapshots WHERE user_id = ?`
+    ).get(req.params.userId) as any;
+    if (!row) return res.json({ data: null });
+    res.json({ data: row.data, path: row.path, capturedAt: row.captured_at });
+  } catch (e) { res.json({ data: null }); }
+});
+
+// Teacher: batch-get latest snapshots for every student in a class (single round-trip)
+router.get("/:classId/snapshots", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureSnapshotTable();
+  try {
+    const rows = await db.prepare(
+      `SELECT ss.user_id, ss.data, ss.path, ss.captured_at
+       FROM student_snapshots ss
+       JOIN class_members cm ON cm.user_id = ss.user_id
+       WHERE cm.class_id = ?`
+    ).all(req.params.classId) as any[];
+    res.json(rows.map((r: any) => ({
+      userId: r.user_id, data: r.data, path: r.path, capturedAt: r.captured_at
+    })));
+  } catch (e) {
+    console.error('snapshots batch error:', e);
+    res.json([]);
   }
 });
 
