@@ -6,6 +6,7 @@ import { isWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
+import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -24,6 +25,8 @@ export default function Layout() {
   // GoGuardian: students poll for lock/commands; teachers/admin skip
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
+  // Rich activity labels tied to pathname — every route change re-pings
+  usePresencePing(user ? activityFromPath(location.pathname) : "");
 
   if (!user) return null;
   const navItems = getNavItems(user.role, workUnlocked);

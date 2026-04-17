@@ -22,6 +22,7 @@ import Achievements from "./components/Achievements.tsx";
 import ChatPanel from "./components/ChatPanel.tsx";
 import LessonsPage from "./components/LessonsPage.tsx";
 import ArcadePage from "./components/ArcadePage.tsx";
+import YouTubeManager from "./components/YouTubeManager.tsx";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
 import StudentKiosk from "./components/StudentKiosk.tsx";
@@ -117,6 +118,7 @@ export default function App() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="achievements" element={<Achievements />} />
             <Route path="lessons" element={<LessonsPage />} />
+            <Route path="youtube" element={<YouTubeManager />} />
           </Route>
 
           {/* Full-screen project workspace (no sidebar) */}

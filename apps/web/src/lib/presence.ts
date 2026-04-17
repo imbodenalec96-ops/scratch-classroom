@@ -37,19 +37,24 @@ async function getMyClassIds(): Promise<string[]> {
  * @param intervalMs  Default 20 000 ms — stays well inside 3-min server timeout
  */
 export function usePresencePing(activity: string, intervalMs = 20_000) {
-  // Keep latest activity in a ref so the interval always reads current value
   const activityRef = useRef(activity);
-  useEffect(() => { activityRef.current = activity; }, [activity]);
+
+  useEffect(() => {
+    activityRef.current = activity;
+    if (!activity) return; // skip if no activity label (user not ready)
+    api.heartbeat(activity).catch(() => {});
+    (async () => {
+      const ids = await getMyClassIds();
+      for (const id of ids) api.pingPresence(id, activity).catch(() => {});
+    })();
+  }, [activity]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function ping() {
-      // Always heartbeat — works even without class membership.
-      // This is the fallback that guarantees the student shows online
-      // in the monitor even if getClasses() returns empty for any reason.
+      if (!activityRef.current) return;
       api.heartbeat(activityRef.current).catch(() => {});
-
       const ids = await getMyClassIds();
       if (cancelled) return;
       for (const id of ids) {
@@ -57,11 +62,39 @@ export function usePresencePing(activity: string, intervalMs = 20_000) {
       }
     }
 
-    ping(); // immediate first ping
+    ping();
     const timer = setInterval(ping, intervalMs);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [intervalMs]); // activity changes are handled via ref — no restart needed
+  }, [intervalMs]);
+}
+
+/** Infer a rich activity label from a React Router pathname */
+export function activityFromPath(pathname: string): string {
+  if (!pathname || pathname === '/') return "🏠 On dashboard";
+  if (pathname === '/student') return "🏠 On dashboard";
+  if (pathname === '/teacher') return "👨‍🏫 Teacher dashboard";
+  if (pathname === '/admin') return "👩‍💼 Admin dashboard";
+  if (pathname.startsWith('/lessons')) return "📖 Reading lessons";
+  if (pathname.startsWith('/assignments')) return "✏️ Doing assignments";
+  if (pathname.startsWith('/quizzes')) return "❓ Taking a quiz";
+  if (pathname.startsWith('/grading')) return "📝 Grading work";
+  if (pathname.startsWith('/arcade/play/')) {
+    const game = pathname.split('/').pop() || '';
+    const pretty = game.charAt(0).toUpperCase() + game.slice(1);
+    return `🎮 Playing ${pretty}`;
+  }
+  if (pathname.startsWith('/arcade')) return "🎮 Browsing arcade";
+  if (pathname.startsWith('/project/')) return "💻 Building a project";
+  if (pathname.startsWith('/projects')) return "💻 Browsing projects";
+  if (pathname.startsWith('/youtube')) return "📺 YouTube queue";
+  if (pathname.startsWith('/monitor')) return "👀 On monitor";
+  if (pathname.startsWith('/leaderboard')) return "🏆 Checking leaderboard";
+  if (pathname.startsWith('/achievements')) return "🎖️ Viewing achievements";
+  if (pathname.startsWith('/analytics')) return "📊 Viewing analytics";
+  if (pathname.startsWith('/classes')) return "📚 Managing class";
+  if (pathname.startsWith('/playground')) return "🎨 In the playground";
+  return `🌐 ${pathname}`;
 }

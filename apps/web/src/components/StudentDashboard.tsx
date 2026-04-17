@@ -48,6 +48,52 @@ function spawnConfetti() {
   }
 }
 
+/* ── YouTubeRequestForm — inline request-a-video form ── */
+function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: string; onSent?: () => void }) {
+  const [title, setTitle] = React.useState("");
+  const [sent, setSent] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const submit = async () => {
+    if (!title.trim() || !userId) return;
+    setSending(true);
+    try {
+      await api.createYouTubeRequest({ student_id: userId, title: title.trim() });
+      setTitle(""); setSent(true);
+      setTimeout(() => setSent(false), 3000);
+      onSent?.();
+    } catch (e: any) {
+      alert("Couldn't send request: " + e.message);
+    } finally { setSending(false); }
+  };
+  return (
+    <div>
+      <div className="text-xs font-bold mb-2" style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}>
+        🎬 Want a video? Ask your teacher:
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder="e.g. fun math song about fractions"
+          className="input text-sm flex-1"
+          style={{ minHeight: 40 }}
+        />
+        <button onClick={submit} disabled={!title.trim() || sending}
+          className={`text-xs font-bold px-4 rounded-xl cursor-pointer transition-all ${
+            sent ? "bg-emerald-500 text-white" : "btn-primary"
+          }`}
+          style={{ minHeight: 40 }}>
+          {sent ? "✓ Sent!" : sending ? "…" : "Request"}
+        </button>
+      </div>
+      <p className="text-[10px] mt-1.5" style={{ color: dk ? "rgba(255,255,255,0.25)" : "#94a3b8" }}>
+        Your teacher will find the video and approve it for you.
+      </p>
+    </div>
+  );
+}
+
 /* ── Flying Word-Buddy (butterfly companion) ── */
 function FlyingBuddy({ active = true }: { active?: boolean }) {
   const rm = prefersReducedMotion();
@@ -1098,42 +1144,41 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library — curated videos from teacher */}
-      {youtubeLibrary.length > 0 && (
-        <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
-          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
-            📺 Video Library
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(239,68,68,0.1)" : "#fee2e2", color: dk ? "#f87171" : "#dc2626" }}>
-              {youtubeLibrary.length} videos
-            </span>
-          </h2>
+      {/* YouTube Library — curated videos from teacher (always shown) */}
+      <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
+        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
+          📺 Video Library
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(239,68,68,0.1)" : "#fee2e2", color: dk ? "#f87171" : "#dc2626" }}>
+            {youtubeLibrary.length} {youtubeLibrary.length === 1 ? "video" : "videos"}
+          </span>
+        </h2>
 
-          {/* Playing inline */}
-          {playingLibVideo && (
-            <div className="mb-4 animate-spring-in">
-              <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
-                  title={playingLibVideo.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
-                />
-              </div>
-              <button onClick={() => setPlayingLibVideo(null)} className="mt-2 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-colors" style={{ background: dk?"rgba(255,255,255,0.05)":"#f1f5f9", color: dk?"rgba(255,255,255,0.5)":"#64748b" }}>
-                ✕ Close video
-              </button>
+        {/* Playing inline */}
+        {playingLibVideo && (
+          <div className="mb-4 animate-spring-in">
+            <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                title={playingLibVideo.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
+              />
             </div>
-          )}
+            <button onClick={() => setPlayingLibVideo(null)} className="mt-2 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-colors" style={{ background: dk?"rgba(255,255,255,0.05)":"#f1f5f9", color: dk?"rgba(255,255,255,0.5)":"#64748b" }}>
+              ✕ Close video
+            </button>
+          </div>
+        )}
 
-          {/* Grid of videos */}
+        {/* Grid of videos OR empty state */}
+        {youtubeLibrary.length > 0 ? (
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
             {youtubeLibrary.map((v: any) => (
               <button
                 key={v.id}
                 onClick={async () => {
                   setPlayingLibVideo({ videoId: v.video_id, title: v.title });
-                  // Auto-approve pick
                   if (user?.id) {
                     api.pickLibraryVideo(v.id, user.id).catch(() => {});
                   }
@@ -1144,18 +1189,11 @@ export default function StudentDashboard() {
                   boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
                   transition:"transform 0.15s, box-shadow 0.15s",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 16px rgba(0,0,0,0.15)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = dk?"0 2px 8px rgba(0,0,0,0.3)":"0 2px 8px rgba(0,0,0,0.08)"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
               >
                 <div style={{ position:"relative", overflow:"hidden" }}>
                   <img src={v.thumbnail_url || `https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%", aspectRatio:"16/9", objectFit:"cover", display:"block" }} />
-                  <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", opacity:0, transition:"opacity 0.15s" }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity="1"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity="0"}>
-                    <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.9)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <span style={{ fontSize:14, marginLeft:2 }}>▶</span>
-                    </div>
-                  </div>
                 </div>
                 <div style={{ padding:"8px 10px", background: dk?"rgba(255,255,255,0.04)":"white" }}>
                   <div style={{ fontSize:11, fontWeight:700, color: dk?"rgba(255,255,255,0.85)":"#1e293b", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
@@ -1164,15 +1202,18 @@ export default function StudentDashboard() {
               </button>
             ))}
           </div>
+        ) : (
+          <div className="text-center py-6" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
+            <div className="text-3xl mb-2">📼</div>
+            <p className="text-xs">No videos in the library yet.<br/>Ask your teacher to add some, or request one below!</p>
+          </div>
+        )}
 
-          <button
-            onClick={() => alert("Ask your teacher to add more videos to the library!")}
-            className="mt-3 w-full text-center text-xs font-medium py-2.5 rounded-xl cursor-pointer transition-colors"
-            style={{ background: dk?"rgba(255,255,255,0.03)":"#f8fafc", color: dk?"rgba(255,255,255,0.3)":"#94a3b8", border: `1px dashed ${dk?"rgba(255,255,255,0.1)":"#e2e8f0"}` }}>
-            Don't see what you want? 🎬 Ask your teacher to add it →
-          </button>
+        {/* Request a video */}
+        <div className={`mt-4 pt-4 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
+          <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => { /* toast or refresh */ }} />
         </div>
-      )}
+      </div>
 
       {/* Join a class */}
       <div className="card animate-slide-up" style={{ animationDelay: "320ms" }}>

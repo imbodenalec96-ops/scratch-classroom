@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
 import { useClassCommands } from "../lib/useClassCommands.ts";
+import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 
 export default function PublicLayout() {
@@ -14,6 +15,8 @@ export default function PublicLayout() {
   // playing arcade games.
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
+  // Rich activity labels for authenticated users
+  usePresencePing(user ? activityFromPath(loc.pathname) : "");
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#07071a" }}>

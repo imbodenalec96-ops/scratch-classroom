@@ -33,8 +33,7 @@ const TOOLS = (dk: boolean) => [
   { path: "/quizzes",     icon: HelpCircle,   label: "Quizzes",      desc: "Build & grade",     color: "text-blue-400",    bg: dk ? "bg-blue-500/10"    : "bg-blue-50",    accent: "border-l-blue-400"    },
   { path: "/grading",     icon: CheckSquare,  label: "Grading",      desc: "Review student work",color: "text-emerald-400", bg: dk ? "bg-emerald-500/10" : "bg-emerald-50", accent: "border-l-emerald-400" },
   { path: "/analytics",   icon: BarChart3,    label: "Analytics",    desc: "View reports",      color: "text-amber-400",   bg: dk ? "bg-amber-500/10"   : "bg-amber-50",   accent: "border-l-amber-400"   },
-  { path: "/monitor",     icon: Youtube,      label: "YouTube Queue",desc: "Manage requests",   color: "text-red-400",     bg: dk ? "bg-red-500/10"     : "bg-red-50",     accent: "border-l-red-400",
-    state: { tab: "youtube" } },
+  { path: "/youtube",     icon: Youtube,      label: "YouTube Queue",desc: "Library + requests",color: "text-red-400",     bg: dk ? "bg-red-500/10"     : "bg-red-50",     accent: "border-l-red-400" },
   { path: "/leaderboard", icon: Trophy,       label: "Leaderboard",  desc: "Student rankings",  color: "text-yellow-400",  bg: dk ? "bg-yellow-500/10"  : "bg-yellow-50",  accent: "border-l-yellow-400"  },
 ];
 
