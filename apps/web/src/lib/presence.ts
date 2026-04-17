@@ -45,6 +45,11 @@ export function usePresencePing(activity: string, intervalMs = 20_000) {
     let cancelled = false;
 
     async function ping() {
+      // Always heartbeat — works even without class membership.
+      // This is the fallback that guarantees the student shows online
+      // in the monitor even if getClasses() returns empty for any reason.
+      api.heartbeat(activityRef.current).catch(() => {});
+
       const ids = await getMyClassIds();
       if (cancelled) return;
       for (const id of ids) {
