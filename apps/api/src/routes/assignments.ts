@@ -667,14 +667,17 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
 // in parallel with its own concurrency limit — always stays under the
 // serverless function timeout regardless of class size.
 router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const T0 = Date.now();
+  const tag = `[slot ${Math.random().toString(36).slice(2, 6)}]`;
+  console.log(`${tag} ENTER +0ms body=${JSON.stringify(req.body).slice(0,200)}`);
   const client = getAnthropic();
   if (!client) {
-    return res.status(503).json({
-      error: "ANTHROPIC_API_KEY not set",
-      code: "AI_NOT_CONFIGURED",
-    });
+    console.log(`${tag} NO_KEY +${Date.now()-T0}ms`);
+    return res.status(503).json({ error: "ANTHROPIC_API_KEY not set", code: "AI_NOT_CONFIGURED" });
   }
-  await ensureGradeCols();
+  console.log(`${tag} CLIENT_OK +${Date.now()-T0}ms`);
+  try { await ensureGradeCols(); } catch (e: any) { console.log(`${tag} ENSURE_COLS_ERR +${Date.now()-T0}ms ${e?.message}`); }
+  console.log(`${tag} COLS_READY +${Date.now()-T0}ms`);
 
   const {
     classId, studentId, subject, subjectKey = subject, date, dayName,
@@ -684,6 +687,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   } = req.body;
 
   if (!classId || !studentId || !subject || !date || gradeMin == null) {
+    console.log(`${tag} BAD_REQ +${Date.now()-T0}ms`);
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -694,15 +698,18 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
       "SELECT prompt FROM daily_tasks WHERE student_id = ? AND subject = ? AND date >= date('now','-14 day')"
     ).all(studentId, subjectKey) as any[];
     recent = rows.map((r: any) => r.prompt || "").slice(0, 6);
-  } catch { /* ignore */ }
+  } catch (e: any) { console.log(`${tag} RECENT_ERR +${Date.now()-T0}ms ${e?.message}`); }
+  console.log(`${tag} RECENT_OK +${Date.now()-T0}ms n=${recent.length}`);
 
+  console.log(`${tag} ANTHROPIC_START +${Date.now()-T0}ms`);
   const gen = await generateDailyAssignmentContent(client, {
     studentId, date: `${date}|${subject}`, subject: subjectKey,
     gradeMin: Number(gradeMin), gradeMax: Number(gradeMax ?? gradeMin),
     weekTheme, recentPrompts: recent,
     questionCount, teacherNotes, focusKeywords, questionType, learningObjective,
   });
-  if (!gen) return res.status(500).json({ error: "Generation failed" });
+  console.log(`${tag} ANTHROPIC_DONE +${Date.now()-T0}ms ok=${!!gen}`);
+  if (!gen) return res.status(500).json({ error: "Generation failed", tag });
 
   const id = crypto.randomUUID();
   try {
