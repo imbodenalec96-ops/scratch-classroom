@@ -69,7 +69,7 @@ function DashboardRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/home" replace />;
-  if (user.role === "admin") return <Navigate to="/teacher" replace />;
+  if (user.role === "admin") return <Navigate to="/admin-dashboard" replace />;
   if (user.role === "teacher") return <Navigate to="/teacher" replace />;
   return <Navigate to="/student" replace />;
 }
@@ -121,6 +121,7 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<DashboardRedirect />} />
             <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin-dashboard" element={<AdminDashboard />} />
             <Route path="teacher" element={<TeacherDashboard />} />
             <Route path="student" element={<StudentDashboard />} />
             <Route path="projects" element={<ProjectsGuard />} />

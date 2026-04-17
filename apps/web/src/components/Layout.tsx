@@ -179,10 +179,17 @@ function getNavItems(role: string, workDone = isWorkUnlocked()) {
     { path: "/arcade",     icon: Gamepad2,        label: "Arcade"      },
   ];
   if (role === "admin") {
-    return [...common,
-      { path: "/monitor",    icon: Monitor,   label: "Monitor"    },
-      { path: "/analytics",  icon: BarChart3, label: "Analytics"  },
-      { path: "/leaderboard",icon: Trophy,    label: "Leaderboard"},
+    return [
+      { path: "/admin-dashboard", icon: LayoutDashboard, label: "Admin Home" },
+      { path: "/monitor",         icon: Monitor,         label: "Monitor"    },
+      { path: "/assignments",     icon: ClipboardList,   label: "Assignments"},
+      { path: "/quizzes",         icon: HelpCircle,      label: "Quizzes"    },
+      { path: "/grading",         icon: CheckSquare,     label: "Grading"    },
+      { path: "/class-grades",    icon: Medal,           label: "Class Grades"},
+      { path: "/analytics",       icon: BarChart3,       label: "Analytics"  },
+      { path: "/leaderboard",     icon: Trophy,          label: "Leaderboard"},
+      { path: "/lessons",         icon: BookOpen,        label: "Lessons"    },
+      { path: "/projects",        icon: FolderOpen,      label: "Projects"   },
     ];
   }
   if (role === "teacher") {
