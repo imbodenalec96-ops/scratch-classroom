@@ -17,10 +17,11 @@ type Listener = () => void;
 
 interface FreetimeSnapshot {
   granted: boolean;
-  until: number | null; // ms epoch, or null when granted=false
+  until: number | null;      // ms epoch when grant expires, null = indefinite or revoked
+  revokedUntil: number | null; // ms epoch for the 60s revoke window; null when inactive
 }
 
-let _state: FreetimeSnapshot = { granted: false, until: null };
+let _state: FreetimeSnapshot = { granted: false, until: null, revokedUntil: null };
 let _expireTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<Listener>();
 
@@ -35,26 +36,31 @@ export const studentFreetimeStore = {
     listeners.add(l);
     return () => { listeners.delete(l); };
   },
-  /** GRANT_FREETIME: set granted=true with auto-expire at `untilIso` */
+  /** GRANT_FREETIME: set granted=true with auto-expire at `untilIso`. Clears the revoke window. */
   setGranted(untilIso: string | null) {
     const untilMs = untilIso ? Date.parse(untilIso) : NaN;
     const valid = Number.isFinite(untilMs) && untilMs > Date.now();
     clearTimer();
-    _state = { granted: true, until: valid ? untilMs : null };
+    _state = { granted: true, until: valid ? untilMs : null, revokedUntil: null };
     if (valid) {
       _expireTimer = setTimeout(() => {
-        _state = { granted: false, until: null };
+        _state = { granted: false, until: null, revokedUntil: null };
         _expireTimer = null;
         emit();
       }, untilMs - Date.now());
     }
     emit();
   },
-  /** REVOKE_FREETIME or local expiry: clear the flag */
+  /** REVOKE_FREETIME: clear grant and start 60s revoke window so isAccessAllowed stays false. */
   setRevoked() {
-    if (!_state.granted && _state.until === null) return;
     clearTimer();
-    _state = { granted: false, until: null };
+    const revokedUntil = Date.now() + 60_000;
+    _state = { granted: false, until: null, revokedUntil };
+    _expireTimer = setTimeout(() => {
+      _state = { granted: false, until: null, revokedUntil: null };
+      _expireTimer = null;
+      emit();
+    }, 60_000);
     emit();
   },
 };

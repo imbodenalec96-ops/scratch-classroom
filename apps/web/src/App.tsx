@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
-import { isWorkUnlocked } from "./lib/workUnlock.ts";
+import { isAccessAllowed } from "./lib/workUnlock.ts";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
 import LoginPage from "./components/LoginPage.tsx";
@@ -77,23 +77,20 @@ function DashboardRedirect() {
 function ProjectWorkspaceRoute() {
   const { user } = useAuth();
   const { id } = useParams();
-  // Students can access projects only after completing today's work
-  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  if (user?.role === 'student' && !isAccessAllowed()) return <Navigate to="/student" replace />;
   return <ProjectWorkspace projectId={id} />;
 }
 
 function ArcadeGuard() {
   const { user } = useAuth();
-  // Students can access arcade only after completing today's work
-  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  if (user?.role === 'student' && !isAccessAllowed()) return <Navigate to="/student" replace />;
   return <ArcadePage />;
 }
 
 function ProjectsGuard() {
   const { user } = useAuth();
   const cfg = useClassConfig();
-  // Students can access projects only after completing today's work
-  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  if (user?.role === 'student' && !isAccessAllowed()) return <Navigate to="/student" replace />;
   // Teacher-set config: projects disabled
   if (user?.role === 'student' && !cfg.projectsEnabled) {
     return (
