@@ -7,6 +7,7 @@ import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
+import { studentVideoStore } from "../lib/studentVideoStore.ts";
 import { setBreakState } from "../lib/breakSystem.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
@@ -50,6 +51,17 @@ export default function PublicLayout() {
       studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
     },
+    BROADCAST_VIDEO: (row) => {
+      let videoId: string | null = null;
+      let url: string | null = null;
+      try {
+        const p = JSON.parse(row.payload || "{}");
+        videoId = p.videoId ?? null;
+        url = p.url ?? null;
+      } catch { /* malformed payload */ }
+      if (videoId) studentVideoStore.setBroadcast(videoId, url);
+    },
+    END_BROADCAST: () => studentVideoStore.clear(),
   });
   const newLock = useSyncExternalStore(
     studentLockStore.subscribe,

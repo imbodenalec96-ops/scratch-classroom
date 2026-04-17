@@ -11,6 +11,7 @@ import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
+import { studentVideoStore } from "../lib/studentVideoStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
@@ -75,6 +76,17 @@ export default function Layout() {
       studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
     },
+    BROADCAST_VIDEO: (row) => {
+      let videoId: string | null = null;
+      let url: string | null = null;
+      try {
+        const p = JSON.parse(row.payload || "{}");
+        videoId = p.videoId ?? null;
+        url = p.url ?? null;
+      } catch { /* malformed payload — nothing to show */ }
+      if (videoId) studentVideoStore.setBroadcast(videoId, url);
+    },
+    END_BROADCAST: () => studentVideoStore.clear(),
   });
   // Subscribe to the new lock store and OR it into the existing overlay
   // props. Legacy class_commands lock (from useClassCommands) stays

@@ -1021,6 +1021,70 @@ router.delete("/:classId/video", requireRole("teacher", "admin"), async (req: Au
   }
 });
 
+// ── YouTube broadcast (new student_commands pipe) ─────────────────────
+// Extract an 11-char YT id from watch / youtu.be / embed / shorts URLs, or
+// accept the raw id. Returns null if unparseable.
+function extractYouTubeId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+  const s = String(urlOrId).trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+// POST /:classId/broadcast-video — fan out BROADCAST_VIDEO to every active
+// student in the class. Kept deliberately thin: we rely on the per-student
+// command pipe (already durable + consume-on-ack) rather than introducing a
+// parallel class-scoped queue.
+router.post("/:classId/broadcast-video", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  const { url } = req.body || {};
+  const videoId = extractYouTubeId(url || "");
+  if (!videoId) return res.status(400).json({ error: "Invalid YouTube URL or ID" });
+  try {
+    const students = await db.prepare(
+      "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    ).all(classId) as any[];
+    const payload = { url, videoId };
+    const enqueueAll = students.map(s =>
+      enqueueStudentCommand(s.id, "BROADCAST_VIDEO", payload)
+        .catch(e => console.error("enqueueStudentCommand BROADCAST_VIDEO failed:", s.id, e))
+    );
+    await Promise.allSettled(enqueueAll);
+    res.json({ ok: true, studentsAffected: students.length, videoId });
+  } catch (e) {
+    console.error("POST /:classId/broadcast-video failed:", e);
+    res.status(500).json({ error: "Failed to broadcast video" });
+  }
+});
+
+// POST /:classId/broadcast-end — enqueue END_BROADCAST for all students AND
+// clear any existing class_video row so the legacy poll-based overlay also
+// tears down immediately (no waiting for the next 3s tick).
+router.post("/:classId/broadcast-end", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  try {
+    try {
+      await ensureVideoTable();
+      await db.prepare("DELETE FROM class_video WHERE class_id = ?").run(classId);
+    } catch (e) {
+      console.warn("broadcast-end: class_video DELETE skipped:", (e as Error).message);
+    }
+    const students = await db.prepare(
+      "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    ).all(classId) as any[];
+    const enqueueAll = students.map(s =>
+      enqueueStudentCommand(s.id, "END_BROADCAST", "")
+        .catch(e => console.error("enqueueStudentCommand END_BROADCAST failed:", s.id, e))
+    );
+    await Promise.allSettled(enqueueAll);
+    res.json({ ok: true, studentsAffected: students.length });
+  } catch (e) {
+    console.error("POST /:classId/broadcast-end failed:", e);
+    res.status(500).json({ error: "Failed to end broadcast" });
+  }
+});
+
 // Anyone in the class: get current video
 router.get("/:classId/video", async (req: AuthRequest, res: Response) => {
   await ensureVideoTable();

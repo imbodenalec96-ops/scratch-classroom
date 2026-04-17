@@ -194,6 +194,15 @@ export const api = {
   grantStudentFreeTime: (studentId: string, minutes?: number) => request<any>(`/students/${studentId}/grant-freetime`, { method: "POST", body: JSON.stringify({ minutes: minutes ?? 15 }) }),
   revokeStudentFreeTime: (studentId: string) => request<any>(`/students/${studentId}/revoke-freetime`, { method: "POST", body: JSON.stringify({}) }),
   endStudentBreak: (studentId: string) => request<any>(`/students/${studentId}/end-break`, { method: "POST", body: JSON.stringify({}) }),
+  // YouTube broadcast via student_commands (parallels legacy class_video path)
+  broadcastClassVideo: (classId: string, url: string) =>
+    request<any>(`/classes/${classId}/broadcast-video`, { method: "POST", body: JSON.stringify({ url }) }),
+  endClassBroadcast: (classId: string) =>
+    request<any>(`/classes/${classId}/broadcast-end`, { method: "POST", body: JSON.stringify({}) }),
+  broadcastStudentVideo: (studentId: string, url: string) =>
+    request<any>(`/students/${studentId}/broadcast-video`, { method: "POST", body: JSON.stringify({ url }) }),
+  endStudentBroadcast: (studentId: string) =>
+    request<any>(`/students/${studentId}/broadcast-end`, { method: "POST", body: JSON.stringify({}) }),
   focusStudent: (studentId: string, focused: boolean) => request<any>(`/classes/focus-student/${studentId}`, { method: "POST", body: JSON.stringify({ focused }) }),
   grantFreeTime: (studentId: string) => request<any>(`/classes/grant-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
   revokeFreeTime: (studentId: string) => request<any>(`/classes/revoke-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),

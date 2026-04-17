@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import {
   X, Lock, LockOpen, Send, Navigation, MessageSquare, Gift, Ban,
-  RefreshCcw, ExternalLink, Clock, Zap, Coffee,
+  RefreshCcw, ExternalLink, Clock, Zap, Coffee, Youtube, Square,
 } from "lucide-react";
 
 interface Props {
@@ -32,6 +32,9 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   const [pushMenu, setPushMenu] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [kidLocked, setKidLocked] = useState(false);
+  // Per-student broadcast URL input (inline — mirrors the `msg` field below).
+  const [broadcastUrl, setBroadcastUrl] = useState("");
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const showFlash = useCallback((txt: string) => {
@@ -125,6 +128,21 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
         api.revokeFreeTime(student.id),
       ]);
       showFlash("⛔ Free time revoked");
+    } catch (e: any) { alert("Failed: " + e.message); }
+  };
+  const handleBroadcast = async () => {
+    const url = broadcastUrl.trim();
+    if (!url) { alert("Enter a YouTube URL first."); return; }
+    try {
+      await api.broadcastStudentVideo(student.id, url);
+      showFlash("📺 Broadcast sent");
+      setBroadcastUrl(""); setBroadcastOpen(false);
+    } catch (e: any) { alert("Failed: " + e.message); }
+  };
+  const handleEndBroadcast = async () => {
+    try {
+      await api.endStudentBroadcast(student.id);
+      showFlash("⏹ Video ended");
     } catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleEndBreak = async () => {
@@ -293,6 +311,29 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
 
               <button onClick={handleEndBreak} className={btn("violet") + " col-span-2"}>
                 <Coffee size={13}/> ⛔ End Break Now
+              </button>
+
+              {/* Per-student YouTube broadcast — toggle the URL input, then send. */}
+              <button onClick={() => setBroadcastOpen(v => !v)} className={btn("red") + " col-span-2"}>
+                <Youtube size={13}/> 📺 Broadcast Video to This Student
+              </button>
+              {broadcastOpen && (
+                <div className="col-span-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={broadcastUrl}
+                    onChange={e => setBroadcastUrl(e.target.value)}
+                    placeholder="https://youtu.be/…"
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs border ${dk ? "bg-[#0f1029] border-white/[0.08] text-white placeholder-white/30" : "bg-white border-gray-200 text-gray-800"}`}
+                    onKeyDown={e => { if (e.key === "Enter") handleBroadcast(); }}
+                  />
+                  <button onClick={handleBroadcast} className={btn("red")}>
+                    <Send size={13}/> Send
+                  </button>
+                </div>
+              )}
+              <button onClick={handleEndBroadcast} className={btn("amber") + " col-span-2"}>
+                <Square size={13}/> ⏹ End Video
               </button>
             </div>
           </div>

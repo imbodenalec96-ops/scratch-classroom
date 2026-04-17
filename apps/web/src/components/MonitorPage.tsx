@@ -360,7 +360,12 @@ export default function MonitorPage() {
     const id = extractYouTubeId(videoUrl);
     if (!id) { alert("Couldn't find a YouTube video ID."); return; }
     getSocket().emit("class:video", { classId: selectedClass.id, videoId: id, url: videoUrl, title: videoTitle || "Class Video" });
-    api.shareClassVideo(selectedClass.id, id, videoTitle || "Class Video").catch(() => {});
+    // Fire legacy class_video write + new student_commands fan-out in parallel.
+    // New pipe is authoritative for students on the new overlay path.
+    Promise.allSettled([
+      api.shareClassVideo(selectedClass.id, id, videoTitle || "Class Video"),
+      api.broadcastClassVideo(selectedClass.id, videoUrl),
+    ]).catch(() => {});
     setActiveVideo(id); setShowVideoInput(false); setVideoUrl(""); setVideoTitle("");
   };
 
@@ -372,7 +377,16 @@ export default function MonitorPage() {
     // broadcast is still live in the DB (the bug users were hitting).
     try {
       getSocket().emit("class:video:stop", { classId: selectedClass.id });
-      await api.stopClassVideo(selectedClass.id);
+      // Fire both paths — new pipe sends END_BROADCAST to every student; legacy
+      // path also drops the class_video row. Use allSettled so a failure in
+      // one doesn't block the other, but still surface to the teacher if the
+      // legacy DELETE (the authoritative "still live in DB" signal) fails.
+      const [cmdRes, legacyRes] = await Promise.allSettled([
+        api.endClassBroadcast(selectedClass.id),
+        api.stopClassVideo(selectedClass.id),
+      ]);
+      if (legacyRes.status === "rejected") throw legacyRes.reason;
+      void cmdRes;
       setActiveVideo(null);
     } catch (e: any) {
       console.error("stopClassVideo failed:", e);

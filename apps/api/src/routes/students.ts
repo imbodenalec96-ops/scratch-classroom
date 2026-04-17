@@ -351,6 +351,44 @@ router.post("/:id/grant-freetime", requireRole("teacher", "admin"), async (req: 
   }
 });
 
+// Shared YT id extractor for the per-student broadcast endpoint. Mirrors the
+// one in classes.ts — inlined rather than moved to a shared module to keep
+// this commit scoped to the single broadcast feature.
+function extractYouTubeId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+  const s = String(urlOrId).trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+// POST /:id/broadcast-video — single-student BROADCAST_VIDEO.
+router.post("/:id/broadcast-video", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { url } = req.body || {};
+  const videoId = extractYouTubeId(url || "");
+  if (!videoId) return res.status(400).json({ error: "Invalid YouTube URL or ID" });
+  try {
+    const cmdId = await enqueueStudentCommand(id, "BROADCAST_VIDEO", { url, videoId });
+    res.json({ ok: true, id: cmdId, videoId });
+  } catch (e) {
+    console.error("POST /:id/broadcast-video failed:", e);
+    res.status(500).json({ error: "Failed to broadcast video" });
+  }
+});
+
+// POST /:id/broadcast-end — single-student END_BROADCAST.
+router.post("/:id/broadcast-end", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const cmdId = await enqueueStudentCommand(id, "END_BROADCAST", "");
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/broadcast-end failed:", e);
+    res.status(500).json({ error: "Failed to end broadcast" });
+  }
+});
+
 // POST /:id/end-break — teacher/admin enqueues an END_BREAK command.
 // Also best-effort clears server-side break state if `students.break_active /
 // break_end` columns exist (they may not on all deployments — guarded).
