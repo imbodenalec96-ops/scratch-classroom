@@ -393,6 +393,12 @@ export default function AssignmentBuilder() {
   const [instructions, setInstructions] = useState("");
   const [dueDate, setDueDate] = useState("");
 
+  // Per-assignment grade targeting
+  const [targetMode, setTargetMode] = useState<"all" | "single" | "range">("all");
+  const [targetGradeMin, setTargetGradeMin] = useState<number>(3);
+  const [targetGradeMax, setTargetGradeMax] = useState<number>(3);
+  const [targetSubject, setTargetSubject] = useState<"reading" | "math" | "writing">("reading");
+
   // AI generation state
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedAssignment | null>(null);
@@ -453,7 +459,17 @@ export default function AssignmentBuilder() {
       ? `[AI-Generated] ${generated.instructions}\n\nSections: ${generated.sections.map((s) => s.title).join(", ")}`
       : instructions;
     const content = generated ? JSON.stringify(generated) : null;
-    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content });
+    const targeting: any = {};
+    if (targetMode === "single") {
+      targeting.targetGradeMin = targetGradeMin;
+      targeting.targetGradeMax = targetGradeMin;
+      targeting.targetSubject = targetSubject;
+    } else if (targetMode === "range") {
+      targeting.targetGradeMin = Math.min(targetGradeMin, targetGradeMax);
+      targeting.targetGradeMax = Math.max(targetGradeMin, targetGradeMax);
+      targeting.targetSubject = targetSubject;
+    }
+    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting });
     setShowForm(false);
     setGenerated(null);
     setTitle(""); setInstructions(""); setDueDate("");
@@ -537,6 +553,76 @@ export default function AssignmentBuilder() {
             </div>
           </div>
 
+          {/* ── Grade Target — who gets this assignment ── */}
+          <div className="p-4 border" style={{ background: "var(--bg-muted)", borderColor: "var(--border)", borderRadius: "var(--r-md)", borderLeft: "3px solid var(--accent)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="section-label">— Grade target —</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--text-2)" }}>
+                  Who in the class actually receives this assignment?
+                </div>
+              </div>
+              <div className="stamp">{
+                targetMode === "all" ? "All students" :
+                targetMode === "single" ? `${targetSubject} · Gr ${targetGradeMin}` :
+                `${targetSubject} · Gr ${Math.min(targetGradeMin, targetGradeMax)}–${Math.max(targetGradeMin, targetGradeMax)}`
+              }</div>
+            </div>
+
+            <div className="flex gap-2 mb-3 flex-wrap">
+              {([
+                ["all",    "All students in class"],
+                ["single", "Specific grade"],
+                ["range",  "Grade range"],
+              ] as const).map(([mode, label]) => (
+                <button key={mode} onClick={() => setTargetMode(mode)} type="button"
+                  className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer"
+                  style={{
+                    borderRadius: "var(--r-md)",
+                    background: targetMode === mode ? "var(--accent-light)" : "transparent",
+                    color: targetMode === mode ? "var(--text-accent)" : "var(--text-2)",
+                    borderColor: targetMode === mode ? "var(--accent)" : "var(--border-md)",
+                  }}>{label}</button>
+              ))}
+            </div>
+
+            {targetMode !== "all" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Subject</label>
+                  <select value={targetSubject} onChange={e => setTargetSubject(e.target.value as any)} className="input text-sm w-32">
+                    <option value="reading">📖 Reading</option>
+                    <option value="math">🔢 Math</option>
+                    <option value="writing">✏️ Writing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>{targetMode === "range" ? "Min grade" : "Grade"}</label>
+                  <select value={targetGradeMin} onChange={e => setTargetGradeMin(Number(e.target.value))} className="input text-sm w-28">
+                    <option value={0}>Kindergarten</option>
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1}{["st","nd","rd"][i] || "th"} grade</option>
+                    ))}
+                  </select>
+                </div>
+                {targetMode === "range" && (
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Max grade</label>
+                    <select value={targetGradeMax} onChange={e => setTargetGradeMax(Number(e.target.value))} className="input text-sm w-28">
+                      <option value={0}>Kindergarten</option>
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <option key={i + 1} value={i + 1}>{i + 1}{["st","nd","rd"][i] || "th"} grade</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="text-[11px] ml-auto max-w-xs" style={{ color: "var(--text-3)" }}>
+                  Students whose <strong>{targetSubject}</strong> grade is in this range will see this assignment. Others in the class won't.
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* AI Generate button */}
           <div className={`rounded-xl p-4 border ${dk ? "bg-violet-500/[0.06] border-violet-500/20" : "bg-violet-50 border-violet-200"}`}>
             <div className="flex items-center justify-between gap-3">
@@ -610,14 +696,25 @@ export default function AssignmentBuilder() {
                   <div className="flex items-center gap-2">
                     <h3 className={`font-semibold ${dk ? "text-white" : "text-gray-900"}`}>{a.title}</h3>
                     {parsed && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">
+                      <span className="stamp" style={{ background: "var(--accent-light)", color: "var(--text-accent)", borderLeftColor: "var(--accent)" }}>
                         AI Worksheet
                       </span>
                     )}
                     {a.scheduled_date && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
+                      <span className="stamp" style={{ background: "color-mix(in srgb, var(--warning) 14%, transparent)", color: "var(--warning)", borderLeftColor: "var(--warning)" }}>
                         📅 {a.scheduled_date}
                       </span>
+                    )}
+                    {a.target_grade_min != null ? (
+                      <span className="stamp" style={{ background: "color-mix(in srgb, var(--info) 14%, transparent)", color: "var(--info)", borderLeftColor: "var(--info)" }}>
+                        🎯 {a.target_subject || "any"} · {
+                          a.target_grade_max != null && a.target_grade_max !== a.target_grade_min
+                            ? `Gr ${a.target_grade_min}–${a.target_grade_max}`
+                            : `Gr ${a.target_grade_min}`
+                        }
+                      </span>
+                    ) : (
+                      <span className="chip">All students</span>
                     )}
                   </div>
                   <p className={`text-sm mt-0.5 line-clamp-1 ${dk ? "text-white/40" : "text-gray-500"}`}>{a.description}</p>

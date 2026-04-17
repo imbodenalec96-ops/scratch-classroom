@@ -6,24 +6,41 @@ import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 
-// Create assignment
+// Ensure grade-target columns exist on the assignments table (idempotent).
+let gradeColsReady = false;
+async function ensureGradeCols() {
+  if (gradeColsReady) return;
+  for (const col of [
+    "ALTER TABLE assignments ADD COLUMN target_grade_min INTEGER",
+    "ALTER TABLE assignments ADD COLUMN target_grade_max INTEGER",
+    "ALTER TABLE assignments ADD COLUMN target_subject TEXT",
+  ]) {
+    try { await db.exec(col); } catch { /* column already exists */ }
+  }
+  gradeColsReady = true;
+}
+
+// Create assignment (accepts optional targetGradeMin / targetGradeMax / targetSubject)
 router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const { classId, title, description, dueDate, rubric, starterProjectId, content, scheduledDate } = req.body;
+  const { classId, title, description, dueDate, rubric, starterProjectId, content, scheduledDate,
+          targetGradeMin, targetGradeMax, targetSubject } = req.body;
   const id = crypto.randomUUID();
-  // Try inserting with content and scheduled_date columns; fall back if columns don't exist yet
+  await ensureGradeCols();
+  const tMin = targetGradeMin != null ? Number(targetGradeMin) : null;
+  const tMax = targetGradeMax != null ? Number(targetGradeMax) : (tMin != null ? tMin : null);
+  const tSub = targetSubject || null;
+
+  const doInsert = async () => db.prepare(
+    `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date, target_grade_min, target_grade_max, target_subject)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null, tMin, tMax, tSub);
+
   try {
-    await db.prepare(
-      `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null);
+    await doInsert();
   } catch {
-    // Fallback: add columns then retry
-    try { await db.exec("ALTER TABLE assignments ADD COLUMN content TEXT"); } catch { /* already exists */ }
-    try { await db.exec("ALTER TABLE assignments ADD COLUMN scheduled_date TEXT"); } catch { /* already exists */ }
-    await db.prepare(
-      `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null);
+    try { await db.exec("ALTER TABLE assignments ADD COLUMN content TEXT"); } catch {}
+    try { await db.exec("ALTER TABLE assignments ADD COLUMN scheduled_date TEXT"); } catch {}
+    await doInsert();
   }
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id) as any;
   row.rubric = JSON.parse(row.rubric || "[]");
@@ -81,10 +98,14 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
   res.json({ created: created.length, assignments: created });
 });
 
-// Get all pending (unsubmitted) assignments for current student in a class
+// Get all pending (unsubmitted) assignments for current student in a class.
+// Honors per-assignment grade targeting:
+//   - If target_grade_min IS NULL → assignment shows to everyone in class
+//   - Else: student's grade for target_subject must fall in [min, max]
 router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const classId = req.params.classId;
+  await ensureGradeCols();
   try {
     const rows = await db.prepare(`
       SELECT a.* FROM assignments a
@@ -92,9 +113,35 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       WHERE a.class_id = ? AND s.id IS NULL
       ORDER BY a.created_at ASC
     `).all(userId, classId) as any[];
-    rows.forEach((r: any) => { r.rubric = JSON.parse(r.rubric || "[]"); });
-    res.json(rows);
-  } catch {
+
+    // Look up this student's grade levels once
+    let studentGrades: any = null;
+    try {
+      studentGrades = await db.prepare(
+        "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
+      ).get(userId);
+    } catch { /* grades table may not exist yet */ }
+    const gradeFor = (subject: string | null): number => {
+      if (!studentGrades) return 3; // reasonable default
+      const col = subject === 'math' ? 'math_grade'
+                : subject === 'writing' ? 'writing_grade'
+                : 'reading_grade';
+      return Number(studentGrades[col] ?? 3);
+    };
+
+    const filtered = rows.filter((r: any) => {
+      r.rubric = JSON.parse(r.rubric || "[]");
+      // If no target set, assignment is for everyone
+      if (r.target_grade_min == null) return true;
+      const tMin = Number(r.target_grade_min);
+      const tMax = r.target_grade_max != null ? Number(r.target_grade_max) : tMin;
+      const g = gradeFor(r.target_subject);
+      return g >= tMin && g <= tMax;
+    });
+
+    res.json(filtered);
+  } catch (e) {
+    console.error('pending assignments error:', e);
     res.json([]);
   }
 });
