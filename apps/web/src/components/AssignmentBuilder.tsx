@@ -399,6 +399,16 @@ export default function AssignmentBuilder() {
   const [targetGradeMax, setTargetGradeMax] = useState<number>(3);
   const [targetSubject, setTargetSubject] = useState<"reading" | "math" | "writing">("reading");
 
+  // Rich customization (Feature 28 — same fields as Edit modal)
+  const [customQuestionCount, setCustomQuestionCount] = useState<number | "">("");
+  const [customEstimatedMinutes, setCustomEstimatedMinutes] = useState<number | "">("");
+  const [customQuestionType, setCustomQuestionType] = useState<string>("");
+  const [customHintsAllowed, setCustomHintsAllowed] = useState<boolean>(true);
+  const [customLearningObjective, setCustomLearningObjective] = useState<string>("");
+  const [customFocusKeywords, setCustomFocusKeywords] = useState<string>("");
+  const [customTeacherNotes, setCustomTeacherNotes] = useState<string>("");
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+
   // AI generation state
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedAssignment | null>(null);
@@ -486,10 +496,21 @@ export default function AssignmentBuilder() {
       targeting.targetGradeMax = Math.max(targetGradeMin, targetGradeMax);
       targeting.targetSubject = targetSubject;
     }
-    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting });
+    const customization: any = {};
+    if (customQuestionCount !== "") customization.questionCount = Number(customQuestionCount);
+    if (customEstimatedMinutes !== "") customization.estimatedMinutes = Number(customEstimatedMinutes);
+    if (customQuestionType) customization.questionType = customQuestionType;
+    customization.hintsAllowed = customHintsAllowed;
+    if (customLearningObjective) customization.learningObjective = customLearningObjective;
+    if (customFocusKeywords) customization.focusKeywords = customFocusKeywords;
+    if (customTeacherNotes) customization.teacherNotes = customTeacherNotes;
+    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization });
     setShowForm(false);
     setGenerated(null);
     setTitle(""); setInstructions(""); setDueDate("");
+    setCustomQuestionCount(""); setCustomEstimatedMinutes(""); setCustomQuestionType("");
+    setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
+    setShowAdvanced(false);
     loadAssignments(classId);
   };
 
@@ -897,6 +918,103 @@ export default function AssignmentBuilder() {
                 )}
                 <div className="text-[11px] ml-auto max-w-xs" style={{ color: "var(--text-3)" }}>
                   Students whose <strong>{targetSubject}</strong> grade is in this range will see this assignment. Others in the class won't.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Advanced customization (optional) ── */}
+          <div className="p-4 border" style={{ background: "var(--bg-muted)", borderColor: "var(--border)", borderRadius: "var(--r-md)" }}>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="w-full flex items-center justify-between cursor-pointer"
+              style={{ color: "var(--text-1)" }}
+            >
+              <div className="text-left">
+                <div className="section-label">— Advanced customization —</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--text-2)" }}>
+                  Fine-tune question count, difficulty hints, learning objective, and private teacher notes
+                </div>
+              </div>
+              <span className="stamp">{showAdvanced ? "Hide" : "Show"}</span>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Question count (1–20)</label>
+                  <input
+                    type="number" min={1} max={20}
+                    value={customQuestionCount}
+                    onChange={e => setCustomQuestionCount(e.target.value === "" ? "" : Math.max(1, Math.min(20, Number(e.target.value))))}
+                    placeholder="default"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Estimated minutes</label>
+                  <input
+                    type="number" min={5} max={120}
+                    value={customEstimatedMinutes}
+                    onChange={e => setCustomEstimatedMinutes(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
+                    placeholder="default"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Question type</label>
+                  <select
+                    value={customQuestionType}
+                    onChange={e => setCustomQuestionType(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">Default (mixed)</option>
+                    <option value="multiple-choice">Multiple choice</option>
+                    <option value="short-answer">Short answer</option>
+                    <option value="fill-in-blank">Fill in the blank</option>
+                    <option value="extended-response">Extended response</option>
+                    <option value="word-problems">Word problems</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: "var(--text-1)" }}>
+                    <input
+                      type="checkbox"
+                      checked={customHintsAllowed}
+                      onChange={e => setCustomHintsAllowed(e.target.checked)}
+                      className="cursor-pointer"
+                    />
+                    Allow hints during work
+                  </label>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Learning objective</label>
+                  <input
+                    value={customLearningObjective}
+                    onChange={e => setCustomLearningObjective(e.target.value)}
+                    placeholder='e.g. "Identify main idea and supporting details in informational text"'
+                    className="input w-full"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Focus keywords / vocabulary</label>
+                  <input
+                    value={customFocusKeywords}
+                    onChange={e => setCustomFocusKeywords(e.target.value)}
+                    placeholder="comma-separated, e.g. inference, evidence, theme"
+                    className="input w-full"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Private teacher notes (not shown to students)</label>
+                  <textarea
+                    value={customTeacherNotes}
+                    onChange={e => setCustomTeacherNotes(e.target.value)}
+                    placeholder="Internal notes on intent, pacing, differentiation…"
+                    rows={3}
+                    className="input w-full"
+                  />
                 </div>
               </div>
             )}
