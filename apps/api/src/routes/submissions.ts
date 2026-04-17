@@ -9,22 +9,20 @@ const router = Router();
 
 // Submit assignment
 router.post("/", async (req: AuthRequest, res: Response) => {
-  const { assignmentId, projectId } = req.body;
+  const { assignmentId, projectId, answers } = req.body;
 
-  // Auto-grade: check project has blocks
+  // Load assignment content for worksheet grading
+  const asgn = await db.prepare("SELECT rubric, content FROM assignments WHERE id = ?").get(assignmentId) as any;
+
+  // Auto-grade: check project has blocks (Scratch-style)
   let autoGrade: AutoGradeResult | null = null;
-  const proj = await db.prepare("SELECT data FROM projects WHERE id = ?").get(projectId) as any;
+  const proj = projectId ? await db.prepare("SELECT data FROM projects WHERE id = ?").get(projectId) as any : null;
   if (proj) {
     const data = typeof proj.data === "string" ? JSON.parse(proj.data) : proj.data;
     const sprites = data.sprites || [];
     const totalBlocks = sprites.reduce((sum: number, s: any) => sum + (s.blocks?.length || 0), 0);
     const hasEvents = sprites.some((s: any) => s.blocks?.some((b: any) => b.category === "events"));
     const hasControl = sprites.some((s: any) => s.blocks?.some((b: any) => b.category === "control"));
-
-    // Load rubric
-    const asgn = await db.prepare("SELECT rubric FROM assignments WHERE id = ?").get(assignmentId) as any;
-    const rubric = asgn ? JSON.parse(asgn.rubric || "[]") : [];
-
     const checks = [
       { label: "Has blocks", passed: totalBlocks > 0, detail: `${totalBlocks} blocks used` },
       { label: "Has event handlers", passed: hasEvents, detail: hasEvents ? "Found event blocks" : "No event blocks" },
@@ -32,13 +30,99 @@ router.post("/", async (req: AuthRequest, res: Response) => {
     ];
     const score = Math.round((checks.filter((c) => c.passed).length / checks.length) * 100);
     autoGrade = { score, checks };
+  } else if (asgn?.content) {
+    // Auto-grade worksheet: score multiple-choice questions by comparing to correctIndex
+    try {
+      const content = JSON.parse(asgn.content);
+      const studentAnswers: Record<number, string> = answers
+        ? JSON.parse(typeof answers === "string" ? answers : JSON.stringify(answers))
+        : {};
+
+      const checks: { label: string; passed: boolean; detail: string }[] = [];
+      let mcCorrect = 0;
+      let mcTotal = 0;
+      let qIndex = 0;
+
+      for (const section of (content.sections || [])) {
+        for (const q of (section.questions || [])) {
+          const studentAns = studentAnswers[qIndex];
+          const label = (q.text || `Q${qIndex + 1}`).slice(0, 70);
+
+          if (q.type === "multiple_choice" && Array.isArray(q.options) && q.correctIndex !== undefined) {
+            mcTotal++;
+            const correctOpt = q.options[q.correctIndex];
+            // Strip leading "A. ", "B. " etc from both sides for robust comparison
+            const normalize = (s: string) => String(s || "").replace(/^[A-D]\.\s*/i, "").trim().toLowerCase();
+            const isCorrect = normalize(studentAns) === normalize(correctOpt);
+            if (isCorrect) mcCorrect++;
+            checks.push({
+              label,
+              passed: isCorrect,
+              detail: isCorrect ? "Correct ✓" : `Correct: ${correctOpt}${studentAns ? ` | Student: ${studentAns}` : " | No answer"}`,
+            });
+          } else if (q.type === "short_answer" || q.type === "fill_blank") {
+            // Short answer / fill blank: mark as attempted if answered
+            const attempted = Boolean(studentAns && String(studentAns).trim().length > 0);
+            checks.push({
+              label,
+              passed: attempted,
+              detail: attempted ? "Answered — pending teacher review" : "Not answered",
+            });
+          }
+          qIndex++;
+        }
+      }
+
+      // Score = MC accuracy + attempted open-ended (open-ended = full credit)
+      const openEnded = checks.filter((c) => !c.label.startsWith("Has ")).length - mcTotal;
+      const openEndedDone = checks.filter((c, i) => {
+        const q = (content.sections || []).flatMap((s: any) => s.questions || [])[i];
+        return (q?.type === "short_answer" || q?.type === "fill_blank") && c.passed;
+      }).length;
+
+      if (checks.length === 0) {
+        // Nothing to grade yet — mark submitted
+        autoGrade = { score: 100, checks: [{ label: "Submitted", passed: true, detail: "Assignment submitted — pending teacher review" }] };
+      } else {
+        const totalPossible = mcTotal + (openEnded > 0 ? openEnded : 0);
+        const totalEarned = mcCorrect + openEndedDone;
+        const score = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 100;
+        autoGrade = { score, checks };
+      }
+    } catch (e) {
+      console.error("[submissions] worksheet auto-grade error:", e);
+      autoGrade = { score: 100, checks: [{ label: "Submitted", passed: true, detail: "Auto-grade error — pending teacher review" }] };
+    }
+  } else {
+    // No project, no content — mark as submitted with pending review
+    autoGrade = { score: 100, checks: [{ label: "Submitted", passed: true, detail: "Pending teacher review" }] };
   }
 
+  // Auto-promote MC score to the grade field so teacher sees it immediately
+  const autoGradeScore = autoGrade ? autoGrade.score : null;
+
   const id = crypto.randomUUID();
-  await db.prepare(
-    `INSERT INTO submissions (id, assignment_id, student_id, project_id, auto_grade_result)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(id, assignmentId, req.user!.id, projectId, autoGrade ? JSON.stringify(autoGrade) : null);
+  // Try inserting with answers column; fall back if it doesn't exist
+  try {
+    await db.prepare(
+      `INSERT INTO submissions (id, assignment_id, student_id, project_id, auto_grade_result, answers, grade)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, assignmentId, req.user!.id, projectId ?? null, autoGrade ? JSON.stringify(autoGrade) : null, answers ?? null, autoGradeScore);
+  } catch {
+    try { await db.exec("ALTER TABLE submissions ADD COLUMN answers TEXT"); } catch { /* already exists */ }
+    try {
+      await db.prepare(
+        `INSERT INTO submissions (id, assignment_id, student_id, project_id, auto_grade_result, answers, grade)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, assignmentId, req.user!.id, projectId ?? null, autoGrade ? JSON.stringify(autoGrade) : null, answers ?? null, autoGradeScore);
+    } catch {
+      // Final fallback without answers/grade
+      await db.prepare(
+        `INSERT INTO submissions (id, assignment_id, student_id, project_id, auto_grade_result)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(id, assignmentId, req.user!.id, projectId ?? null, autoGrade ? JSON.stringify(autoGrade) : null);
+    }
+  }
   const row = await db.prepare("SELECT * FROM submissions WHERE id = ?").get(id) as any;
   if (row?.auto_grade_result) row.auto_grade_result = JSON.parse(row.auto_grade_result);
   res.json(row);
