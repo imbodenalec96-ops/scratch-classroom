@@ -26,3 +26,7 @@ export function clearWorkUnlock(): void {
     localStorage.removeItem(KEY);
   } catch {}
 }
+
+export function isAccessAllowed(): boolean {
+  return isWorkUnlocked();
+}

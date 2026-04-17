@@ -94,7 +94,12 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   };
   const handleSendMsg = async () => {
     if (!msg.trim()) return;
-    try { await api.sendClassCommand(classId, "MESSAGE", msg.trim(), student.id); showFlash("✉️ Sent"); setMsg(""); }
+    try {
+      await api.sendClassCommand(classId, "MESSAGE", msg.trim(), student.id);
+      api.sendStudentMessage(student.id, msg.trim()).catch(() => {});
+      showFlash("✉️ Sent");
+      setMsg("");
+    }
     catch (e: any) { alert("Failed: " + e.message); }
   };
   const handlePush = async (path: string) => {

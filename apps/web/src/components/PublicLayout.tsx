@@ -28,6 +28,11 @@ export default function PublicLayout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      let text = "";
+      try { text = JSON.parse(row.payload || "{}").text ?? row.payload ?? ""; } catch { text = row.payload || ""; }
+      classCommands.showMessage(text);
+    },
   });
   const newLock = useSyncExternalStore(
     studentLockStore.subscribe,

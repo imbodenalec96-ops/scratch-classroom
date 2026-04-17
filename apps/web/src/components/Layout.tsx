@@ -47,6 +47,11 @@ export default function Layout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      let text = "";
+      try { text = JSON.parse(row.payload || "{}").text ?? row.payload ?? ""; } catch { text = row.payload || ""; }
+      classCommands.showMessage(text);
+    },
   });
   // Subscribe to the new lock store and OR it into the existing overlay
   // props. Legacy class_commands lock (from useClassCommands) stays

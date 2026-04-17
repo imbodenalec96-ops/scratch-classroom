@@ -49,7 +49,7 @@ export interface ClassroomState {
 let _focusedMode = false;
 export function isScreenshotFocused(): boolean { return _focusedMode; }
 
-export function useClassCommands(enabled = true): ClassroomState & { dismissMessage: () => void } {
+export function useClassCommands(enabled = true): ClassroomState & { dismissMessage: () => void; showMessage: (text: string, duration?: number) => void } {
   const navigate = useNavigate();
   const [isLocked, setIsLocked] = useState(false);
   const [studentLocked, setStudentLocked] = useState(false);
@@ -61,6 +61,10 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
 
   const lastCmdAtRef = useRef(new Date(0).toISOString());
   const dismissMessage = useCallback(() => setPendingMessage(null), []);
+  const showMessage = useCallback((text: string, duration = 15_000) => {
+    setPendingMessage(text);
+    setTimeout(() => setPendingMessage(null), duration);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -168,5 +172,6 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
     pendingMessage,
     isFocused,
     dismissMessage,
+    showMessage,
   };
 }
