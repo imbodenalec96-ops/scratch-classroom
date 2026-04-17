@@ -213,8 +213,10 @@ export const api = {
   checkAdminPassword: (password: string) => request<any>('/admin-settings/check-password', { method: 'POST', body: JSON.stringify({ password }) }),
 
   // AI Tasks (Step 6)
-  generateTasks: (data: { student_id: string; date: string; subject: string; grade_min: number; grade_max: number }) =>
+  generateTasks: (data: { student_id: string; date: string; subject: string; grade_min: number; grade_max: number; focus?: string }) =>
     request<any[]>('/ai-tasks/generate', { method: 'POST', body: JSON.stringify(data) }),
+  generateClasswideTasks: (data: { class_id: string; date: string; subject: string; grade_min: number; grade_max: number; focus?: string }) =>
+    request<any>('/ai-tasks/generate-classwide', { method: 'POST', body: JSON.stringify(data) }),
   worksheetSearch: (query: string, grade_min: number, grade_max: number) =>
     request<any[]>('/ai-tasks/worksheet-search', { method: 'POST', body: JSON.stringify({ query, grade_min, grade_max }) }),
   getTaskConfig: () => request<any[]>('/ai-tasks/task-config'),

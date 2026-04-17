@@ -29,43 +29,76 @@ const AI_UNAVAILABLE = {
 
 const MODEL = "claude-sonnet-4-20250514";
 
+// Theme pool for per-student randomization (seeds variety into prompt)
+const VARIETY_THEMES = [
+  "pirates and treasure", "space and planets", "dinosaurs", "ocean creatures",
+  "sports", "cooking and food", "superheroes", "farm animals", "forest adventure",
+  "building and construction", "robots and gadgets", "weather and seasons",
+  "friendship and sharing", "family", "art and colors", "music and instruments",
+  "holidays and celebrations", "magic and wizards", "cars and racing", "nature walks",
+];
+
+function hashString(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
 // ── Task generation ───────────────────────────────────────────────────────────
 // POST /api/ai-tasks/generate
-// Body: { student_id, date, subject, grade_min, grade_max }
-// Returns: { id, prompt, hint } — also saves to daily_tasks
+// Body: { student_id, date, subject, grade_min, grade_max, focus?, mode? }
+//   mode: 'individualized' (default) — unique prompt per student, seeded by
+//         student_id + date; 7-day recent-prompt dedup.
+// Returns: array of { id, prompt, hint } — also saves to daily_tasks
 router.post("/generate", async (req: AuthRequest, res: Response) => {
   const client = getAnthropic();
   if (!client) return res.status(503).json(AI_UNAVAILABLE);
 
-  const { student_id, date, subject, grade_min, grade_max } = req.body;
+  const { student_id, date, subject, grade_min, grade_max, focus } = req.body;
   if (!student_id || !date || !subject || grade_min == null || grade_max == null) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // Check if task already exists for this student/date/subject
   const existing = (db as any).prepare(
     "SELECT * FROM daily_tasks WHERE student_id=? AND date=? AND subject=?"
   ).all(student_id, date, subject);
-  if (existing.length > 0) {
-    return res.json(existing);
-  }
+  if (existing.length > 0) return res.json(existing);
 
-  // Load task count config
   const configRow = (db as any).prepare(
     "SELECT base_count FROM task_config WHERE subject=? LIMIT 1"
   ).get(subject) as any;
   const count = configRow?.base_count ?? 1;
+
+  // Recent prompts (last 7 days) to avoid repeating
+  const recent = (db as any).prepare(
+    `SELECT prompt FROM daily_tasks WHERE student_id=? AND subject=? AND date >= date('now','-7 day')`
+  ).all(student_id, subject) as any[];
+  const recentSnippet = recent.length
+    ? `AVOID repeating these recent prompts (rephrase or pick a fresh angle):\n${recent.slice(0, 7).map((r: any) => '- ' + (r.prompt || '').slice(0, 80)).join('\n')}`
+    : '';
+
+  // Deterministic per-student variety: pick a theme based on hash
+  const seed = hashString(`${student_id}|${date}|${subject}`);
+  const theme = VARIETY_THEMES[seed % VARIETY_THEMES.length];
+  const focusHint = focus ? `Teacher focus note: ${focus}.` : '';
 
   const tasks: any[] = [];
   try {
     for (let i = 0; i < count; i++) {
       const msg = await client.messages.create({
         model: MODEL,
-        max_tokens: 256,
-        system: "You are a teacher. Return JSON only with prompt string and hint string. No preamble. No markdown.",
+        max_tokens: 320,
+        system: "You are a creative elementary teacher. Return JSON only: {\"prompt\": string, \"hint\": string}. Vary the task type each time (word problem, short writing, visual description, pattern, puzzle, reflection). No preamble. No markdown.",
         messages: [{
           role: "user",
-          content: `Subject ${subject}. Grade range ${grade_min} to ${grade_max}. One short engaging task achievable in 5 minutes for an elementary student.`,
+          content: `Subject: ${subject}. Grade: ${grade_min}–${grade_max}. Task #${i + 1} of ${count}.
+Theme seed: ${theme}.
+${focusHint}
+${recentSnippet}
+Write ONE short engaging task (under 5 min) that fits grade level and is different in style from recent prompts. Return JSON.`,
         }],
       });
 
@@ -74,7 +107,7 @@ router.post("/generate", async (req: AuthRequest, res: Response) => {
         const raw = (msg.content[0] as any).text.trim();
         parsed = JSON.parse(raw);
       } catch {
-        parsed = { prompt: `Write a short ${subject} response about something you learned today.`, hint: "Think about what you did at school recently." };
+        parsed = { prompt: `Write a short ${subject} response about ${theme}.`, hint: "Use your imagination!" };
       }
 
       const id = crypto.randomUUID();
@@ -88,6 +121,76 @@ router.post("/generate", async (req: AuthRequest, res: Response) => {
   } catch (err: any) {
     console.error("[ai-tasks/generate]", err?.message);
     return res.status(500).json({ error: "Task generation failed", detail: err?.message });
+  }
+});
+
+// ── Classwide generation ──────────────────────────────────────────────────────
+// POST /api/ai-tasks/generate-classwide
+// Body: { class_id, date, subject, grade_min, grade_max, focus? }
+// Generates ONE set of tasks (based on class's grade range) and inserts a copy
+// for every student in the class. Use this when teacher wants same tasks for all.
+router.post("/generate-classwide", async (req: AuthRequest, res: Response) => {
+  const client = getAnthropic();
+  if (!client) return res.status(503).json(AI_UNAVAILABLE);
+
+  const { class_id, date, subject, grade_min, grade_max, focus } = req.body;
+  if (!class_id || !date || !subject || grade_min == null || grade_max == null) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Students in class
+  const students = await db.prepare(
+    "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+  ).all(class_id) as any[];
+  if (students.length === 0) return res.json({ studentsAffected: 0, tasks: [] });
+
+  const configRow = (db as any).prepare(
+    "SELECT base_count FROM task_config WHERE subject=? LIMIT 1"
+  ).get(subject) as any;
+  const count = configRow?.base_count ?? 1;
+
+  const generated: { prompt: string; hint: string }[] = [];
+  try {
+    for (let i = 0; i < count; i++) {
+      const msg = await client.messages.create({
+        model: MODEL,
+        max_tokens: 320,
+        system: "You are a creative elementary teacher. Return JSON only: {\"prompt\": string, \"hint\": string}. No preamble. No markdown.",
+        messages: [{
+          role: "user",
+          content: `Whole class task. Subject: ${subject}. Grade: ${grade_min}–${grade_max}. Task #${i + 1} of ${count}.
+${focus ? `Focus: ${focus}.` : ''}
+Write ONE engaging task under 5 min for the whole class. Return JSON.`,
+        }],
+      });
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse((msg.content[0] as any).text.trim());
+      } catch {
+        parsed = { prompt: `Short ${subject} task for the class.`, hint: "Do your best!" };
+      }
+      generated.push({ prompt: parsed.prompt ?? '', hint: parsed.hint ?? '' });
+    }
+
+    // Insert a copy for every student (deleting any existing tasks for today first)
+    let inserted = 0;
+    for (const s of students) {
+      await db.prepare(
+        "DELETE FROM daily_tasks WHERE student_id=? AND date=? AND subject=?"
+      ).run(s.id, date, subject).catch(() => {});
+      for (const t of generated) {
+        const id = crypto.randomUUID();
+        await db.prepare(
+          "INSERT INTO daily_tasks (id, student_id, date, subject, prompt, hint) VALUES (?, ?, ?, ?, ?, ?)"
+        ).run(id, s.id, date, subject, t.prompt, t.hint);
+        inserted++;
+      }
+    }
+
+    return res.json({ studentsAffected: students.length, tasksInserted: inserted, tasks: generated });
+  } catch (err: any) {
+    console.error("[ai-tasks/generate-classwide]", err?.message);
+    return res.status(500).json({ error: "Classwide generation failed", detail: err?.message });
   }
 });
 
