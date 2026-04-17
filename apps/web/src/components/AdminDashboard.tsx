@@ -7,6 +7,7 @@ import {
   Users, GraduationCap, BookOpen, School, Eye,
   LockOpen, Youtube, BarChart3, Trophy,
   ClipboardList, Monitor, HelpCircle, CheckSquare,
+  Download, AlertTriangle,
 } from "lucide-react";
 
 /**
@@ -58,6 +59,37 @@ export default function AdminDashboard() {
     catch (e: any) { alert("Failed: " + e.message); }
   };
 
+  const handleExportCSV = () => {
+    const classNameById: Record<string, string> = {};
+    classes.forEach(c => { classNameById[c.id] = c.name; });
+    const rows = [
+      ["Name", "Email", "Role", "Username", "Created"],
+      ...students.map(s => [s.name || "", s.email || "", s.role, s.username || "", s.created_at || ""]),
+    ];
+    const csv = rows
+      .map(r => r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Pending admin tasks — computed synchronously from loaded data
+  const unstaffedClasses = classes.filter(c => !c.teacher_id);
+  const emptyClasses = classes.filter(c => (studentsByClass[c.id] ?? -1) === 0);
+  const pendingTasks: { severity: "high" | "med" | "low"; label: string; link: string }[] = [];
+  if (aiKeySet === false)   pendingTasks.push({ severity: "high", label: "Anthropic API key not configured — AI generation disabled", link: "/settings" });
+  if (youtubePending > 0)   pendingTasks.push({ severity: youtubePending > 5 ? "high" : "med", label: `${youtubePending} YouTube link${youtubePending === 1 ? "" : "s"} waiting for approval`, link: "/youtube" });
+  if (unstaffedClasses.length > 0) pendingTasks.push({ severity: "high", label: `${unstaffedClasses.length} class${unstaffedClasses.length === 1 ? "" : "es"} without a teacher`, link: "/admin-dashboard" });
+  if (emptyClasses.length > 0)     pendingTasks.push({ severity: "low", label: `${emptyClasses.length} empty class${emptyClasses.length === 1 ? "" : "es"} (no students enrolled)`, link: "/admin-dashboard" });
+  if (totalTeachers === 0)         pendingTasks.push({ severity: "high", label: "No teachers on the platform yet", link: "/admin-dashboard" });
+
   const ADMIN_TOOLS = [
     { path: "/monitor",          icon: Monitor,        label: "Live Monitor",     desc: "Every student, every class", accent: "var(--accent)" },
     { path: "/class-grades",     icon: GraduationCap,  label: "Class Grades",     desc: "Per-student grade levels",   accent: "var(--accent-sage)" },
@@ -92,6 +124,17 @@ export default function AdminDashboard() {
             <Link to="/teacher" className="btn-secondary gap-1.5 text-xs">
               <Eye size={13} /> View as Teacher
             </Link>
+            <button onClick={handleExportCSV}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+              style={{
+                color: "var(--text-2)",
+                background: "transparent",
+                borderColor: "var(--border-md)",
+                borderRadius: "var(--r-md)",
+              }}
+              title="Download student roster as CSV">
+              <Download size={13}/> Export Students
+            </button>
             <button onClick={handleForceUnlockAll}
               className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
               style={{
@@ -123,6 +166,39 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Pending admin tasks ── */}
+      {pendingTasks.length > 0 && (
+        <div className="card" style={{ borderLeft: "3px solid var(--warning)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="section-label">— Pending tasks —</div>
+              <h3 className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
+                Needs your attention.
+              </h3>
+            </div>
+            <span className="chip">{pendingTasks.length} item{pendingTasks.length === 1 ? "" : "s"}</span>
+          </div>
+          <div className="space-y-1.5">
+            {pendingTasks.map((t, i) => {
+              const color = t.severity === "high" ? "var(--danger)"
+                          : t.severity === "med"  ? "var(--warning)"
+                          : "var(--text-3)";
+              return (
+                <Link key={i} to={t.link} className="list-row" style={{ textDecoration: "none" }}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <AlertTriangle size={14} style={{ color, flexShrink: 0 }} />
+                    <div className="text-sm" style={{ color: "var(--text-1)" }}>{t.label}</div>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color }}>
+                    {t.severity === "high" ? "High" : t.severity === "med" ? "Medium" : "Low"}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Admin tools grid ── */}
       <div>
