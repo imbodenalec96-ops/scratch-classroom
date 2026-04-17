@@ -397,6 +397,7 @@ function WorkScreen({
   };
 
   if (submitted) {
+    const submittedCount = Object.keys(answers).length;
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6" style={{ background: "var(--bg)" }}>
         <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
@@ -409,7 +410,7 @@ function WorkScreen({
             <em style={{ color: "var(--accent)", fontStyle: "italic" }}>work.</em>
           </h2>
           <p className="text-sm mt-4 animate-slide-up" style={{ animationDelay: "240ms", color: "var(--text-2)" }}>
-            {answeredCount} of {total} answered · heading to your dashboard…
+            {submittedCount} of {total} answered · heading to your dashboard…
           </p>
         </div>
         <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
