@@ -19,6 +19,9 @@ import ConnectFour from "./games/ConnectFour.tsx";
 import EndlessRunner from "./games/EndlessRunner.tsx";
 import BubbleShooter from "./games/BubbleShooter.tsx";
 import ColoringBook from "./games/ColoringBook.tsx";
+import DressUp from "./games/DressUp.tsx";
+import PixelArt from "./games/PixelArt.tsx";
+import BridgeBuilder from "./games/BridgeBuilder.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -271,6 +274,43 @@ const GAMES: Game[] = [
     emoji: "🎨",
     component: ColoringBook,
     hint: "Pick color · tap any region to fill · 3 scenes",
+  },
+  // ── Batch 3 ──────────────────────────────────────────────────
+  {
+    id: "dressup",
+    title: "Avatar Creator",
+    description: "Design your own character! Mix and match skin tones, hair, eyes, outfits and accessories.",
+    category: "Creative",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#d8b4fe",
+    emoji: "👗",
+    component: DressUp,
+    hint: "Tap the tabs · pick styles · make your look!",
+  },
+  {
+    id: "pixelart",
+    title: "Pixel Art Studio",
+    description: "Draw pixel art on a 32×32 grid! Use the draw, erase, and fill tools. Save as PNG!",
+    category: "Creative",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#818cf8",
+    emoji: "🖼️",
+    component: PixelArt,
+    hint: "Click/drag to draw · fill bucket · save PNG",
+  },
+  {
+    id: "bridgebuilder",
+    title: "Bridge Builder",
+    description: "Place planks between anchor points to build a bridge. Test it — can the car cross?",
+    category: "Puzzle",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#f59e0b",
+    emoji: "🌉",
+    component: BridgeBuilder,
+    hint: "Drag between dots to place planks · test the bridge",
   },
 ];
 
