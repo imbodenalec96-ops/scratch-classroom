@@ -38,6 +38,14 @@ export default function Layout() {
     return () => { window.removeEventListener("breakstate-change", refresh); clearInterval(iv); };
   }, []);
 
+  // Refresh nav when freetime store flips (grant/revoke) — immediate, no poll lag.
+  const freetimeSnap = useSyncExternalStore(
+    studentFreetimeStore.subscribe,
+    studentFreetimeStore.getSnapshot,
+    studentFreetimeStore.getSnapshot,
+  );
+  useEffect(() => { setAccessAllowed(isAccessAllowed()); }, [freetimeSnap.granted]);
+
   // GoGuardian: students poll for lock/commands; teachers/admin skip
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
