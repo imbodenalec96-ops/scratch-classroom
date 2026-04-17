@@ -595,71 +595,61 @@ export default function StudentKiosk() {
   // PHASE 1: Avatar Selector
   // ─────────────────────────────────────────────────────────────────────────
   if (!activeStudent) {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
     return (
       <div style={{
-        minHeight: "100vh", background: "#07071a",
+        minHeight: "100vh", background: "var(--bg, #f6f1e6)",
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
         padding: "40px 24px",
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         <style>{SHAKE_CSS}</style>
 
-        {/* Background orbs */}
-        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+        <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 960 }}>
+          {/* ── Editorial masthead ── */}
           <div style={{
-            position: "absolute", top: "20%", left: "10%",
-            width: 400, height: 400, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,58,237,0.12), transparent 70%)",
-            filter: "blur(40px)",
-          }} />
-          <div style={{
-            position: "absolute", bottom: "15%", right: "8%",
-            width: 350, height: 350, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(34,211,238,0.10), transparent 70%)",
-            filter: "blur(40px)",
-          }} />
-        </div>
-
-        <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 920 }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 12 }}>
-            <div style={{
-              width: 44, height: 44,
-              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-              borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 0 24px rgba(124,58,237,0.4)",
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
-                <path d="M7 7h.01"/>
-              </svg>
-            </div>
-            <span style={{
-              fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px",
-              background: "linear-gradient(135deg, #a78bfa, #818cf8)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            }}>BlockForge</span>
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginBottom: 24, fontSize: 10, letterSpacing: "0.16em",
+            textTransform: "uppercase", color: "var(--text-3, #857a63)",
+            fontWeight: 600,
+          }}>
+            <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>BLOCKFORGE · KIOSK</span>
           </div>
 
-          {/* Title */}
-          <h1 style={{
-            fontSize: 38, fontWeight: 900, color: "#fff",
-            textAlign: "center", marginBottom: 8, letterSpacing: "-0.5px",
+          <div style={{
+            borderTop: "1px solid var(--border, rgba(24,23,26,0.12))",
+            borderBottom: "1px solid var(--border, rgba(24,23,26,0.12))",
+            padding: "24px 0 28px", marginBottom: 40, textAlign: "center",
           }}>
-            Who's learning today? 🎓
-          </h1>
-          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 16, marginBottom: 48 }}>
-            Tap your avatar to start
-          </p>
+            <div style={{
+              fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase",
+              color: "var(--accent, #d97706)", fontWeight: 700, marginBottom: 10,
+            }}>— Who's learning today —</div>
+            <h1 style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: "clamp(44px, 6vw, 72px)", fontWeight: 500,
+              color: "var(--text-1, #18171a)",
+              lineHeight: 1.02, letterSpacing: "-0.02em", margin: 0,
+            }}>
+              {greeting}.
+              <br />
+              <em style={{
+                color: "var(--accent, #d97706)", fontStyle: "italic",
+                fontWeight: 400,
+              }}>Tap your name.</em>
+            </h1>
+          </div>
 
           {/* Student grid */}
           {loadingStudents ? (
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 40 }}>
               {[0,1,2].map(i => (
                 <div key={i} style={{
-                  width: 12, height: 12, borderRadius: "50%",
-                  background: "#7c3aed", opacity: 0.5,
+                  width: 10, height: 10, borderRadius: "50%",
+                  background: "var(--accent, #d97706)", opacity: 0.4,
                   animation: "kiosk-fade-in 0.6s ease infinite alternate",
                   animationDelay: `${i * 200}ms`,
                 }} />
@@ -667,8 +657,9 @@ export default function StudentKiosk() {
             </div>
           ) : students.length === 0 ? (
             <div style={{
-              textAlign: "center", color: "rgba(255,255,255,0.3)",
+              textAlign: "center", color: "var(--text-3, #857a63)",
               fontSize: 18, marginTop: 40, padding: "40px 0",
+              fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic",
             }}>
               No students found. Ask your teacher to set up the class.
             </div>
@@ -676,7 +667,7 @@ export default function StudentKiosk() {
             <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: 20,
+              gap: 16,
             }}>
               {students.map((s, i) => (
                 <button
@@ -684,44 +675,68 @@ export default function StudentKiosk() {
                   onClick={() => selectStudent(s)}
                   className="kiosk-fade-in"
                   style={{
-                    animationDelay: `${i * 50}ms`,
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 20, padding: "28px 16px",
-                    cursor: "pointer", transition: "all 0.2s ease",
+                    animationDelay: `${i * 40}ms`,
+                    background: "var(--bg-surface, #fffaf0)",
+                    border: "1px solid var(--border, rgba(24,23,26,0.12))",
+                    borderRadius: 10, padding: "22px 14px 18px",
+                    cursor: "pointer", transition: "all 0.18s ease",
                     display: "flex", flexDirection: "column",
                     alignItems: "center", gap: 12,
+                    fontFamily: "inherit",
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(124,58,237,0.15)";
-                    (e.currentTarget as HTMLButtonElement).style.border = "1px solid rgba(124,58,237,0.4)";
-                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-4px) scale(1.03)";
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 12px 40px rgba(124,58,237,0.25)";
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = "var(--accent, #d97706)";
+                    el.style.transform = "translateY(-2px)";
+                    el.style.boxShadow = "0 8px 28px rgba(217,119,6,0.18)";
+                    const inner = el.querySelector<HTMLDivElement>("[data-avatar]");
+                    if (inner) inner.style.background = "var(--accent-light, #fde8c7)";
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
-                    (e.currentTarget as HTMLButtonElement).style.border = "1px solid rgba(255,255,255,0.08)";
-                    (e.currentTarget as HTMLButtonElement).style.transform = "";
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "";
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = "var(--border, rgba(24,23,26,0.12))";
+                    el.style.transform = "";
+                    el.style.boxShadow = "";
+                    const inner = el.querySelector<HTMLDivElement>("[data-avatar]");
+                    if (inner) inner.style.background = "var(--bg-muted, #efe7d4)";
                   }}
                 >
-                  <div style={{
+                  <div data-avatar style={{
                     width: 72, height: 72, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.06)",
+                    background: "var(--bg-muted, #efe7d4)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 40, lineHeight: 1,
-                    border: "2px solid rgba(255,255,255,0.08)",
+                    border: "1px solid var(--border, rgba(24,23,26,0.12))",
+                    transition: "background 0.18s ease",
                   }}>
                     {s.avatar_emoji || "🧑"}
                   </div>
                   <span style={{
-                    color: "#fff", fontWeight: 700, fontSize: 15,
+                    color: "var(--text-1, #18171a)",
+                    fontFamily: "'Fraunces', Georgia, serif",
+                    fontWeight: 500, fontSize: 17,
                     textAlign: "center", wordBreak: "break-word",
+                    letterSpacing: "-0.01em",
                   }}>{s.name}</span>
                 </button>
               ))}
             </div>
           )}
+
+          {/* ── Newspaper footer ── */}
+          <div style={{
+            marginTop: 56, paddingTop: 20,
+            borderTop: "1px solid var(--border, rgba(24,23,26,0.12))",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
+            color: "var(--text-3, #857a63)", fontWeight: 600,
+          }}>
+            <span>Vol. I · No. 01</span>
+            <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic", letterSpacing: 0, textTransform: "none", fontSize: 13 }}>
+              Est. in the classroom.
+            </span>
+            <span>{new Date().getFullYear()}</span>
+          </div>
         </div>
       </div>
     );
