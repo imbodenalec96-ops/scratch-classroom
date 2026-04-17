@@ -85,6 +85,13 @@ function ArcadeGuard() {
   return <ArcadePage />;
 }
 
+function ProjectsGuard() {
+  const { user } = useAuth();
+  // Students can access projects only after completing today's work
+  if (user?.role === 'student' && !isWorkUnlocked()) return <Navigate to="/student" replace />;
+  return <ProjectsList />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -99,7 +106,7 @@ export default function App() {
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="teacher" element={<TeacherDashboard />} />
             <Route path="student" element={<StudentDashboard />} />
-            <Route path="projects" element={<ProjectsList />} />
+            <Route path="projects" element={<ProjectsGuard />} />
             <Route path="classes/:id" element={<ClassManager />} />
             <Route path="assignments" element={<AssignmentBuilder />} />
             <Route path="quizzes" element={<QuizBuilder />} />

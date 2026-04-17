@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
@@ -14,8 +14,12 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  // Re-compute nav whenever location changes so arcade/projects appear
+  // immediately after a student submits their assignment (same session).
+  const [workUnlocked, setWorkUnlocked] = useState(isWorkUnlocked);
+  useEffect(() => { setWorkUnlocked(isWorkUnlocked()); }, [location.pathname]);
   if (!user) return null;
-  const navItems = getNavItems(user.role);
+  const navItems = getNavItems(user.role, workUnlocked);
   const dk = theme === "dark";
 
   return (
@@ -136,14 +140,13 @@ export default function Layout() {
   );
 }
 
-function getNavItems(role: string) {
+function getNavItems(role: string, workDone = isWorkUnlocked()) {
   const common = [
     { path: "/",           icon: LayoutDashboard, label: "Dashboard"   },
     { path: "/projects",   icon: FolderOpen,      label: "Projects"    },
     { path: "/lessons",    icon: BookOpen,        label: "Lessons"     },
     { path: "/arcade",     icon: Gamepad2,        label: "Arcade"      },
   ];
-  const workDone = isWorkUnlocked();
   if (role === "admin") {
     return [...common,
       { path: "/monitor",    icon: Monitor,   label: "Monitor"    },
