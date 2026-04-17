@@ -429,6 +429,12 @@ export default function AssignmentBuilder() {
   // Real-time progress
   const [fwProgress, setFwProgress] = useState<{ done: number; failed: number; total: number; current?: string; elapsed: number }>({ done: 0, failed: 0, total: 0, elapsed: 0 });
   const fwCancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  // Per-class defaults (loaded from class_settings)
+  const [fwDefaultQuestionCount, setFwDefaultQuestionCount] = useState<number>(3);
+  const [fwDefaultEstimatedMinutes, setFwDefaultEstimatedMinutes] = useState<number>(5);
+  const [fwDefaultHintsAllowed, setFwDefaultHintsAllowed] = useState<boolean>(true);
+  const [fwSaveAsDefault, setFwSaveAsDefault] = useState<boolean>(false);
+  const [fwSettingsLoaded, setFwSettingsLoaded] = useState<boolean>(false);
 
   // Edit modal state
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
@@ -449,6 +455,28 @@ export default function AssignmentBuilder() {
     const a = await api.getAssignments(cid);
     setAssignments(a);
   };
+
+  // Load per-class defaults when mega-button opens or class changes
+  useEffect(() => {
+    if (!showFullWeek || !classId) return;
+    setFwSettingsLoaded(false);
+    api.getClassSettings(classId).then((s: any) => {
+      if (s?.enabled_subjects && Array.isArray(s.enabled_subjects)) {
+        setFullWeekSubjects({
+          reading:  s.enabled_subjects.includes("reading"),
+          writing:  s.enabled_subjects.includes("writing"),
+          spelling: s.enabled_subjects.includes("spelling"),
+          math:     s.enabled_subjects.includes("math"),
+          sel:      s.enabled_subjects.includes("sel"),
+        });
+      }
+      if (s?.default_variety_level) setFullWeekVariety(s.default_variety_level);
+      if (s?.default_question_count != null) setFwDefaultQuestionCount(Number(s.default_question_count));
+      if (s?.default_estimated_minutes != null) setFwDefaultEstimatedMinutes(Number(s.default_estimated_minutes));
+      if (s?.default_hints_allowed != null) setFwDefaultHintsAllowed(!!s.default_hints_allowed);
+      setFwSettingsLoaded(true);
+    }).catch(() => setFwSettingsLoaded(true));
+  }, [showFullWeek, classId]);
 
   // Route students to interactive view
   if (user?.role === "student") {
@@ -540,6 +568,17 @@ export default function AssignmentBuilder() {
     setFullWeekResult(null);
     fwCancelRef.current.cancelled = false;
 
+    // Persist these choices as the class default if requested
+    if (fwSaveAsDefault) {
+      api.updateClassSettings(classId, {
+        enabled_subjects: subjects,
+        default_variety_level: fullWeekVariety,
+        default_question_count: fwDefaultQuestionCount,
+        default_estimated_minutes: fwDefaultEstimatedMinutes,
+        default_hints_allowed: fwDefaultHintsAllowed,
+      }).catch(() => { /* non-blocking */ });
+    }
+
     const CONCURRENCY = 10; // max parallel AI calls — stays well under Anthropic rate limits
     const t0 = Date.now();
 
@@ -569,12 +608,18 @@ export default function AssignmentBuilder() {
           if (!slot) return;
           const tickLabel = `${slot.studentName} · ${slot.subject} · ${slot.dayName}`;
           setFwProgress(p => ({ ...p, current: tickLabel }));
+          const slotWithDefaults = {
+            ...slot,
+            questionCount: fwDefaultQuestionCount,
+            estimatedMinutes: fwDefaultEstimatedMinutes,
+            hintsAllowed: fwDefaultHintsAllowed,
+          };
           try {
-            await api.generateAssignmentSlot(slot);
+            await api.generateAssignmentSlot(slotWithDefaults);
             done++;
           } catch (e: any) {
             // Retry once
-            try { await api.generateAssignmentSlot(slot); done++; }
+            try { await api.generateAssignmentSlot(slotWithDefaults); done++; }
             catch (e2: any) { failed++; errors.push({ slot: tickLabel, err: e2?.message || String(e2) }); }
           }
           setFwProgress(p => ({
@@ -726,6 +771,58 @@ export default function AssignmentBuilder() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Per-class defaults — question count, minutes, hints */}
+          <div className="p-3 border" style={{ background: "var(--bg-muted)", borderColor: "var(--border)", borderRadius: "var(--r-md)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="section-label">— Per-assignment defaults —</div>
+              {fwSettingsLoaded && (
+                <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                  Loaded from this class's saved settings
+                </span>
+              )}
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Questions per assignment</label>
+                <input
+                  type="number" min={1} max={20}
+                  value={fwDefaultQuestionCount}
+                  onChange={e => setFwDefaultQuestionCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                  className="input text-sm w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Estimated minutes each</label>
+                <input
+                  type="number" min={1} max={120}
+                  value={fwDefaultEstimatedMinutes}
+                  onChange={e => setFwDefaultEstimatedMinutes(Math.max(1, Number(e.target.value) || 1))}
+                  className="input text-sm w-full"
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: "var(--text-1)" }}>
+                  <input
+                    type="checkbox"
+                    checked={fwDefaultHintsAllowed}
+                    onChange={e => setFwDefaultHintsAllowed(e.target.checked)}
+                    className="cursor-pointer"
+                  />
+                  Allow hints
+                </label>
+              </div>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-2)" }}>
+              <input
+                type="checkbox"
+                checked={fwSaveAsDefault}
+                onChange={e => setFwSaveAsDefault(e.target.checked)}
+                className="cursor-pointer"
+              />
+              Save these choices as this class's defaults (subjects + variety + counts)
+            </label>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
