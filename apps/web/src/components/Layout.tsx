@@ -63,7 +63,7 @@ export default function Layout() {
       studentFreetimeStore.setGranted(until);
     },
     REVOKE_FREETIME: () => {
-      studentFreetimeStore.setRevoked();
+      studentFreetimeStore.setRevoked(Date.now() + 60_000);
       studentMessageStore.setMessage("Free time ended — back to work 📚");
       navigate("/assignments");
     },
