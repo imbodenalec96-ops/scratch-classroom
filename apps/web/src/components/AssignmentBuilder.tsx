@@ -997,6 +997,14 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
 }) {
   const [title, setTitle] = useState(assignment.title || "");
   const [description, setDescription] = useState(assignment.description || "");
+  const [teacherNotes, setTeacherNotes] = useState(assignment.teacher_notes || "");
+  const [questionCount, setQuestionCount] = useState<number>(assignment.question_count || 3);
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number>(assignment.estimated_minutes || 5);
+  const [focusKeywords, setFocusKeywords] = useState(assignment.focus_keywords || "");
+  const [learningObjective, setLearningObjective] = useState(assignment.learning_objective || "");
+  const [questionType, setQuestionType] = useState(assignment.question_type || "mixed");
+  const [hintsAllowed, setHintsAllowed] = useState<boolean>(assignment.hints_allowed !== 0);
+  const [showRawJson, setShowRawJson] = useState(false);
   const [contentText, setContentText] = useState(() => {
     try { return assignment.content ? JSON.stringify(JSON.parse(assignment.content), null, 2) : ""; }
     catch { return assignment.content || ""; }
@@ -1008,15 +1016,30 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     api.getAssignmentSubmissionCount(assignment.id).then(r => setSubmissionCount(r.count)).catch(() => {});
   }, [assignment.id]);
 
+  const subject = (assignment.target_subject || "reading").toLowerCase();
+  // Subject-specific objectives dropdown
+  const OBJECTIVES: Record<string, string[]> = {
+    reading:  ["phonics", "comprehension", "fluency", "vocabulary", "inference", "main idea"],
+    writing:  ["sentence structure", "paragraph organization", "descriptive writing", "narrative", "opinion writing"],
+    math:     ["addition/subtraction", "multiplication/division", "fractions", "word problems", "measurement", "geometry"],
+    spelling: ["short vowels", "long vowels", "blends", "digraphs", "sight words", "compound words"],
+    sel:      ["self-awareness", "self-management", "social awareness", "relationships", "decision-making"],
+  };
+  const objectives = OBJECTIVES[subject] || OBJECTIVES.reading;
+
   const handleSave = async () => {
     let parsedContent: any = null;
-    try { parsedContent = contentText.trim() ? JSON.parse(contentText) : null; }
-    catch { alert("Content JSON is invalid. Fix it or leave it blank to not change content."); return; }
+    if (showRawJson && contentText.trim()) {
+      try { parsedContent = JSON.parse(contentText); }
+      catch { alert("Content JSON is invalid. Fix it or leave raw-JSON toggle off to skip."); return; }
+    }
     setSaving(true);
     try {
       await api.updateAssignment(assignment.id, {
-        title,
-        description,
+        title, description,
+        teacherNotes, questionCount, estimatedMinutes,
+        focusKeywords, learningObjective, questionType,
+        hintsAllowed,
         content: parsedContent ? JSON.stringify(parsedContent) : undefined,
       });
       onSaved();
@@ -1028,7 +1051,7 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div className="card" style={{ maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto",
+      <div className="card" style={{ maxWidth: 780, width: "100%", maxHeight: "92vh", overflowY: "auto",
         borderLeft: "3px solid var(--accent)" }}>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -1051,26 +1074,92 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Title + description */}
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className="input text-sm w-full" />
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Description / instructions</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="input text-sm w-full resize-none" />
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Description / instructions (student sees this)</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="input text-sm w-full resize-none" />
           </div>
-          <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>
-              Content JSON (sections + questions)
-            </label>
-            <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={14}
-              className="input text-xs w-full resize-none font-mono"
-              spellCheck={false} />
-            <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-              Power-user: edit the raw JSON directly, or use 📉 Easier / 📈 Harder / ✨ Regenerate for AI-driven changes.
-            </p>
+
+          {/* Customization grid */}
+          <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+            <div className="section-label mb-3">— Customization —</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Questions</label>
+                <input type="number" min={1} max={20} value={questionCount} onChange={e => setQuestionCount(Number(e.target.value))} className="input text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>~ Minutes</label>
+                <input type="number" min={1} max={60} value={estimatedMinutes} onChange={e => setEstimatedMinutes(Number(e.target.value))} className="input text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Question type</label>
+                <select value={questionType} onChange={e => setQuestionType(e.target.value)} className="input text-sm w-full">
+                  <option value="mixed">Mixed (AI picks)</option>
+                  <option value="multiple_choice">Multiple choice</option>
+                  <option value="short_answer">Short answer</option>
+                  <option value="fill_blank">Fill in blank</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>💡 Hints</label>
+                <button type="button" onClick={() => setHintsAllowed(v => !v)}
+                  className="input text-sm w-full cursor-pointer text-left"
+                  style={{ color: hintsAllowed ? "var(--success)" : "var(--text-3)" }}>
+                  {hintsAllowed ? "✓ Allowed" : "✕ Blocked"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Learning objective</label>
+                <select value={learningObjective} onChange={e => setLearningObjective(e.target.value)} className="input text-sm w-full">
+                  <option value="">— None / general —</option>
+                  {objectives.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Focus keywords (comma-separated)</label>
+                <input value={focusKeywords} onChange={e => setFocusKeywords(e.target.value)} placeholder="e.g. short vowels, CVC words" className="input text-sm w-full" />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>
+                🔒 Private teacher notes (AI reads, student never sees)
+              </label>
+              <textarea value={teacherNotes} onChange={e => setTeacherNotes(e.target.value)}
+                rows={2} placeholder="e.g. This student struggles with word problems — use visual hints + shorter sentences."
+                className="input text-sm w-full resize-none" />
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                When you hit 📉 Easier / 📈 Harder / ✨ Regenerate, the AI uses these notes to tailor the rewrite.
+              </p>
+            </div>
           </div>
+
+          {/* Raw JSON toggle — collapsed by default */}
+          <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+            <button type="button" onClick={() => setShowRawJson(v => !v)}
+              className="btn-ghost text-[11px]" style={{ padding: "4px 8px" }}>
+              {showRawJson ? "▾ Hide" : "▸ Show"} raw content JSON (power users)
+            </button>
+            {showRawJson && (
+              <div className="mt-2">
+                <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={14}
+                  className="input text-xs w-full resize-none font-mono" spellCheck={false} />
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                  Editing this replaces the stored questions directly. Leave unchanged to only save the fields above.
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 pt-2">
             <button onClick={handleSave} disabled={saving} className="btn-primary gap-1.5">
               {saving ? "Saving…" : "Save changes"}
