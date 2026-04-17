@@ -22,6 +22,9 @@ import ColoringBook from "./games/ColoringBook.tsx";
 import DressUp from "./games/DressUp.tsx";
 import PixelArt from "./games/PixelArt.tsx";
 import BridgeBuilder from "./games/BridgeBuilder.tsx";
+import Basketball from "./games/Basketball.tsx";
+import SimonSays from "./games/SimonSays.tsx";
+import TowerDefense from "./games/TowerDefense.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -312,9 +315,46 @@ const GAMES: Game[] = [
     component: BridgeBuilder,
     hint: "Drag between dots to place planks · test the bridge",
   },
+  // ── Batch 4 ──────────────────────────────────────────────────
+  {
+    id: "basketball",
+    title: "Basketball Shots",
+    description: "Aim, hold to charge power, release to shoot! Score as many baskets as you can.",
+    category: "Sports",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#f97316",
+    emoji: "🏀",
+    component: Basketball,
+    hint: "Move to aim · hold = power · release to shoot",
+  },
+  {
+    id: "simonsays",
+    title: "Simon Says",
+    description: "Watch the color pattern light up, then repeat it! How long can your memory go?",
+    category: "Puzzle",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#a78bfa",
+    emoji: "🎮",
+    component: SimonSays,
+    hint: "Watch · repeat · Q W A S keys or tap",
+  },
+  {
+    id: "towerdefense",
+    title: "Flower Defense",
+    description: "Plant flower towers to stop the bug invasion! Send waves and spend gold wisely.",
+    category: "Action",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#4ade80",
+    emoji: "🌻",
+    component: TowerDefense,
+    hint: "Click lanes to place towers · send waves to battle!",
+  },
 ];
 
-const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Unity"];
+const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Sports", "Unity"];
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   All: <Grid3X3 size={13} />,
   Classic: <Gamepad2 size={13} />,
@@ -322,6 +362,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Puzzle: <Puzzle size={13} />,
   Education: <GraduationCap size={13} />,
   Creative: <Wand2 size={13} />,
+  Sports: <Trophy size={13} />,
   Unity: <Package size={13} />,
 };
 
