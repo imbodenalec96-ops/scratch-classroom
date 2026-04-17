@@ -7,6 +7,7 @@ import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
+import { setBreakState } from "../lib/breakSystem.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
@@ -42,6 +43,11 @@ export default function PublicLayout() {
     REVOKE_FREETIME: () => {
       studentFreetimeStore.setRevoked();
       studentMessageStore.setMessage("Free time ended — back to work 📚");
+      navigate("/assignments");
+    },
+    END_BREAK: () => {
+      setBreakState({ path: "fullwork", breakStartAt: 0, breakEndAt: 0, breakOffered: true });
+      studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
     },
   });

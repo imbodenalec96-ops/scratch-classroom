@@ -13,7 +13,7 @@ import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
-import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
+import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -64,6 +64,15 @@ export default function Layout() {
     REVOKE_FREETIME: () => {
       studentFreetimeStore.setRevoked();
       studentMessageStore.setMessage("Free time ended — back to work 📚");
+      navigate("/assignments");
+    },
+    END_BREAK: () => {
+      // Clear the localStorage break state so isOnBreak() flips false and the
+      // break modal doesn't immediately re-offer. We set path=fullwork + zero
+      // out the start/end times (matches chooseFullWork's "keep grinding" exit
+      // and won't re-prompt because breakOffered stays true).
+      setBreakState({ path: "fullwork", breakStartAt: 0, breakEndAt: 0, breakOffered: true });
+      studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
     },
   });

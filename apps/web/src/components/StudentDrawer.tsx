@@ -129,8 +129,14 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   };
   const handleEndBreak = async () => {
     if (!confirm(`End ${student.name}'s break early? They'll get a toast and go back to /student.`)) return;
-    try { await api.endBreak(student.id); showFlash("⏰ Break ended"); }
-    catch (e: any) { alert("Failed: " + e.message); }
+    // Fire new student_commands pipe + legacy path in parallel.
+    try {
+      await Promise.allSettled([
+        api.endStudentBreak(student.id),
+        api.endBreak(student.id),
+      ]);
+      showFlash("⏰ Break ended");
+    } catch (e: any) { alert("Failed: " + e.message); }
   };
 
   const btnBase = `flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border`;

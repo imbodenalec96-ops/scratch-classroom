@@ -193,6 +193,7 @@ export const api = {
   unlockStudentCmd: (studentId: string) => request<any>(`/students/${studentId}/unlock`, { method: "POST", body: JSON.stringify({}) }),
   grantStudentFreeTime: (studentId: string, minutes?: number) => request<any>(`/students/${studentId}/grant-freetime`, { method: "POST", body: JSON.stringify({ minutes: minutes ?? 15 }) }),
   revokeStudentFreeTime: (studentId: string) => request<any>(`/students/${studentId}/revoke-freetime`, { method: "POST", body: JSON.stringify({}) }),
+  endStudentBreak: (studentId: string) => request<any>(`/students/${studentId}/end-break`, { method: "POST", body: JSON.stringify({}) }),
   focusStudent: (studentId: string, focused: boolean) => request<any>(`/classes/focus-student/${studentId}`, { method: "POST", body: JSON.stringify({ focused }) }),
   grantFreeTime: (studentId: string) => request<any>(`/classes/grant-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
   revokeFreeTime: (studentId: string) => request<any>(`/classes/revoke-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),

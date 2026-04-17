@@ -351,6 +351,27 @@ router.post("/:id/grant-freetime", requireRole("teacher", "admin"), async (req: 
   }
 });
 
+// POST /:id/end-break — teacher/admin enqueues an END_BREAK command.
+// Also best-effort clears server-side break state if `students.break_active /
+// break_end` columns exist (they may not on all deployments — guarded).
+router.post("/:id/end-break", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    try {
+      await db.prepare(`UPDATE students SET break_active=0, break_end=? WHERE id=?`).run(new Date().toISOString(), id);
+    } catch (e) {
+      // Columns or `students` table may not exist — client localStorage is
+      // the authoritative break state anyway, so this is pure belt-and-braces.
+      console.warn("end-break: UPDATE students skipped:", (e as Error).message);
+    }
+    const cmdId = await enqueueStudentCommand(id, "END_BREAK", {});
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/end-break failed:", e);
+    res.status(500).json({ error: "Failed to end break" });
+  }
+});
+
 // POST /:id/revoke-freetime — teacher/admin enqueues a REVOKE_FREETIME command.
 // Also writes `freetime_revoked_until = now + 60s` on the student row so the
 // client's unlock precedence treats the revoke as authoritative even if a stale
