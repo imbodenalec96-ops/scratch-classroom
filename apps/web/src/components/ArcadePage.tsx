@@ -209,13 +209,14 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
 
   return (
     <div
-      className="animate-arcade-card relative rounded-2xl overflow-hidden cursor-pointer select-none group"
+      className="animate-arcade-card arcade-card-press relative rounded-2xl overflow-hidden cursor-pointer select-none group"
       style={{
         animationDelay: `${index * 55}ms`,
         background: "#0a0b1e",
         border: `1px solid ${game.accentColor}22`,
-        transform: hov ? "translateY(-5px) scale(1.025)" : pressed ? "scale(0.97)" : "scale(1)",
-        transition: "transform 0.22s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.22s ease",
+        /* hover handled by CSS .arcade-card-press:hover; pressed here overrides */
+        transform: pressed ? "scale(0.95)" : undefined,
+        transition: pressed ? "transform 0.10s ease" : "transform 0.22s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.22s ease",
         boxShadow: hov
           ? `0 20px 44px ${game.accentColor}44, 0 4px 16px rgba(0,0,0,0.5)`
           : `0 2px 8px rgba(0,0,0,0.4)`,
@@ -223,15 +224,18 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
+      onMouseUp={() => { setPressed(false); }}
+      onTouchStart={() => setPressed(true)}
+      onTouchEnd={() => { setPressed(false); onPlay(); }}
+      onTouchCancel={() => setPressed(false)}
       onClick={onPlay}
     >
       {/* Shimmer overlay */}
       {hov && <div className="absolute inset-0 z-10 pointer-events-none animate-arcade-shimmer rounded-2xl" />}
 
-      {/* Thumbnail */}
+      {/* Thumbnail — taller on wider screens via aspect-ratio hint */}
       <div
-        className="h-36 flex items-center justify-center relative overflow-hidden"
+        className="h-40 flex items-center justify-center relative overflow-hidden"
         style={{ background: `radial-gradient(ellipse at 65% 40%, ${game.accentColor}28 0%, transparent 65%)` }}
       >
         <div className="absolute inset-0 animate-arcade-ken-burns opacity-30"
@@ -443,13 +447,13 @@ function FeaturedBanner({ game, onPlay }: { game: Game; onPlay: () => void }) {
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden cursor-pointer group"
+      className="arcade-card-press relative rounded-2xl overflow-hidden cursor-pointer group"
       style={{
         background: "linear-gradient(135deg, #0f0a28 0%, #080714 100%)",
         border: `1px solid ${game.accentColor}33`,
         boxShadow: `0 8px 32px ${game.accentColor}22`,
-        transform: hov ? "scale(1.01)" : "scale(1)",
-        transition: "transform 0.25s cubic-bezier(0.34,1.2,0.64,1), box-shadow 0.25s ease",
+        transition: "box-shadow 0.25s ease",
+        touchAction: "manipulation",
       }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
@@ -598,10 +602,18 @@ export default function ArcadePage() {
         <div className={`text-[11px] font-semibold mb-3.5 ${dk ? "text-white/25" : "text-gray-400"}`}>
           {filtered.length} game{filtered.length !== 1 ? "s" : ""} • {activeCategory}
         </div>
+        {/*
+          auto-fill minmax(260px, 1fr) gives:
+          - 600px  → 2 cols  (iPad portrait)
+          - 768px  → 2-3 cols (iPad portrait / small Chromebook)
+          - 1024px → 3 cols  (iPad landscape / Chromebook)
+          - 1366px → 4 cols  (Chromebook HD)
+          - 1440px+→ 4-5 cols (desktop / iPad Pro landscape)
+        */}
         <div
           key={cardKey} // remount to re-trigger stagger
           className="grid gap-4"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))" }}
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
         >
           {filtered.map((game, i) => (
             <GameCard key={game.id} game={game} index={i} onPlay={() => handlePlay(game)} />
