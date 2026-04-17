@@ -850,12 +850,21 @@ export default function LessonsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in min-h-screen" style={{ background: "var(--bg)" }}>
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-t1">Lessons</h1>
-        <p className="text-sm text-t3 mt-1">Choose a subject to explore lessons designed for grades 2–5.</p>
-      </div>
+    <div className="p-7 space-y-6 animate-fade-in min-h-screen max-w-7xl mx-auto" style={{ background: "var(--bg)" }}>
+      {/* ── Editorial masthead ── */}
+      <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+          <span className="font-mono">BLOCKFORGE · LIBRARY</span>
+        </div>
+        <div className="section-label mb-2">— Reading room —</div>
+        <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
+          Lessons. <em style={{ color: "var(--accent)", fontStyle: "italic", fontWeight: 400 }}>Worth your time.</em>
+        </h1>
+        <p className="text-sm mt-2 max-w-xl" style={{ color: "var(--text-2)" }}>
+          Choose a subject to explore lessons designed for grades 2–5.
+        </p>
+      </header>
 
       {/* Subject tabs */}
       <div className="flex flex-wrap gap-2">
@@ -900,7 +909,7 @@ export default function LessonsPage() {
                 onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "var(--border)")}
               >
                 <span className="text-3xl">{lesson.icon}</span>
-                <h3 className="text-sm font-bold text-t1 mt-3 group-hover:text-violet-400 transition-colors">{lesson.title}</h3>
+                <h3 className="text-sm font-bold text-t1 mt-3 group-hover:text-t1 transition-colors">{lesson.title}</h3>
                 <p className="text-xs text-t3 mt-1">{lesson.desc}</p>
                 <span
                   className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-2 ${
@@ -933,7 +942,7 @@ export default function LessonsPage() {
                   onClick={() => setGradeFilter(g)}
                   className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                     gradeFilter === g
-                      ? "bg-violet-500/25 text-violet-300 border-violet-500/50"
+                      ? "bg-[var(--accent-light)] text-[var(--text-accent)] border-[var(--accent)]"
                       : dk
                       ? "bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08] hover:text-white/60"
                       : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
@@ -991,7 +1000,7 @@ export default function LessonsPage() {
                         </span>
                       ))}
                     </div>
-                    <h3 className="text-sm font-bold text-t1 group-hover:text-violet-400 transition-colors leading-snug">
+                    <h3 className="text-sm font-bold text-t1 group-hover:text-t1 transition-colors leading-snug">
                       {lesson.title}
                     </h3>
                     <p className="text-xs text-t3 mt-1 flex-1 leading-relaxed">{lesson.description}</p>
