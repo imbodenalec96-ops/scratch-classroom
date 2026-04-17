@@ -48,18 +48,43 @@ router.post("/", async (req: AuthRequest, res: Response) => {
           const studentAns = studentAnswers[qIndex];
           const label = (q.text || `Q${qIndex + 1}`).slice(0, 70);
 
-          if (q.type === "multiple_choice" && Array.isArray(q.options) && q.correctIndex !== undefined) {
-            mcTotal++;
-            const correctOpt = q.options[q.correctIndex];
+          if (q.type === "multiple_choice" && Array.isArray(q.options)) {
             // Strip leading "A. ", "B. " etc from both sides for robust comparison
             const normalize = (s: string) => String(s || "").replace(/^[A-D]\.\s*/i, "").trim().toLowerCase();
-            const isCorrect = normalize(studentAns) === normalize(correctOpt);
-            if (isCorrect) mcCorrect++;
-            checks.push({
-              label,
-              passed: isCorrect,
-              detail: isCorrect ? "Correct ✓" : `Correct: ${correctOpt}${studentAns ? ` | Student: ${studentAns}` : " | No answer"}`,
-            });
+
+            // Resolve the correct option — prefer correctIndex, fall back to correctAnswer string
+            let correctOpt: string | undefined;
+            const ci = q.correctIndex;
+            if (ci !== undefined && ci !== null) {
+              // coerce string "2" → 2 just in case AI returned a string
+              const idx = typeof ci === "string" ? parseInt(ci, 10) : Number(ci);
+              correctOpt = isNaN(idx) ? undefined : q.options[idx];
+            }
+            if (!correctOpt && q.correctAnswer) {
+              // some AI responses use a correctAnswer string instead
+              correctOpt = String(q.correctAnswer);
+            }
+
+            if (correctOpt !== undefined) {
+              mcTotal++;
+              const isCorrect = normalize(studentAns) === normalize(correctOpt);
+              if (isCorrect) mcCorrect++;
+              checks.push({
+                label,
+                passed: isCorrect,
+                detail: isCorrect
+                  ? "Correct ✓"
+                  : `Expected: "${normalize(correctOpt)}" | Got: "${normalize(studentAns) || "(blank)"}"`
+              });
+            } else {
+              // correctIndex missing on old question — treat as attempted (teacher must review)
+              const attempted = Boolean(studentAns && String(studentAns).trim().length > 0);
+              checks.push({
+                label,
+                passed: attempted,
+                detail: attempted ? "Answered — pending teacher review (no answer key)" : "Not answered",
+              });
+            }
           } else if (q.type === "short_answer" || q.type === "fill_blank") {
             // Short answer / fill blank: mark as attempted if answered
             const attempted = Boolean(studentAns && String(studentAns).trim().length > 0);

@@ -195,9 +195,28 @@ export default function GradingPanel() {
 
                       let isCorrect: boolean | null = null;
                       let correctOpt = "";
-                      if (q.type === "multiple_choice" && q.options && q.correctIndex !== undefined) {
-                        correctOpt = q.options[q.correctIndex];
-                        isCorrect = normalize(studentAns) === normalize(correctOpt);
+                      let correctOptIndex: number | null = null;
+                      if (q.type === "multiple_choice" && q.options) {
+                        // Resolve correctIndex (coerce string → number if needed)
+                        const ci = q.correctIndex;
+                        if (ci !== undefined && ci !== null) {
+                          const idx = typeof ci === "string" ? parseInt(ci, 10) : Number(ci);
+                          if (!isNaN(idx) && idx >= 0 && idx < q.options.length) {
+                            correctOptIndex = idx;
+                            correctOpt = q.options[idx];
+                          }
+                        }
+                        // Fallback: correctAnswer string field
+                        if (!correctOpt && q.correctAnswer) {
+                          correctOpt = String(q.correctAnswer);
+                          correctOptIndex = q.options.findIndex(
+                            (o: string) => normalize(o) === normalize(correctOpt)
+                          );
+                          if (correctOptIndex === -1) correctOptIndex = null;
+                        }
+                        if (correctOpt) {
+                          isCorrect = normalize(studentAns) === normalize(correctOpt);
+                        }
                       }
 
                       return (
@@ -218,7 +237,7 @@ export default function GradingPanel() {
                             <div className="ml-6 grid grid-cols-2 gap-1">
                               {q.options.map((opt: string, oi: number) => {
                                 const isStudentPick = normalize(studentAns) === normalize(opt);
-                                const isCorrectOpt = oi === q.correctIndex;
+                                const isCorrectOpt = correctOptIndex !== null ? oi === correctOptIndex : (correctOpt ? normalize(opt) === normalize(correctOpt) : false);
                                 return (
                                   <div key={oi} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs
                                     ${isCorrectOpt && isStudentPick ? "bg-emerald-500/15 text-emerald-400 font-bold"
