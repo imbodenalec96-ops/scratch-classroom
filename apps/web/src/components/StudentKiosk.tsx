@@ -32,6 +32,9 @@ interface Student {
   math_max_grade?: number;
   writing_min_grade?: number;
   writing_max_grade?: number;
+  approved_video_url?: string | null;
+  approved_video_title?: string | null;
+  approved_video_set_at?: string | null;
 }
 
 interface Task {
@@ -351,8 +354,8 @@ export default function StudentKiosk() {
 
   const [videoReqOpen, setVideoReqOpen] = useState(false);
   const [videoReqTitle, setVideoReqTitle] = useState("");
-  const [videoReqUrl, setVideoReqUrl] = useState("");
   const [videoReqLoading, setVideoReqLoading] = useState(false);
+  const [approvedVideoModal, setApprovedVideoModal] = useState(false);
 
   const confettiRef = useRef<HTMLCanvasElement>(null);
   const alreadyCelebrated = useRef(false);
@@ -564,17 +567,16 @@ export default function StudentKiosk() {
   }
 
   async function submitVideoRequest() {
-    if (!videoReqTitle.trim() || !videoReqUrl.trim()) return;
+    if (!videoReqTitle.trim()) return;
     setVideoReqLoading(true);
     try {
       await req("/youtube/requests", {
         method: "POST",
-        body: JSON.stringify({ title: videoReqTitle, url: videoReqUrl, student_id: activeStudent?.id }),
+        body: JSON.stringify({ title: videoReqTitle, student_id: activeStudent?.id }),
       });
-      toast("🎬 Video request sent!");
+      toast("🎬 Video request sent! Your teacher will find it for you.");
       setVideoReqOpen(false);
       setVideoReqTitle("");
-      setVideoReqUrl("");
     } catch {
       toast("Couldn't send request — try again!");
     } finally {
@@ -769,13 +771,58 @@ export default function StudentKiosk() {
       {/* Iframe modal */}
       {iframeUrl && <IframeModal url={iframeUrl} onClose={() => setIframeUrl(null)} />}
 
-      {/* YouTube video modal */}
+      {/* YouTube video modal (class-wide approved list) */}
       {videoModal && (() => {
         const vid = extractYoutubeId(videoModal.url);
         const embedUrl = vid
-          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1`
+          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1`
           : videoModal.url;
         return <IframeModal url={embedUrl} onClose={() => setVideoModal(null)} />;
+      })()}
+
+      {/* Approved per-student video modal */}
+      {approvedVideoModal && activeStudent?.approved_video_url && (() => {
+        const vid = extractYoutubeId(activeStudent.approved_video_url);
+        const embedUrl = vid
+          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1`
+          : activeStudent.approved_video_url;
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 9000,
+            background: "rgba(0,0,0,0.92)", backdropFilter: "blur(10px)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{
+              width: "min(900px, 96vw)", background: "#07071a",
+              border: "1px solid rgba(139,92,246,0.3)", borderRadius: 20, overflow: "hidden",
+              boxShadow: "0 0 80px rgba(139,92,246,0.2)",
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 16px", background: "rgba(139,92,246,0.08)",
+                borderBottom: "1px solid rgba(139,92,246,0.15)",
+              }}>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 14 }}>
+                  📺 {activeStudent.approved_video_title || "Your Approved Video"}
+                </span>
+                <button onClick={() => setApprovedVideoModal(false)} style={{
+                  marginLeft: "auto", background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)",
+                  borderRadius: 8, padding: "4px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700,
+                }}>✕ Close</button>
+              </div>
+              <div style={{ position: "relative", paddingTop: "56.25%" }}>
+                <iframe
+                  src={embedUrl}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title="Approved Video"
+                />
+              </div>
+            </div>
+          </div>
+        );
       })()}
 
       {/* Video request modal */}
@@ -789,31 +836,26 @@ export default function StudentKiosk() {
             background: "#0a0b20", border: "1px solid rgba(255,255,255,0.1)",
             borderRadius: 20, padding: 32, width: "90%", maxWidth: 440,
           }}>
-            <h3 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>🎬 Request a Video</h3>
+            <h3 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800 }}>🎬 Request a Video</h3>
+            <p style={{ margin: "0 0 18px", fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+              Tell your teacher what you'd like to watch. They'll find an approved version and send it to you.
+            </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <input
                 value={videoReqTitle}
                 onChange={e => setVideoReqTitle(e.target.value)}
-                placeholder="Video title"
+                onKeyDown={e => e.key === "Enter" && submitVideoRequest()}
+                placeholder="What do you want to watch? (e.g. Minecraft tips, math tricks)"
+                autoFocus
                 style={{
                   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 10, padding: "10px 14px", color: "#fff",
-                  fontSize: 15, outline: "none",
-                }}
-              />
-              <input
-                value={videoReqUrl}
-                onChange={e => setVideoReqUrl(e.target.value)}
-                placeholder="YouTube URL"
-                style={{
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 10, padding: "10px 14px", color: "#fff",
+                  borderRadius: 10, padding: "12px 14px", color: "#fff",
                   fontSize: 15, outline: "none",
                 }}
               />
               <div style={{ display: "flex", gap: 10 }}>
                 <button
-                  onClick={() => setVideoReqOpen(false)}
+                  onClick={() => { setVideoReqOpen(false); setVideoReqTitle(""); }}
                   style={{
                     flex: 1, padding: "10px 0",
                     background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
@@ -823,15 +865,15 @@ export default function StudentKiosk() {
                 >Cancel</button>
                 <button
                   onClick={submitVideoRequest}
-                  disabled={videoReqLoading}
+                  disabled={videoReqLoading || !videoReqTitle.trim()}
                   style={{
                     flex: 2, padding: "10px 0",
                     background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
                     border: "none", borderRadius: 10, color: "#fff",
                     fontWeight: 800, cursor: "pointer", fontSize: 14,
-                    opacity: videoReqLoading ? 0.6 : 1,
+                    opacity: (videoReqLoading || !videoReqTitle.trim()) ? 0.5 : 1,
                   }}
-                >{videoReqLoading ? "Sending..." : "Send Request"}</button>
+                >{videoReqLoading ? "Sending..." : "📩 Send to Teacher"}</button>
               </div>
             </div>
           </div>
@@ -1294,7 +1336,7 @@ export default function StudentKiosk() {
                 justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12,
               }}>
                 <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0, letterSpacing: "-0.3px" }}>
-                  📺 Approved Videos
+                  📺 Videos
                 </h2>
                 <button
                   onClick={() => setVideoReqOpen(true)}
@@ -1306,16 +1348,52 @@ export default function StudentKiosk() {
                     cursor: "pointer",
                   }}
                 >
-                  + Request a Video
+                  🎬 Request a Video
                 </button>
               </div>
 
-              {videos.length === 0 ? (
+              {/* Per-student approved video card */}
+              {activeStudent?.approved_video_url && (
+                <div style={{
+                  ...cardStyle,
+                  marginBottom: 16,
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(79,70,229,0.10))",
+                  border: "1px solid rgba(124,58,237,0.35)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: 14,
+                      background: "rgba(124,58,237,0.25)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 26, flexShrink: 0,
+                    }}>▶</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 2 }}>
+                        {activeStudent.approved_video_title || "Your Approved Video"}
+                      </div>
+                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
+                        Approved by your teacher just for you ✓
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setApprovedVideoModal(true)}
+                      style={{
+                        background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                        border: "none", borderRadius: 12,
+                        padding: "10px 20px", color: "#fff",
+                        fontWeight: 800, fontSize: 14, cursor: "pointer", flexShrink: 0,
+                      }}
+                    >Watch Now ▶</button>
+                  </div>
+                </div>
+              )}
+
+              {videos.length === 0 && !activeStudent?.approved_video_url ? (
                 <div style={{
                   ...cardStyle, textAlign: "center",
                   color: "rgba(255,255,255,0.25)", padding: "40px 20px", fontSize: 15,
                 }}>
-                  No approved videos yet
+                  No videos yet — request one above!
                 </div>
               ) : (
                 <div style={{

@@ -27,6 +27,7 @@ interface Student {
   id: number;
   name: string;
   avatar: string;
+  avatar_emoji?: string;
   reading_min: number;
   reading_max: number;
   math_min: number;
@@ -36,6 +37,9 @@ interface Student {
   behavior_points: number;
   active: boolean;
   skip_work_day_date: string | null;
+  approved_video_url?: string | null;
+  approved_video_title?: string | null;
+  approved_video_set_at?: string | null;
 }
 
 interface AdminSettings {
@@ -61,9 +65,10 @@ interface YTRequest {
   student_id: number;
   student_name?: string;
   title: string;
-  url: string;
+  url?: string;
   status: "pending" | "approved" | "denied";
-  created_at: string;
+  created_at?: string;
+  requested_at?: string;
 }
 
 interface YTApproved {
@@ -1312,55 +1317,80 @@ function WorksheetsSection({ students }: { students: Student[] }) {
 }
 
 // ─── Section: YouTube Queue ───────────────────────────────────────────────────
-function YouTubeSection({ students }: { students: Student[] }) {
-  const [tab, setTab] = useState<"pending"|"approved"|"denied">("pending");
+function YouTubeSection({ students: propStudents }: { students: Student[] }) {
+  const [tab, setTab] = useState<"pending" | "active" | "denied">("pending");
   const [pending, setPending] = useState<YTRequest[]>([]);
-  const [approved, setApproved] = useState<YTApproved[]>([]);
   const [denied, setDenied] = useState<YTRequest[]>([]);
-  const [addForm, setAddForm] = useState({ title: "", url: "", category: "educational" });
-  const [addSaving, setAddSaving] = useState(false);
+  // local copy of students so we can refresh after approve/revoke
+  const [localStudents, setLocalStudents] = useState<Student[]>(propStudents);
+  const [urlInputs, setUrlInputs] = useState<Record<number, string>>({});
+  const [approving, setApproving] = useState<Record<number, boolean>>({});
+  const [denying, setDenying] = useState<Record<number, boolean>>({});
+  const [revoking, setRevoking] = useState<Record<number, boolean>>({});
 
   const load = useCallback(() => {
     req<YTRequest[]>("/youtube/requests?status=pending").then(setPending).catch(() => {});
-    req<YTApproved[]>("/youtube/approved").then(setApproved).catch(() => {});
     req<YTRequest[]>("/youtube/requests?status=denied").then(setDenied).catch(() => {});
+    req<Student[]>("/students").then(setLocalStudents).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // keep in sync if parent reloads students
+  useEffect(() => { setLocalStudents(propStudents); }, [propStudents]);
 
-  const approve = async (id: number) => {
-    await req(`/youtube/requests/${id}/approve`, { method: "PUT" }).catch(() => {});
-    load();
+  const studentObj = (id: number) =>
+    localStudents.find((x) => Number(x.id) === Number(id));
+
+  const studentDisplay = (id: number) => {
+    const s = studentObj(id);
+    if (!s) return `Student #${id}`;
+    const icon = s.avatar_emoji || s.avatar || "🎓";
+    return `${icon} ${s.name}`;
   };
 
-  const deny = async (id: number) => {
-    await req(`/youtube/requests/${id}/deny`, { method: "PUT" }).catch(() => {});
-    load();
-  };
-
-  const removeApproved = async (id: number) => {
-    if (!confirm("Remove from approved?")) return;
-    await req(`/youtube/approved/${id}`, { method: "DELETE" }).catch(() => {});
-    load();
-  };
-
-  const addManually = async () => {
-    setAddSaving(true);
+  /** Approve: write URL to student record + mark request approved */
+  const approve = async (r: YTRequest) => {
+    const url = (urlInputs[r.id] || "").trim();
+    if (!url) { alert("Paste a YouTube URL first."); return; }
+    setApproving((p) => ({ ...p, [r.id]: true }));
     try {
-      await req("/youtube/approved", { method: "POST", body: JSON.stringify(addForm) });
-      setAddForm({ title: "", url: "", category: "educational" });
+      await req(`/students/${r.student_id}/approve-video`, {
+        method: "PUT",
+        body: JSON.stringify({ url, title: r.title }),
+      });
+      await req(`/youtube/requests/${r.id}/approve`, { method: "PUT" });
+      setUrlInputs((p) => { const n = { ...p }; delete n[r.id]; return n; });
       load();
     } catch (e: any) {
-      alert(e.message);
+      alert("Error approving: " + e.message);
     } finally {
-      setAddSaving(false);
+      setApproving((p) => ({ ...p, [r.id]: false }));
     }
   };
 
-  const studentName = (id: number) => {
-    const s = students.find((x) => x.id === id);
-    return s ? `${s.avatar} ${s.name}` : `#${id}`;
+  const deny = async (id: number) => {
+    setDenying((p) => ({ ...p, [id]: true }));
+    try {
+      await req(`/youtube/requests/${id}/deny`, { method: "PUT" });
+      load();
+    } catch { /* ignore */ } finally {
+      setDenying((p) => ({ ...p, [id]: false }));
+    }
   };
+
+  const revoke = async (studentId: number) => {
+    if (!confirm("Remove this student's approved video?")) return;
+    setRevoking((p) => ({ ...p, [studentId]: true }));
+    try {
+      await req(`/students/${studentId}/approve-video`, { method: "DELETE" });
+      load();
+    } catch { /* ignore */ } finally {
+      setRevoking((p) => ({ ...p, [studentId]: false }));
+    }
+  };
+
+  // Students who currently have an active approved video
+  const activeVideos = localStudents.filter((s) => s.approved_video_url);
 
   const TabBtn = ({ id, label, count }: { id: typeof tab; label: string; count: number }) => (
     <button
@@ -1395,62 +1425,89 @@ function YouTubeSection({ students }: { students: Student[] }) {
     </button>
   );
 
-  const YTCard = ({ item, actions }: { item: YTRequest | YTApproved; actions: React.ReactNode }) => {
-    const url = (item as YTRequest).url || (item as YTApproved).url;
-    const thumb = url ? yt_thumb(url) : null;
-    return (
-      <div style={{
-        ...card,
-        display: "flex",
-        gap: 16,
-        alignItems: "flex-start",
-        padding: 16,
-      }}>
-        {thumb ? (
-          <img src={thumb} alt="" style={{ width: 120, height: 68, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-        ) : (
-          <div style={{ width: 120, height: 68, background: "rgba(255,255,255,0.06)", borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📺</div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: "white", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "Untitled"}</div>
-          {"student_id" in item && (
-            <div style={{ fontSize: 12, color: T.sub, marginBottom: 4 }}>Requested by: {studentName((item as YTRequest).student_id)}</div>
-          )}
-          {"category" in item && (
-            <div style={{ fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>{(item as YTApproved).category}</div>
-          )}
-          <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#60a5fa", wordBreak: "break-all" }}>{url}</a>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-          {actions}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div>
       <SectionTitle>📺 YouTube Queue</SectionTitle>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-        <TabBtn id="pending" label="Pending" count={pending.length} />
-        <TabBtn id="approved" label="Approved" count={approved.length} />
+        <TabBtn id="pending" label="Pending Requests" count={pending.length} />
+        <TabBtn id="active" label="Active Videos" count={activeVideos.length} />
         <TabBtn id="denied" label="Denied" count={denied.length} />
       </div>
 
+      {/* ── Pending Requests ── */}
       {tab === "pending" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {pending.map((r) => (
-            <YTCard
-              key={r.id}
-              item={r}
-              actions={
-                <>
-                  <button onClick={() => approve(r.id)} style={T.btnSuccess}>✓ Approve</button>
-                  <button onClick={() => deny(r.id)} style={T.btnDanger}>✕ Deny</button>
-                </>
-              }
-            />
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {pending.map((r) => {
+            const s = studentObj(r.student_id);
+            const icon = s?.avatar_emoji || s?.avatar || "🎓";
+            const inputUrl = urlInputs[r.id] || "";
+            const inputThumb = inputUrl ? yt_thumb(inputUrl) : null;
+            const isApproving = !!approving[r.id];
+            const isDenying = !!denying[r.id];
+            const ts = r.requested_at || r.created_at;
+            return (
+              <div key={r.id} style={{ ...card, padding: 20 }}>
+                {/* Student + request info */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                  <span style={{ fontSize: 32 }}>{icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{s?.name || `Student #${r.student_id}`}</div>
+                    <div style={{ fontSize: 13, color: T.sub, marginTop: 2 }}>
+                      wants to watch: <span style={{ color: "#e2e8f0", fontWeight: 600 }}>"{r.title}"</span>
+                    </div>
+                  </div>
+                  {ts && (
+                    <div style={{ fontSize: 11, color: T.sub, flexShrink: 0 }}>
+                      {new Date(ts).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+
+                {/* URL paste row */}
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-end", marginBottom: 14 }}>
+                  {inputThumb && (
+                    <img
+                      src={inputThumb}
+                      alt=""
+                      style={{ width: 100, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <Label>Paste YouTube URL to approve</Label>
+                    <input
+                      style={{ ...T.input, marginTop: 4 }}
+                      value={inputUrl}
+                      onChange={(e) => setUrlInputs((p) => ({ ...p, [r.id]: e.target.value }))}
+                      placeholder="https://www.youtube.com/watch?v=…"
+                    />
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => approve(r)}
+                    disabled={isApproving || !inputUrl.trim()}
+                    style={{
+                      ...T.btnSuccess,
+                      flex: 1,
+                      opacity: isApproving || !inputUrl.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {isApproving ? "Approving…" : `✓ Approve for ${s?.name || "Student"}`}
+                  </button>
+                  <button
+                    onClick={() => deny(r.id)}
+                    disabled={isDenying}
+                    style={{ ...T.btnDanger, opacity: isDenying ? 0.5 : 1 }}
+                  >
+                    {isDenying ? "…" : "✕ Deny"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
           {pending.length === 0 && (
             <div style={{ ...card, textAlign: "center", color: T.sub, padding: 40 }}>
               No pending requests 🎉
@@ -1459,66 +1516,92 @@ function YouTubeSection({ students }: { students: Student[] }) {
         </div>
       )}
 
-      {tab === "approved" && (
-        <div>
-          <div style={{ ...card, marginBottom: 16 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "white", margin: "0 0 12px 0" }}>+ Add Video Manually</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 12, alignItems: "flex-end" }}>
-              <div>
-                <Label>Title</Label>
-                <input style={T.input} value={addForm.title} onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))} placeholder="Video title" />
+      {/* ── Active Videos (per-student approved video) ── */}
+      {tab === "active" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {activeVideos.map((s) => {
+            const thumb = s.approved_video_url ? yt_thumb(s.approved_video_url) : null;
+            const icon = s.avatar_emoji || s.avatar || "🎓";
+            return (
+              <div
+                key={s.id}
+                style={{ ...card, display: "flex", gap: 16, alignItems: "center", padding: 16 }}
+              >
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt=""
+                    style={{ width: 120, height: 68, objectFit: "cover", borderRadius: 8, flexShrink: 0 }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 120, height: 68, background: "rgba(255,255,255,0.06)",
+                    borderRadius: 8, flexShrink: 0, display: "flex",
+                    alignItems: "center", justifyContent: "center", fontSize: 24,
+                  }}>📺</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 22 }}>{icon}</span>
+                    <span style={{ fontWeight: 700, color: "white", fontSize: 15 }}>{s.name}</span>
+                  </div>
+                  <div style={{ fontWeight: 600, color: "#e2e8f0", fontSize: 14, marginBottom: 4 }}>
+                    {s.approved_video_title || "Untitled Video"}
+                  </div>
+                  <a
+                    href={s.approved_video_url!}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 11, color: "#60a5fa", wordBreak: "break-all" }}
+                  >
+                    {s.approved_video_url}
+                  </a>
+                  {s.approved_video_set_at && (
+                    <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                      Approved {new Date(s.approved_video_set_at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => revoke(Number(s.id))}
+                  disabled={!!revoking[Number(s.id)]}
+                  style={{ ...T.btnDanger, flexShrink: 0, opacity: revoking[Number(s.id)] ? 0.5 : 1 }}
+                >
+                  {revoking[Number(s.id)] ? "Revoking…" : "Revoke"}
+                </button>
               </div>
-              <div>
-                <Label>YouTube URL</Label>
-                <input style={T.input} value={addForm.url} onChange={(e) => setAddForm((f) => ({ ...f, url: e.target.value }))} placeholder="https://youtube.com/watch?v=…" />
-              </div>
-              <div>
-                <Label>Category</Label>
-                <select style={{ ...T.input, appearance: "none" }} value={addForm.category} onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value }))}>
-                  <option value="educational">Educational</option>
-                  <option value="music">Music</option>
-                  <option value="science">Science</option>
-                  <option value="math">Math</option>
-                  <option value="reading">Reading</option>
-                  <option value="fun">Fun</option>
-                </select>
-              </div>
-              <button onClick={addManually} disabled={addSaving} style={{ ...T.btn, opacity: addSaving ? 0.6 : 1, whiteSpace: "nowrap" }}>
-                {addSaving ? "Adding…" : "+ Add"}
-              </button>
+            );
+          })}
+          {activeVideos.length === 0 && (
+            <div style={{ ...card, textAlign: "center", color: T.sub, padding: 40 }}>
+              No students have an approved video right now
             </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {approved.map((v) => (
-              <YTCard
-                key={v.id}
-                item={v}
-                actions={
-                  <button onClick={() => removeApproved(v.id)} style={T.btnDanger}>Remove</button>
-                }
-              />
-            ))}
-            {approved.length === 0 && (
-              <div style={{ ...card, textAlign: "center", color: T.sub, padding: 40 }}>
-                No approved videos yet
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
 
+      {/* ── Denied ── */}
       {tab === "denied" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {denied.map((r) => (
-            <YTCard
-              key={r.id}
-              item={r}
-              actions={
-                <button onClick={() => approve(r.id)} style={T.btnSuccess}>↩ Re-approve</button>
-              }
-            />
-          ))}
+          {denied.map((r) => {
+            const s = studentObj(r.student_id);
+            const icon = s?.avatar_emoji || s?.avatar || "🎓";
+            const ts = r.requested_at || r.created_at;
+            return (
+              <div key={r.id} style={{ ...card, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 26 }}>{icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "white" }}>{s?.name || `Student #${r.student_id}`}</div>
+                    <div style={{ fontSize: 12, color: T.sub, marginTop: 2 }}>
+                      requested: <span style={{ color: "#e2e8f0" }}>"{r.title}"</span>
+                    </div>
+                  </div>
+                  {ts && <div style={{ fontSize: 11, color: T.sub }}>{new Date(ts).toLocaleString()}</div>}
+                </div>
+              </div>
+            );
+          })}
           {denied.length === 0 && (
             <div style={{ ...card, textAlign: "center", color: T.sub, padding: 40 }}>
               No denied requests
