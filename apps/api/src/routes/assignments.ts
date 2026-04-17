@@ -16,6 +16,13 @@ async function ensureGradeCols() {
     "ALTER TABLE assignments ADD COLUMN target_subject TEXT",
     "ALTER TABLE assignments ADD COLUMN student_id TEXT",
     "ALTER TABLE assignments ADD COLUMN week_theme TEXT",
+    "ALTER TABLE assignments ADD COLUMN teacher_notes TEXT",
+    "ALTER TABLE assignments ADD COLUMN question_count INTEGER",
+    "ALTER TABLE assignments ADD COLUMN estimated_minutes INTEGER",
+    "ALTER TABLE assignments ADD COLUMN focus_keywords TEXT",
+    "ALTER TABLE assignments ADD COLUMN learning_objective TEXT",
+    "ALTER TABLE assignments ADD COLUMN hints_allowed INTEGER",
+    "ALTER TABLE assignments ADD COLUMN question_type TEXT",
   ]) {
     try { await db.exec(col); } catch { /* column already exists */ }
   }
@@ -52,10 +59,23 @@ async function generateDailyAssignmentContent(client: any, opts: {
   gradeMax: number;
   weekTheme?: string;
   recentPrompts: string[];
+  questionCount?: number;
+  teacherNotes?: string;
+  focusKeywords?: string;
+  questionType?: string;
+  learningObjective?: string;
 }): Promise<{ title: string; content: any } | null> {
   const seed = hashString(`${opts.studentId}|${opts.date}|${opts.subject}`);
   const theme = WEEKLY_THEMES[seed % WEEKLY_THEMES.length];
   const recent = opts.recentPrompts.slice(0, 8).map(p => "- " + (p || "").slice(0, 80)).join("\n");
+  const qCount = opts.questionCount && opts.questionCount > 0 ? opts.questionCount : 3;
+  const qTypeDirective = opts.questionType === "multiple_choice"
+    ? "Every question must be multiple_choice."
+    : opts.questionType === "short_answer"
+    ? "Every question must be short_answer (free-text)."
+    : opts.questionType === "fill_blank"
+    ? "Every question must be fill_blank."
+    : "Mix multiple_choice, short_answer, and fill_blank when natural.";
 
   try {
     const msg = await client.messages.create({
@@ -64,12 +84,15 @@ async function generateDailyAssignmentContent(client: any, opts: {
       system:
         "You are a creative elementary teacher. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
         `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
-        "Exactly 3 questions per task, mix of multiple_choice + short_answer + fill_blank when natural. multiple_choice MUST include correctIndex (0-based).",
+        `Exactly ${qCount} questions per task. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`,
       messages: [{
         role: "user",
         content:
 `Subject: ${opts.subject}. Student grade: ${opts.gradeMin === opts.gradeMax ? opts.gradeMax : `${opts.gradeMin}–${opts.gradeMax}`}. Date: ${opts.date}.
 Theme seed: ${theme}.${opts.weekTheme ? `\nThis week's focus: ${opts.weekTheme}.` : ""}
+${opts.learningObjective ? `Learning objective: ${opts.learningObjective}.` : ""}
+${opts.focusKeywords ? `Emphasize these topics/keywords: ${opts.focusKeywords}.` : ""}
+${opts.teacherNotes ? `Private teacher notes (don't expose to student, but use when crafting): ${opts.teacherNotes}` : ""}
 ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different question type):\n${recent}` : ""}
 Make this feel different from other days this week. Return ONLY JSON.`,
       }],
@@ -84,31 +107,126 @@ Make this feel different from other days this week. Return ONLY JSON.`,
   }
 }
 
-// Create assignment (accepts optional targetGradeMin / targetGradeMax / targetSubject)
+// Create assignment with full custom fields (Feature 29 rich customization)
 router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const { classId, title, description, dueDate, rubric, starterProjectId, content, scheduledDate,
-          targetGradeMin, targetGradeMax, targetSubject } = req.body;
+  const {
+    classId, title, description, dueDate, rubric, starterProjectId, content, scheduledDate,
+    targetGradeMin, targetGradeMax, targetSubject,
+    teacherNotes, questionCount, estimatedMinutes, focusKeywords,
+    learningObjective, hintsAllowed, questionType,
+  } = req.body;
   const id = crypto.randomUUID();
   await ensureGradeCols();
   const tMin = targetGradeMin != null ? Number(targetGradeMin) : null;
   const tMax = targetGradeMax != null ? Number(targetGradeMax) : (tMin != null ? tMin : null);
   const tSub = targetSubject || null;
 
-  const doInsert = async () => db.prepare(
-    `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date, target_grade_min, target_grade_max, target_subject)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null, tMin, tMax, tSub);
-
   try {
-    await doInsert();
-  } catch {
+    await db.prepare(
+      `INSERT INTO assignments (
+        id, class_id, teacher_id, title, description, due_date, rubric,
+        starter_project_id, content, scheduled_date,
+        target_grade_min, target_grade_max, target_subject,
+        teacher_notes, question_count, estimated_minutes,
+        focus_keywords, learning_objective, hints_allowed, question_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []),
+      starterProjectId, content ?? null, scheduledDate ?? null,
+      tMin, tMax, tSub,
+      teacherNotes || null,
+      questionCount != null ? Number(questionCount) : null,
+      estimatedMinutes != null ? Number(estimatedMinutes) : null,
+      focusKeywords || null,
+      learningObjective || null,
+      hintsAllowed != null ? (hintsAllowed ? 1 : 0) : 1,
+      questionType || null,
+    );
+  } catch (e: any) {
+    console.error('assignment insert error:', e?.message);
+    // fallback without new cols
     try { await db.exec("ALTER TABLE assignments ADD COLUMN content TEXT"); } catch {}
     try { await db.exec("ALTER TABLE assignments ADD COLUMN scheduled_date TEXT"); } catch {}
-    await doInsert();
+    await db.prepare(
+      `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date, target_grade_min, target_grade_max, target_subject)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null, tMin, tMax, tSub);
   }
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id) as any;
   row.rubric = JSON.parse(row.rubric || "[]");
   res.json(row);
+});
+
+// Class settings table — per-class defaults for the mega-button
+let classSettingsReady = false;
+async function ensureClassSettings() {
+  if (classSettingsReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS class_settings (
+        class_id TEXT PRIMARY KEY,
+        enabled_subjects TEXT NOT NULL DEFAULT '["reading","writing","spelling","math","sel"]',
+        default_variety_level TEXT NOT NULL DEFAULT 'medium',
+        default_question_count INTEGER NOT NULL DEFAULT 3,
+        default_estimated_minutes INTEGER NOT NULL DEFAULT 5,
+        default_hints_allowed INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    `);
+    classSettingsReady = true;
+  } catch (e) { console.error('ensureClassSettings error:', e); }
+}
+
+router.get("/settings/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassSettings();
+  try {
+    const row = await db.prepare("SELECT * FROM class_settings WHERE class_id = ?").get(req.params.classId) as any;
+    if (!row) {
+      return res.json({
+        enabled_subjects: ["reading", "writing", "spelling", "math", "sel"],
+        default_variety_level: "medium",
+        default_question_count: 3,
+        default_estimated_minutes: 5,
+        default_hints_allowed: true,
+      });
+    }
+    res.json({
+      ...row,
+      enabled_subjects: (() => { try { return JSON.parse(row.enabled_subjects); } catch { return ["reading","writing","spelling","math","sel"]; } })(),
+      default_hints_allowed: !!row.default_hints_allowed,
+    });
+  } catch { res.json({}); }
+});
+
+router.put("/settings/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassSettings();
+  const { enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed } = req.body;
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      `INSERT INTO class_settings (class_id, enabled_subjects, default_variety_level, default_question_count, default_estimated_minutes, default_hints_allowed, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET
+         enabled_subjects = excluded.enabled_subjects,
+         default_variety_level = excluded.default_variety_level,
+         default_question_count = excluded.default_question_count,
+         default_estimated_minutes = excluded.default_estimated_minutes,
+         default_hints_allowed = excluded.default_hints_allowed,
+         updated_at = excluded.updated_at`
+    ).run(
+      req.params.classId,
+      JSON.stringify(enabled_subjects || ["reading","writing","spelling","math","sel"]),
+      default_variety_level || "medium",
+      default_question_count != null ? Number(default_question_count) : 3,
+      default_estimated_minutes != null ? Number(default_estimated_minutes) : 5,
+      default_hints_allowed ? 1 : 0,
+      now,
+    );
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('class_settings put error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
 });
 
 // Create weekly assignments (Mon–Fri) — per-student × per-day, each uniquely generated
@@ -512,17 +630,38 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 
 // Update assignment
 router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const { title, description, dueDate, rubric, content } = req.body;
+  await ensureGradeCols();
+  const {
+    title, description, dueDate, rubric, content,
+    teacherNotes, questionCount, estimatedMinutes,
+    focusKeywords, learningObjective, hintsAllowed, questionType,
+  } = req.body;
   await db.prepare(
-    `UPDATE assignments SET title = COALESCE(?, title), description = COALESCE(?, description),
-     due_date = COALESCE(?, due_date), rubric = COALESCE(?, rubric), content = COALESCE(?, content)
+    `UPDATE assignments SET
+       title = COALESCE(?, title),
+       description = COALESCE(?, description),
+       due_date = COALESCE(?, due_date),
+       rubric = COALESCE(?, rubric),
+       content = COALESCE(?, content),
+       teacher_notes = COALESCE(?, teacher_notes),
+       question_count = COALESCE(?, question_count),
+       estimated_minutes = COALESCE(?, estimated_minutes),
+       focus_keywords = COALESCE(?, focus_keywords),
+       learning_objective = COALESCE(?, learning_objective),
+       hints_allowed = COALESCE(?, hints_allowed),
+       question_type = COALESCE(?, question_type)
      WHERE id = ?`
   ).run(
-    title,
-    description,
-    dueDate,
+    title, description, dueDate,
     rubric ? JSON.stringify(rubric) : null,
     content != null ? (typeof content === 'string' ? content : JSON.stringify(content)) : null,
+    teacherNotes ?? null,
+    questionCount != null ? Number(questionCount) : null,
+    estimatedMinutes != null ? Number(estimatedMinutes) : null,
+    focusKeywords ?? null,
+    learningObjective ?? null,
+    hintsAllowed != null ? (hintsAllowed ? 1 : 0) : null,
+    questionType ?? null,
     req.params.id,
   );
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(req.params.id) as any;
