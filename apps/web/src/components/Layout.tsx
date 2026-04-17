@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useSyncExternalStore } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
@@ -8,6 +8,7 @@ import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
+import { studentLockStore } from "../lib/studentLockStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
@@ -36,10 +37,25 @@ export default function Layout() {
   // GoGuardian: students poll for lock/commands; teachers/admin skip
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
-  // New per-student command pipe (runs alongside the class_commands poll
-  // during the rewire — dispatch table is intentionally empty in this
-  // foundation commit; specific actions get wired in follow-up commits).
-  useStudentCommands(isStudent, {});
+  // New per-student command pipe. LOCK/UNLOCK wired; other actions follow
+  // in subsequent commits. The hook auto-consumes each row after its handler
+  // runs, so the poll keeps running while locked (UNLOCK can still arrive).
+  useStudentCommands(isStudent, {
+    LOCK: (row) => {
+      let msg: string | null = null;
+      try { msg = JSON.parse(row.payload || "{}").message ?? null; } catch { msg = row.payload || null; }
+      studentLockStore.setLocked(true, msg);
+    },
+    UNLOCK: () => studentLockStore.setLocked(false, null),
+  });
+  // Subscribe to the new lock store and OR it into the existing overlay
+  // props. Legacy class_commands lock (from useClassCommands) stays
+  // authoritative for class-wide state until the old pipe is retired.
+  const newLock = useSyncExternalStore(
+    studentLockStore.subscribe,
+    studentLockStore.getSnapshot,
+    studentLockStore.getSnapshot,
+  );
   // Rich activity labels tied to pathname — every route change re-pings
   usePresencePing(user ? activityFromPath(location.pathname) : "");
   // Screenshot thumbnails for teacher monitor (students only)
@@ -169,8 +185,8 @@ export default function Layout() {
       {/* GoGuardian: screen lock + teacher message overlay (students only) */}
       {isStudent && (
         <ScreenLockOverlay
-          isLocked={classCommands.isLocked}
-          message={classCommands.lockMessage}
+          isLocked={classCommands.isLocked || newLock.locked}
+          message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
           pendingMessage={classCommands.pendingMessage}
           onDismissMessage={classCommands.dismissMessage}

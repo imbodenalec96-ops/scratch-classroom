@@ -3,6 +3,7 @@ import crypto from "crypto";
 import db from "../db.js";
 import { AuthRequest } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
+import { enqueueStudentCommand } from "./students.js";
 
 const router = Router();
 
@@ -649,11 +650,17 @@ router.post("/lock-student/:studentId", requireRole("teacher", "admin"), async (
     const now = new Date().toISOString();
     for (const r of rows) {
       const id = crypto.randomUUID();
-      // Payload is the lock message (optional). Client OR's this with class-wide lock.
+      // Legacy: class_commands row (useClassCommands still reads this).
       await db.prepare(
         "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'LOCK', ?, ?)"
       ).run(id, r.class_id, studentId, message || '', now).catch(() => {});
     }
+    // NEW PIPE: also enqueue a student_commands LOCK. useStudentCommands will
+    // pick this up within ~3s and set the new lock store → ScreenLockOverlay.
+    // Both pipes coexist until lock wiring is verified end-to-end, then legacy
+    // is ripped out in a follow-up commit.
+    await enqueueStudentCommand(studentId, "LOCK", JSON.stringify({ message: message || null }))
+      .catch(e => console.error("enqueueStudentCommand LOCK failed:", e));
     res.json({ ok: true, classesAffected: rows.length });
   } catch (e) {
     console.error('lock-student error:', e);
@@ -676,6 +683,9 @@ router.post("/unlock-student/:studentId", requireRole("teacher", "admin"), async
         "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'UNLOCK', '', ?)"
       ).run(id, r.class_id, studentId, now).catch(() => {});
     }
+    // NEW PIPE: enqueue student_commands UNLOCK.
+    await enqueueStudentCommand(studentId, "UNLOCK", "")
+      .catch(e => console.error("enqueueStudentCommand UNLOCK failed:", e));
     res.json({ ok: true });
   } catch (e) {
     console.error('unlock-student error:', e);
@@ -796,6 +806,21 @@ router.post("/:classId/lock", requireRole("teacher", "admin"), async (req: AuthR
          is_locked = 1, lock_message = excluded.lock_message,
          locked_by = excluded.locked_by, locked_at = excluded.locked_at`
     ).run(classId, message, req.user!.name, now);
+    // NEW PIPE: fan out a student_commands LOCK to every student in the class
+    // so the new useStudentCommands handler can flip its lock store. Runs in
+    // parallel with the legacy class_state flag (useClassCommands still reads
+    // that). Teachers/admins are excluded by role filter.
+    try {
+      const students = await db.prepare(
+        "SELECT cm.user_id FROM class_members cm JOIN users u ON u.id = cm.user_id WHERE cm.class_id = ? AND u.role = 'student'"
+      ).all(classId) as any[];
+      await Promise.all(students.map(s =>
+        enqueueStudentCommand(s.user_id, "LOCK", JSON.stringify({ message: message || null }))
+          .catch(e => console.error("enqueueStudentCommand LOCK (class) failed:", s.user_id, e))
+      ));
+    } catch (e) {
+      console.error("class-lock student_commands fan-out failed:", e);
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error('lock error:', e);
@@ -814,6 +839,18 @@ router.post("/:classId/unlock", requireRole("teacher", "admin"), async (req: Aut
        ON CONFLICT (class_id) DO UPDATE SET
          is_locked = 0, lock_message = '', locked_by = '', locked_at = ''`
     ).run(classId);
+    // NEW PIPE: fan out UNLOCK to every student in the class.
+    try {
+      const students = await db.prepare(
+        "SELECT cm.user_id FROM class_members cm JOIN users u ON u.id = cm.user_id WHERE cm.class_id = ? AND u.role = 'student'"
+      ).all(classId) as any[];
+      await Promise.all(students.map(s =>
+        enqueueStudentCommand(s.user_id, "UNLOCK", "")
+          .catch(e => console.error("enqueueStudentCommand UNLOCK (class) failed:", s.user_id, e))
+      ));
+    } catch (e) {
+      console.error("class-unlock student_commands fan-out failed:", e);
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error('unlock error:', e);

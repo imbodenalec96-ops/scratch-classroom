@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
 import { useClassCommands } from "../lib/useClassCommands.ts";
+import { useStudentCommands } from "../lib/useStudentCommands.ts";
+import { studentLockStore } from "../lib/studentLockStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
@@ -17,6 +19,21 @@ export default function PublicLayout() {
   // playing arcade games.
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
+  // New pipe — same LOCK/UNLOCK wiring as Layout so arcade-page students
+  // also respond to student_commands lock.
+  useStudentCommands(isStudent, {
+    LOCK: (row) => {
+      let msg: string | null = null;
+      try { msg = JSON.parse(row.payload || "{}").message ?? null; } catch { msg = row.payload || null; }
+      studentLockStore.setLocked(true, msg);
+    },
+    UNLOCK: () => studentLockStore.setLocked(false, null),
+  });
+  const newLock = useSyncExternalStore(
+    studentLockStore.subscribe,
+    studentLockStore.getSnapshot,
+    studentLockStore.getSnapshot,
+  );
   // Rich activity labels for authenticated users
   usePresencePing(user ? activityFromPath(loc.pathname) : "");
   // Screenshot thumbnails for teacher monitor (students on public routes too)
@@ -91,8 +108,8 @@ export default function PublicLayout() {
       {/* GoGuardian overlay — only for authenticated students */}
       {isStudent && (
         <ScreenLockOverlay
-          isLocked={classCommands.isLocked}
-          message={classCommands.lockMessage}
+          isLocked={classCommands.isLocked || newLock.locked}
+          message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
           pendingMessage={classCommands.pendingMessage}
           onDismissMessage={classCommands.dismissMessage}
