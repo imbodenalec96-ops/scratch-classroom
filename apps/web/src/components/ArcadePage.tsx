@@ -16,6 +16,9 @@ import TetrisGame from "./games/TetrisGame.tsx";
 import Game2048 from "./games/Game2048.tsx";
 import TicTacToe from "./games/TicTacToe.tsx";
 import ConnectFour from "./games/ConnectFour.tsx";
+import EndlessRunner from "./games/EndlessRunner.tsx";
+import BubbleShooter from "./games/BubbleShooter.tsx";
+import ColoringBook from "./games/ColoringBook.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -231,6 +234,43 @@ const GAMES: Game[] = [
     emoji: "🔴",
     component: ConnectFour,
     hint: "Click a column to drop · 4 in a row wins",
+  },
+  // ── Batch 2 ──────────────────────────────────────────────────
+  {
+    id: "runner",
+    title: "Endless Runner",
+    description: "Sprint through three lanes, jump over obstacles, collect stars! How far can you go?",
+    category: "Action",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#38bdf8",
+    emoji: "🏃",
+    component: EndlessRunner,
+    hint: "← → lanes · Space / tap = jump · swipe to change lane",
+  },
+  {
+    id: "bubbles",
+    title: "Bubble Shooter",
+    description: "Aim and fire colored bubbles to match 3 or more. Clear the board to win!",
+    category: "Action",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#a78bfa",
+    emoji: "🫧",
+    component: BubbleShooter,
+    hint: "Move to aim · click / tap to shoot · match 3+",
+  },
+  {
+    id: "coloringbook",
+    title: "Coloring Book",
+    description: "Pick a color and paint beautiful scenes — flowers, a cozy house, and an ocean world!",
+    category: "Creative",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#f472b6",
+    emoji: "🎨",
+    component: ColoringBook,
+    hint: "Pick color · tap any region to fill · 3 scenes",
   },
 ];
 
