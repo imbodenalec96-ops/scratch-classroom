@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { randomUUID } from "crypto";
 import db from "../db.js";
 import { AuthRequest } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 
@@ -294,6 +295,31 @@ router.delete("/:id/skip-work-day", async (req: AuthRequest, res: Response) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to clear skip work day" });
+  }
+});
+
+// POST /:id/lock — teacher/admin enqueues a LOCK command for a single student
+router.post("/:id/lock", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { message } = req.body;
+  try {
+    const cmdId = await enqueueStudentCommand(id, "LOCK", { message: message || null });
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/lock failed:", e);
+    res.status(500).json({ error: "Failed to lock student" });
+  }
+});
+
+// POST /:id/unlock — teacher/admin enqueues an UNLOCK command for a single student
+router.post("/:id/unlock", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const cmdId = await enqueueStudentCommand(id, "UNLOCK", "");
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/unlock failed:", e);
+    res.status(500).json({ error: "Failed to unlock student" });
   }
 });
 

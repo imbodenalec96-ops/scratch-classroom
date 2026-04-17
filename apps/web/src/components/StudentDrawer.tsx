@@ -76,14 +76,18 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   if (!open || !student) return null;
 
   const handleLock = async () => {
-    try { await api.lockStudent(student.id, msg); setKidLocked(true); showFlash("🔒 Locked"); }
-    catch (e: any) { alert("Failed: " + e.message); }
+    try {
+      await api.lockStudent(student.id, msg);
+      api.lockStudentCmd(student.id, msg || undefined).catch(() => {});
+      setKidLocked(true);
+      showFlash("🔒 Locked");
+    } catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleUnlock = async () => {
     try {
-      // Send UNLOCK command AND clear any class-wide lock for safety
       await api.unlockStudent(student.id);
       await api.forceUnlockStudent(student.id).catch(() => {});
+      api.unlockStudentCmd(student.id).catch(() => {});
       setKidLocked(false);
       showFlash("🔓 Unlocked");
     } catch (e: any) { alert("Failed: " + e.message); }
