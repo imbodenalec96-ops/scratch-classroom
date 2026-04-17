@@ -190,7 +190,6 @@ export default function TeacherDashboard() {
           <Link
             key={item.path + item.label}
             to={item.path}
-            state={item.state}
             className={`group flex flex-col gap-2 p-3 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-slide-in cursor-pointer ${
               dk
                 ? `bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.12] border-l-2 ${item.accent}`
