@@ -221,14 +221,6 @@ function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEm
           </form>
 
 
-          <a
-            href="/playground"
-            className={`block text-center mt-5 text-sm font-medium transition-colors ${
-              dk ? "text-violet-400 hover:text-violet-300" : "text-violet-600 hover:text-violet-700"
-            }`}
-          >
-            Try the Playground — no login needed
-          </a>
         </div>
       </div>
     </div>

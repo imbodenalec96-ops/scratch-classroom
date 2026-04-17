@@ -13,7 +13,11 @@ export default function QuizBuilder() {
   const [title, setTitle] = useState("");
   const [questions, setQuestions] = useState<any[]>([]);
   const [aiTopic, setAiTopic] = useState("");
+  const [aiSubject, setAiSubject] = useState("Math");
+  const [aiGrade, setAiGrade] = useState("3rd Grade");
+  const [count, setCount] = useState(10);
   const [takingQuiz, setTakingQuiz] = useState<any>(null);
+  const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [result, setResult] = useState<any>(null);
 
@@ -22,9 +26,12 @@ export default function QuizBuilder() {
   }, []);
 
   const loadQuizzes = async (cid: string) => { const q = await api.getQuizzes(cid); setQuizzes(q); };
+  const SUBJECTS = ["Math", "Reading", "Writing", "Science", "Social Studies", "Spelling"];
+  const GRADES   = ["Kindergarten", "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade"];
+
   const handleAIGenerate = async () => {
     if (!aiTopic.trim()) return;
-    const res = await api.aiGenerateQuiz(aiTopic, 5);
+    const res = await api.aiGenerateQuiz(aiTopic, count, aiSubject, aiGrade);
     setTitle(res.title); setQuestions(res.questions); setShowForm(true);
   };
   const addQuestion = () => setQuestions([...questions, { id: `q${questions.length + 1}`, text: "", options: ["", "", "", ""], correctIndex: 0 }]);
@@ -33,8 +40,28 @@ export default function QuizBuilder() {
     await api.createQuiz({ classId, title, questions });
     setShowForm(false); setQuestions([]); setTitle(""); loadQuizzes(classId);
   };
-  const handleStartQuiz = (quiz: any) => { setTakingQuiz(quiz); setAnswers(new Array(quiz.questions.length).fill(-1)); setResult(null); };
-  const handleSubmitQuiz = async () => { if (!takingQuiz) return; const res = await api.submitQuiz(takingQuiz.id, answers); setResult(res); };
+  const handleStartQuiz = (quiz: any) => {
+    setTakingQuiz(quiz);
+    setCurrentQ(0);
+    setAnswers(new Array(quiz.questions.length).fill(-1));
+    setResult(null);
+  };
+  const handleSelectAnswer = (optIndex: number) => {
+    const a = [...answers];
+    a[currentQ] = optIndex;
+    setAnswers(a);
+  };
+  const handleNext = () => {
+    if (currentQ < takingQuiz.questions.length - 1) setCurrentQ(currentQ + 1);
+  };
+  const handlePrev = () => {
+    if (currentQ > 0) setCurrentQ(currentQ - 1);
+  };
+  const handleSubmitQuiz = async () => {
+    if (!takingQuiz) return;
+    const res = await api.submitQuiz(takingQuiz.id, answers);
+    setResult(res);
+  };
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -51,14 +78,53 @@ export default function QuizBuilder() {
       </select>
 
       <div className="card">
-        <h3 className="text-sm font-semibold text-t1 mb-2 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-t1 mb-3 flex items-center gap-2">
           <Sparkles size={14} className="text-violet-400" /> AI Quiz Generator
         </h3>
+
+        {/* Row 1: Subject + Grade + # of questions */}
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1">
+            <label className="block text-xs font-semibold text-t3 mb-1">Subject</label>
+            <select value={aiSubject} onChange={(e) => setAiSubject(e.target.value)} className="input w-full text-sm">
+              {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs font-semibold text-t3 mb-1">Grade</label>
+            <select value={aiGrade} onChange={(e) => setAiGrade(e.target.value)} className="input w-full text-sm">
+              {GRADES.map((g) => <option key={g}>{g}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-t3 mb-1">Questions</label>
+            <input
+              type="number"
+              value={count}
+              min={1}
+              max={20}
+              onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value))))}
+              className="input w-20 text-sm"
+              title="Number of questions"
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Topic + Generate */}
         <div className="flex gap-2">
           <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)}
-            placeholder="E.g., loops, variables, events" className="input flex-1" />
-          <button onClick={handleAIGenerate} className="btn-primary text-sm">Generate</button>
+            placeholder={
+              aiSubject === "Math" ? "E.g., Adding 4-digit numbers, fractions, multiplication…" :
+              aiSubject === "Reading" ? "E.g., Main idea & details, inferencing, vocabulary…" :
+              aiSubject === "Writing" ? "E.g., Topic sentences, punctuation, paragraph structure…" :
+              "Describe the specific topic or skill to quiz on…"
+            }
+            className="input flex-1 text-sm" />
+          <button onClick={handleAIGenerate} className="btn-primary text-sm flex-shrink-0">Generate</button>
         </div>
+        <p className="text-xs text-t3 mt-1.5">
+          AI will create {count} {aiSubject.toLowerCase()} questions for {aiGrade} level
+        </p>
       </div>
 
       {showForm && (
@@ -87,28 +153,74 @@ export default function QuizBuilder() {
         </div>
       )}
 
+      {/* One-at-a-time quiz taking */}
       {takingQuiz && !result && (
         <div className="card space-y-4">
-          <h2 className="text-lg font-semibold text-t1">{takingQuiz.title}</h2>
-          {takingQuiz.questions.map((q: any, qi: number) => (
-            <div key={qi} className="rounded-xl p-3 border" style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}>
-              <p className="text-sm text-t1 mb-2">{qi + 1}. {q.text}</p>
-              <div className="space-y-1">
-                {q.options.map((opt: string, oi: number) => (
-                  <label key={oi} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                    answers[qi] === oi ? "bg-violet-600/20 border border-violet-500/30" : ""
-                  }`}
-                    style={answers[qi] !== oi ? { background: "var(--bg-hover)" } : {}}>
-                    <input type="radio" name={`take-q${qi}`} checked={answers[qi] === oi}
-                      onChange={() => { const a = [...answers]; a[qi] = oi; setAnswers(a); }}
-                      className="accent-violet-500" />
-                    <span className="text-sm text-t2">{opt}</span>
-                  </label>
-                ))}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-t1">{takingQuiz.title}</h2>
+            <span className="text-sm text-t3">
+              {currentQ + 1} / {takingQuiz.questions.length}
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div className={`h-2 rounded-full overflow-hidden ${dk ? "bg-white/10" : "bg-gray-200"}`}>
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500"
+              style={{ width: `${((currentQ + 1) / takingQuiz.questions.length) * 100}%` }}
+            />
+          </div>
+
+          {/* Current question */}
+          {(() => {
+            const q = takingQuiz.questions[currentQ];
+            return (
+              <div className="rounded-xl p-4 border space-y-3" style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}>
+                <p className="text-sm font-medium text-t1">{currentQ + 1}. {q.text}</p>
+                <div className="space-y-2">
+                  {q.options.map((opt: string, oi: number) => (
+                    <label key={oi} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer border-2 transition-all ${
+                      answers[currentQ] === oi
+                        ? "border-violet-500 bg-violet-500/10 text-violet-300"
+                        : dk ? "border-white/10 hover:border-violet-500/40 text-t2" : "border-gray-200 hover:border-violet-300 text-t2"
+                    }`}>
+                      <input type="radio" name={`take-q${currentQ}`} checked={answers[currentQ] === oi}
+                        onChange={() => handleSelectAnswer(oi)}
+                        className="accent-violet-500" />
+                      <span className="text-sm">{opt}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-          <button onClick={handleSubmitQuiz} className="btn-primary">Submit Quiz</button>
+            );
+          })()}
+
+          {/* Navigation */}
+          <div className="flex items-center gap-3">
+            <button onClick={handlePrev} disabled={currentQ === 0}
+              className="btn-ghost text-sm disabled:opacity-30">
+              ← Back
+            </button>
+            {currentQ < takingQuiz.questions.length - 1 ? (
+              <button onClick={handleNext} className="btn-primary flex-1 text-sm">
+                Next →
+              </button>
+            ) : (
+              <button onClick={handleSubmitQuiz} className="btn-primary flex-1 text-sm bg-emerald-600 hover:bg-emerald-500">
+                Submit Quiz ✓
+              </button>
+            )}
+          </div>
+
+          {/* Dot indicators */}
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {takingQuiz.questions.map((_: any, i: number) => (
+              <button key={i} onClick={() => setCurrentQ(i)}
+                className={`rounded-full transition-all cursor-pointer ${
+                  i === currentQ ? "w-5 h-2.5 bg-violet-500" : answers[i] !== -1 ? "w-2.5 h-2.5 bg-emerald-500" : dk ? "w-2.5 h-2.5 bg-white/20" : "w-2.5 h-2.5 bg-gray-300"
+                }`} />
+            ))}
+          </div>
         </div>
       )}
 

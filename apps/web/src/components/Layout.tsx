@@ -4,6 +4,8 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { isWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
+import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
+import { useClassCommands } from "../lib/useClassCommands.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -18,6 +20,11 @@ export default function Layout() {
   // immediately after a student submits their assignment (same session).
   const [workUnlocked, setWorkUnlocked] = useState(isWorkUnlocked);
   useEffect(() => { setWorkUnlocked(isWorkUnlocked()); }, [location.pathname]);
+
+  // GoGuardian: students poll for lock/commands; teachers/admin skip
+  const isStudent = user?.role === "student";
+  const classCommands = useClassCommands(isStudent);
+
   if (!user) return null;
   const navItems = getNavItems(user.role, workUnlocked);
   const dk = theme === "dark";
@@ -136,6 +143,17 @@ export default function Layout() {
 
       {/* Video lockdown overlay for students */}
       <VideoOverlay />
+
+      {/* GoGuardian: screen lock + teacher message overlay (students only) */}
+      {isStudent && (
+        <ScreenLockOverlay
+          isLocked={classCommands.isLocked}
+          message={classCommands.lockMessage}
+          lockedBy={classCommands.lockedBy}
+          pendingMessage={classCommands.pendingMessage}
+          onDismissMessage={classCommands.dismissMessage}
+        />
+      )}
     </div>
   );
 }

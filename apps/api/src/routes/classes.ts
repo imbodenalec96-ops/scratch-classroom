@@ -189,9 +189,12 @@ router.get("/:id/behavior", requireRole("teacher", "admin"), async (req: AuthReq
   res.json(rows);
 });
 
-// ── Student Presence (HTTP polling — WebSocket unavailable on Vercel) ──────
+// ── Student Presence + GoGuardian Classroom Control ─────────────────────────
 
 let presenceTableReady = false;
+let classStateTableReady = false;
+let commandTableReady = false;
+
 async function ensurePresenceTable() {
   if (presenceTableReady) return;
   try {
@@ -205,10 +208,43 @@ async function ensurePresenceTable() {
       )
     `);
     presenceTableReady = true;
-  } catch { /* already exists */ }
+  } catch (e) { console.error('ensurePresenceTable error:', e); }
 }
 
-// Student: ping presence (called every 30s from client)
+async function ensureClassStateTables() {
+  if (!classStateTableReady) {
+    try {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS class_state (
+          class_id TEXT PRIMARY KEY,
+          is_locked INTEGER NOT NULL DEFAULT 0,
+          lock_message TEXT NOT NULL DEFAULT '',
+          locked_by TEXT NOT NULL DEFAULT '',
+          locked_at TEXT NOT NULL DEFAULT ''
+        )
+      `);
+      classStateTableReady = true;
+    } catch (e) { console.error('ensureClassState error:', e); }
+  }
+  if (!commandTableReady) {
+    try {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS class_commands (
+          id TEXT PRIMARY KEY,
+          class_id TEXT NOT NULL,
+          target_user_id TEXT,
+          type TEXT NOT NULL,
+          payload TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        )
+      `);
+      commandTableReady = true;
+    } catch (e) { console.error('ensureCommands error:', e); }
+  }
+}
+
+// Student: ping presence (called every 5s from client)
+// Bug 2 fix: use excluded.last_seen / excluded.activity (avoids extra $N param)
 router.post("/:classId/ping", async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const classId = req.params.classId;
@@ -218,9 +254,9 @@ router.post("/:classId/ping", async (req: AuthRequest, res: Response) => {
   try {
     await db.prepare(
       `INSERT INTO student_presence (user_id, class_id, last_seen, activity) VALUES (?, ?, ?, ?)
-       ON CONFLICT (user_id, class_id) DO UPDATE SET last_seen = ?, activity = excluded.activity`
-    ).run(userId, classId, now, activity, now);
-  } catch { /* ignore if table not ready yet */ }
+       ON CONFLICT (user_id, class_id) DO UPDATE SET last_seen = excluded.last_seen, activity = excluded.activity`
+    ).run(userId, classId, now, activity);
+  } catch (e) { console.error('ping insert error:', e); }
   res.json({ ok: true });
 });
 
@@ -237,14 +273,114 @@ router.get("/:classId/presence", requireRole("teacher", "admin"), async (req: Au
        ORDER BY u.name`
     ).all(req.params.classId, req.params.classId);
     const now = Date.now();
-    const THREE_MIN = 3 * 60 * 1000; // students ping every 20s; allow up to 3 missed pings
+    const FIVE_MIN = 5 * 60 * 1000; // students ping every 5s; 5 min is generous threshold
     const result = (rows as any[]).map((r: any) => ({
       ...r,
-      isOnline: r.last_seen ? (now - new Date(r.last_seen).getTime() < THREE_MIN) : false,
+      isOnline: r.last_seen ? (now - new Date(r.last_seen).getTime() < FIVE_MIN) : false,
     }));
     res.json(result);
-  } catch {
+  } catch (e) {
+    console.error('presence get error:', e);
     res.json([]);
+  }
+});
+
+// ── GoGuardian: Classroom State (student polls every 5s) ─────────────────────
+
+// Student: get classroom lock state + pending commands
+router.get("/:classId/classroom-state", async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  const since = (req.query.since as string) || new Date(0).toISOString();
+  await ensureClassStateTables();
+  try {
+    const state = await db.prepare(
+      "SELECT * FROM class_state WHERE class_id = ?"
+    ).get(classId) as any;
+
+    const commands = await db.prepare(
+      `SELECT * FROM class_commands
+       WHERE class_id = ?
+         AND (target_user_id IS NULL OR target_user_id = ?)
+         AND created_at > ?
+       ORDER BY created_at ASC`
+    ).all(classId, req.user!.id, since) as any[];
+
+    res.json({
+      isLocked: state?.is_locked === 1 || state?.is_locked === true,
+      lockMessage: state?.lock_message || '',
+      lockedBy: state?.locked_by || '',
+      commands: commands.map((c: any) => ({
+        id: c.id, type: c.type, payload: c.payload, createdAt: c.created_at,
+      })),
+    });
+  } catch (e) {
+    console.error('classroom-state error:', e);
+    res.json({ isLocked: false, lockMessage: '', lockedBy: '', commands: [] });
+  }
+});
+
+// Teacher: lock all screens in class
+router.post("/:classId/lock", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  const { message = '' } = req.body;
+  await ensureClassStateTables();
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      `INSERT INTO class_state (class_id, is_locked, lock_message, locked_by, locked_at)
+       VALUES (?, 1, ?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET
+         is_locked = 1, lock_message = excluded.lock_message,
+         locked_by = excluded.locked_by, locked_at = excluded.locked_at`
+    ).run(classId, message, req.user!.name, now);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('lock error:', e);
+    res.status(500).json({ error: 'Failed to lock class' });
+  }
+});
+
+// Teacher: unlock all screens
+router.post("/:classId/unlock", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  await ensureClassStateTables();
+  try {
+    await db.prepare(
+      `INSERT INTO class_state (class_id, is_locked, lock_message, locked_by, locked_at)
+       VALUES (?, 0, '', '', '')
+       ON CONFLICT (class_id) DO UPDATE SET
+         is_locked = 0, lock_message = '', locked_by = '', locked_at = ''`
+    ).run(classId);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('unlock error:', e);
+    res.status(500).json({ error: 'Failed to unlock class' });
+  }
+});
+
+// Teacher: send a command to all or one student (NAVIGATE, MESSAGE, KICK)
+router.post("/:classId/command", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  const { type, payload = '', targetUserId } = req.body;
+  if (!["NAVIGATE", "MESSAGE", "KICK"].includes(type)) {
+    return res.status(400).json({ error: "Invalid command type" });
+  }
+  await ensureClassStateTables();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      `INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(id, classId, targetUserId || null, type, payload, now);
+    // Cleanup commands older than 2 minutes
+    const cutoff = new Date(Date.now() - 120_000).toISOString();
+    db.prepare("DELETE FROM class_commands WHERE class_id = ? AND created_at < ?")
+      .run(classId, cutoff).catch(() => {});
+    res.json({ ok: true, commandId: id });
+  } catch (e) {
+    console.error('command error:', e);
+    res.status(500).json({ error: 'Failed to send command' });
   }
 });
 

@@ -48,6 +48,124 @@ function spawnConfetti() {
   }
 }
 
+/* ── Flying Word-Buddy (butterfly companion) ── */
+function FlyingBuddy({ active = true }: { active?: boolean }) {
+  const rm = prefersReducedMotion();
+  if (rm || !active) return null;
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        top: "15%",
+        right: "3%",
+        zIndex: 45,
+        pointerEvents: "none",
+        animation: "buddyFloat 8s ease-in-out infinite",
+        transformOrigin: "center",
+      }}
+    >
+      <style>{`
+        @keyframes buddyFloat {
+          0%   { transform: translate(0, 0) rotate(-5deg) scaleX(1); }
+          20%  { transform: translate(-40px, -30px) rotate(5deg) scaleX(-1); }
+          40%  { transform: translate(-80px, 10px) rotate(-8deg) scaleX(1); }
+          60%  { transform: translate(-40px, 40px) rotate(6deg) scaleX(-1); }
+          80%  { transform: translate(20px, 15px) rotate(-4deg) scaleX(1); }
+          100% { transform: translate(0, 0) rotate(-5deg) scaleX(1); }
+        }
+        @keyframes wingFlap {
+          0%, 100% { transform: scaleY(1); }
+          50%       { transform: scaleY(0.6); }
+        }
+      `}</style>
+      <svg width="52" height="44" viewBox="0 0 52 44" fill="none">
+        {/* Left wings */}
+        <ellipse cx="14" cy="18" rx="13" ry="17" fill="#f9a8d4" opacity="0.85" style={{ animation: "wingFlap 0.4s ease-in-out infinite" }}/>
+        <ellipse cx="12" cy="30" rx="10" ry="10" fill="#fda4af" opacity="0.7" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.1s" }}/>
+        {/* Right wings */}
+        <ellipse cx="38" cy="18" rx="13" ry="17" fill="#c4b5fd" opacity="0.85" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.05s" }}/>
+        <ellipse cx="40" cy="30" rx="10" ry="10" fill="#a5b4fc" opacity="0.7" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.15s" }}/>
+        {/* Body */}
+        <ellipse cx="26" cy="22" rx="4" ry="14" fill="#7c3aed"/>
+        {/* Head */}
+        <circle cx="26" cy="7" r="5" fill="#6d28d9"/>
+        {/* Eyes */}
+        <circle cx="24" cy="6" r="1.2" fill="white"/>
+        <circle cx="28" cy="6" r="1.2" fill="white"/>
+        <circle cx="24.5" cy="6" r="0.6" fill="#1e293b"/>
+        <circle cx="28.5" cy="6" r="0.6" fill="#1e293b"/>
+        {/* Smile */}
+        <path d="M23.5 8.5 Q26 10.5 28.5 8.5" stroke="#f9a8d4" strokeWidth="1" strokeLinecap="round" fill="none"/>
+        {/* Antennae */}
+        <line x1="24" y1="3" x2="21" y2="-1" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round"/>
+        <line x1="28" y1="3" x2="31" y2="-1" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round"/>
+        <circle cx="21" cy="-1" r="1.5" fill="#f9a8d4"/>
+        <circle cx="31" cy="-1" r="1.5" fill="#c4b5fd"/>
+        {/* Wing letter accents */}
+        <text x="10" y="21" fontSize="8" fill="white" opacity="0.7" fontWeight="bold">A</text>
+        <text x="36" y="21" fontSize="8" fill="white" opacity="0.7" fontWeight="bold">B</text>
+      </svg>
+    </div>
+  );
+}
+
+/* ── TypewriterText ── */
+function TypewriterText({ text, speed = 28, className, style }: {
+  text: string; speed?: number; className?: string; style?: React.CSSProperties;
+}) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  const rm = prefersReducedMotion();
+  useEffect(() => {
+    if (rm) { setDisplayed(text); setDone(true); return; }
+    setDisplayed(""); setDone(false);
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { clearInterval(iv); setDone(true); }
+    }, speed);
+    return () => clearInterval(iv);
+  }, [text, speed, rm]);
+  return (
+    <span className={className} style={style} onClick={() => { setDisplayed(text); setDone(true); }}>
+      {displayed}
+      {!done && <span style={{ borderRight: "2px solid currentColor", marginLeft: 1, animation: "blink 0.7s step-end infinite" }} />}
+    </span>
+  );
+}
+
+/* ── StreakCounter ── */
+function StreakCounter({ streak }: { streak: number }) {
+  const rm = prefersReducedMotion();
+  if (streak < 2) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 72,
+        left: 16,
+        zIndex: 46,
+        background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+        borderRadius: 20,
+        padding: "6px 14px",
+        color: "white",
+        fontWeight: 800,
+        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        boxShadow: "0 4px 16px rgba(245,158,11,0.3)",
+        animation: rm ? "none" : "scaleIn 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+        pointerEvents: "none",
+      }}
+    >
+      🔥 {streak} in a row!
+    </div>
+  );
+}
+
 /* ── Mascot Star SVG ── */
 function MascotStar({ size = 64 }: { size?: number }) {
   return (
@@ -188,6 +306,8 @@ function WorkScreen({
   const [submitted, setSubmitted] = useState(false);
   const [mascotState, setMascotState] = useState<'idle' | 'cheer'>('idle');
   const [cardKey, setCardKey] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [showHint, setShowHint] = useState(false);
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
   const rm = prefersReducedMotion();
@@ -201,22 +321,27 @@ function WorkScreen({
       const next = questionsAnswered + 1;
       setQuestionsAnswered(next);
       if (next >= 3) setShowBreakBanner(true);
+      setStreak(s => s + 1);
       // Briefly cheer the mascot
       setMascotState('cheer');
       setTimeout(() => setMascotState('idle'), 800);
     }
+    setShowHint(false); // hide hint on new answer
   };
 
   const handleNext = () => {
     if (currentQ < total - 1) {
       setCurrentQ(currentQ + 1);
       setCardKey(k => k + 1);
+      setShowHint(false);
     }
   };
   const handlePrev = () => {
     if (currentQ > 0) {
       setCurrentQ(currentQ - 1);
       setCardKey(k => k + 1);
+      setStreak(0);
+      setShowHint(false);
     }
   };
 
@@ -328,10 +453,30 @@ function WorkScreen({
               ? "rounded-3xl p-6 space-y-5 border border-white/[0.07] bg-white/[0.04]"
               : "clay-card p-6 space-y-5"
             }>
-              {/* Question text */}
+              {/* Question text — typewriter reveal */}
               <p className="font-student text-lg font-semibold leading-relaxed" style={{ color: dk ? "white" : "#1e293b" }}>
-                {q.q.text}
+                <TypewriterText text={q.q.text} speed={28} />
               </p>
+
+              {/* Hint */}
+              {q.q.hint && (
+                <div>
+                  {showHint ? (
+                    <div
+                      className="rounded-2xl p-3 border-2 animate-spring-in"
+                      style={{ background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb", borderColor: dk ? "rgba(245,158,11,0.3)" : "#fde68a" }}>
+                      <span className="text-xs font-bold" style={{ color: dk ? "#fbbf24" : "#92400e" }}>💡 Hint: </span>
+                      <span className="text-sm" style={{ color: dk ? "rgba(251,191,36,0.8)" : "#78350f" }}>{q.q.hint}</span>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowHint(true)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-all"
+                      style={{ background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb", color: dk ? "#fbbf24" : "#92400e", border: "1px solid " + (dk ? "rgba(245,158,11,0.2)" : "#fde68a") }}>
+                      💡 Show Hint
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* ── Multiple choice ── */}
               {q.q.type === "multiple_choice" && q.q.options && (
@@ -480,6 +625,12 @@ function WorkScreen({
           <Mascot state={mascotState} />
         </div>
       )}
+
+      {/* Flying word-buddy */}
+      <FlyingBuddy active={!dk} />
+
+      {/* Streak counter */}
+      <StreakCounter streak={streak} />
     </div>
   );
 }
@@ -609,6 +760,8 @@ export default function StudentDashboard() {
   const [classVideo, setClassVideo] = useState<any>(null);
   const joinBtnRef = useRef<HTMLButtonElement>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
+  const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
+  const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
 
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
@@ -645,6 +798,11 @@ export default function StudentDashboard() {
         setStatClasses(clsList.length);
         setStatSubmitted(subList.length);
         setStatGraded(subList.filter((s: any) => s.grade !== null).length);
+
+        // Load YouTube library for first enrolled class
+        if (clsList.length > 0) {
+          api.getYouTubeLibrary(clsList[0].id).then(setYoutubeLibrary).catch(() => {});
+        }
 
         let found: any = null;
         let foundParsed: any = null;
@@ -937,6 +1095,82 @@ export default function StudentDashboard() {
               style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
             />
           </div>
+        </div>
+      )}
+
+      {/* YouTube Library — curated videos from teacher */}
+      {youtubeLibrary.length > 0 && (
+        <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
+            📺 Video Library
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(239,68,68,0.1)" : "#fee2e2", color: dk ? "#f87171" : "#dc2626" }}>
+              {youtubeLibrary.length} videos
+            </span>
+          </h2>
+
+          {/* Playing inline */}
+          {playingLibVideo && (
+            <div className="mb-4 animate-spring-in">
+              <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                  title={playingLibVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
+                />
+              </div>
+              <button onClick={() => setPlayingLibVideo(null)} className="mt-2 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-colors" style={{ background: dk?"rgba(255,255,255,0.05)":"#f1f5f9", color: dk?"rgba(255,255,255,0.5)":"#64748b" }}>
+                ✕ Close video
+              </button>
+            </div>
+          )}
+
+          {/* Grid of videos */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
+            {youtubeLibrary.map((v: any) => (
+              <button
+                key={v.id}
+                onClick={async () => {
+                  setPlayingLibVideo({ videoId: v.video_id, title: v.title });
+                  // Auto-approve pick
+                  if (user?.id) {
+                    api.pickLibraryVideo(v.id, user.id).catch(() => {});
+                  }
+                }}
+                style={{
+                  textAlign:"left", padding:0, background:"none", border:"none", cursor:"pointer",
+                  borderRadius:12, overflow:"hidden",
+                  boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
+                  transition:"transform 0.15s, box-shadow 0.15s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 16px rgba(0,0,0,0.15)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = dk?"0 2px 8px rgba(0,0,0,0.3)":"0 2px 8px rgba(0,0,0,0.08)"; }}
+              >
+                <div style={{ position:"relative", overflow:"hidden" }}>
+                  <img src={v.thumbnail_url || `https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%", aspectRatio:"16/9", objectFit:"cover", display:"block" }} />
+                  <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", opacity:0, transition:"opacity 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity="1"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity="0"}>
+                    <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.9)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <span style={{ fontSize:14, marginLeft:2 }}>▶</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding:"8px 10px", background: dk?"rgba(255,255,255,0.04)":"white" }}>
+                  <div style={{ fontSize:11, fontWeight:700, color: dk?"rgba(255,255,255,0.85)":"#1e293b", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
+                  {v.category && <div style={{ fontSize:9, fontWeight:600, marginTop:3, color: dk?"rgba(239,68,68,0.7)":"#dc2626", textTransform:"uppercase", letterSpacing:"0.05em" }}>{v.category}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => alert("Ask your teacher to add more videos to the library!")}
+            className="mt-3 w-full text-center text-xs font-medium py-2.5 rounded-xl cursor-pointer transition-colors"
+            style={{ background: dk?"rgba(255,255,255,0.03)":"#f8fafc", color: dk?"rgba(255,255,255,0.3)":"#94a3b8", border: `1px dashed ${dk?"rgba(255,255,255,0.1)":"#e2e8f0"}` }}>
+            Don't see what you want? 🎬 Ask your teacher to add it →
+          </button>
         </div>
       )}
 

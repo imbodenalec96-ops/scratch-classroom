@@ -1,25 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useTheme } from "../lib/theme.tsx";
+import { useAuth } from "../lib/auth.tsx";
 import { api } from "../lib/api.ts";
 import { getSocket } from "../lib/ws.ts";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Users, Wifi, WifiOff, Lock, LockOpen, Megaphone,
   ChevronLeft, Monitor, Activity, Box, ExternalLink,
-  Youtube, X, Play, Square, Eye,
+  Youtube, X, Play, Square, Eye, Send, Navigation,
+  Gamepad2, BookOpen, LayoutDashboard, MessageSquare,
 } from "lucide-react";
 
 /* ── helpers ──────────────────────────────────────────────── */
-
-interface StudentPresence {
-  isOnline: boolean;
-  lastActive: number;
-  lastAction: string;
-  projectId?: string;
-  projectName?: string;
-  blockCount?: number;
-  unityRoom?: string;   // multiplayer room code when in Unity stage
-}
 
 function timeAgo(ts: number): string {
   if (!ts) return "No activity yet";
@@ -31,7 +23,7 @@ function timeAgo(ts: number): string {
 }
 
 function avatarGradient(name: string): string {
-  const palettes = [
+  const p = [
     "from-violet-500 to-indigo-600","from-cyan-500 to-blue-600",
     "from-emerald-500 to-teal-600","from-amber-500 to-orange-600",
     "from-pink-500 to-rose-600","from-sky-500 to-cyan-600",
@@ -39,7 +31,7 @@ function avatarGradient(name: string): string {
   ];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return palettes[h % palettes.length];
+  return p[h % p.length];
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -49,43 +41,68 @@ function extractYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Maps presence activity string to an icon/label for the tile preview */
+function activityPreview(activity: string): { emoji: string; label: string; color: string } {
+  const a = (activity || "").toLowerCase();
+  if (a.includes("arcade") || a.includes("game"))  return { emoji: "🎮", label: "In Arcade",       color: "#8b5cf6" };
+  if (a.includes("assignment") || a.includes("quiz")) return { emoji: "📝", label: "On Assignment", color: "#f59e0b" };
+  if (a.includes("project"))                        return { emoji: "💻", label: "In Projects",     color: "#06b6d4" };
+  if (a.includes("lesson"))                         return { emoji: "📖", label: "Reading Lessons", color: "#10b981" };
+  if (a.includes("video"))                          return { emoji: "📺", label: "Watching Video",  color: "#ef4444" };
+  if (a.includes("dashboard"))                      return { emoji: "🏠", label: "On Dashboard",   color: "#6366f1" };
+  return { emoji: "🟢", label: activity || "Online",                                                color: "#34d399" };
+}
+
+const PUSH_PAGES = [
+  { label: "Dashboard",  path: "/student",  icon: LayoutDashboard },
+  { label: "Lessons",    path: "/lessons",  icon: BookOpen },
+  { label: "Assignments",path: "/assignments", icon: BookOpen },
+  { label: "Arcade",     path: "/arcade",   icon: Gamepad2 },
+];
+
 /* ── main component ────────────────────────────────────────── */
 
 export default function MonitorPage() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const dk = theme === "dark";
 
   const [classes, setClasses]               = useState<any[]>([]);
   const [selectedClass, setSelectedClass]   = useState<any>(null);
   const [students, setStudents]             = useState<any[]>([]);
-  const [presence, setPresence]             = useState<Record<string, StudentPresence>>({});
+  const [presence, setPresence]             = useState<Record<string, any>>({});
   const [announcement, setAnnouncement]     = useState("");
   const [announceSent, setAnnounceSent]     = useState(false);
   const [wsConnected, setWsConnected]       = useState(false);
   const [loading, setLoading]               = useState(true);
   const [tick, setTick]                     = useState(0);
+  const [isClassLocked, setIsClassLocked]   = useState(false);
+  const [lockMsg, setLockMsg]               = useState("");
+  const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
+  const [msgText, setMsgText]               = useState("");
+  const [showPushMenu, setShowPushMenu]     = useState(false);
   const announceRef                         = useRef<HTMLInputElement>(null);
 
   // Video sharing
   const [videoUrl, setVideoUrl]             = useState("");
   const [videoTitle, setVideoTitle]         = useState("");
-  const [activeVideo, setActiveVideo]       = useState<string | null>(null); // videoId when live
+  const [activeVideo, setActiveVideo]       = useState<string | null>(null);
   const [showVideoInput, setShowVideoInput] = useState(false);
 
   // Unity live view
-  const [watchingRoom, setWatchingRoom]     = useState<string | null>(null); // room code being watched
+  const [watchingRoom, setWatchingRoom]     = useState<string | null>(null);
   const [watchingName, setWatchingName]     = useState("");
 
-  // Refresh time-ago every 10 s
+  // Refresh time-ago every 10s
   useEffect(() => {
-    const iv = setInterval(() => setTick((t) => t + 1), 10000);
+    const iv = setInterval(() => setTick(t => t + 1), 10000);
     return () => clearInterval(iv);
   }, []);
 
-  // Load classes on mount
+  // Load classes
   useEffect(() => {
     api.getClasses()
-      .then((c) => {
+      .then(c => {
         setClasses(c);
         if (c.length > 0) { setSelectedClass(c[0]); loadClass(c[0]); }
         else setLoading(false);
@@ -98,31 +115,28 @@ export default function MonitorPage() {
     try {
       const studs = await api.getStudents(cls.id);
       setStudents(studs);
-      const init: Record<string, StudentPresence> = {};
-      for (const s of studs) {
-        init[s.id] = { isOnline: false, lastActive: 0, lastAction: "No activity yet" };
-      }
+      const init: Record<string, any> = {};
+      for (const s of studs) init[s.id] = { isOnline: false, lastActive: 0, lastAction: "No activity yet" };
       setPresence(init);
     } catch {
       setStudents([]); setPresence({});
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   const handleClassChange = (classId: string) => {
-    const cls = classes.find((c) => c.id === classId);
+    const cls = classes.find(c => c.id === classId);
     if (!cls) return;
     setSelectedClass(cls); loadClass(cls);
+    setIsClassLocked(false);
   };
 
-  // HTTP polling for presence (WebSocket not available on Vercel serverless)
+  // HTTP polling for presence every 5s
   useEffect(() => {
     if (!selectedClass) return;
     const fetchPresence = async () => {
       try {
         const data = await api.getClassPresence(selectedClass.id);
-        setPresence((prev) => {
+        setPresence(prev => {
           const next = { ...prev };
           for (const s of data) {
             next[s.id] = {
@@ -137,7 +151,7 @@ export default function MonitorPage() {
       } catch { /* ignore */ }
     };
     fetchPresence();
-    const iv = setInterval(fetchPresence, 15000); // poll every 15s for near-real-time feel
+    const iv = setInterval(fetchPresence, 5000);
     return () => clearInterval(iv);
   }, [selectedClass]);
 
@@ -149,19 +163,18 @@ export default function MonitorPage() {
     const onDisconnect = () => setWsConnected(false);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-
     const mark = (data: any, action: string) => {
-      setStudents((prev) => {
-        const matched = prev.find(
-          (s) => (data.userId && s.id === data.userId) || (data.userName && s.name === data.userName)
+      setStudents(prev => {
+        const matched = prev.find(s =>
+          (data.userId && s.id === data.userId) || (data.userName && s.name === data.userName)
         );
         if (!matched) return prev;
-        setPresence((p) => ({
+        setPresence(p => ({
           ...p,
           [matched.id]: {
             ...p[matched.id],
             isOnline: true, lastActive: Date.now(), lastAction: action,
-            ...(data.projectId   ? { projectId:   data.projectId   } : {}),
+            ...(data.projectId   ? { projectId: data.projectId }   : {}),
             ...(data.projectName ? { projectName: data.projectName } : {}),
             ...(Array.isArray(data.blocks) ? { blockCount: data.blocks.length } : {}),
           },
@@ -169,38 +182,62 @@ export default function MonitorPage() {
         return prev;
       });
     };
-
-    // Track students joining Unity rooms
     const onUnityJoin = (data: any) => {
-      setStudents((prev) => {
-        const matched = prev.find(
-          (s) => (data.userId && s.id === data.userId) || (data.userName && s.name === data.userName)
+      setStudents(prev => {
+        const matched = prev.find(s =>
+          (data.userId && s.id === data.userId) || (data.userName && s.name === data.userName)
         );
         if (!matched) return prev;
-        setPresence((p) => ({
+        setPresence(p => ({
           ...p,
-          [matched.id]: {
-            ...p[matched.id],
-            isOnline: true, lastActive: Date.now(),
-            lastAction: "in Unity 3D stage",
-            unityRoom: data.room,
-          },
+          [matched.id]: { ...p[matched.id], isOnline: true, lastActive: Date.now(), lastAction: "in Unity 3D", unityRoom: data.room },
         }));
         return prev;
       });
     };
-
-    socket.on("project:update", (d) => mark(d, d.action || "updated project"));
-    socket.on("chat:message",   (d) => mark(d, "sent a message"));
-    socket.on("unity:join",     onUnityJoin);
-
+    socket.on("project:update", d => mark(d, d.action || "updated project"));
+    socket.on("chat:message",   d => mark(d, "sent a message"));
+    socket.on("unity:join", onUnityJoin);
     return () => {
       socket.off("connect", onConnect); socket.off("disconnect", onDisconnect);
       socket.off("project:update"); socket.off("chat:message"); socket.off("unity:join", onUnityJoin);
     };
   }, []);
 
-  // Note: online/offline state is now computed server-side via HTTP polling (isOnline based on last_seen < 2 min ago)
+  // ── GoGuardian actions ─────────────────────────────────────
+
+  const handleLockAll = useCallback(async (locked: boolean) => {
+    if (!selectedClass) return;
+    if (locked) {
+      await api.lockClass(selectedClass.id, lockMsg).catch(console.error);
+    } else {
+      await api.unlockClass(selectedClass.id).catch(console.error);
+    }
+    setIsClassLocked(locked);
+    // Also emit WS for fast response on same-origin clients
+    getSocket().emit("class:lock", { classId: selectedClass.id, locked });
+  }, [selectedClass, lockMsg]);
+
+  const handlePushToPage = useCallback(async (path: string) => {
+    if (!selectedClass) return;
+    await api.sendClassCommand(selectedClass.id, "NAVIGATE", path).catch(console.error);
+    setShowPushMenu(false);
+  }, [selectedClass]);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!selectedClass || !msgText.trim()) return;
+    if (showMsgModal === "all") {
+      await api.sendClassCommand(selectedClass.id, "MESSAGE", msgText.trim()).catch(console.error);
+    } else if (showMsgModal) {
+      await api.sendClassCommand(selectedClass.id, "MESSAGE", msgText.trim(), showMsgModal).catch(console.error);
+    }
+    setMsgText(""); setShowMsgModal(null);
+  }, [selectedClass, showMsgModal, msgText]);
+
+  const handleKick = useCallback(async (studentId: string) => {
+    if (!selectedClass) return;
+    await api.sendClassCommand(selectedClass.id, "KICK", "/student", studentId).catch(console.error);
+  }, [selectedClass]);
 
   const handleAnnounce = useCallback(() => {
     if (!announcement.trim() || !selectedClass) return;
@@ -210,100 +247,72 @@ export default function MonitorPage() {
     announceRef.current?.blur();
   }, [announcement, selectedClass]);
 
-  const handleLockAll = useCallback(async (locked: boolean) => {
-    if (!selectedClass) return;
-    getSocket().emit("class:lock", { classId: selectedClass.id, locked });
-    for (const s of students) {
-      api.updateControls(selectedClass.id, s.id, { screen_locked: locked }).catch(() => {});
-    }
-  }, [selectedClass, students]);
-
-  // ── Video sharing ──────────────────────────────────────────
+  // Video sharing
   const handleShareVideo = () => {
     if (!selectedClass) return;
     const id = extractYouTubeId(videoUrl);
-    if (!id) { alert("Couldn't find a YouTube video ID. Paste a YouTube link or video ID."); return; }
-    getSocket().emit("class:video", {
-      classId: selectedClass.id,
-      videoId: id,
-      url: videoUrl,
-      title: videoTitle || "Class Video",
-    });
-    // HTTP fallback (works on Vercel)
-    if (selectedClass) {
-      api.shareClassVideo(selectedClass.id, id, videoTitle || "Class Video").catch(() => {});
-    }
-    setActiveVideo(id);
-    setShowVideoInput(false);
-    setVideoUrl(""); setVideoTitle("");
+    if (!id) { alert("Couldn't find a YouTube video ID."); return; }
+    getSocket().emit("class:video", { classId: selectedClass.id, videoId: id, url: videoUrl, title: videoTitle || "Class Video" });
+    api.shareClassVideo(selectedClass.id, id, videoTitle || "Class Video").catch(() => {});
+    setActiveVideo(id); setShowVideoInput(false); setVideoUrl(""); setVideoTitle("");
   };
 
   const handleStopVideo = () => {
     if (!selectedClass) return;
     getSocket().emit("class:video:stop", { classId: selectedClass.id });
-    // HTTP fallback (works on Vercel)
-    if (selectedClass) {
-      api.stopClassVideo(selectedClass.id).catch(() => {});
-    }
+    api.stopClassVideo(selectedClass.id).catch(() => {});
     setActiveVideo(null);
   };
 
-  const onlineCount  = Object.values(presence).filter((p) => p.isOnline).length;
+  const onlineCount  = Object.values(presence).filter(p => p.isOnline).length;
   const offlineCount = students.length - onlineCount;
 
   return (
-    <div className="p-7 space-y-5 animate-page-enter">
+    <div className="p-6 space-y-5 animate-page-enter">
 
-      {/* Unity Live View Modal */}
+      {/* Unity live view modal */}
       {watchingRoom && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            width: "min(960px, 96vw)", borderRadius: 16, overflow: "hidden",
-            border: "1px solid rgba(34,211,238,0.3)",
-            boxShadow: "0 0 80px rgba(34,211,238,0.15)",
-            display: "flex", flexDirection: "column",
-            background: "#07071a",
-          }}>
-            {/* Modal header */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 16px",
-              background: "rgba(34,211,238,0.07)",
-              borderBottom: "1px solid rgba(34,211,238,0.15)",
-            }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22d3ee", boxShadow: "0 0 8px #22d3ee" }} />
-              <span style={{ color: "#22d3ee", fontWeight: 700, fontSize: 13 }}>
-                👁 Watching {watchingName}'s Unity Stage — Room: {watchingRoom}
-              </span>
-              <button
-                onClick={() => { setWatchingRoom(null); setWatchingName(""); }}
-                style={{
-                  marginLeft: "auto", background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "rgba(255,255,255,0.6)", borderRadius: 8,
-                  padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600,
-                }}
-              >
-                ✕ Close
-              </button>
+        <div style={{ position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <div style={{ width:"min(960px,96vw)",borderRadius:16,overflow:"hidden",border:"1px solid rgba(34,211,238,0.3)",background:"#07071a",display:"flex",flexDirection:"column" }}>
+            <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"rgba(34,211,238,0.07)",borderBottom:"1px solid rgba(34,211,238,0.15)" }}>
+              <div style={{ width:8,height:8,borderRadius:"50%",background:"#22d3ee",boxShadow:"0 0 8px #22d3ee" }} />
+              <span style={{ color:"#22d3ee",fontWeight:700,fontSize:13 }}>👁 Watching {watchingName}'s Unity Stage — Room: {watchingRoom}</span>
+              <button onClick={() => { setWatchingRoom(null); setWatchingName(""); }} style={{ marginLeft:"auto",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.6)",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontSize:12,fontWeight:600 }}>✕ Close</button>
             </div>
-            {/* Unity iframe */}
-            <iframe
-              src={`/unity-games/blockforge-stage/index.html?room=${encodeURIComponent(watchingRoom)}&spectator=1`}
-              style={{ width: "100%", height: 540, border: "none" }}
-              allow="autoplay; fullscreen; pointer-lock"
-              title="Unity Live View"
+            <iframe src={`/unity-games/blockforge-stage/index.html?room=${encodeURIComponent(watchingRoom)}&spectator=1`} style={{ width:"100%",height:540,border:"none" }} allow="autoplay; fullscreen; pointer-lock" title="Unity Live View" />
+          </div>
+        </div>
+      )}
+
+      {/* Message modal */}
+      {showMsgModal && (
+        <div style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowMsgModal(null); }}>
+          <div className={`rounded-2xl p-6 w-full max-w-md shadow-2xl border ${dk ? "bg-[#0f1029] border-white/[0.08]" : "bg-white border-gray-200"}`}>
+            <h3 className={`font-bold text-lg mb-4 ${dk ? "text-white" : "text-gray-900"}`}>
+              💬 Send Message{showMsgModal === "all" ? " to Everyone" : ` to ${students.find(s => s.id === showMsgModal)?.name}`}
+            </h3>
+            <textarea
+              value={msgText}
+              onChange={e => setMsgText(e.target.value)}
+              placeholder="Type your message…"
+              className="input w-full text-sm resize-none"
+              rows={3}
+              autoFocus
+              onKeyDown={e => { if (e.key === "Enter" && e.metaKey) handleSendMessage(); }}
             />
+            <div className="flex gap-2 mt-4">
+              <button onClick={handleSendMessage} disabled={!msgText.trim()} className="btn-primary flex-1 gap-2">
+                <Send size={14} /> Send
+              </button>
+              <button onClick={() => { setShowMsgModal(null); setMsgText(""); }} className="btn-secondary px-4">Cancel</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className={`text-2xl font-bold tracking-tight flex items-center gap-2 ${dk ? "text-white" : "text-gray-900"}`}>
             <Monitor size={22} className="text-pink-400" />
@@ -313,41 +322,29 @@ export default function MonitorPage() {
             {loading ? "Loading…" : `${onlineCount} online · ${offlineCount} offline · ${students.length} total`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* WS status */}
-          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${
-            wsConnected
-              ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-              : dk ? "bg-white/5 text-white/25"           : "bg-gray-100 text-gray-400"
-          }`}>
-            {wsConnected
-              ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><Wifi size={11} /> Live</>
-              : <><span className="w-1.5 h-1.5 rounded-full bg-gray-400" /><WifiOff size={11} /> Offline</>
-            }
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${wsConnected ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600" : dk ? "bg-white/5 text-white/25" : "bg-gray-100 text-gray-400"}`}>
+            {wsConnected ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><Wifi size={11}/> Live</> : <><span className="w-1.5 h-1.5 rounded-full bg-gray-400" /><WifiOff size={11}/> Polling</>}
           </div>
-          {/* Class selector */}
           {classes.length > 1 && (
-            <select value={selectedClass?.id ?? ""} onChange={(e) => handleClassChange(e.target.value)} className="input py-2 text-sm w-44">
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <select value={selectedClass?.id ?? ""} onChange={e => handleClassChange(e.target.value)} className="input py-2 text-sm w-44">
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          <Link to="/teacher" className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-colors ${
-            dk ? "border-white/[0.07] text-white/50 hover:text-white hover:bg-white/[0.04]"
-               : "border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-          }`}>
-            <ChevronLeft size={13} /> Dashboard
+          <Link to="/teacher" className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-colors ${dk ? "border-white/[0.07] text-white/50 hover:text-white hover:bg-white/[0.04]" : "border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
+            <ChevronLeft size={13}/> Dashboard
           </Link>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label:"Online",     value:onlineCount,     color:"text-emerald-400", bg:dk?"bg-emerald-500/10":"bg-emerald-50",  border:dk?"border-emerald-500/20":"border-emerald-200",  icon:<Wifi size={15}/> },
-          { label:"Offline",    value:offlineCount,    color:"text-red-400",     bg:dk?"bg-red-500/10":"bg-red-50",          border:dk?"border-red-500/20":"border-red-200",          icon:<WifiOff size={15}/> },
-          { label:"Students",   value:students.length, color:"text-violet-400",  bg:dk?"bg-violet-500/10":"bg-violet-50",    border:dk?"border-violet-500/20":"border-violet-200",    icon:<Users size={15}/> },
-          { label:"Active Now", value:onlineCount,     color:"text-blue-400",    bg:dk?"bg-blue-500/10":"bg-blue-50",        border:dk?"border-blue-500/20":"border-blue-200",        icon:<Activity size={15}/> },
-        ].map((stat) => (
+          { label:"Online",    value:onlineCount,     color:"text-emerald-400", bg:dk?"bg-emerald-500/10":"bg-emerald-50", border:dk?"border-emerald-500/20":"border-emerald-200", icon:<Wifi size={14}/> },
+          { label:"Offline",   value:offlineCount,    color:"text-red-400",     bg:dk?"bg-red-500/10":"bg-red-50",         border:dk?"border-red-500/20":"border-red-200",         icon:<WifiOff size={14}/> },
+          { label:"Students",  value:students.length, color:"text-violet-400",  bg:dk?"bg-violet-500/10":"bg-violet-50",   border:dk?"border-violet-500/20":"border-violet-200",   icon:<Users size={14}/> },
+          { label:"Active Now",value:onlineCount,     color:"text-blue-400",    bg:dk?"bg-blue-500/10":"bg-blue-50",       border:dk?"border-blue-500/20":"border-blue-200",       icon:<Activity size={14}/> },
+        ].map(stat => (
           <div key={stat.label} className={`rounded-xl px-4 py-3 border flex items-center gap-3 ${stat.bg} ${stat.border}`}>
             <div className={stat.color}>{stat.icon}</div>
             <div>
@@ -358,102 +355,109 @@ export default function MonitorPage() {
         ))}
       </div>
 
-      {/* Controls */}
+      {/* GoGuardian Controls */}
       {selectedClass && (
         <div className="card space-y-3">
-          <h3 className={`text-sm font-semibold flex items-center gap-2 ${dk?"text-white/70":"text-gray-700"}`}>
-            Classroom Controls
-            <span className={`text-xs font-normal ${dk?"text-white/25":"text-gray-400"}`}>— {selectedClass.name}</span>
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-semibold flex items-center gap-2 ${dk?"text-white/70":"text-gray-700"}`}>
+              <Monitor size={14} className="text-pink-400" />
+              Classroom Controls
+              <span className={`text-xs font-normal ${dk?"text-white/25":"text-gray-400"}`}>— {selectedClass.name}</span>
+            </h3>
+            {isClassLocked && (
+              <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/25 animate-pulse">
+                <Lock size={11}/> LOCKED
+              </span>
+            )}
+          </div>
 
-          {/* Row 1: announce + lock */}
+          {/* Row 1: Lock controls + Push to Page */}
           <div className="flex flex-wrap gap-2">
-            <div className="flex gap-2 flex-1 min-w-0">
-              <input
-                ref={announceRef}
-                value={announcement}
-                onChange={(e) => setAnnouncement(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAnnounce()}
-                placeholder="Type announcement to broadcast…"
-                className="input text-sm flex-1"
-              />
-              <button onClick={handleAnnounce} disabled={!announcement.trim()}
-                className={`btn-primary gap-2 px-4 transition-all ${announceSent?"bg-emerald-500 border-emerald-500":""}`}>
-                {announceSent ? "Sent!" : <><Megaphone size={14}/> Announce</>}
-              </button>
-            </div>
             <button onClick={() => handleLockAll(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
-                dk?"bg-red-500/10 hover:bg-red-500/15 text-red-400 border-red-500/20"
-                  :"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${isClassLocked ? "bg-red-500/20 text-red-300 border-red-400/40" : dk?"bg-red-500/10 hover:bg-red-500/18 text-red-400 border-red-500/20":"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
               <Lock size={13}/> Lock All
             </button>
             <button onClick={() => handleLockAll(false)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
-                dk?"bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
-                  :"bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200"}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-emerald-500/10 hover:bg-emerald-500/18 text-emerald-400 border-emerald-500/20":"bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200"}`}>
               <LockOpen size={13}/> Unlock All
+            </button>
+
+            {/* Optional lock message */}
+            <input
+              value={lockMsg}
+              onChange={e => setLockMsg(e.target.value)}
+              placeholder="Lock message (optional)…"
+              className="input text-sm flex-1 min-w-0"
+            />
+
+            {/* Push to Page */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPushMenu(v => !v)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}>
+                <Navigation size={13}/> Push to Page ▾
+              </button>
+              {showPushMenu && (
+                <div className={`absolute top-full mt-1 right-0 rounded-xl shadow-2xl border overflow-hidden z-50 ${dk?"bg-[#0f1029] border-white/[0.08]":"bg-white border-gray-200"}`} style={{ minWidth: 180 }}>
+                  {PUSH_PAGES.map(p => (
+                    <button key={p.path} onClick={() => handlePushToPage(p.path)}
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors cursor-pointer ${dk?"hover:bg-white/[0.05] text-white/70 hover:text-white":"hover:bg-gray-50 text-gray-700"}`}>
+                      <p.icon size={14}/> {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Broadcast message */}
+            <button onClick={() => setShowMsgModal("all")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
+              <MessageSquare size={13}/> Message All
             </button>
           </div>
 
-          {/* Row 2: Video sharing */}
+          {/* Row 2: Announce */}
+          <div className="flex gap-2">
+            <input
+              ref={announceRef}
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAnnounce()}
+              placeholder="Type announcement to broadcast (WebSocket)…"
+              className="input text-sm flex-1"
+            />
+            <button onClick={handleAnnounce} disabled={!announcement.trim()}
+              className={`btn-primary gap-2 px-4 transition-all ${announceSent?"bg-emerald-500 border-emerald-500":""}`}>
+              {announceSent ? "Sent!" : <><Megaphone size={14}/> Announce</>}
+            </button>
+          </div>
+
+          {/* Row 3: Video sharing */}
           <div className={`flex flex-wrap gap-2 items-center pt-2 border-t ${dk?"border-white/[0.05]":"border-gray-100"}`}>
             <Youtube size={15} className="text-red-400 flex-shrink-0" />
             <span className={`text-xs font-semibold ${dk?"text-white/50":"text-gray-600"}`}>Share Video to Class</span>
-
             {activeVideo ? (
               <>
-                <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <div style={{
-                    display:"flex",alignItems:"center",gap:8,
-                    background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",
-                    borderRadius:8,padding:"4px 12px",
-                  }}>
-                    <span style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite"}} />
-                    <span style={{color:"#f87171",fontSize:12,fontWeight:600}}>Video Live</span>
-                    <img
-                      src={`https://img.youtube.com/vi/${activeVideo}/default.jpg`}
-                      style={{width:32,height:24,objectFit:"cover",borderRadius:4}}
-                      alt="thumb"
-                    />
-                  </div>
+                <div style={{ display:"flex",alignItems:"center",gap:8,background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"4px 12px" }}>
+                  <span style={{ width:8,height:8,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite" }} />
+                  <span style={{ color:"#f87171",fontSize:12,fontWeight:600 }}>Video Live</span>
+                  <img src={`https://img.youtube.com/vi/${activeVideo}/default.jpg`} style={{ width:32,height:24,objectFit:"cover",borderRadius:4 }} alt="thumb" />
                 </div>
-                <button onClick={handleStopVideo}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer transition-colors"
-                  style={{background:"rgba(239,68,68,0.12)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}>
+                <button onClick={handleStopVideo} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer" style={{ background:"rgba(239,68,68,0.12)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)" }}>
                   <Square size={12}/> Stop Video
                 </button>
               </>
             ) : showVideoInput ? (
               <>
-                <input
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleShareVideo()}
-                  placeholder="YouTube URL or video ID…"
-                  className="input text-sm flex-1"
-                  autoFocus
-                />
-                <input
-                  value={videoTitle}
-                  onChange={(e) => setVideoTitle(e.target.value)}
-                  placeholder="Title (optional)"
-                  className="input text-sm w-40"
-                />
-                <button onClick={handleShareVideo}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer"
-                  style={{background:"rgba(239,68,68,0.15)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}>
+                <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && handleShareVideo()} placeholder="YouTube URL or video ID…" className="input text-sm flex-1" autoFocus />
+                <input value={videoTitle} onChange={e => setVideoTitle(e.target.value)} placeholder="Title (optional)" className="input text-sm w-40" />
+                <button onClick={handleShareVideo} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer" style={{ background:"rgba(239,68,68,0.15)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)" }}>
                   <Play size={12}/> Share
                 </button>
-                <button onClick={() => { setShowVideoInput(false); setVideoUrl(""); setVideoTitle(""); }}
-                  className={`p-2 rounded-lg cursor-pointer ${dk?"text-white/30 hover:text-white/60":"text-gray-400 hover:text-gray-700"}`}>
-                  <X size={14}/>
-                </button>
+                <button onClick={() => { setShowVideoInput(false); setVideoUrl(""); setVideoTitle(""); }} className={`p-2 rounded-lg cursor-pointer ${dk?"text-white/30 hover:text-white/60":"text-gray-400 hover:text-gray-700"}`}><X size={14}/></button>
               </>
             ) : (
-              <button onClick={() => setShowVideoInput(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer transition-colors"
-                style={{background:"rgba(239,68,68,0.1)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)"}}>
+              <button onClick={() => setShowVideoInput(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer" style={{ background:"rgba(239,68,68,0.1)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)" }}>
                 <Youtube size={13}/> Share YouTube Video
               </button>
             )}
@@ -461,7 +465,7 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* Student grid */}
+      {/* Student tile grid */}
       {loading ? (
         <div className={`text-center py-16 text-sm ${dk?"text-white/20":"text-gray-400"}`}>Loading students…</div>
       ) : students.length === 0 ? (
@@ -469,22 +473,28 @@ export default function MonitorPage() {
           <Users size={36} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">
             {selectedClass
-              ? <>No students in {selectedClass.name} yet. Share code <strong className={`font-mono ${dk?"text-violet-400":"text-violet-600"}`}>{selectedClass.code}</strong></>
+              ? <>No students yet. Share code <strong className={`font-mono ${dk?"text-violet-400":"text-violet-600"}`}>{selectedClass?.code}</strong></>
               : "Select a class to begin."}
+          </p>
+          <p className={`text-xs mt-2 ${dk?"text-white/20":"text-gray-400"}`}>
+            Students are quiet right now. Check back when class starts! 🎒
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {students.map((s) => {
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {students.map((s, i) => {
             const pr = presence[s.id] ?? { isOnline:false, lastActive:0, lastAction:"No activity yet" };
             return (
-              <StudentCard
+              <StudentTile
                 key={s.id}
                 student={s}
                 presence={pr}
                 dk={dk}
                 tick={tick}
+                animDelay={i * 40}
                 onWatchUnity={(room, name) => { setWatchingRoom(room); setWatchingName(name); }}
+                onMessage={() => setShowMsgModal(s.id)}
+                onKick={() => handleKick(s.id)}
               />
             );
           })}
@@ -494,98 +504,98 @@ export default function MonitorPage() {
   );
 }
 
-/* ── StudentCard ──────────────────────────────────────────── */
+/* ── StudentTile ──────────────────────────────────────────── */
 
-interface StudentCardProps {
+interface TileProps {
   student: any;
-  presence: StudentPresence;
+  presence: any;
   dk: boolean;
   tick: number;
+  animDelay: number;
   onWatchUnity: (room: string, name: string) => void;
+  onMessage: () => void;
+  onKick: () => void;
 }
 
-function StudentCard({ student, presence, dk, onWatchUnity }: StudentCardProps) {
+function StudentTile({ student, presence, dk, tick, animDelay, onWatchUnity, onMessage, onKick }: TileProps) {
   const gradient = avatarGradient(student.name || "?");
   const initials = (student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+  const { emoji, label, color } = activityPreview(presence.lastAction || "");
 
   return (
-    <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-      presence.isOnline
-        ? dk ? "border-emerald-500/25 shadow-lg shadow-emerald-500/5" : "border-emerald-300/60 shadow-md shadow-emerald-100"
-        : dk ? "border-white/[0.06]" : "border-gray-200"
-    }`} style={{ background: "var(--bg-surface)" }}>
-      {presence.isOnline && <div className="h-0.5 bg-gradient-to-r from-emerald-500/60 via-emerald-400/80 to-emerald-500/60" />}
+    <div
+      className={`rounded-2xl border transition-all duration-200 overflow-hidden animate-slide-in group ${
+        presence.isOnline
+          ? dk ? "border-emerald-500/25 shadow-lg shadow-emerald-500/5" : "border-emerald-300/60 shadow-md shadow-emerald-100"
+          : dk ? "border-white/[0.06]" : "border-gray-200"
+      }`}
+      style={{ background: "var(--bg-surface)", animationDelay: `${animDelay}ms` }}
+    >
+      {/* Online accent stripe */}
+      {presence.isOnline && <div className="h-0.5 bg-gradient-to-r from-emerald-500/60 via-emerald-400 to-emerald-500/60" />}
 
-      <div className="p-4">
+      {/* Activity preview pane */}
+      <div style={{
+        height: 72,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexDirection: "column", gap: 4,
+        background: presence.isOnline ? `${color}12` : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+        borderBottom: dk ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(0,0,0,0.05)",
+      }}>
+        {presence.isOnline ? (
+          <>
+            <span style={{ fontSize: 28 }}>{emoji}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
+          </>
+        ) : (
+          <span style={{ fontSize: 24, opacity: 0.2 }}>💤</span>
+        )}
+      </div>
+
+      <div className="p-3">
         {/* Avatar + status */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div className="relative">
-            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
               {initials}
             </div>
-            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${dk?"border-[#0f1029]":"border-white"} ${presence.isOnline?"bg-emerald-400":dk?"bg-white/20":"bg-gray-300"}`} />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${dk?"border-[#0f1029]":"border-white"} ${presence.isOnline?"bg-emerald-400":dk?"bg-white/20":"bg-gray-300"}`} />
           </div>
-          <span className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-            presence.isOnline
-              ? dk?"bg-emerald-500/10 text-emerald-400":"bg-emerald-50 text-emerald-600"
-              : dk?"bg-white/5 text-white/25":"bg-gray-100 text-gray-400"
-          }`}>
+          <span className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${presence.isOnline ? dk?"bg-emerald-500/10 text-emerald-400":"bg-emerald-50 text-emerald-600" : dk?"bg-white/5 text-white/25":"bg-gray-100 text-gray-400"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${presence.isOnline?"bg-emerald-400 animate-pulse":dk?"bg-white/20":"bg-gray-300"}`} />
-            {presence.isOnline ? "Online" : "Offline"}
+            {presence.isOnline ? "Live" : "Away"}
           </span>
         </div>
 
-        {/* Name */}
+        {/* Name + time */}
         <div className="mb-2 min-w-0">
           <div className={`font-semibold text-sm leading-tight truncate ${dk?"text-white":"text-gray-900"}`}>{student.name}</div>
-          <div className={`text-[11px] truncate mt-0.5 ${dk?"text-white/30":"text-gray-400"}`}>{student.email}</div>
-        </div>
-
-        {/* Last activity */}
-        <div className={`text-[11px] leading-snug mb-3 ${dk?"text-white/35":"text-gray-500"}`}>
-          {presence.lastActive ? (
-            <><span className={`font-medium ${dk?"text-white/55":"text-gray-600"}`}>{timeAgo(presence.lastActive)}</span>{" — "}<span className="truncate">{presence.lastAction}</span></>
-          ) : (
-            <span className={dk?"text-white/20":"text-gray-400"}>No activity yet</span>
-          )}
-        </div>
-
-        {/* Project info */}
-        {presence.projectName && (
-          <div className={`text-[11px] flex items-center gap-1 mb-2 truncate ${dk?"text-white/30":"text-gray-400"}`}>
-            <Box size={10} className="flex-shrink-0" />
-            <span className="truncate">{presence.projectName}</span>
-            {typeof presence.blockCount === "number" && presence.blockCount > 0 && (
-              <span className={`ml-auto flex-shrink-0 font-mono ${dk?"text-white/20":"text-gray-400"}`}>{presence.blockCount} blk</span>
-            )}
+          <div className={`text-[10px] mt-0.5 ${dk?"text-white/25":"text-gray-400"}`}>
+            {presence.lastActive ? timeAgo(presence.lastActive) : "No activity yet"}
           </div>
-        )}
+        </div>
 
-        {/* Buttons */}
-        <div className="flex flex-col gap-1.5 mt-2">
-          {/* View Project */}
+        {/* Action buttons — visible on hover */}
+        <div className="flex gap-1.5 mt-2">
           {presence.projectId ? (
-            <Link to={`/project/${presence.projectId}`}
-              className={`flex items-center justify-center gap-1.5 w-full py-1.5 rounded-xl text-xs font-medium border transition-colors ${
-                dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20"
-                  :"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
-              <ExternalLink size={11}/> View Project
+            <Link to={`/project/${presence.projectId}`} className={`flex items-center justify-center gap-1 flex-1 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
+              <ExternalLink size={9}/> View
             </Link>
           ) : (
-            <div className={`text-center text-[11px] py-1 ${dk?"text-white/15":"text-gray-300"}`}>No project yet</div>
+            <div className={`flex-1 text-center text-[10px] py-1.5 ${dk?"text-white/15":"text-gray-300"}`}>No project</div>
           )}
-
-          {/* Watch Unity — only shown when student is in a Unity room */}
+          <button onClick={onMessage} title="Send message"
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}>
+            <MessageSquare size={11}/>
+          </button>
+          <button onClick={onKick} title="Kick to dashboard"
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-amber-500/10 hover:bg-amber-500/18 text-amber-400 border-amber-500/20":"bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200"}`}>
+            <Navigation size={11}/>
+          </button>
           {presence.unityRoom && (
-            <button
-              onClick={() => onWatchUnity(presence.unityRoom!, student.name)}
-              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer"
-              style={{
-                background:"rgba(34,211,238,0.1)",
-                color:"#22d3ee",
-                border:"1px solid rgba(34,211,238,0.25)",
-              }}>
-              <Eye size={11}/> Watch Unity Live
+            <button onClick={() => onWatchUnity(presence.unityRoom!, student.name)} title="Watch Unity"
+              className="p-1.5 rounded-lg border transition-all cursor-pointer" style={{ background:"rgba(34,211,238,0.1)",color:"#22d3ee",border:"1px solid rgba(34,211,238,0.25)" }}>
+              <Eye size={11}/>
             </button>
           )}
         </div>

@@ -60,8 +60,15 @@ export const api = {
   // Assignments
   getAssignments: (classId: string) => request<any[]>(`/assignments/class/${classId}`),
   createAssignment: (data: any) => request<any>("/assignments", { method: "POST", body: JSON.stringify(data) }),
+  generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string }) =>
+    request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),
   getAssignment: (id: string) => request<any>(`/assignments/${id}`),
   updateAssignment: (id: string, data: any) => request<any>(`/assignments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  getTodayAssignment: (classId: string) => request<any[]>(`/assignments/class/${classId}/today`),
+  getPendingAssignments: (classId: string) => request<any[]>(`/assignments/class/${classId}/pending`),
+  createWeeklyAssignments: (data: any) => request<any>(`/assignments/weekly`, { method: "POST", body: JSON.stringify(data) }),
+  submitAssignmentWithAnswers: (assignmentId: string, answers: any) =>
+    request<any>(`/submissions`, { method: "POST", body: JSON.stringify({ assignmentId, answers: JSON.stringify(answers) }) }),
 
   // Submissions
   submitAssignment: (assignmentId: string, projectId: string) => request<any>("/submissions", { method: "POST", body: JSON.stringify({ assignmentId, projectId }) }),
@@ -96,7 +103,8 @@ export const api = {
   // AI
   aiChat: (messages: any[], context?: string) => request<any>("/ai/chat", { method: "POST", body: JSON.stringify({ messages, context }) }),
   aiGenerateProject: (prompt: string) => request<any>("/ai/generate-project", { method: "POST", body: JSON.stringify({ prompt }) }),
-  aiGenerateQuiz: (topic: string, count: number) => request<any>("/ai/generate-quiz", { method: "POST", body: JSON.stringify({ topic, count }) }),
+  aiGenerateQuiz: (topic: string, count = 5, subject?: string, grade?: string) =>
+    request<any>("/ai/generate-quiz", { method: "POST", body: JSON.stringify({ topic, count, subject, grade }) }),
 
   // Upload
   upload: async (file: File) => {
@@ -111,8 +119,28 @@ export const api = {
     return res.json();
   },
 
+  // Class video
+  getClassVideo: (classId: string) => request<any>(`/classes/${classId}/video`),
+  shareClassVideo: (classId: string, videoId: string, videoTitle?: string) =>
+    request<any>(`/classes/${classId}/video`, { method: "POST", body: JSON.stringify({ videoId, videoTitle }) }),
+  stopClassVideo: (classId: string) => request<any>(`/classes/${classId}/video`, { method: "DELETE" }),
+
   // Student: get my controls for a class (lock status etc.)
   getMyControls: (classId: string) => request<any>(`/classes/${classId}/my-controls`),
+  pingPresence: (classId: string, activity?: string) =>
+    request<{ok: boolean}>(`/classes/${classId}/ping`, { method: "POST", body: JSON.stringify({ activity: activity || "online" }) }),
+  getClassPresence: (classId: string) =>
+    request<any[]>(`/classes/${classId}/presence`),
+
+  // GoGuardian classroom control
+  getClassroomState: (classId: string, since?: string) =>
+    request<any>(`/classes/${classId}/classroom-state${since ? `?since=${encodeURIComponent(since)}` : ''}`),
+  lockClass: (classId: string, message?: string) =>
+    request<any>(`/classes/${classId}/lock`, { method: "POST", body: JSON.stringify({ message: message || '' }) }),
+  unlockClass: (classId: string) =>
+    request<any>(`/classes/${classId}/unlock`, { method: "POST", body: JSON.stringify({}) }),
+  sendClassCommand: (classId: string, type: string, payload?: string, targetUserId?: string) =>
+    request<any>(`/classes/${classId}/command`, { method: "POST", body: JSON.stringify({ type, payload: payload || '', targetUserId }) }),
 
   // Student management
   getStudentsKiosk: () => request<any[]>('/students'),
@@ -122,6 +150,9 @@ export const api = {
   deleteStudent: (id: string) => request<any>(`/students/${id}`, { method: 'DELETE' }),
   setSkipWorkDay: (id: string) => request<any>(`/students/${id}/skip-work-day`, { method: 'POST' }),
   clearSkipWorkDay: (id: string) => request<any>(`/students/${id}/skip-work-day`, { method: 'DELETE' }),
+  approveStudentVideo: (id: string, url: string, title?: string) =>
+    request<any>(`/students/${id}/approve-video`, { method: 'PUT', body: JSON.stringify({ url, title }) }),
+  clearStudentVideo: (id: string) => request<any>(`/students/${id}/approve-video`, { method: 'DELETE' }),
 
   // Tasks
   getStudentTasks: (studentId: string, date: string) => request<any[]>(`/tasks/${studentId}/${date}`),
@@ -147,8 +178,15 @@ export const api = {
   completeWorksheet: (id: string) => request<any>(`/worksheets/assignments/${id}/complete`, { method: 'PUT' }),
   deleteWorksheetAssignment: (id: string) => request<any>(`/worksheets/assignments/${id}`, { method: 'DELETE' }),
 
+  // YouTube library (curated class videos)
+  getYouTubeLibrary: (classId: string) => request<any[]>(`/youtube/library/${classId}`),
+  addToYouTubeLibrary: (data: any) => request<any>('/youtube/library', { method: 'POST', body: JSON.stringify(data) }),
+  removeFromYouTubeLibrary: (id: string) => request<any>(`/youtube/library/${id}`, { method: 'DELETE' }),
+  pickLibraryVideo: (libraryId: string, studentId: string | number) => request<any>(`/youtube/library/${libraryId}/pick`, { method: 'POST', body: JSON.stringify({ student_id: studentId }) }),
+
   // YouTube
   getYouTubeRequests: (status?: string) => request<any[]>(`/youtube/requests${status ? '?status=' + status : ''}`),
+  getStudentYouTubeRequests: (studentId: string | number) => request<any[]>(`/youtube/requests/student/${studentId}`),
   createYouTubeRequest: (data: any) => request<any>('/youtube/requests', { method: 'POST', body: JSON.stringify(data) }),
   approveYouTubeRequest: (id: string, note?: string) => request<any>(`/youtube/requests/${id}/approve`, { method: 'PUT', body: JSON.stringify({ teacher_note: note }) }),
   denyYouTubeRequest: (id: string, note?: string) => request<any>(`/youtube/requests/${id}/deny`, { method: 'PUT', body: JSON.stringify({ teacher_note: note }) }),

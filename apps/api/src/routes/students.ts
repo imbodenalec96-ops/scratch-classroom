@@ -5,6 +5,14 @@ import { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 
+// Ensure approved-video columns exist (idempotent)
+async function ensureVideoColumns() {
+  const cols = ["approved_video_url TEXT", "approved_video_title TEXT", "approved_video_set_at TEXT"];
+  for (const col of cols) {
+    try { await db.exec(`ALTER TABLE students ADD COLUMN ${col}`); } catch { /* already exists */ }
+  }
+}
+
 // GET / — list students (active only by default, ?all=1 for all)
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
@@ -135,6 +143,36 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: "Failed to delete student" });
+  }
+});
+
+// PUT /:id/approve-video — teacher approves a YouTube video for this student
+router.put("/:id/approve-video", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureVideoColumns();
+    const { url, title } = req.body;
+    if (!url) return res.status(400).json({ error: "url is required" });
+    const now = new Date().toISOString();
+    await db.prepare(
+      "UPDATE students SET approved_video_url=?, approved_video_title=?, approved_video_set_at=? WHERE id=?"
+    ).run(url, title || "", now, req.params.id);
+    const row = await db.prepare("SELECT * FROM students WHERE id=?").get(req.params.id);
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to approve video" });
+  }
+});
+
+// DELETE /:id/approve-video — teacher clears a student's approved video
+router.delete("/:id/approve-video", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureVideoColumns();
+    await db.prepare(
+      "UPDATE students SET approved_video_url=NULL, approved_video_title=NULL, approved_video_set_at=NULL WHERE id=?"
+    ).run(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to clear video" });
   }
 });
 

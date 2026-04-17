@@ -10,6 +10,18 @@ export default function ProjectsList() {
   const { theme } = useTheme();
   const dk = theme === "dark";
   const navigate = useNavigate();
+
+  // Students have no access to projects
+  if (user?.role === "student") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-32 text-center">
+        <FolderOpen size={40} className={`mb-3 ${dk ? "text-white/15" : "text-gray-300"}`} />
+        <p className={`text-sm ${dk ? "text-white/30" : "text-gray-400"}`}>
+          Projects are not available here. Ask your teacher for access.
+        </p>
+      </div>
+    );
+  }
   const [projects, setProjects] = useState<any[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
