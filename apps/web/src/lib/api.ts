@@ -82,6 +82,7 @@ export const api = {
   regenerateAssignment: (id: string) =>
     request<any>(`/assignments/${id}/regenerate`, { method: "POST", body: JSON.stringify({}) }),
   getAssignmentSubmissionCount: (id: string) => request<{count:number}>(`/assignments/${id}/submission-count`),
+  deleteAssignment: (id: string) => request<any>(`/assignments/${id}`, { method: "DELETE" }),
   getClassSettings: (classId: string) => request<any>(`/assignments/settings/${classId}`),
   updateClassSettings: (classId: string, data: any) => request<any>(`/assignments/settings/${classId}`, { method: "PUT", body: JSON.stringify(data) }),
   submitAssignmentWithAnswers: (assignmentId: string, answers: any) =>

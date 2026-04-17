@@ -797,10 +797,24 @@ router.post("/:id/regenerate", requireRole("teacher", "admin"), async (req: Auth
   res.json({ ok: true, assignment: updated });
 });
 
-// Delete assignment
+// Delete assignment. Teacher can delete their own; admin can delete any.
+// Also cleans up submissions so we don't leave orphaned rows.
 router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await db.prepare("DELETE FROM assignments WHERE id = ? AND teacher_id = ?").run(req.params.id, req.user!.id);
-  res.json({ deleted: true });
+  // Verify existence + ownership
+  const row = await db.prepare("SELECT id, teacher_id FROM assignments WHERE id = ?").get(req.params.id) as any;
+  if (!row) return res.status(404).json({ error: "Not found" });
+  if (req.user!.role !== 'admin' && row.teacher_id !== req.user!.id) {
+    return res.status(403).json({ error: "Not your assignment to delete" });
+  }
+  try {
+    await db.prepare("DELETE FROM submissions WHERE assignment_id = ?").run(req.params.id).catch(() => {});
+    await db.prepare("DELETE FROM assignment_adjustments WHERE assignment_id = ?").run(req.params.id).catch(() => {});
+    await db.prepare("DELETE FROM assignments WHERE id = ?").run(req.params.id);
+    res.json({ deleted: true, id: req.params.id });
+  } catch (e: any) {
+    console.error('delete assignment error:', e);
+    res.status(500).json({ error: 'Delete failed', detail: e?.message });
+  }
 });
 
 export default router;

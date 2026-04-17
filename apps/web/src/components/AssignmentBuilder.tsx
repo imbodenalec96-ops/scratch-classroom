@@ -904,7 +904,16 @@ export default function AssignmentBuilder() {
                 </div>
               </div>
 
-              {/* Per-assignment action row — Edit / Easier / Harder / Regenerate */}
+              {/* Per-assignment metadata strip */}
+              <div className="flex items-center gap-3 mt-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                {a.target_subject && <span>{a.target_subject === "math" ? "🔢" : a.target_subject === "writing" ? "✏️" : "📖"} {a.target_subject}</span>}
+                {a.question_count != null && <span>· {a.question_count} Qs</span>}
+                {a.estimated_minutes != null && <span>· ~{a.estimated_minutes} min</span>}
+                <span>· {a.student_id ? "Per-student" : "Whole class"}</span>
+                {a.created_at && <span style={{ marginLeft: "auto" }}>Created {new Date(a.created_at).toLocaleDateString()}</span>}
+              </div>
+
+              {/* Per-assignment action row — Edit / Easier / Harder / Regenerate / Delete */}
               <div className="flex gap-1.5 mt-3 pt-3 flex-wrap" style={{ borderTop: "1px solid var(--border)" }}>
                 <button onClick={() => setEditingAssignment(a)}
                   className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
@@ -925,6 +934,25 @@ export default function AssignmentBuilder() {
                   className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
                   style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)", color: "var(--accent)", background: "var(--accent-light)" }}>
                   {adjusting[a.id] === "regen" ? "Regenerating…" : "✨ Regenerate fresh"}
+                </button>
+                <button
+                  onClick={async () => {
+                    const count = await api.getAssignmentSubmissionCount(a.id).catch(() => ({ count: 0 }));
+                    const warn = count.count > 0
+                      ? `Delete "${a.title}"?\n\n⚠️ ${count.count} student${count.count === 1 ? " has" : "s have"} already submitted. Their submissions will be deleted too.\n\nThis cannot be undone.`
+                      : `Delete "${a.title}"?\n\nThis will remove it from every student in this class. Cannot be undone.`;
+                    if (!confirm(warn)) return;
+                    setAdjusting(p => ({ ...p, [a.id]: "delete" }));
+                    try {
+                      await api.deleteAssignment(a.id);
+                      await loadAssignments(classId);
+                    } catch (e: any) { alert("Delete failed: " + e.message); }
+                    finally { setAdjusting(p => { const n = { ...p }; delete n[a.id]; return n; }); }
+                  }}
+                  disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", marginLeft: "auto" }}>
+                  {adjusting[a.id] === "delete" ? "Deleting…" : "🗑 Delete"}
                 </button>
               </div>
 
