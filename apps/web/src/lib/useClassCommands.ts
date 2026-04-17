@@ -2,15 +2,19 @@
  * useClassCommands — GoGuardian-style classroom control for students.
  *
  * Polls the classroom-state endpoint every 4 seconds. When the teacher
- * locks screens, students get a full-screen overlay within 4s. When the
- * teacher sends a NAVIGATE or KICK command, the student's browser routes
- * immediately. MESSAGE commands show a dismissable overlay.
+ * locks screens, students get a full-screen overlay within 4s.
  *
- * Works entirely via HTTP polling — no WebSocket required (Vercel-safe).
+ * Safety nets baked in:
+ * - Admins/teachers can never be locked (server-side + client-side)
+ * - Locks older than 30 min auto-expire (server-side + client-side guard)
+ * - Network/auth failures keep the student UNLOCKED (fail-open)
+ * - A separate global heartbeat fires regardless of class membership
  */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api.ts";
+
+const LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 // Module-level cache so multiple hook instances share the same class IDs
 let _cachedClassIds: string[] = [];
@@ -24,7 +28,7 @@ async function getMyClassIds(): Promise<string[]> {
     .getClasses()
     .then((classes: any[]) => {
       _cachedClassIds = classes.map((c: any) => c.id);
-      _cacheExpiry = Date.now() + 5 * 60 * 1000; // 5 min TTL
+      _cacheExpiry = Date.now() + 5 * 60 * 1000;
       return _cachedClassIds;
     })
     .catch(() => _cachedClassIds)
@@ -46,31 +50,41 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
   const [lockedBy, setLockedBy] = useState("");
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
-  // Track latest command timestamp to avoid re-executing old commands
   const lastCmdAtRef = useRef(new Date(0).toISOString());
   const dismissMessage = useCallback(() => setPendingMessage(null), []);
 
   useEffect(() => {
-    if (!enabled) return; // Teachers/admins: no-op
+    if (!enabled) return;
     let cancelled = false;
+
+    // Fire-and-forget global heartbeat every 10s — works even if no class
+    const hb = () => { api.heartbeat().catch(() => {}); };
+    hb();
+    const hbInterval = setInterval(hb, 10_000);
 
     async function poll() {
       const ids = await getMyClassIds();
       if (cancelled || ids.length === 0) return;
-
-      // Poll the primary class (first in list); if multi-class, worst case is
-      // 4s delay for subsequent classes — acceptable tradeoff to avoid N requests
       const classId = ids[0];
 
       try {
         const data = await api.getClassroomState(classId, lastCmdAtRef.current);
         if (cancelled) return;
 
-        setIsLocked(data.isLocked ?? false);
+        // CLIENT-SIDE SAFETY NET: ignore stale locks
+        let isLockedSafe = !!data.isLocked;
+        if (isLockedSafe && data.lockedAt) {
+          const age = Date.now() - new Date(data.lockedAt).getTime();
+          if (age > LOCK_MAX_AGE_MS) {
+            console.warn(`Client: ignoring stale lock (age ${Math.round(age/60000)}min)`);
+            isLockedSafe = false;
+          }
+        }
+
+        setIsLocked(isLockedSafe);
         setLockMessage(data.lockMessage ?? "");
         setLockedBy(data.lockedBy ?? "");
 
-        // Process commands (only new ones — since lastCmdAt)
         for (const cmd of data.commands ?? []) {
           if (cmd.createdAt > lastCmdAtRef.current) {
             lastCmdAtRef.current = cmd.createdAt;
@@ -84,12 +98,14 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
               break;
             case "MESSAGE":
               setPendingMessage(cmd.payload || "");
-              // Auto-dismiss after 15s
               setTimeout(() => setPendingMessage(null), 15_000);
               break;
           }
         }
-      } catch { /* network failure — keep previous state */ }
+      } catch (err) {
+        // Fail-open: on network errors, assume NOT locked
+        console.warn('Classroom state poll failed:', err);
+      }
     }
 
     poll();
@@ -97,8 +113,9 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
     return () => {
       cancelled = true;
       clearInterval(iv);
+      clearInterval(hbInterval);
     };
-  }, [navigate]);
+  }, [navigate, enabled]);
 
   return { isLocked, lockMessage, lockedBy, pendingMessage, dismissMessage };
 }

@@ -78,6 +78,8 @@ export default function MonitorPage() {
   const [tick, setTick]                     = useState(0);
   const [isClassLocked, setIsClassLocked]   = useState(false);
   const [lockMsg, setLockMsg]               = useState("");
+  const [pollOk, setPollOk]                 = useState(false);
+  const [lastPollAt, setLastPollAt]         = useState<number>(0);
   const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
   const [msgText, setMsgText]               = useState("");
   const [showPushMenu, setShowPushMenu]     = useState(false);
@@ -148,7 +150,12 @@ export default function MonitorPage() {
           }
           return next;
         });
-      } catch { /* ignore */ }
+        setPollOk(true);
+        setLastPollAt(Date.now());
+      } catch (e) {
+        console.warn('presence poll failed:', e);
+        setPollOk(false);
+      }
     };
     fetchPresence();
     const iv = setInterval(fetchPresence, 5000);
@@ -323,9 +330,34 @@ export default function MonitorPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${wsConnected ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600" : dk ? "bg-white/5 text-white/25" : "bg-gray-100 text-gray-400"}`}>
-            {wsConnected ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><Wifi size={11}/> Live</> : <><span className="w-1.5 h-1.5 rounded-full bg-gray-400" /><WifiOff size={11}/> Polling</>}
+          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${
+            pollOk || wsConnected
+              ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+              : dk ? "bg-red-500/10 text-red-400" : "bg-red-50 text-red-600"
+          }`}>
+            {pollOk || wsConnected ? (
+              <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <Wifi size={11}/> {wsConnected ? "Live" : "Connected"}</>
+            ) : (
+              <><span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                <WifiOff size={11}/> Disconnected</>
+            )}
           </div>
+          {/* Force Unlock All — panic button */}
+          <button
+            onClick={async () => {
+              if (!confirm("Force-unlock EVERY class?")) return;
+              try { await api.forceUnlockAll(); setIsClassLocked(false); alert("✓ All classes unlocked."); }
+              catch (e: any) { alert("Failed: " + (e?.message || e)); }
+            }}
+            title="Clear every active lock system-wide"
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-all ${
+              dk ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25"
+                 : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
+            }`}
+          >
+            <LockOpen size={11}/> Force Unlock All
+          </button>
           {classes.length > 1 && (
             <select value={selectedClass?.id ?? ""} onChange={e => handleClassChange(e.target.value)} className="input py-2 text-sm w-44">
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

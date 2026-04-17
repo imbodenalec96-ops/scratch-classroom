@@ -130,6 +130,17 @@ export default function TeacherDashboard() {
     setMsgText(""); setShowMsgModal(false);
   };
 
+  const handleForceUnlockAll = async () => {
+    if (!confirm("Force-unlock EVERY class? This clears all active locks system-wide.")) return;
+    try {
+      await api.forceUnlockAll();
+      setIsClassLocked(false);
+      alert("✓ All classes unlocked.");
+    } catch (e: any) {
+      alert("Failed: " + (e?.message || e));
+    }
+  };
+
   const onlineCount = useCountUp(students.length);
 
   return (
@@ -160,6 +171,18 @@ export default function TeacherDashboard() {
             Welcome back, {user?.name}
           </p>
         </div>
+        {/* Emergency panic button — force-unlock every class */}
+        <button
+          onClick={handleForceUnlockAll}
+          title="Clear every active lock system-wide — use if a student gets stuck"
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+            dk
+              ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25"
+              : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+          }`}
+        >
+          <LockOpen size={13}/> Force Unlock All
+        </button>
       </div>
 
       {/* Quick-access tools grid — staggered fade in */}

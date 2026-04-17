@@ -141,6 +141,9 @@ export const api = {
     request<any>(`/classes/${classId}/unlock`, { method: "POST", body: JSON.stringify({}) }),
   sendClassCommand: (classId: string, type: string, payload?: string, targetUserId?: string) =>
     request<any>(`/classes/${classId}/command`, { method: "POST", body: JSON.stringify({ type, payload: payload || '', targetUserId }) }),
+  forceUnlockAll: () => request<any>(`/classes/force-unlock-all`, { method: "POST", body: JSON.stringify({}) }),
+  heartbeat: (activity?: string) => request<{ok:boolean}>(`/classes/heartbeat`, { method: "POST", body: JSON.stringify({ activity: activity || 'online' }) }),
+  debugMe: () => request<any>(`/classes/debug/me`),
 
   // Student management
   getStudentsKiosk: () => request<any[]>('/students'),

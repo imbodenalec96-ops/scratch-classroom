@@ -2,10 +2,18 @@ import React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
+import { useClassCommands } from "../lib/useClassCommands.ts";
+import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 
 export default function PublicLayout() {
   const { user } = useAuth();
   const loc = useLocation();
+
+  // Students on public routes (like /arcade) still need the lock overlay +
+  // command polling — otherwise teachers can't lock them when they're
+  // playing arcade games.
+  const isStudent = user?.role === "student";
+  const classCommands = useClassCommands(isStudent);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#07071a" }}>
@@ -72,6 +80,17 @@ export default function PublicLayout() {
       <div className="flex-1">
         <Outlet />
       </div>
+
+      {/* GoGuardian overlay — only for authenticated students */}
+      {isStudent && (
+        <ScreenLockOverlay
+          isLocked={classCommands.isLocked}
+          message={classCommands.lockMessage}
+          lockedBy={classCommands.lockedBy}
+          pendingMessage={classCommands.pendingMessage}
+          onDismissMessage={classCommands.dismissMessage}
+        />
+      )}
     </div>
   );
 }
