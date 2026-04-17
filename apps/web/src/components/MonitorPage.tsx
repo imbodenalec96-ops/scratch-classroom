@@ -156,6 +156,12 @@ export default function MonitorPage() {
     try { const r = await api.revokeFreeTimeAll(selectedClass.id); alert(`⛔ Free time revoked for ${r.studentsAffected} students`); }
     catch (e: any) { alert("Failed: " + e.message); }
   };
+  const handleEndAllBreaks = async () => {
+    if (!selectedClass) return;
+    if (!confirm(`End every active break in ${selectedClass.name}? Students will be kicked back to /student with a toast.`)) return;
+    try { const r = await api.endAllBreaks(selectedClass.id); alert(`⏰ Break-end signal sent to ${r.studentsNotified} students`); }
+    catch (e: any) { alert("Failed: " + e.message); }
+  };
   const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
   const [msgText, setMsgText]               = useState("");
   const [showPushMenu, setShowPushMenu]     = useState(false);
@@ -599,6 +605,10 @@ export default function MonitorPage() {
             <button onClick={handleRevokeAll}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25":"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
               ⛔ Revoke All
+            </button>
+            <button onClick={handleEndAllBreaks}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border-violet-500/25":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
+              ⏰ End All Breaks
             </button>
             <button onClick={() => setShowConfigPanel(v => !v)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${showConfigPanel ? (dk?"bg-blue-500/20 text-blue-300 border-blue-500/40":"bg-blue-100 text-blue-700 border-blue-300") : (dk?"bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/25":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200")}`}>

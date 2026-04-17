@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import {
   X, Lock, LockOpen, Send, Navigation, MessageSquare, Gift, Ban,
-  RefreshCcw, ExternalLink, Clock, Zap,
+  RefreshCcw, ExternalLink, Clock, Zap, Coffee,
 } from "lucide-react";
 
 interface Props {
@@ -109,6 +109,11 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   const handleRevoke = async () => {
     if (!confirm(`Revoke free time for ${student.name}? They'll be pushed back to assignments.`)) return;
     try { await api.revokeFreeTime(student.id); showFlash("⛔ Free time revoked"); }
+    catch (e: any) { alert("Failed: " + e.message); }
+  };
+  const handleEndBreak = async () => {
+    if (!confirm(`End ${student.name}'s break early? They'll get a toast and go back to /student.`)) return;
+    try { await api.endBreak(student.id); showFlash("⏰ Break ended"); }
     catch (e: any) { alert("Failed: " + e.message); }
   };
 
@@ -263,6 +268,10 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
 
               <button onClick={handleGrant}  className={btn("gold")}>   <Gift size={13}/> Grant Free Time</button>
               <button onClick={handleRevoke} className={btn("red")}>    <Ban  size={13}/> Revoke Free Time</button>
+
+              <button onClick={handleEndBreak} className={btn("violet") + " col-span-2"}>
+                <Coffee size={13}/> ⛔ End Break Now
+              </button>
             </div>
           </div>
 
