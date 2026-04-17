@@ -939,6 +939,32 @@ router.post("/:classId/command", requireRole("teacher", "admin"), async (req: Au
     const cutoff = new Date(Date.now() - 120_000).toISOString();
     db.prepare("DELETE FROM class_commands WHERE class_id = ? AND created_at < ?")
       .run(classId, cutoff).catch(() => {});
+
+    // Parallel fan-out to the new student_commands pipe for MESSAGE.
+    // Legacy class_commands still fires (useClassCommands still consumes it),
+    // so students see the message either way during the migration. Once
+    // useStudentCommands proves reliable we'll retire the class_commands
+    // MESSAGE branch in useClassCommands.ts.
+    if (type === "MESSAGE") {
+      try {
+        if (targetUserId) {
+          await enqueueStudentCommand(targetUserId, "MESSAGE", payload || "");
+        } else {
+          // Class-wide: fan out to every role='student' in the class.
+          const students = await db.prepare(
+            "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+          ).all(classId) as Array<{ id: string }>;
+          await Promise.all(students.map(s =>
+            enqueueStudentCommand(s.id, "MESSAGE", payload || "")
+          ));
+        }
+      } catch (e) {
+        // Don't fail the teacher's request if the new pipe hiccups — legacy
+        // class_commands insert above already succeeded.
+        console.warn("MESSAGE fan-out to student_commands failed (legacy pipe still delivered):", e);
+      }
+    }
+
     res.json({ ok: true, commandId: id });
   } catch (e) {
     console.error('command error:', e);

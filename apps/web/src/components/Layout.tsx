@@ -9,6 +9,7 @@ import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
+import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
@@ -47,6 +48,12 @@ export default function Layout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      // Payload is the raw message text (matches legacy class_commands
+      // MESSAGE payload shape so the server fan-out writes the same string
+      // to both pipes).
+      studentMessageStore.setMessage(row.payload || "");
+    },
   });
   // Subscribe to the new lock store and OR it into the existing overlay
   // props. Legacy class_commands lock (from useClassCommands) stays
@@ -55,6 +62,11 @@ export default function Layout() {
     studentLockStore.subscribe,
     studentLockStore.getSnapshot,
     studentLockStore.getSnapshot,
+  );
+  const newMessage = useSyncExternalStore(
+    studentMessageStore.subscribe,
+    studentMessageStore.getSnapshot,
+    studentMessageStore.getSnapshot,
   );
   // Rich activity labels tied to pathname — every route change re-pings
   usePresencePing(user ? activityFromPath(location.pathname) : "");
@@ -188,8 +200,8 @@ export default function Layout() {
           isLocked={classCommands.isLocked || newLock.locked}
           message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
-          pendingMessage={classCommands.pendingMessage}
-          onDismissMessage={classCommands.dismissMessage}
+          pendingMessage={newMessage || classCommands.pendingMessage}
+          onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
       )}
 
