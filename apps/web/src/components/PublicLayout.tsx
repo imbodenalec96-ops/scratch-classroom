@@ -5,6 +5,7 @@ import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
+import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
@@ -28,11 +29,22 @@ export default function PublicLayout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      let text = row.payload || "";
+      try { text = JSON.parse(row.payload || "{}").text || row.payload || ""; } catch {}
+      studentMessageStore.setMessage(text);
+      setTimeout(() => studentMessageStore.setMessage(null), 15_000);
+    },
   });
   const newLock = useSyncExternalStore(
     studentLockStore.subscribe,
     studentLockStore.getSnapshot,
     studentLockStore.getSnapshot,
+  );
+  const newMsg = useSyncExternalStore(
+    studentMessageStore.subscribe,
+    studentMessageStore.getSnapshot,
+    studentMessageStore.getSnapshot,
   );
   // Rich activity labels for authenticated users
   usePresencePing(user ? activityFromPath(loc.pathname) : "");
@@ -111,8 +123,8 @@ export default function PublicLayout() {
           isLocked={classCommands.isLocked || newLock.locked}
           message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
-          pendingMessage={classCommands.pendingMessage}
-          onDismissMessage={classCommands.dismissMessage}
+          pendingMessage={newMsg.message || classCommands.pendingMessage}
+          onDismissMessage={() => { classCommands.dismissMessage?.(); studentMessageStore.setMessage(null); }}
         />
       )}
 

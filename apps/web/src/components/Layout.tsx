@@ -9,6 +9,7 @@ import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
+import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
@@ -47,14 +48,22 @@ export default function Layout() {
       studentLockStore.setLocked(true, msg);
     },
     UNLOCK: () => studentLockStore.setLocked(false, null),
+    MESSAGE: (row) => {
+      let text = row.payload || "";
+      try { text = JSON.parse(row.payload || "{}").text || row.payload || ""; } catch {}
+      studentMessageStore.setMessage(text);
+      setTimeout(() => studentMessageStore.setMessage(null), 15_000);
+    },
   });
-  // Subscribe to the new lock store and OR it into the existing overlay
-  // props. Legacy class_commands lock (from useClassCommands) stays
-  // authoritative for class-wide state until the old pipe is retired.
   const newLock = useSyncExternalStore(
     studentLockStore.subscribe,
     studentLockStore.getSnapshot,
     studentLockStore.getSnapshot,
+  );
+  const newMsg = useSyncExternalStore(
+    studentMessageStore.subscribe,
+    studentMessageStore.getSnapshot,
+    studentMessageStore.getSnapshot,
   );
   // Rich activity labels tied to pathname — every route change re-pings
   usePresencePing(user ? activityFromPath(location.pathname) : "");
@@ -188,8 +197,8 @@ export default function Layout() {
           isLocked={classCommands.isLocked || newLock.locked}
           message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
           lockedBy={classCommands.lockedBy}
-          pendingMessage={classCommands.pendingMessage}
-          onDismissMessage={classCommands.dismissMessage}
+          pendingMessage={newMsg.message || classCommands.pendingMessage}
+          onDismissMessage={() => { classCommands.dismissMessage?.(); studentMessageStore.setMessage(null); }}
         />
       )}
 
