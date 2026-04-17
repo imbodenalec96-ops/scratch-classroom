@@ -37,6 +37,26 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
+// Admin: reassign a class's primary teacher
+router.put("/:id/reassign-teacher", requireRole("admin"), async (req: AuthRequest, res: Response) => {
+  const { teacher_id } = req.body;
+  if (!teacher_id) return res.status(400).json({ error: "teacher_id required" });
+  try {
+    // Verify the new teacher exists and has role 'teacher' or 'admin'
+    const u = await db.prepare("SELECT id, name, role FROM users WHERE id = ?").get(teacher_id) as any;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    if (u.role !== "teacher" && u.role !== "admin") {
+      return res.status(400).json({ error: "Target user must be a teacher or admin" });
+    }
+    await db.prepare("UPDATE classes SET teacher_id = ? WHERE id = ?").run(teacher_id, req.params.id);
+    const row = await db.prepare("SELECT * FROM classes WHERE id = ?").get(req.params.id);
+    res.json({ ok: true, class: row, newTeacher: u.name });
+  } catch (e) {
+    console.error('reassign-teacher error:', e);
+    res.status(500).json({ error: 'Failed to reassign' });
+  }
+});
+
 // Delete class (admin can delete any, teacher can delete own)
 router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
