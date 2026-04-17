@@ -10,6 +10,7 @@ import {
   Youtube, X, Play, Square, Eye, Send, Navigation,
   Gamepad2, BookOpen, LayoutDashboard, MessageSquare,
 } from "lucide-react";
+import StudentDrawer from "./StudentDrawer.tsx";
 
 /* ── helpers ──────────────────────────────────────────────── */
 
@@ -82,6 +83,7 @@ export default function MonitorPage() {
   const [lastPollAt, setLastPollAt]         = useState<number>(0);
   const [snapshots, setSnapshots]           = useState<Record<string, { data: string; path: string; capturedAt: string }>>({});
   const [zoomedSnapshot, setZoomedSnapshot] = useState<{ name: string; data: string; path: string } | null>(null);
+  const [drawerStudent, setDrawerStudent]   = useState<any>(null);
   const [showMsgModal, setShowMsgModal]     = useState<string | null>(null); // studentId or "all"
   const [msgText, setMsgText]               = useState("");
   const [showPushMenu, setShowPushMenu]     = useState(false);
@@ -296,6 +298,18 @@ export default function MonitorPage() {
 
   return (
     <div className="p-6 space-y-5 animate-page-enter">
+
+      {/* Per-student control drawer */}
+      {drawerStudent && selectedClass && (
+        <StudentDrawer
+          open={!!drawerStudent}
+          onClose={() => setDrawerStudent(null)}
+          student={drawerStudent}
+          classId={selectedClass.id}
+          presence={presence[drawerStudent.id] || {}}
+          dk={dk}
+        />
+      )}
 
       {/* Zoomed snapshot modal */}
       {zoomedSnapshot && (
@@ -566,6 +580,7 @@ export default function MonitorPage() {
                 onMessage={() => setShowMsgModal(s.id)}
                 onKick={() => handleKick(s.id)}
                 onZoom={snap?.data ? () => setZoomedSnapshot({ name: s.name, data: snap.data, path: snap.path }) : undefined}
+                onOpenDrawer={() => setDrawerStudent(s)}
               />
             );
           })}
@@ -588,9 +603,10 @@ interface TileProps {
   onMessage: () => void;
   onKick: () => void;
   onZoom?: () => void;
+  onOpenDrawer?: () => void;
 }
 
-function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatchUnity, onMessage, onKick, onZoom }: TileProps) {
+function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatchUnity, onMessage, onKick, onZoom, onOpenDrawer }: TileProps) {
   const gradient = avatarGradient(student.name || "?");
   const initials = (student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
   const { emoji, label, color } = activityPreview(presence.lastAction || "");
@@ -599,7 +615,8 @@ function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatch
 
   return (
     <div
-      className={`rounded-2xl border transition-all duration-200 overflow-hidden animate-slide-in group ${
+      onClick={onOpenDrawer}
+      className={`rounded-2xl border transition-all duration-200 overflow-hidden animate-slide-in group cursor-pointer hover:-translate-y-0.5 hover:shadow-xl ${
         presence.isOnline
           ? dk ? "border-emerald-500/25 shadow-lg shadow-emerald-500/5" : "border-emerald-300/60 shadow-md shadow-emerald-100"
           : dk ? "border-white/[0.06]" : "border-gray-200"
@@ -609,9 +626,8 @@ function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatch
       {/* Online accent stripe */}
       {presence.isOnline && <div className="h-0.5 bg-gradient-to-r from-emerald-500/60 via-emerald-400 to-emerald-500/60" />}
 
-      {/* Screenshot preview pane — click to zoom */}
+      {/* Screenshot preview pane — click to zoom (no stopPropagation so tile opens drawer) */}
       <div
-        onClick={hasSnap && onZoom ? onZoom : undefined}
         style={{
           position: "relative",
           height: 140,
@@ -619,7 +635,6 @@ function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatch
           flexDirection: "column", gap: 4,
           background: hasSnap ? "#07071a" : presence.isOnline ? `${color}12` : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
           borderBottom: dk ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(0,0,0,0.05)",
-          cursor: hasSnap && onZoom ? "zoom-in" : "default",
           overflow: "hidden",
         }}>
         {hasSnap ? (
@@ -679,7 +694,7 @@ function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatch
         </div>
 
         {/* Action buttons — visible on hover */}
-        <div className="flex gap-1.5 mt-2">
+        <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
           {presence.projectId ? (
             <Link to={`/project/${presence.projectId}`} className={`flex items-center justify-center gap-1 flex-1 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
               <ExternalLink size={9}/> View
@@ -687,16 +702,16 @@ function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatch
           ) : (
             <div className={`flex-1 text-center text-[10px] py-1.5 ${dk?"text-white/15":"text-gray-300"}`}>No project</div>
           )}
-          <button onClick={onMessage} title="Send message"
+          <button onClick={e => { e.stopPropagation(); onMessage(); }} title="Send message"
             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}>
             <MessageSquare size={11}/>
           </button>
-          <button onClick={onKick} title="Kick to dashboard"
+          <button onClick={e => { e.stopPropagation(); onKick(); }} title="Kick to dashboard"
             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-amber-500/10 hover:bg-amber-500/18 text-amber-400 border-amber-500/20":"bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200"}`}>
             <Navigation size={11}/>
           </button>
           {presence.unityRoom && (
-            <button onClick={() => onWatchUnity(presence.unityRoom!, student.name)} title="Watch Unity"
+            <button onClick={e => { e.stopPropagation(); onWatchUnity(presence.unityRoom!, student.name); }} title="Watch Unity"
               className="p-1.5 rounded-lg border transition-all cursor-pointer" style={{ background:"rgba(34,211,238,0.1)",color:"#22d3ee",border:"1px solid rgba(34,211,238,0.25)" }}>
               <Eye size={11}/>
             </button>

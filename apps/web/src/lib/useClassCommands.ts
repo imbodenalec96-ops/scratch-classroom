@@ -100,6 +100,21 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
               setPendingMessage(cmd.payload || "");
               setTimeout(() => setPendingMessage(null), 15_000);
               break;
+            case "GRANT_FREE_TIME":
+              try {
+                localStorage.setItem("workDoneDate", new Date().toISOString().slice(0, 10));
+                setPendingMessage("🎁 Teacher granted you free time! Enjoy.");
+                setTimeout(() => setPendingMessage(null), 8_000);
+              } catch {}
+              break;
+            case "REVOKE_FREE_TIME":
+              try {
+                localStorage.removeItem("workDoneDate");
+                setPendingMessage("⛔ Free time paused — back to work.");
+                setTimeout(() => setPendingMessage(null), 8_000);
+                navigate(cmd.payload || "/student");
+              } catch {}
+              break;
           }
         }
       } catch (err) {

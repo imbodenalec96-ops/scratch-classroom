@@ -534,6 +534,89 @@ router.post("/force-unlock-all", requireRole("teacher", "admin"), async (req: Au
   }
 });
 
+// Teacher: lock a SINGLE student (adds a targeted NAVIGATE + sets teacher_controls.screen_locked)
+router.post("/lock-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  const { message = '' } = req.body;
+  try {
+    // Flip the per-student lock flag in teacher_controls (exists across all classes)
+    const rows = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    for (const r of rows) {
+      const existing = await db.prepare(
+        "SELECT id FROM teacher_controls WHERE class_id = ? AND student_id = ?"
+      ).get(r.class_id, studentId) as any;
+      if (!existing) {
+        await db.prepare(
+          "INSERT INTO teacher_controls (id, class_id, student_id, screen_locked) VALUES (?, ?, ?, 1)"
+        ).run(crypto.randomUUID(), r.class_id, studentId).catch(() => {});
+      } else {
+        await db.prepare(
+          "UPDATE teacher_controls SET screen_locked = 1 WHERE id = ?"
+        ).run(existing.id).catch(() => {});
+      }
+      // Also drop a targeted MESSAGE command so they see something immediately
+      if (message) {
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await db.prepare(
+          "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'MESSAGE', ?, ?)"
+        ).run(id, r.class_id, studentId, message, now).catch(() => {});
+      }
+    }
+    res.json({ ok: true, classesAffected: rows.length });
+  } catch (e) {
+    console.error('lock-student error:', e);
+    res.status(500).json({ error: 'Failed to lock student' });
+  }
+});
+
+// Teacher: grant one student free time immediately (mirrors the client-side
+// isWorkUnlocked by setting a server-side flag that the client can check).
+// Minimal: push a NAVIGATE command + a message, leave client to update.
+router.post("/grant-free-time/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  try {
+    const rows = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    for (const r of rows) {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      // Custom command type the client will unpack to flip isWorkUnlocked
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'GRANT_FREE_TIME', '', ?)"
+      ).run(id, r.class_id, studentId, now).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('grant-free-time error:', e);
+    res.status(500).json({ error: 'Failed to grant free time' });
+  }
+});
+
+// Teacher: revoke one student's free time (send REVOKE_FREE_TIME command)
+router.post("/revoke-free-time/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.params;
+  try {
+    const rows = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    for (const r of rows) {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at) VALUES (?, ?, ?, 'REVOKE_FREE_TIME', '/student', ?)"
+      ).run(id, r.class_id, studentId, now).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('revoke-free-time error:', e);
+    res.status(500).json({ error: 'Failed to revoke free time' });
+  }
+});
+
 // Teacher: rescue a single stuck student — sends them a NAVIGATE command to
 // /student and clears any per-class lock for every class they're in.
 router.post("/force-unlock-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
@@ -608,7 +691,7 @@ router.post("/:classId/unlock", requireRole("teacher", "admin"), async (req: Aut
 router.post("/:classId/command", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId } = req.params;
   const { type, payload = '', targetUserId } = req.body;
-  if (!["NAVIGATE", "MESSAGE", "KICK"].includes(type)) {
+  if (!["NAVIGATE", "MESSAGE", "KICK", "GRANT_FREE_TIME", "REVOKE_FREE_TIME"].includes(type)) {
     return res.status(400).json({ error: "Invalid command type" });
   }
   await ensureClassStateTables();

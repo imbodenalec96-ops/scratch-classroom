@@ -143,6 +143,9 @@ export const api = {
     request<any>(`/classes/${classId}/command`, { method: "POST", body: JSON.stringify({ type, payload: payload || '', targetUserId }) }),
   forceUnlockAll: () => request<any>(`/classes/force-unlock-all`, { method: "POST", body: JSON.stringify({}) }),
   forceUnlockStudent: (studentId: string) => request<any>(`/classes/force-unlock-student/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
+  lockStudent: (studentId: string, message?: string) => request<any>(`/classes/lock-student/${studentId}`, { method: "POST", body: JSON.stringify({ message: message || '' }) }),
+  grantFreeTime: (studentId: string) => request<any>(`/classes/grant-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
+  revokeFreeTime: (studentId: string) => request<any>(`/classes/revoke-free-time/${studentId}`, { method: "POST", body: JSON.stringify({}) }),
 
   // DOM preview thumbnails
   postSnapshot: (data: string, path: string) =>
