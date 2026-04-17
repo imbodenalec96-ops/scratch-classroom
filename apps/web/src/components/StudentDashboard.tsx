@@ -830,6 +830,13 @@ export default function StudentDashboard() {
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
 
+  // Pending quizzes (Bug #32): quizzes created by teachers should surface here
+  const [pendingQuizzes, setPendingQuizzes] = useState<any[]>([]);
+  const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
+  const [quizResult, setQuizResult] = useState<{ score: number } | null>(null);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+
   // Stats
   const [statClasses, setStatClasses] = useState(0);
   const [statSubmitted, setStatSubmitted] = useState(0);
@@ -868,10 +875,11 @@ export default function StudentDashboard() {
 
         let found: any = null;
         let foundParsed: any = null;
+        const allQuizzes: any[] = [];
         for (const cls of clsList) {
           try {
             const pending = await api.getPendingAssignments(cls.id);
-            if (pending && pending.length > 0) {
+            if (pending && pending.length > 0 && !found) {
               const a = pending[0];
               found = a;
               if (a.content) {
@@ -880,10 +888,17 @@ export default function StudentDashboard() {
                   if (parsed?.sections?.length > 0) foundParsed = parsed;
                 } catch {}
               }
-              break;
+            }
+          } catch {}
+          // Bug #32: pull pending quizzes per class too
+          try {
+            const qz = await api.getPendingQuizzes(cls.id);
+            if (Array.isArray(qz) && qz.length) {
+              qz.forEach((q: any) => allQuizzes.push({ ...q, _className: cls.name }));
             }
           } catch {}
         }
+        setPendingQuizzes(allQuizzes);
 
         if (found) {
           setPendingAssignment(found);
@@ -1106,6 +1121,99 @@ export default function StudentDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Today's Quizzes (Bug #32): quizzes created by teacher surface here ── */}
+      {pendingQuizzes.length > 0 && !activeQuiz && (
+        <div className="animate-slide-up" style={{ animationDelay: "160ms" }}>
+          <div className="section-label mb-3" style={{ color: "var(--accent)" }}>
+            — Today's quizzes —
+          </div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+            {pendingQuizzes.map((q) => (
+              <button key={q.id}
+                onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
+                className="text-left p-5 card-hover transition-all"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderLeft: "3px solid var(--accent)",
+                  borderRadius: "var(--r-xl)",
+                  cursor: "pointer",
+                }}>
+                <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>
+                  {q._className || "Quiz"} · {(q.questions || []).length} questions
+                </div>
+                <div className="font-display text-xl leading-tight" style={{ color: "var(--text-1)" }}>
+                  {q.title || "Untitled quiz"}
+                </div>
+                {q.estimated_minutes ? (
+                  <div className="text-xs mt-2" style={{ color: "var(--text-2)" }}>~{q.estimated_minutes} min</div>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Inline quiz taker */}
+      {activeQuiz && (
+        <div className="animate-slide-up card p-6" style={{ borderLeft: "3px solid var(--accent)" }}>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <div className="section-label mb-1">— Quiz —</div>
+              <h2 className="font-display text-2xl" style={{ color: "var(--text-1)" }}>{activeQuiz.title}</h2>
+            </div>
+            <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} className="text-sm" style={{ color: "var(--text-3)" }}>Close</button>
+          </div>
+
+          {quizResult ? (
+            <div className="text-center py-8">
+              <div className="font-display text-5xl mb-2" style={{ color: "var(--accent)" }}>{quizResult.score}%</div>
+              <div style={{ color: "var(--text-2)" }}>Quiz submitted. Nice work.</div>
+              <button
+                onClick={() => {
+                  setPendingQuizzes((prev) => prev.filter((x) => x.id !== activeQuiz.id));
+                  setActiveQuiz(null); setQuizResult(null);
+                }}
+                className="btn-primary mt-4">Done</button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {(activeQuiz.questions || []).map((q: any, qi: number) => (
+                  <div key={qi} className="p-4" style={{ background: "var(--bg-muted)", borderRadius: "var(--r-md)" }}>
+                    <div className="font-medium mb-3" style={{ color: "var(--text-1)" }}>{qi + 1}. {q.text}</div>
+                    <div className="space-y-2">
+                      {(q.options || []).map((opt: string, oi: number) => (
+                        <label key={oi} className="flex items-center gap-2 cursor-pointer p-2 rounded"
+                          style={{ background: quizAnswers[qi] === oi ? "var(--accent-light)" : "transparent" }}>
+                          <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
+                            onChange={() => setQuizAnswers((a) => { const n = [...a]; n[qi] = oi; return n; })} />
+                          <span style={{ color: "var(--text-1)" }}>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                disabled={quizSubmitting || quizAnswers.some((a) => a < 0)}
+                onClick={async () => {
+                  setQuizSubmitting(true);
+                  try {
+                    const r = await api.submitQuiz(activeQuiz.id, quizAnswers);
+                    setQuizResult({ score: r.score });
+                  } catch (e: any) {
+                    alert("Could not submit: " + (e?.message || "unknown error"));
+                  } finally { setQuizSubmitting(false); }
+                }}
+                className="btn-primary mt-6">
+                {quizSubmitting ? "Submitting…" : "Submit quiz"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Free Time Unlocked — editorial tile set ── */}
       {unlocked && (

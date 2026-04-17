@@ -111,6 +111,7 @@ export const api = {
 
   // Quizzes
   getQuizzes: (classId: string) => request<any[]>(`/quizzes/class/${classId}`),
+  getPendingQuizzes: (classId: string) => request<any[]>(`/quizzes/class/${classId}/pending`),
   createQuiz: (data: any) => request<any>("/quizzes", { method: "POST", body: JSON.stringify(data) }),
   getQuiz: (id: string) => request<any>(`/quizzes/${id}`),
   submitQuiz: (quizId: string, answers: number[]) => request<any>(`/quizzes/${quizId}/attempt`, { method: "POST", body: JSON.stringify({ answers }) }),

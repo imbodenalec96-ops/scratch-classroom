@@ -43,7 +43,10 @@ function getAnthropic() {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
   const { default: Anthropic } = require("@anthropic-ai/sdk");
-  return new Anthropic({ apiKey: key });
+  // 60s per-request timeout + 1 retry only. Default SDK config is 10min
+  // timeout with 2 retries — that turns a single slow call into 30min of
+  // hanging, which is what was blowing past our client-side 90s abort.
+  return new Anthropic({ apiKey: key, timeout: 45_000, maxRetries: 0 });
 }
 const AI_MODEL = "claude-sonnet-4-20250514";
 

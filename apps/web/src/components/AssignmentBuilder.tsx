@@ -593,7 +593,7 @@ export default function AssignmentBuilder() {
     const CONCURRENCY = 3;
     // Per-slot hard timeout. If Vercel's function hangs (cold start + slow
     // Anthropic response), we abort and retry rather than waiting forever.
-    const SLOT_TIMEOUT_MS = 90_000;
+    const SLOT_TIMEOUT_MS = 120_000;
     const t0 = Date.now();
 
     const appendLog = (entry: { label: string; status: "start" | "ok" | "fail"; ms?: number; err?: string }) => {

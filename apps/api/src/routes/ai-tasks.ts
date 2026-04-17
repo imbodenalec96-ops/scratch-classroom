@@ -19,7 +19,7 @@ function getAnthropic() {
   // Dynamic import keeps the optional dep from crashing at module load time
   // We use the SDK synchronously after the key check
   const { default: Anthropic } = require("@anthropic-ai/sdk");
-  return new Anthropic({ apiKey: key });
+  return new Anthropic({ apiKey: key, timeout: 60_000, maxRetries: 1 });
 }
 
 const AI_UNAVAILABLE = {

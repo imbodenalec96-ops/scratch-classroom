@@ -6,13 +6,62 @@ import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 
+// Idempotent migration: extend quizzes with grade targeting, per-student
+// delivery, scheduled_date, and rich customization fields — mirrors the
+// assignments schema so quizzes can reach students the same way.
+let quizColsReady = false;
+let quizColsInFlight: Promise<void> | null = null;
+async function ensureQuizCols() {
+  if (quizColsReady) return;
+  if (quizColsInFlight) return quizColsInFlight;
+  quizColsInFlight = (async () => {
+    for (const col of [
+      "ALTER TABLE quizzes ADD COLUMN target_grade_min INTEGER",
+      "ALTER TABLE quizzes ADD COLUMN target_grade_max INTEGER",
+      "ALTER TABLE quizzes ADD COLUMN target_subject TEXT",
+      "ALTER TABLE quizzes ADD COLUMN student_id TEXT",
+      "ALTER TABLE quizzes ADD COLUMN scheduled_date TEXT",
+      "ALTER TABLE quizzes ADD COLUMN teacher_notes TEXT",
+      "ALTER TABLE quizzes ADD COLUMN question_count INTEGER",
+      "ALTER TABLE quizzes ADD COLUMN estimated_minutes INTEGER",
+      "ALTER TABLE quizzes ADD COLUMN focus_keywords TEXT",
+      "ALTER TABLE quizzes ADD COLUMN learning_objective TEXT",
+      "ALTER TABLE quizzes ADD COLUMN hints_allowed INTEGER",
+      "ALTER TABLE quizzes ADD COLUMN question_type TEXT",
+    ]) {
+      try { await db.exec(col); } catch { /* column already exists */ }
+    }
+    quizColsReady = true;
+  })();
+  try { await quizColsInFlight; } finally { quizColsInFlight = null; }
+}
+
 // Create quiz
 router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const { classId, title, questions } = req.body;
+  await ensureQuizCols();
+  const {
+    classId, title, questions,
+    targetGradeMin, targetGradeMax, targetSubject,
+    studentId, scheduledDate, teacherNotes,
+    questionCount, estimatedMinutes, focusKeywords,
+    learningObjective, hintsAllowed, questionType,
+  } = req.body;
   const id = crypto.randomUUID();
   await db.prepare(
-    "INSERT INTO quizzes (id, class_id, teacher_id, title, questions) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, classId, req.user!.id, title, JSON.stringify(questions || []));
+    `INSERT INTO quizzes (
+       id, class_id, teacher_id, title, questions,
+       target_grade_min, target_grade_max, target_subject,
+       student_id, scheduled_date, teacher_notes,
+       question_count, estimated_minutes, focus_keywords,
+       learning_objective, hints_allowed, question_type
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, classId, req.user!.id, title, JSON.stringify(questions || []),
+    targetGradeMin ?? null, targetGradeMax ?? null, targetSubject ?? null,
+    studentId ?? null, scheduledDate ?? null, teacherNotes ?? null,
+    questionCount ?? null, estimatedMinutes ?? null, focusKeywords ?? null,
+    learningObjective ?? null, hintsAllowed ?? null, questionType ?? null,
+  );
   const row = await db.prepare("SELECT * FROM quizzes WHERE id = ?").get(id) as any;
   row.questions = JSON.parse(row.questions);
   res.json(row);
@@ -25,6 +74,57 @@ router.get("/class/:classId", async (req: AuthRequest, res: Response) => {
   ).all(req.params.classId) as any[];
   rows.forEach((r) => { r.questions = JSON.parse(r.questions); });
   res.json(rows);
+});
+
+// Pending quizzes for the current student in a class.
+// Honors per-student delivery (student_id) and grade targeting
+// (target_grade_min/max vs user_grade_levels[target_subject]).
+// Excludes quizzes the student has already attempted.
+router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id;
+  const classId = req.params.classId;
+  await ensureQuizCols();
+  try {
+    const rows = await db.prepare(`
+      SELECT q.* FROM quizzes q
+      LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id AND qa.student_id = ?
+      WHERE q.class_id = ? AND qa.id IS NULL
+        AND (q.student_id IS NULL OR q.student_id = ?)
+      ORDER BY q.scheduled_date ASC, q.created_at ASC
+    `).all(userId, classId, userId) as any[];
+
+    let studentGrades: any = null;
+    try {
+      studentGrades = await db.prepare(
+        "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
+      ).get(userId);
+    } catch { /* grades table may not exist yet */ }
+    const gradeFor = (subject: string | null): number => {
+      if (!studentGrades) return 3;
+      const col = subject === 'math' ? 'math_grade'
+                : subject === 'writing' ? 'writing_grade'
+                : 'reading_grade';
+      return Number(studentGrades[col] ?? 3);
+    };
+
+    const filtered = rows.filter((r: any) => {
+      try { r.questions = JSON.parse(r.questions); } catch { r.questions = []; }
+      // Student view: strip correctIndex so answers aren't leaked
+      r.questions = (r.questions || []).map((q: any) => ({
+        id: q.id, text: q.text, options: q.options,
+      }));
+      if (r.target_grade_min == null) return true;
+      const tMin = Number(r.target_grade_min);
+      const tMax = r.target_grade_max != null ? Number(r.target_grade_max) : tMin;
+      const g = gradeFor(r.target_subject);
+      return g >= tMin && g <= tMax;
+    });
+
+    res.json(filtered);
+  } catch (e) {
+    console.error('pending quizzes error:', e);
+    res.json([]);
+  }
 });
 
 // Get quiz

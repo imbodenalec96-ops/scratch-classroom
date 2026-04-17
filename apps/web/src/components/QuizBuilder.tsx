@@ -16,6 +16,11 @@ export default function QuizBuilder() {
   const [aiSubject, setAiSubject] = useState("Math");
   const [aiGrade, setAiGrade] = useState("3rd Grade");
   const [count, setCount] = useState(10);
+  const [targetSubject, setTargetSubject] = useState<string>("");
+  const [targetGradeMin, setTargetGradeMin] = useState<string>("");
+  const [targetGradeMax, setTargetGradeMax] = useState<string>("");
+  const [scheduledDate, setScheduledDate] = useState<string>("");
+  const [teacherNotes, setTeacherNotes] = useState<string>("");
   const [takingQuiz, setTakingQuiz] = useState<any>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
@@ -37,8 +42,17 @@ export default function QuizBuilder() {
   const addQuestion = () => setQuestions([...questions, { id: `q${questions.length + 1}`, text: "", options: ["", "", "", ""], correctIndex: 0 }]);
   const handleCreate = async () => {
     if (!title || questions.length === 0) return;
-    await api.createQuiz({ classId, title, questions });
-    setShowForm(false); setQuestions([]); setTitle(""); loadQuizzes(classId);
+    await api.createQuiz({
+      classId, title, questions,
+      targetSubject: targetSubject || null,
+      targetGradeMin: targetGradeMin ? Number(targetGradeMin) : null,
+      targetGradeMax: targetGradeMax ? Number(targetGradeMax) : (targetGradeMin ? Number(targetGradeMin) : null),
+      scheduledDate: scheduledDate || null,
+      teacherNotes: teacherNotes || null,
+    });
+    setShowForm(false); setQuestions([]); setTitle("");
+    setTargetSubject(""); setTargetGradeMin(""); setTargetGradeMax(""); setScheduledDate(""); setTeacherNotes("");
+    loadQuizzes(classId);
   };
   const handleStartQuiz = (quiz: any) => {
     setTakingQuiz(quiz);
@@ -148,6 +162,35 @@ export default function QuizBuilder() {
               ))}
             </div>
           ))}
+          {/* Targeting: who sees this quiz (optional; blank = whole class) */}
+          <div className="rounded-xl p-3 border space-y-2" style={{ background: "var(--bg-muted)", borderColor: "var(--border)" }}>
+            <div className="text-xs font-semibold text-t3 uppercase tracking-wider">Who sees this quiz?</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div>
+                <label className="block text-[11px] text-t3 mb-1">Subject</label>
+                <select value={targetSubject} onChange={(e) => setTargetSubject(e.target.value)} className="input w-full text-sm">
+                  <option value="">(any)</option>
+                  <option value="reading">Reading</option>
+                  <option value="math">Math</option>
+                  <option value="writing">Writing</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] text-t3 mb-1">Grade min</label>
+                <input type="number" min={0} max={12} value={targetGradeMin} onChange={(e) => setTargetGradeMin(e.target.value)} className="input w-full text-sm" placeholder="any" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-t3 mb-1">Grade max</label>
+                <input type="number" min={0} max={12} value={targetGradeMax} onChange={(e) => setTargetGradeMax(e.target.value)} className="input w-full text-sm" placeholder="= min" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-t3 mb-1">Scheduled</label>
+                <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="input w-full text-sm" />
+              </div>
+            </div>
+            <input value={teacherNotes} onChange={(e) => setTeacherNotes(e.target.value)}
+              placeholder="Teacher notes (optional)" className="input w-full text-sm" />
+          </div>
           <button onClick={addQuestion} className="btn-ghost text-sm">+ Add Question</button>
           <button onClick={handleCreate} className="btn-primary">Create Quiz</button>
         </div>
