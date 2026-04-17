@@ -590,7 +590,9 @@ export default function AssignmentBuilder() {
     // Tuned down from 10 → 3. Anthropic Tier 1 concurrent-request limits + pg
     // default pool size of 10 were causing generate-slot requests to queue
     // behind each other silently. 3 keeps the bar moving without stalls.
-    const CONCURRENCY = 3;
+    // Concurrency=2 to stay well under Anthropic's tier-1 concurrent-call limit.
+    // Higher values trigger SDK retries that silently stall past our 120s abort.
+    const CONCURRENCY = 2;
     // Per-slot hard timeout. If Vercel's function hangs (cold start + slow
     // Anthropic response), we abort and retry rather than waiting forever.
     const SLOT_TIMEOUT_MS = 120_000;

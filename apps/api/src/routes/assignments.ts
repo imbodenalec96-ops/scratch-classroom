@@ -90,7 +90,11 @@ async function generateDailyAssignmentContent(client: any, opts: {
     : "Mix multiple_choice, short_answer, and fill_blank when natural.";
 
   try {
-    const msg = await client.messages.create({
+    // Explicit Promise.race hard-timeout. The SDK's `timeout` config is
+    // unreliable under rate-limit backoff — calls can stall past 120s even
+    // with maxRetries:0. This forcibly rejects at 40s regardless of SDK state.
+    const HARD_TIMEOUT_MS = 40_000;
+    const apiCall = client.messages.create({
       model: AI_MODEL,
       max_tokens: 900,
       system:
@@ -109,6 +113,10 @@ ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different 
 Make this feel different from other days this week. Return ONLY JSON.`,
       }],
     });
+    const msg: any = await Promise.race([
+      apiCall,
+      new Promise((_r, rej) => setTimeout(() => rej(new Error(`anthropic hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
+    ]);
     const raw = (msg.content[0] as any).text.trim();
     const parsed = JSON.parse(raw);
     if (!parsed.sections || !Array.isArray(parsed.sections)) throw new Error("bad shape");
@@ -920,7 +928,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     : "Rewrite this to be MORE CHALLENGING. Use longer sentences, more advanced vocabulary, larger numbers, questions that require multi-step reasoning. Keep the same general topic and the same question count.";
 
   try {
-    const msg = await client.messages.create({
+    const apiCall2 = client.messages.create({
       model: AI_MODEL,
       max_tokens: 900,
       system: "You are a creative elementary teacher. Return JSON ONLY matching the EXACT same shape as the input. No markdown, no preamble.",
@@ -929,6 +937,10 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
         content: `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.`,
       }],
     });
+    const msg: any = await Promise.race([
+      apiCall2,
+      new Promise((_r, rej) => setTimeout(() => rej(new Error("anthropic hard-timeout 40000ms")), 40_000)),
+    ]);
     const raw = (msg.content[0] as any).text.trim();
     const next = JSON.parse(raw);
     if (!next?.sections) throw new Error("bad shape");
