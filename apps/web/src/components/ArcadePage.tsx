@@ -29,6 +29,7 @@ import RacingGame from "./games/RacingGame.tsx";
 import Minesweeper from "./games/Minesweeper.tsx";
 import WordSearch from "./games/WordSearch.tsx";
 import Sudoku from "./games/Sudoku.tsx";
+import Sandbox from "./games/Sandbox.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -405,9 +406,34 @@ const GAMES: Game[] = [
     component: Sudoku,
     hint: "Tap cell · tap number · 💡 hint if you're stuck",
   },
+  {
+    id: "sandbox",
+    title: "Sandbox Builder",
+    description: "Build your own world on a 2D grid. 24 tiles, day/night modes, random worlds, auto-saves. Pure creative play — no rules.",
+    category: "Sandbox",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#10b981",
+    emoji: "🏗️",
+    component: Sandbox,
+    hint: "Pick a tile · click/drag to paint · eraser to remove",
+  },
+  {
+    id: "sandbox-3d",
+    title: "3D Stage",
+    description: "The Unity 3D creative stage — walk around, place props, build scenes with others in your class in real time.",
+    category: "Sandbox",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#22d3ee",
+    emoji: "🎮",
+    type: "unity",
+    embedUrl: "/unity-games/blockforge-stage/index.html",
+    hint: "WASD / arrow keys · mouse to look around",
+  },
 ];
 
-const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Sports", "Unity"];
+const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Sandbox", "Sports", "Unity"];
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   All: <Grid3X3 size={13} />,
   Classic: <Gamepad2 size={13} />,
