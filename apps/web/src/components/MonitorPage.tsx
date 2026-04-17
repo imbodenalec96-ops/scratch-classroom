@@ -440,18 +440,25 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight flex items-center gap-2 ${dk ? "text-white" : "text-gray-900"}`}>
-            <Monitor size={22} className="text-pink-400" />
-            Student Monitor
-          </h1>
-          <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-            {loading ? "Loading…" : `${onlineCount} online · ${offlineCount} offline · ${students.length} total`}
-          </p>
+      {/* ── Masthead header ── */}
+      <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+          <span className="font-mono">BLOCKFORGE · LIVE MONITOR</span>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <div className="section-label mb-2">— Classroom in session —</div>
+            <h1 className="font-display text-4xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
+              {selectedClass?.name || "No class selected"}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+            </h1>
+            <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
+              {loading ? "Loading…" : <>
+                <strong style={{ color: "var(--success)" }}>{onlineCount} online</strong> · {offlineCount} offline · {students.length} total students
+              </>}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
           <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${
             pollOk || wsConnected
               ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
@@ -495,39 +502,41 @@ export default function MonitorPage() {
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          <Link to="/teacher" className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-colors ${dk ? "border-white/[0.07] text-white/50 hover:text-white hover:bg-white/[0.04]" : "border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
+          <Link to="/teacher" className="btn-ghost text-xs">
             <ChevronLeft size={13}/> Dashboard
           </Link>
         </div>
-      </div>
+        </div>
+      </header>
 
-      {/* Stats row */}
+      {/* Stats row — editorial numerals, not colored pills */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label:"Online",    value:onlineCount,     color:"text-emerald-400", bg:dk?"bg-emerald-500/10":"bg-emerald-50", border:dk?"border-emerald-500/20":"border-emerald-200", icon:<Wifi size={14}/> },
-          { label:"Offline",   value:offlineCount,    color:"text-red-400",     bg:dk?"bg-red-500/10":"bg-red-50",         border:dk?"border-red-500/20":"border-red-200",         icon:<WifiOff size={14}/> },
-          { label:"Students",  value:students.length, color:"text-violet-400",  bg:dk?"bg-violet-500/10":"bg-violet-50",   border:dk?"border-violet-500/20":"border-violet-200",   icon:<Users size={14}/> },
-          { label:"Active Now",value:onlineCount,     color:"text-blue-400",    bg:dk?"bg-blue-500/10":"bg-blue-50",       border:dk?"border-blue-500/20":"border-blue-200",       icon:<Activity size={14}/> },
+          { label:"Online",    value:onlineCount,     accent:"var(--success)", icon:<Wifi size={14}/> },
+          { label:"Offline",   value:offlineCount,    accent:"var(--danger)",  icon:<WifiOff size={14}/> },
+          { label:"Students",  value:students.length, accent:"var(--accent)",  icon:<Users size={14}/> },
+          { label:"Active Now",value:onlineCount,     accent:"var(--accent-sage)", icon:<Activity size={14}/> },
         ].map(stat => (
-          <div key={stat.label} className={`rounded-xl px-4 py-3 border flex items-center gap-3 ${stat.bg} ${stat.border}`}>
-            <div className={stat.color}>{stat.icon}</div>
-            <div>
-              <div className={`text-xs ${dk?"text-white/40":"text-gray-500"}`}>{stat.label}</div>
-              <div className={`text-2xl font-bold leading-tight ${dk?"text-white":"text-gray-900"}`}>{stat.value}</div>
+          <div key={stat.label} className="card flex items-baseline gap-3" style={{ padding: "14px 16px", borderLeft: `3px solid ${stat.accent}` }}>
+            <div style={{ color: stat.accent }}>{stat.icon}</div>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{stat.label}</div>
+              <div className="font-display text-3xl leading-none mt-0.5" style={{ color: "var(--text-1)" }}>{stat.value}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* GoGuardian Controls */}
+      {/* ── Classroom Controls ── */}
       {selectedClass && (
         <div className="card space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className={`text-sm font-semibold flex items-center gap-2 ${dk?"text-white/70":"text-gray-700"}`}>
-              <Monitor size={14} className="text-pink-400" />
-              Classroom Controls
-              <span className={`text-xs font-normal ${dk?"text-white/25":"text-gray-400"}`}>— {selectedClass.name}</span>
-            </h3>
+            <div>
+              <div className="section-label mb-1">— Controls —</div>
+              <h3 className="font-display text-xl leading-none" style={{ color: "var(--text-1)" }}>
+                Classroom
+              </h3>
+            </div>
             {isClassLocked && (
               <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/25 animate-pulse">
                 <Lock size={11}/> LOCKED

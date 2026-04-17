@@ -144,25 +144,31 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
       >
         <style>{`@keyframes slideInR { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
 
-        {/* Header */}
-        <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b ${
-          dk ? "bg-[#0f1029] border-white/[0.06]" : "bg-white border-gray-200"
-        }`}>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0">
+        {/* ── Editorial drawer header ── */}
+        <div className="sticky top-0 z-10 px-6 py-5 border-b" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
+          <div className="flex items-center justify-between mb-3 text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-3)" }}>
+            <span>Student Profile</span>
+            <button onClick={onClose} className="btn-ghost text-[10px]" style={{ padding: "2px 6px" }}>
+              <X size={12}/> Close
+            </button>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 flex items-center justify-center text-base font-bold flex-shrink-0"
+              style={{ background: "var(--accent-light)", color: "var(--text-accent)",
+                       borderRadius: "var(--r-sm)",
+                       border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
               {(student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
             </div>
-            <div className="min-w-0">
-              <div className={`font-bold text-base truncate ${dk ? "text-white" : "text-gray-900"}`}>{student.name}</div>
-              <div className={`text-xs flex items-center gap-2 truncate ${dk ? "text-white/40" : "text-gray-500"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${presence?.isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-400"}`} />
-                {presence?.isOnline ? "Live" : "Offline"} · {presence?.lastAction || "No activity yet"}
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-2xl leading-tight truncate" style={{ color: "var(--text-1)" }}>{student.name}</h2>
+              <div className="text-xs flex items-center gap-1.5 mt-1" style={{ color: "var(--text-2)" }}>
+                <span className={`w-1.5 h-1.5 rounded-full ${presence?.isOnline ? "animate-pulse" : ""}`} style={{ background: presence?.isOnline ? "var(--success)" : "var(--text-3)" }} />
+                <strong style={{ color: presence?.isOnline ? "var(--success)" : "var(--text-3)" }}>{presence?.isOnline ? "Live" : "Offline"}</strong>
+                <span style={{ color: "var(--text-3)" }}>·</span>
+                <span className="truncate">{presence?.lastAction || "No activity yet"}</span>
               </div>
             </div>
           </div>
-          <button onClick={onClose} className={`p-1.5 rounded-lg cursor-pointer ${dk ? "hover:bg-white/[0.06] text-white/40 hover:text-white" : "hover:bg-gray-100 text-gray-400 hover:text-gray-700"}`}>
-            <X size={18} />
-          </button>
         </div>
 
         {/* Flash toast */}
