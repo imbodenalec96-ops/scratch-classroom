@@ -153,6 +153,9 @@ export const api = {
     return res.json();
   },
 
+  // Class daily schedule (block-based day table; seeded for Star)
+  getClassSchedule: (classId: string) => request<any[]>(`/classes/${classId}/schedule`),
+
   // Class video
   getClassVideo: (classId: string) => request<any>(`/classes/${classId}/video`),
   shareClassVideo: (classId: string, videoId: string, videoTitle?: string) =>

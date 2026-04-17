@@ -6,6 +6,7 @@ import { isWorkUnlocked, isAccessAllowed } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
+import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
@@ -221,6 +222,9 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto animate-page-enter min-w-0">
+        {/* Schedule-block header — display-only. Renders nothing when no class,
+            no schedule, or the wall clock is outside every block. */}
+        <CurrentBlockStrip />
         <Outlet />
       </main>
 
