@@ -29,6 +29,7 @@ import youtubeRoutes from "./routes/youtube.js";
 import adminSettingsRoutes from "./routes/admin-settings.js";
 import aiTasksRoutes from "./routes/ai-tasks.js";
 import lessonsRoutes from "./routes/lessons.js";
+import gradesRoutes from "./routes/grades.js";
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use("/api/youtube", authMiddleware, youtubeRoutes);
 app.use("/api/admin-settings", authMiddleware, adminSettingsRoutes);
 app.use("/api/ai-tasks", authMiddleware, aiTasksRoutes);
 app.use("/api/lessons", authMiddleware, lessonsRoutes);
+app.use("/api/grades", authMiddleware, gradesRoutes);
 
 // File upload endpoint
 app.post("/api/upload", authMiddleware, upload.single("file"), (req, res) => {

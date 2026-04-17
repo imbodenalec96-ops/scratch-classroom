@@ -24,6 +24,7 @@ import LessonsPage from "./components/LessonsPage.tsx";
 import ArcadePage from "./components/ArcadePage.tsx";
 import YouTubeManager from "./components/YouTubeManager.tsx";
 import LessonAnalytics from "./components/LessonAnalytics.tsx";
+import ClassGrades from "./components/ClassGrades.tsx";
 import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
@@ -135,6 +136,7 @@ export default function App() {
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="youtube" element={<YouTubeManager />} />
             <Route path="lesson-analytics" element={<LessonAnalytics />} />
+            <Route path="class-grades" element={<ClassGrades />} />
           </Route>
 
           {/* Full-screen project workspace (no sidebar) */}

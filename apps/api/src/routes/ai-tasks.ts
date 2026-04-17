@@ -57,9 +57,22 @@ router.post("/generate", async (req: AuthRequest, res: Response) => {
   const client = getAnthropic();
   if (!client) return res.status(503).json(AI_UNAVAILABLE);
 
-  const { student_id, date, subject, grade_min, grade_max, focus } = req.body;
-  if (!student_id || !date || !subject || grade_min == null || grade_max == null) {
+  const { student_id, date, subject, focus } = req.body;
+  let { grade_min, grade_max } = req.body;
+  if (!student_id || !date || !subject) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+  // If caller didn't supply grades, look them up from user_grade_levels for this student+subject
+  if (grade_min == null || grade_max == null) {
+    try {
+      const g = await db.prepare(
+        "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
+      ).get(student_id) as any;
+      const col = subject === 'math' ? 'math_grade' : subject === 'writing' ? 'writing_grade' : 'reading_grade';
+      const single = g?.[col] ?? 3;
+      if (grade_min == null) grade_min = single;
+      if (grade_max == null) grade_max = single;
+    } catch { grade_min = grade_min ?? 3; grade_max = grade_max ?? 3; }
   }
 
   const existing = (db as any).prepare(

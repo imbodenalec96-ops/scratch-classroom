@@ -232,6 +232,15 @@ export const api = {
   markLessonRead: (lessonId: string) => request<any>(`/lessons/mark-read/${encodeURIComponent(lessonId)}`, { method: "POST", body: JSON.stringify({}) }),
   getMyLessonViews: () => request<Array<{lesson_id: string; opened_at: string; marked_read_at: string}>>("/lessons/my-views"),
   getClassLessonViews: (classId: string) => request<any[]>(`/lessons/class/${classId}/views`),
+
+  // Per-student grade levels (Feature 17)
+  getMyGrades: () => request<{reading_grade:number; math_grade:number; writing_grade:number}>("/grades/mine"),
+  getStudentGrades: (userId: string) => request<any>(`/grades/student/${userId}`),
+  setStudentGrades: (userId: string, data: { reading_grade?: number; math_grade?: number; writing_grade?: number }) =>
+    request<any>(`/grades/student/${userId}`, { method: "PUT", body: JSON.stringify(data) }),
+  getClassGrades: (classId: string) => request<any[]>(`/grades/class/${classId}`),
+  bulkSetClassGrades: (classId: string, data: { reading_grade?: number; math_grade?: number; writing_grade?: number }) =>
+    request<any>(`/grades/class/${classId}/bulk`, { method: "PUT", body: JSON.stringify(data) }),
   worksheetSearch: (query: string, grade_min: number, grade_max: number) =>
     request<any[]>('/ai-tasks/worksheet-search', { method: 'POST', body: JSON.stringify({ query, grade_min, grade_max }) }),
   getTaskConfig: () => request<any[]>('/ai-tasks/task-config'),

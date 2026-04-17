@@ -8,7 +8,7 @@ import {
   Monitor, ClipboardList, HelpCircle, CheckSquare, BarChart3,
   Lock, LockOpen, Megaphone, Eye, Users, Plus, Activity,
   Youtube, Trophy, Navigation, MessageSquare, Gamepad2,
-  Send, X,
+  Send, X, GraduationCap,
 } from "lucide-react";
 
 /** Count-up animation for stat numbers */
@@ -36,6 +36,7 @@ const TOOLS = (dk: boolean) => [
   { path: "/youtube",     icon: Youtube,      label: "YouTube Queue",desc: "Library + requests",color: "text-red-400",     bg: dk ? "bg-red-500/10"     : "bg-red-50",     accent: "border-l-red-400" },
   { path: "/leaderboard", icon: Trophy,       label: "Leaderboard",  desc: "Student rankings",  color: "text-yellow-400",  bg: dk ? "bg-yellow-500/10"  : "bg-yellow-50",  accent: "border-l-yellow-400"  },
   { path: "/lesson-analytics", icon: ClipboardList, label: "Lesson Views", desc: "Who read what",  color: "text-indigo-400",  bg: dk ? "bg-indigo-500/10"  : "bg-indigo-50",  accent: "border-l-indigo-400"  },
+  { path: "/class-grades", icon: GraduationCap, label: "Class Grades", desc: "Per-student levels", color: "text-teal-400", bg: dk ? "bg-teal-500/10" : "bg-teal-50", accent: "border-l-teal-400" },
 ];
 
 const PUSH_PAGES = [
