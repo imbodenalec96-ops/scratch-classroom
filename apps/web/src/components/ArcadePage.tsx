@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "../lib/theme.tsx";
+import { useAuth } from "../lib/auth.tsx";
+import { usePresencePing } from "../lib/presence.ts";
 import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
@@ -498,11 +500,18 @@ function FeaturedBanner({ game, onPlay }: { game: Game; onPlay: () => void }) {
 /* ── Main page ──────────────────────────────────────────────── */
 export default function ArcadePage() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const dk = theme === "dark";
   const [activeCategory, setActiveCategory] = useState("All");
   const [prevCategory, setPrevCategory] = useState("All");
   const [playingGame, setPlayingGame] = useState<Game | null>(null);
   const [cardKey, setCardKey] = useState(0); // remount grid to re-trigger entrance anims
+
+  // Presence ping — students show as "Playing in Arcade 🎮" in teacher monitor
+  const arcadeActivity = playingGame
+    ? `Playing ${playingGame.title} 🎮`
+    : "Browsing Arcade 🎮";
+  usePresencePing(user?.role === "student" ? arcadeActivity : "");
 
   const filtered = activeCategory === "All"
     ? GAMES

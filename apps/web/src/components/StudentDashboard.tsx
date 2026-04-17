@@ -5,6 +5,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
+import { usePresencePing } from "../lib/presence.ts";
 import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2, FolderOpen } from "lucide-react";
 
 type Phase = 'welcome' | 'loading' | 'working' | 'break' | 'done';
@@ -472,14 +473,14 @@ export default function StudentDashboard() {
     return () => clearInterval(iv);
   }, [classes]);
 
-  // Presence ping
-  useEffect(() => {
-    if (classes.length === 0) return;
-    const ping = () => classes.forEach((cls) => api.pingPresence(cls.id, "on dashboard").catch(() => {}));
-    ping();
-    const iv = setInterval(ping, 30000);
-    return () => clearInterval(iv);
-  }, [classes]);
+  // Presence ping — uses global hook (no dependency on classes being loaded)
+  const phaseActivity =
+    phase === 'welcome' ? "Just logged in 👋" :
+    phase === 'loading' ? "Loading dashboard 🔄" :
+    phase === 'working' ? `Working on assignment 📝${pendingAssignment ? ` — ${pendingAssignment.title}` : ""}` :
+    phase === 'break'   ? "On break ☕" :
+                          "Free time! 🎉";
+  usePresencePing(phaseActivity);
 
   useSocket("class:lock", (data) => setLockedScreen(data.locked));
   useSocket("class:broadcast", (data) => {

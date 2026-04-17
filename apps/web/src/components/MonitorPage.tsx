@@ -76,9 +76,9 @@ export default function MonitorPage() {
   const [watchingRoom, setWatchingRoom]     = useState<string | null>(null); // room code being watched
   const [watchingName, setWatchingName]     = useState("");
 
-  // Refresh time-ago every 15 s
+  // Refresh time-ago every 10 s
   useEffect(() => {
-    const iv = setInterval(() => setTick((t) => t + 1), 15000);
+    const iv = setInterval(() => setTick((t) => t + 1), 10000);
     return () => clearInterval(iv);
   }, []);
 
@@ -115,6 +115,31 @@ export default function MonitorPage() {
     if (!cls) return;
     setSelectedClass(cls); loadClass(cls);
   };
+
+  // HTTP polling for presence (WebSocket not available on Vercel serverless)
+  useEffect(() => {
+    if (!selectedClass) return;
+    const fetchPresence = async () => {
+      try {
+        const data = await api.getClassPresence(selectedClass.id);
+        setPresence((prev) => {
+          const next = { ...prev };
+          for (const s of data) {
+            next[s.id] = {
+              ...prev[s.id],
+              isOnline: s.isOnline,
+              lastActive: s.last_seen ? new Date(s.last_seen).getTime() : (prev[s.id]?.lastActive ?? 0),
+              lastAction: s.activity || prev[s.id]?.lastAction || "online",
+            };
+          }
+          return next;
+        });
+      } catch { /* ignore */ }
+    };
+    fetchPresence();
+    const iv = setInterval(fetchPresence, 15000); // poll every 15s for near-real-time feel
+    return () => clearInterval(iv);
+  }, [selectedClass]);
 
   // WebSocket live presence
   useEffect(() => {
@@ -175,23 +200,7 @@ export default function MonitorPage() {
     };
   }, []);
 
-  // Mark students offline after 3 min of inactivity
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const now = Date.now();
-      setPresence((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [id, p] of Object.entries(prev)) {
-          if (p.isOnline && p.lastActive && now - p.lastActive > 180_000) {
-            next[id] = { ...p, isOnline: false }; changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }, 30_000);
-    return () => clearInterval(iv);
-  }, []);
+  // Note: online/offline state is now computed server-side via HTTP polling (isOnline based on last_seen < 2 min ago)
 
   const handleAnnounce = useCallback(() => {
     if (!announcement.trim() || !selectedClass) return;
@@ -220,6 +229,10 @@ export default function MonitorPage() {
       url: videoUrl,
       title: videoTitle || "Class Video",
     });
+    // HTTP fallback (works on Vercel)
+    if (selectedClass) {
+      api.shareClassVideo(selectedClass.id, id, videoTitle || "Class Video").catch(() => {});
+    }
     setActiveVideo(id);
     setShowVideoInput(false);
     setVideoUrl(""); setVideoTitle("");
@@ -228,6 +241,10 @@ export default function MonitorPage() {
   const handleStopVideo = () => {
     if (!selectedClass) return;
     getSocket().emit("class:video:stop", { classId: selectedClass.id });
+    // HTTP fallback (works on Vercel)
+    if (selectedClass) {
+      api.stopClassVideo(selectedClass.id).catch(() => {});
+    }
     setActiveVideo(null);
   };
 

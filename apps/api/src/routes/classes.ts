@@ -189,4 +189,114 @@ router.get("/:id/behavior", requireRole("teacher", "admin"), async (req: AuthReq
   res.json(rows);
 });
 
+// ── Student Presence (HTTP polling — WebSocket unavailable on Vercel) ──────
+
+let presenceTableReady = false;
+async function ensurePresenceTable() {
+  if (presenceTableReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS student_presence (
+        user_id TEXT NOT NULL,
+        class_id TEXT NOT NULL,
+        last_seen TEXT NOT NULL DEFAULT '',
+        activity TEXT DEFAULT 'online',
+        PRIMARY KEY (user_id, class_id)
+      )
+    `);
+    presenceTableReady = true;
+  } catch { /* already exists */ }
+}
+
+// Student: ping presence (called every 30s from client)
+router.post("/:classId/ping", async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id;
+  const classId = req.params.classId;
+  const { activity = 'online' } = req.body;
+  const now = new Date().toISOString();
+  await ensurePresenceTable();
+  try {
+    await db.prepare(
+      `INSERT INTO student_presence (user_id, class_id, last_seen, activity) VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id, class_id) DO UPDATE SET last_seen = ?, activity = excluded.activity`
+    ).run(userId, classId, now, activity, now);
+  } catch { /* ignore if table not ready yet */ }
+  res.json({ ok: true });
+});
+
+// Teacher: get presence for all students in a class
+router.get("/:classId/presence", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensurePresenceTable();
+  try {
+    const rows = await db.prepare(
+      `SELECT u.id, u.name, u.email, sp.last_seen, sp.activity
+       FROM users u
+       JOIN class_members cm ON u.id = cm.user_id
+       LEFT JOIN student_presence sp ON sp.user_id = u.id AND sp.class_id = ?
+       WHERE cm.class_id = ?
+       ORDER BY u.name`
+    ).all(req.params.classId, req.params.classId);
+    const now = Date.now();
+    const THREE_MIN = 3 * 60 * 1000; // students ping every 20s; allow up to 3 missed pings
+    const result = (rows as any[]).map((r: any) => ({
+      ...r,
+      isOnline: r.last_seen ? (now - new Date(r.last_seen).getTime() < THREE_MIN) : false,
+    }));
+    res.json(result);
+  } catch {
+    res.json([]);
+  }
+});
+
+// ── Class Video Sharing (HTTP polling) ────────────────────────
+let videoTableReady = false;
+async function ensureVideoTable() {
+  if (videoTableReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS class_video (
+        class_id TEXT PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        video_title TEXT DEFAULT '',
+        shared_at TEXT NOT NULL DEFAULT '',
+        shared_by TEXT DEFAULT ''
+      )
+    `);
+    videoTableReady = true;
+  } catch {}
+}
+
+// Teacher: share a YouTube video to class
+router.post("/:classId/video", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { classId } = req.params;
+  const { videoId, videoTitle } = req.body;
+  await ensureVideoTable();
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      `INSERT INTO class_video (class_id, video_id, video_title, shared_at, shared_by) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET video_id = ?, video_title = ?, shared_at = ?, shared_by = ?`
+    ).run(classId, videoId, videoTitle || '', now, req.user!.name, videoId, videoTitle || '', now, req.user!.name);
+  } catch { await ensureVideoTable(); }
+  res.json({ ok: true, videoId, videoTitle });
+});
+
+// Teacher: stop sharing video
+router.delete("/:classId/video", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureVideoTable();
+  await db.prepare("DELETE FROM class_video WHERE class_id = ?").run(req.params.classId).catch(() => {});
+  res.json({ ok: true });
+});
+
+// Anyone in the class: get current video
+router.get("/:classId/video", async (req: AuthRequest, res: Response) => {
+  await ensureVideoTable();
+  try {
+    const row = await db.prepare("SELECT * FROM class_video WHERE class_id = ?").get(req.params.classId);
+    res.json(row || null);
+  } catch {
+    res.json(null);
+  }
+});
+
 export default router;
