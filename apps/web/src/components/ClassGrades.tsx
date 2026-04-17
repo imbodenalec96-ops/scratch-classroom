@@ -23,10 +23,23 @@ export default function ClassGrades() {
 
   const showFlash = useCallback((t: string) => { setFlash(t); setTimeout(() => setFlash(null), 2500); }, []);
 
+  const [studentsByClass, setStudentsByClass] = useState<Record<string, number>>({});
+
   useEffect(() => {
-    api.getClasses().then(c => {
+    api.getClasses().then(async c => {
       setClasses(c);
-      if (c.length > 0 && !selectedClassId) setSelectedClassId(c[0].id);
+      // Populate student counts per class so the selector shows '(8)' badges
+      const counts: Record<string, number> = {};
+      await Promise.all(c.map(async (cls: any) => {
+        try { const list = await api.getStudents(cls.id); counts[cls.id] = list.length; }
+        catch { counts[cls.id] = 0; }
+      }));
+      setStudentsByClass(counts);
+      // Default to the first class with actual students, not just the first class alphabetically
+      if (c.length > 0 && !selectedClassId) {
+        const firstWithStudents = c.find((cls: any) => counts[cls.id] > 0);
+        setSelectedClassId((firstWithStudents || c[0]).id);
+      }
     }).catch(console.error);
   }, []);
 
@@ -110,16 +123,26 @@ export default function ClassGrades() {
       {classes.length > 0 && (
         <div className="card flex items-center gap-3 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Class</span>
-          {classes.map(c => (
-            <button key={c.id} onClick={() => setSelectedClassId(c.id)}
-              className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer"
-              style={{
-                borderRadius: "var(--r-md)",
-                background: selectedClassId === c.id ? "var(--accent-light)" : "transparent",
-                color: selectedClassId === c.id ? "var(--text-accent)" : "var(--text-2)",
-                borderColor: selectedClassId === c.id ? "var(--accent)" : "var(--border-md)",
-              }}>{c.name}</button>
-          ))}
+          {classes.map(c => {
+            const n = studentsByClass[c.id] ?? 0;
+            return (
+              <button key={c.id} onClick={() => setSelectedClassId(c.id)}
+                className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer flex items-center gap-1.5"
+                style={{
+                  borderRadius: "var(--r-md)",
+                  background: selectedClassId === c.id ? "var(--accent-light)" : "transparent",
+                  color: selectedClassId === c.id ? "var(--text-accent)" : "var(--text-2)",
+                  borderColor: selectedClassId === c.id ? "var(--accent)" : "var(--border-md)",
+                }}>
+                {c.name}
+                <span style={{
+                  padding: "1px 6px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                  background: n > 0 ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "var(--bg-muted)",
+                  color: n > 0 ? "var(--text-accent)" : "var(--text-3)",
+                }}>{n}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 

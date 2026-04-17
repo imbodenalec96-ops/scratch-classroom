@@ -406,6 +406,20 @@ export default function AssignmentBuilder() {
 
   // Expanded assignment preview
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showFullWeek, setShowFullWeek] = useState(false);
+  const [fullWeekSubjects, setFullWeekSubjects] = useState<Record<string, boolean>>({
+    reading: true, writing: true, spelling: true, math: true, sel: true,
+  });
+  const [fullWeekThemes, setFullWeekThemes] = useState<Record<string, string>>({});
+  const [fullWeekDifficulty, setFullWeekDifficulty] = useState<"match"|"easier"|"harder">("match");
+  const [fullWeekVariety, setFullWeekVariety] = useState<"low"|"medium"|"high">("medium");
+  const [fullWeekStart, setFullWeekStart] = useState<string>("");
+  const [fullWeekGenerating, setFullWeekGenerating] = useState(false);
+  const [fullWeekResult, setFullWeekResult] = useState<any>(null);
+
+  // Edit modal state
+  const [editingAssignment, setEditingAssignment] = useState<any>(null);
+  const [adjusting, setAdjusting] = useState<Record<string, string>>({});
 
   const SUBJECTS = ["Reading", "Math", "Writing", "Science", "Social Studies", "SEL", "Spelling"];
   const GRADES = ["Kindergarten", "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade"];
@@ -493,19 +507,170 @@ export default function AssignmentBuilder() {
     alert("✅ 5 assignments created for Mon–Fri!");
   };
 
+  const handleGenerateFullWeek = async () => {
+    if (!classId) return;
+    const subjects = Object.entries(fullWeekSubjects).filter(([, v]) => v).map(([k]) => k);
+    if (subjects.length === 0) { alert("Pick at least one subject."); return; }
+    setFullWeekGenerating(true);
+    setFullWeekResult(null);
+    try {
+      const r = await api.generateFullWeek({
+        classId,
+        weekStarting: fullWeekStart || undefined,
+        subjects,
+        themeBySubject: fullWeekThemes,
+        difficultyTweak: fullWeekDifficulty,
+        varietyLevel: fullWeekVariety,
+      });
+      setFullWeekResult(r);
+      loadAssignments(classId);
+    } catch (e: any) {
+      alert("Failed: " + (e?.message || e));
+    } finally { setFullWeekGenerating(false); }
+  };
+
+  const handleAdjust = async (id: string, direction: "easier"|"harder") => {
+    setAdjusting(a => ({ ...a, [id]: direction }));
+    try {
+      await api.adjustAssignmentDifficulty(id, direction);
+      await loadAssignments(classId);
+    } catch (e: any) { alert("Failed: " + e.message); }
+    finally { setAdjusting(a => { const n = { ...a }; delete n[id]; return n; }); }
+  };
+
+  const handleRegenerate = async (id: string) => {
+    if (!confirm("Regenerate this assignment with fresh content?")) return;
+    setAdjusting(a => ({ ...a, [id]: "regen" }));
+    try {
+      await api.regenerateAssignment(id);
+      await loadAssignments(classId);
+    } catch (e: any) { alert("Failed: " + e.message); }
+    finally { setAdjusting(a => { const n = { ...a }; delete n[id]; return n; }); }
+  };
+
   return (
     <div className="p-7 space-y-5 animate-page-enter">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${dk ? "text-white" : "text-gray-900"}`}>Assignments</h1>
-          <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>Create AI-generated paper worksheets for your class</p>
+      <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+          <span className="font-mono">BLOCKFORGE · ASSIGNMENTS</span>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setGenerated(null); setGenError(""); }} className="btn-primary gap-2">
-          {showForm ? <X size={14}/> : <Plus size={14}/>}
-          {showForm ? "Cancel" : "New Assignment"}
-        </button>
-      </div>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <div className="section-label mb-2">— Planning this week —</div>
+            <h1 className="font-display text-4xl leading-tight" style={{ color: "var(--text-1)" }}>
+              Assignments<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+            </h1>
+            <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
+              AI-generated, per student, per grade. One click makes the whole week.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setShowFullWeek(v => !v)} className="btn-secondary gap-1.5 text-xs">
+              📅 Generate Full Week
+            </button>
+            <button onClick={() => { setShowForm(!showForm); setGenerated(null); setGenError(""); }} className="btn-primary gap-2">
+              {showForm ? <X size={14}/> : <Plus size={14}/>}
+              {showForm ? "Cancel" : "New Assignment"}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Full Week Generator dialog ── */}
+      {showFullWeek && (
+        <div className="card space-y-4" style={{ borderLeft: "3px solid var(--accent)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="section-label">— Full week generator —</div>
+              <h3 className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>One click, full week.</h3>
+              <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+                Generates unique content for every student × subject × day (Mon–Fri). Each task tailored to that student's grade.
+              </p>
+            </div>
+            <button onClick={() => setShowFullWeek(false)} className="btn-ghost text-xs">Close</button>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Week starting (Monday)</label>
+              <input type="date" value={fullWeekStart} onChange={e => setFullWeekStart(e.target.value)} className="input text-sm" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Difficulty tweak</label>
+              <select value={fullWeekDifficulty} onChange={e => setFullWeekDifficulty(e.target.value as any)} className="input text-sm">
+                <option value="match">Match each student's grade</option>
+                <option value="easier">Force easier (-1 grade)</option>
+                <option value="harder">Force harder (+1 grade)</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Variety (how different each day should feel)</label>
+              <div className="flex gap-2">
+                {(["low","medium","high"] as const).map(v => (
+                  <button key={v} onClick={() => setFullWeekVariety(v)} type="button"
+                    className="px-3 py-1.5 text-xs font-semibold border cursor-pointer transition-colors"
+                    style={{
+                      borderRadius: "var(--r-md)",
+                      background: fullWeekVariety === v ? "var(--accent-light)" : "transparent",
+                      color: fullWeekVariety === v ? "var(--text-accent)" : "var(--text-2)",
+                      borderColor: fullWeekVariety === v ? "var(--accent)" : "var(--border-md)",
+                    }}>{v}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Subjects + weekly focus (optional)</label>
+            <div className="space-y-2">
+              {[
+                { key: "reading",  label: "📖 Reading",  hint: "e.g. phonics and beginning sounds" },
+                { key: "writing",  label: "✏️ Writing",  hint: "e.g. sentence structure" },
+                { key: "spelling", label: "🔤 Spelling", hint: "e.g. weekly word list focus" },
+                { key: "math",     label: "🔢 Math",     hint: "e.g. single-digit addition" },
+                { key: "sel",      label: "💛 SEL",      hint: "e.g. theme: resilience" },
+              ].map(s => (
+                <div key={s.key} className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ width: 150, color: "var(--text-1)" }}>
+                    <input type="checkbox" checked={!!fullWeekSubjects[s.key]}
+                      onChange={e => setFullWeekSubjects(cur => ({ ...cur, [s.key]: e.target.checked }))} />
+                    {s.label}
+                  </label>
+                  <input placeholder={s.hint} value={fullWeekThemes[s.key] || ""}
+                    disabled={!fullWeekSubjects[s.key]}
+                    onChange={e => setFullWeekThemes(cur => ({ ...cur, [s.key]: e.target.value }))}
+                    className="input text-sm flex-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={handleGenerateFullWeek} disabled={fullWeekGenerating} className="btn-primary gap-2">
+              {fullWeekGenerating ? "Generating… this may take 60–90s" : "🚀 Generate Full Week"}
+            </button>
+            <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Approx. {Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × {classes.find(c => c.id === classId)?.name ? "all students" : "students"} AI calls
+            </span>
+          </div>
+
+          {fullWeekResult && (
+            <div className="p-3 border-l-2" style={{
+              background: "color-mix(in srgb, var(--success) 10%, transparent)",
+              borderLeftColor: "var(--success)",
+              color: "var(--success)",
+              borderRadius: "var(--r-md)",
+              fontSize: 13, fontWeight: 600,
+            }}>
+              ✓ Created {fullWeekResult.created} / {fullWeekResult.expected} assignments
+              ({fullWeekResult.studentsAffected} students × {fullWeekResult.subjectsPerStudent} subjects × 5 days)
+              {fullWeekResult.failed > 0 && <span style={{ color: "var(--danger)", marginLeft: 6 }}>· {fullWeekResult.failed} failed</span>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Class selector */}
       <select value={classId} onChange={(e) => { setClassId(e.target.value); loadAssignments(e.target.value); }} className="input w-56 text-sm">
@@ -739,11 +904,35 @@ export default function AssignmentBuilder() {
                 </div>
               </div>
 
+              {/* Per-assignment action row — Edit / Easier / Harder / Regenerate */}
+              <div className="flex gap-1.5 mt-3 pt-3 flex-wrap" style={{ borderTop: "1px solid var(--border)" }}>
+                <button onClick={() => setEditingAssignment(a)}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
+                  ✎ Edit
+                </button>
+                <button onClick={() => handleAdjust(a.id, "easier")} disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--success) 35%, transparent)", color: "var(--success)", background: "color-mix(in srgb, var(--success) 8%, transparent)" }}>
+                  {adjusting[a.id] === "easier" ? "…" : "📉 Make easier"}
+                </button>
+                <button onClick={() => handleAdjust(a.id, "harder")} disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--warning) 35%, transparent)", color: "var(--warning)", background: "color-mix(in srgb, var(--warning) 8%, transparent)" }}>
+                  {adjusting[a.id] === "harder" ? "…" : "📈 Make harder"}
+                </button>
+                <button onClick={() => handleRegenerate(a.id)} disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)", color: "var(--accent)", background: "var(--accent-light)" }}>
+                  {adjusting[a.id] === "regen" ? "Regenerating…" : "✨ Regenerate fresh"}
+                </button>
+              </div>
+
               {/* Expanded paper preview */}
               {isExpanded && parsed && (
-                <div className="mt-4 pt-4 border-t border-white/[0.05]">
+                <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
                   <div className="flex justify-end mb-3">
-                    <button onClick={() => window.print()} className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer ${dk ? "border-white/10 text-white/50 hover:text-white/80" : "border-gray-200 text-gray-500 hover:text-gray-800"}`}>
+                    <button onClick={() => window.print()} className="btn-ghost text-xs gap-1.5">
                       <Printer size={12}/> Print
                     </button>
                   </div>
@@ -759,6 +948,108 @@ export default function AssignmentBuilder() {
             <p className="text-sm">No assignments yet — create one to get started!</p>
           </div>
         )}
+      </div>
+
+      {/* ── Edit modal ── */}
+      {editingAssignment && (
+        <EditAssignmentModal
+          assignment={editingAssignment}
+          dk={dk}
+          onClose={() => setEditingAssignment(null)}
+          onSaved={() => { setEditingAssignment(null); loadAssignments(classId); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Edit Assignment Modal ─────────────────────────────────────── */
+function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
+  assignment: any; dk: boolean; onClose: () => void; onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(assignment.title || "");
+  const [description, setDescription] = useState(assignment.description || "");
+  const [contentText, setContentText] = useState(() => {
+    try { return assignment.content ? JSON.stringify(JSON.parse(assignment.content), null, 2) : ""; }
+    catch { return assignment.content || ""; }
+  });
+  const [submissionCount, setSubmissionCount] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getAssignmentSubmissionCount(assignment.id).then(r => setSubmissionCount(r.count)).catch(() => {});
+  }, [assignment.id]);
+
+  const handleSave = async () => {
+    let parsedContent: any = null;
+    try { parsedContent = contentText.trim() ? JSON.parse(contentText) : null; }
+    catch { alert("Content JSON is invalid. Fix it or leave it blank to not change content."); return; }
+    setSaving(true);
+    try {
+      await api.updateAssignment(assignment.id, {
+        title,
+        description,
+        content: parsedContent ? JSON.stringify(parsedContent) : undefined,
+      });
+      onSaved();
+    } catch (e: any) { alert("Save failed: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div className="card" style={{ maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto",
+        borderLeft: "3px solid var(--accent)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="section-label">— Edit assignment —</div>
+            <h3 className="font-display text-2xl leading-tight mt-1" style={{ color: "var(--text-1)" }}>
+              Tune this<em style={{ color: "var(--accent)", fontStyle: "italic" }}> one.</em>
+            </h3>
+          </div>
+          <button onClick={onClose} className="btn-ghost text-xs">Close</button>
+        </div>
+
+        {submissionCount != null && submissionCount > 0 && (
+          <div className="p-3 mb-4" style={{
+            background: "color-mix(in srgb, var(--warning) 10%, transparent)",
+            borderLeft: "3px solid var(--warning)",
+            borderRadius: "var(--r-md)",
+            fontSize: 12, color: "var(--warning)", fontWeight: 600,
+          }}>
+            ⚠️ {submissionCount} student{submissionCount === 1 ? " has" : "s have"} already submitted. Edits only affect new submissions.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} className="input text-sm w-full" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Description / instructions</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="input text-sm w-full resize-none" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>
+              Content JSON (sections + questions)
+            </label>
+            <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={14}
+              className="input text-xs w-full resize-none font-mono"
+              spellCheck={false} />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+              Power-user: edit the raw JSON directly, or use 📉 Easier / 📈 Harder / ✨ Regenerate for AI-driven changes.
+            </p>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button onClick={handleSave} disabled={saving} className="btn-primary gap-1.5">
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+            <button onClick={onClose} className="btn-secondary">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
   );

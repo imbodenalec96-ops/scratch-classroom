@@ -67,12 +67,16 @@ router.put("/student/:userId", requireRole("teacher", "admin"), async (req: Auth
   }
 });
 
-// Teacher/admin: class overview — all students + their grades (LEFT JOIN to include defaults)
+// Teacher/admin: class overview — all students in a class + their grades.
+// Returns EVERY class_members row regardless of whether they have a
+// user_grade_levels entry yet. No role filter (earlier version required
+// users.role='student' which excluded some enrollment paths).
 router.get("/class/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureGradesTable();
+  const debug = req.query.debug === '1';
   try {
     const rows = await db.prepare(
-      `SELECT u.id, u.name, u.email,
+      `SELECT u.id, u.name, u.email, u.role,
         COALESCE(g.reading_grade, 3) AS reading_grade,
         COALESCE(g.math_grade,    3) AS math_grade,
         COALESCE(g.writing_grade, 3) AS writing_grade,
@@ -80,12 +84,15 @@ router.get("/class/:classId", requireRole("teacher", "admin"), async (req: AuthR
        FROM users u
        JOIN class_members cm ON u.id = cm.user_id
        LEFT JOIN user_grade_levels g ON g.user_id = u.id
-       WHERE cm.class_id = ? AND u.role = 'student'
+       WHERE cm.class_id = ?
        ORDER BY u.name`
-    ).all(req.params.classId);
-    res.json(rows);
-  } catch (e) {
+    ).all(req.params.classId) as any[];
+    // Keep role filter OFF by default — only exclude obvious non-students
+    const filtered = rows.filter(r => r.role !== 'admin');
+    res.json(filtered);
+  } catch (e: any) {
     console.error('class grades error:', e);
+    if (debug) return res.status(500).json({ error: String(e?.message || e) });
     res.json([]);
   }
 });

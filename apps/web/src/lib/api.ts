@@ -68,6 +68,20 @@ export const api = {
   getTodayAssignment: (classId: string) => request<any[]>(`/assignments/class/${classId}/today`),
   getPendingAssignments: (classId: string) => request<any[]>(`/assignments/class/${classId}/pending`),
   createWeeklyAssignments: (data: any) => request<any>(`/assignments/weekly`, { method: "POST", body: JSON.stringify(data) }),
+  generateFullWeek: (data: {
+    classId: string;
+    weekStarting?: string;
+    subjects?: string[];
+    themeBySubject?: Record<string, string>;
+    difficultyTweak?: "match" | "easier" | "harder";
+    varietyLevel?: "low" | "medium" | "high";
+    studentIds?: string[];
+  }) => request<any>(`/assignments/generate-full-week`, { method: "POST", body: JSON.stringify(data) }),
+  adjustAssignmentDifficulty: (id: string, direction: "easier" | "harder") =>
+    request<any>(`/assignments/${id}/adjust-difficulty`, { method: "POST", body: JSON.stringify({ direction }) }),
+  regenerateAssignment: (id: string) =>
+    request<any>(`/assignments/${id}/regenerate`, { method: "POST", body: JSON.stringify({}) }),
+  getAssignmentSubmissionCount: (id: string) => request<{count:number}>(`/assignments/${id}/submission-count`),
   submitAssignmentWithAnswers: (assignmentId: string, answers: any) =>
     request<any>(`/submissions`, { method: "POST", body: JSON.stringify({ assignmentId, answers: JSON.stringify(answers) }) }),
 
