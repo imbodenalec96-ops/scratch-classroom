@@ -255,24 +255,20 @@ function WelcomeScreen({ name }: { name: string }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #0f0726 0%, #1a0a35 50%, #0a0b20 100%)" }}>
-      {Array.from({ length: 20 }).map((_, i) => (
-        <span key={i} className="absolute text-lg animate-pulse"
-          style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, opacity: 0.3 + Math.random() * 0.5, animationDelay: `${Math.random() * 2}s`, animationDuration: `${1.5 + Math.random()}s` }}>
-          ✨
-        </span>
-      ))}
-      <div className="relative z-10 text-center space-y-4 animate-page-enter">
-        <div className="text-7xl animate-bounce">📚</div>
-        <h1 className="text-4xl font-extrabold text-white tracking-tight font-student">
-          {greeting}, <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-cyan-400">{name.split(" ")[0]}!</span>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: "var(--bg)" }}>
+      <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+      <div className="relative z-10 text-center space-y-4 animate-page-enter max-w-md px-6">
+        <div className="section-label mb-3">— {new Date().toLocaleDateString("en-US", { weekday: "long" })} —</div>
+        <h1 className="font-display text-6xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
+          {greeting},<br/>
+          <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{name.split(" ")[0]}.</em>
         </h1>
-        <p className="text-white/50 text-lg">Getting your work ready…</p>
-        <div className="flex justify-center gap-2 mt-4">
+        <p className="text-sm mt-4" style={{ color: "var(--text-2)" }}>Setting your desk up…</p>
+        <div className="flex justify-center gap-1.5 mt-4">
           {[0, 1, 2].map((i) => (
-            <span key={i} className="w-2 h-2 rounded-full bg-violet-400 animate-bounce"
-              style={{ animationDelay: `${i * 150}ms` }} />
+            <span key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+              style={{ background: "var(--accent)", animationDelay: `${i * 150}ms` }} />
           ))}
         </div>
       </div>
@@ -402,17 +398,20 @@ function WorkScreen({
 
   if (submitted) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6"
-        style={{ background: dk ? "linear-gradient(135deg, #0f0726, #1a0a35)" : "linear-gradient(135deg, #f5f3ff, #fdf4ff, #eff6ff)" }}>
-        <div className="animate-pop-in text-8xl">🌟</div>
-        <h2 className="font-student animate-spring-in text-3xl font-extrabold"
-          style={{ animationDelay: "120ms", color: dk ? "white" : "#4c1d95" }}>
-          Amazing work!
-        </h2>
-        <p className="animate-slide-up" style={{ animationDelay: "220ms", color: dk ? "rgba(255,255,255,0.5)" : "#7c3aed" }}>
-          Loading your dashboard…
-        </p>
-        {/* Mascot cheering */}
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6" style={{ background: "var(--bg)" }}>
+        <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
+          style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+        <div className="relative z-10 text-center max-w-md px-6 space-y-3">
+          <div className="animate-pop-in" style={{ fontSize: 80 }}>🌟</div>
+          <div className="section-label animate-slide-up" style={{ animationDelay: "100ms" }}>— Submitted —</div>
+          <h2 className="font-display text-6xl leading-[1.02] animate-spring-in" style={{ animationDelay: "140ms", color: "var(--text-1)" }}>
+            Nice<br/>
+            <em style={{ color: "var(--accent)", fontStyle: "italic" }}>work.</em>
+          </h2>
+          <p className="text-sm mt-4 animate-slide-up" style={{ animationDelay: "240ms", color: "var(--text-2)" }}>
+            {answeredCount} of {total} answered · heading to your dashboard…
+          </p>
+        </div>
         <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
           <Mascot state="cheer" />
         </div>
@@ -443,66 +442,75 @@ function WorkScreen({
         </div>
       )}
 
-      <div className={`max-w-xl mx-auto p-5 space-y-5 ${showBreakBanner ? "pt-20" : "pt-6"}`}>
+      <div className={`max-w-2xl mx-auto px-6 py-8 space-y-7 ${showBreakBanner ? "pt-20" : ""}`}>
 
-        {/* ── Header ── */}
-        <div className="animate-slide-up flex items-center gap-3" style={{ animationDelay: "0ms" }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-md"
-            style={{ background: `linear-gradient(135deg, ${subjectPal.border}, ${subjectPal.bg})` }}>
-            {subjectPal.emoji}
-          </div>
-          <div>
-            <div className="font-student font-bold text-lg" style={{ color: dk ? "white" : "#1e293b" }}>
-              {assignment.title}
+        {/* ── Editorial header: exit + subject eyebrow + progress strip ── */}
+        <div className="animate-slide-up" style={{ animationDelay: "0ms" }}>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => {
+                if (answeredCount > 0 && !confirm("Leave before finishing? Your answers so far will be lost.")) return;
+                window.location.reload();
+              }}
+              className="btn-ghost text-xs gap-1.5"
+              style={{ padding: "6px 10px" }}>
+              ← Back to dashboard
+            </button>
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-3)" }}>
+              <span style={{ fontSize: 16 }}>{subjectPal.emoji}</span>
+              <span>{parsed?.subject || subjectPal.label}</span>
+              <span style={{ color: "var(--border-md)" }}>·</span>
+              <span>{todayName}</span>
             </div>
-            <div className="text-xs font-semibold" style={{ color: dk ? "rgba(255,255,255,0.45)" : subjectPal.accent }}>
-              📅 {todayName} · {parsed?.subject || subjectPal.label}
-            </div>
           </div>
+
+          {/* Masthead */}
+          <div className="section-label mb-2">— Today's assignment —</div>
+          <h1 className="font-display text-3xl sm:text-4xl leading-[1.05]" style={{ color: "var(--text-1)" }}>
+            {assignment.title}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+          </h1>
         </div>
 
-        {/* ── Progress bar ── */}
+        {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold" style={{ color: dk ? "rgba(255,255,255,0.5)" : "#64748b" }}>
-              {answeredCount} of {total} answered ✨
-            </span>
-            <span className="text-xs font-bold" style={{ color: dk ? "rgba(255,255,255,0.35)" : subjectPal.accent }}>
-              {Math.round(progress)}%
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
+              Question {currentQ + 1} <span style={{ color: "var(--border-md)" }}>of</span> {total}
+            </div>
+            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "var(--accent)" }}>
+              {answeredCount} answered · {Math.round(progress)}%
+            </div>
           </div>
-          <div className="rounded-full overflow-hidden" style={{ height: 14, background: dk ? "rgba(255,255,255,0.08)" : "#e2e8f0" }}>
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${progress}%`,
-                background: `linear-gradient(90deg, ${subjectPal.accent}, #7c3aed)`,
-                transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
-                boxShadow: progress > 0 ? `0 0 10px ${subjectPal.accent}66` : "none",
-              }}
-            />
+          <div style={{ height: 3, background: "var(--border)", overflow: "hidden", borderRadius: 2 }}>
+            <div style={{
+              width: `${progress}%`, height: "100%",
+              background: "var(--accent)",
+              transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+            }}/>
           </div>
         </div>
 
         {/* ── Section label ── */}
         {q && (
-          <div className="text-[10px] font-bold uppercase tracking-widest animate-slide-up"
-            style={{ animationDelay: "90ms", color: dk ? "rgba(255,255,255,0.25)" : subjectPal.accent }}>
-            {q.sectionTitle}
+          <div className="section-label animate-slide-up" style={{ animationDelay: "90ms" }}>
+            — {q.sectionTitle} —
           </div>
         )}
 
-        {/* ── Question card ── */}
+        {/* ── Question card — editorial: big serif, generous whitespace ── */}
         {q && (
           <div key={`card-${cardKey}`}
             className={rm ? "" : "animate-spring-in"}
             style={{ animationDelay: "120ms" }}>
-            <div className={dk
-              ? "rounded-3xl p-6 space-y-5 border border-white/[0.07] bg-white/[0.04]"
-              : "clay-card p-6 space-y-5"
-            }>
-              {/* Question text — typewriter reveal */}
-              <p className="font-student text-lg font-semibold leading-relaxed" style={{ color: dk ? "white" : "#1e293b" }}>
+            <div className="p-7 sm:p-9 space-y-6" style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--accent)",
+              borderRadius: "var(--r-xl)",
+              boxShadow: dk ? "0 1px 0 rgba(0,0,0,0.4)" : "0 1px 3px rgba(24,23,30,0.04)",
+            }}>
+              {/* Question text — Fraunces serif, typewriter reveal */}
+              <p className="font-display text-xl sm:text-2xl leading-[1.35]" style={{ color: "var(--text-1)" }}>
                 <TypewriterText text={q.q.text} speed={28} />
               </p>
 
