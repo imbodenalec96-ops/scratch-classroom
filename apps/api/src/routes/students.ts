@@ -15,14 +15,21 @@ async function ensureVideoColumns() {
 }
 
 // Ensure freetime_revoked_until column exists (idempotent).
-// Stored as TEXT ISO timestamp to match the sqlite-compat shim. When set in
-// the future, the student's assignments flow is force-locked for ~60s so a
-// revoke can't be instantly undone by a stale local unlock.
 let freetimeColumnReady = false;
 async function ensureFreetimeColumn() {
   if (freetimeColumnReady) return;
   try { await db.exec(`ALTER TABLE students ADD COLUMN freetime_revoked_until TEXT`); } catch { /* already exists */ }
   freetimeColumnReady = true;
+}
+
+// Ensure freetime_grant_until column exists (idempotent).
+// Stored as TEXT ISO timestamp; set when teacher grants freetime so
+// server-side queries can reflect the grant state independently of commands.
+let freetimeGrantColumnReady = false;
+async function ensureFreetimeGrantColumn() {
+  if (freetimeGrantColumnReady) return;
+  try { await db.exec(`ALTER TABLE students ADD COLUMN freetime_grant_until TEXT`); } catch { /* already exists */ }
+  freetimeGrantColumnReady = true;
 }
 
 // ── Per-student command pipe (Scenario 1 foundation) ───────────────
@@ -337,12 +344,19 @@ router.post("/:id/unlock", requireRole("teacher", "admin"), async (req: AuthRequ
 // POST /:id/grant-freetime — teacher/admin enqueues a GRANT_FREETIME command.
 // Body: { minutes?: number } default 15. Payload carries `until` ISO so the
 // client can set a local expiry timer without re-polling for the end.
+// Also writes freetime_grant_until on the student row for server-side visibility.
 router.post("/:id/grant-freetime", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const rawMinutes = Number(req.body?.minutes);
   const minutes = Number.isFinite(rawMinutes) && rawMinutes > 0 ? rawMinutes : 15;
   try {
     const until = new Date(Date.now() + minutes * 60_000).toISOString();
+    await ensureFreetimeGrantColumn();
+    try {
+      await db.prepare(`UPDATE students SET freetime_grant_until = ? WHERE id = ?`).run(until, id);
+    } catch (e) {
+      console.warn("grant-freetime: UPDATE students.freetime_grant_until skipped:", (e as Error).message);
+    }
     const cmdId = await enqueueStudentCommand(id, "GRANT_FREETIME", { until });
     res.json({ ok: true, id: cmdId });
   } catch (e) {
@@ -411,21 +425,20 @@ router.post("/:id/end-break", requireRole("teacher", "admin"), async (req: AuthR
 });
 
 // POST /:id/revoke-freetime — teacher/admin enqueues a REVOKE_FREETIME command.
-// Also writes `freetime_revoked_until = now + 60s` on the student row so the
-// client's unlock precedence treats the revoke as authoritative even if a stale
-// GRANT_FREETIME flag is still pending in local state.
+// Sets freetime_revoked_until = now + 60s (force-lock gate) and nulls out
+// freetime_grant_until so server-side state stays consistent.
 router.post("/:id/revoke-freetime", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     await ensureFreetimeColumn();
-    const until = new Date(Date.now() + 60_000).toISOString();
+    await ensureFreetimeGrantColumn();
+    const revokedUntil = new Date(Date.now() + 60_000).toISOString();
     try {
-      await db.prepare(`UPDATE students SET freetime_revoked_until = ? WHERE id = ?`).run(until, id);
+      await db.prepare(
+        `UPDATE students SET freetime_revoked_until = ?, freetime_grant_until = NULL WHERE id = ?`
+      ).run(revokedUntil, id);
     } catch (e) {
-      // The `students` table on Neon may or may not have a row for this user-id
-      // (depending on how the auth migration landed). The UPDATE is a best-
-      // effort guard — the command itself is still enqueued below.
-      console.warn("revoke-freetime: UPDATE students.freetime_revoked_until skipped:", e);
+      console.warn("revoke-freetime: UPDATE students skipped:", (e as Error).message);
     }
     const cmdId = await enqueueStudentCommand(id, "REVOKE_FREETIME", "");
     res.json({ ok: true, id: cmdId });
