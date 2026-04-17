@@ -462,6 +462,37 @@ router.post("/force-unlock-all", requireRole("teacher", "admin"), async (req: Au
   }
 });
 
+// Teacher: rescue a single stuck student — sends them a NAVIGATE command to
+// /student and clears any per-class lock for every class they're in.
+router.post("/force-unlock-student/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassStateTables();
+  const { studentId } = req.params;
+  try {
+    // Unlock every class this student is a member of
+    const memberships = await db.prepare(
+      "SELECT class_id FROM class_members WHERE user_id = ?"
+    ).all(studentId) as any[];
+    for (const m of memberships) {
+      await db.prepare(
+        `INSERT INTO class_state (class_id, is_locked, lock_message, locked_by, locked_at)
+         VALUES (?, 0, '', '', '')
+         ON CONFLICT (class_id) DO UPDATE SET is_locked = 0, lock_message = '', locked_by = '', locked_at = ''`
+      ).run(m.class_id).catch(() => {});
+      // Also send the student a kick-to-dashboard command so they route out of anything stuck
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await db.prepare(
+        `INSERT INTO class_commands (id, class_id, target_user_id, type, payload, created_at)
+         VALUES (?, ?, ?, 'KICK', '/student', ?)`
+      ).run(id, m.class_id, studentId, now).catch(() => {});
+    }
+    res.json({ ok: true, classesAffected: memberships.length });
+  } catch (e) {
+    console.error('force-unlock-student error:', e);
+    res.status(500).json({ error: 'Failed to force unlock student' });
+  }
+});
+
 // Teacher: lock all screens in class
 router.post("/:classId/lock", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { classId } = req.params;

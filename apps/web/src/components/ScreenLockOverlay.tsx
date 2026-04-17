@@ -1,5 +1,5 @@
-import React from "react";
-import { Lock } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Lock, LogOut } from "lucide-react";
 
 interface Props {
   isLocked: boolean;
@@ -9,6 +9,9 @@ interface Props {
   onDismissMessage?: () => void;
 }
 
+const ESCAPE_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
+const EARLY_ESCAPE_MS   = 30 * 1000;     // 30s for poll-failure case
+
 /**
  * ScreenLockOverlay — renders a full-screen teacher-controlled lockdown.
  *
@@ -17,6 +20,31 @@ interface Props {
  * Message toast (1:1 teacher message) is separately dismissable.
  */
 export default function ScreenLockOverlay({ isLocked, message, lockedBy, pendingMessage, onDismissMessage }: Props) {
+  // Escape-hatch: if the lock has been showing > 5 min, surface a sign-out
+  // link so a kid is never permanently trapped if the server is unreachable.
+  const [showEscape, setShowEscape] = useState(false);
+  const lockStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isLocked) { lockStartRef.current = null; setShowEscape(false); return; }
+    if (lockStartRef.current == null) lockStartRef.current = Date.now();
+    // Poll every 10s to decide whether to show the escape
+    const iv = setInterval(() => {
+      const age = Date.now() - (lockStartRef.current || Date.now());
+      if (age >= ESCAPE_TIMEOUT_MS) setShowEscape(true);
+    }, 10_000);
+    // Also surface sooner if we've had no server contact in 30s
+    const early = setTimeout(() => setShowEscape(true), ESCAPE_TIMEOUT_MS);
+    return () => { clearInterval(iv); clearTimeout(early); };
+  }, [isLocked]);
+
+  const handleSignOut = () => {
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('_tkn_student');
+    } catch {}
+    window.location.href = '/login';
+  };
+
   return (
     <>
       {/* Full-screen lock */}
@@ -119,6 +147,34 @@ export default function ScreenLockOverlay({ isLocked, message, lockedBy, pending
           }}>
             Your screen will unlock automatically when your teacher is ready.
           </p>
+
+          {/* Escape hatch — appears after 5 min so a kid isn't permanently trapped */}
+          {showEscape && (
+            <button
+              onClick={handleSignOut}
+              style={{
+                position: "fixed",
+                bottom: 20,
+                right: 20,
+                background: "rgba(239,68,68,0.15)",
+                border: "1px solid rgba(239,68,68,0.35)",
+                color: "rgba(252,165,165,0.9)",
+                padding: "10px 16px",
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                backdropFilter: "blur(8px)",
+              }}
+              aria-label="Sign out"
+            >
+              <LogOut size={13} />
+              Something wrong? Sign out
+            </button>
+          )}
         </div>
       )}
 
