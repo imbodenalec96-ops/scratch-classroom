@@ -6,7 +6,8 @@ import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
 import { usePresencePing } from "../lib/presence.ts";
-import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2, FolderOpen } from "lucide-react";
+import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
+import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
 
 type Phase = 'welcome' | 'loading' | 'working' | 'break' | 'done';
 
@@ -32,10 +33,10 @@ function useCountUp(target: number, duration = 900, delay = 0) {
 /* ── Confetti ── */
 function spawnConfetti() {
   const glyphs = ["🎉", "✨", "🌟", "💫", "🎊", "⭐", "🏆"];
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 20; i++) {
     const el = document.createElement("span");
     el.textContent = glyphs[i % glyphs.length];
-    el.style.cssText = `position:fixed;left:${Math.random() * 100}vw;top:-2rem;font-size:1.5rem;pointer-events:none;z-index:9999;animation:confettiFall 2s ease-in forwards;animation-delay:${Math.random() * 0.8}s`;
+    el.style.cssText = `position:fixed;left:${Math.random() * 100}vw;top:-2rem;font-size:${1.2 + Math.random()}rem;pointer-events:none;z-index:9999;animation:confettiFall 2s ease-in forwards;animation-delay:${Math.random() * 0.8}s`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
   }
@@ -47,8 +48,44 @@ function spawnConfetti() {
   }
 }
 
+/* ── Mascot Star SVG ── */
+function MascotStar({ size = 64 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+      <path
+        d="M32 5L39 24H59L43.5 35.5L49.5 54.5L32 43L14.5 54.5L20.5 35.5L5 24H25L32 5Z"
+        fill="#fbbf24"
+        stroke="#f59e0b"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="25.5" cy="29" r="2.8" fill="#1e293b" />
+      <circle cx="38.5" cy="29" r="2.8" fill="#1e293b" />
+      <circle cx="26.8" cy="27.5" r="0.9" fill="white" />
+      <circle cx="39.8" cy="27.5" r="0.9" fill="white" />
+      <path d="M25.5 37 Q32 43.5 38.5 37" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      <circle cx="22" cy="35" r="3.2" fill="#fb7185" opacity="0.35" />
+      <circle cx="42" cy="35" r="3.2" fill="#fb7185" opacity="0.35" />
+    </svg>
+  );
+}
+
+/* ── Mascot component ── */
+function Mascot({ state, style }: { state: 'idle' | 'cheer'; style?: React.CSSProperties }) {
+  const rm = prefersReducedMotion();
+  return (
+    <div
+      className={rm ? "" : state === 'idle' ? "mascot-bop" : "mascot-cheer"}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", ...style }}
+      aria-hidden="true"
+    >
+      <MascotStar size={state === 'cheer' ? 80 : 64} />
+    </div>
+  );
+}
+
 /* ── Welcome Screen ── */
-function WelcomeScreen({ name, dk }: { name: string; dk: boolean }) {
+function WelcomeScreen({ name }: { name: string }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return (
@@ -62,7 +99,7 @@ function WelcomeScreen({ name, dk }: { name: string; dk: boolean }) {
       ))}
       <div className="relative z-10 text-center space-y-4 animate-page-enter">
         <div className="text-7xl animate-bounce">📚</div>
-        <h1 className="text-4xl font-extrabold text-white tracking-tight">
+        <h1 className="text-4xl font-extrabold text-white tracking-tight font-student">
           {greeting}, <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-cyan-400">{name.split(" ")[0]}!</span>
         </h1>
         <p className="text-white/50 text-lg">Getting your work ready…</p>
@@ -93,7 +130,7 @@ function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
       style={{ background: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)" }}>
       <div className="text-center space-y-2">
         <div className="text-5xl">☕</div>
-        <h2 className="text-3xl font-extrabold text-white">Break Time!</h2>
+        <h2 className="text-3xl font-extrabold text-white font-student">Break Time!</h2>
         <p className="text-white/50 text-sm">Relax, stretch, grab some water</p>
       </div>
       <div className="relative w-48 h-48">
@@ -114,9 +151,21 @@ function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
         <div className="w-24 h-24 rounded-full bg-cyan-500/20 animate-ping absolute" style={{ animationDuration: "4s" }} />
         <div className="w-16 h-16 rounded-full bg-cyan-400/30 flex items-center justify-center text-2xl">🌊</div>
       </div>
-      <button onClick={onDone} className="text-white/40 text-sm hover:text-white/70 transition-colors cursor-pointer">
+      <button onClick={onDone} className="text-white/40 text-sm hover:text-white/70 transition-colors cursor-pointer" style={{ minHeight: 44, padding: "10px 20px" }}>
         Skip break →
       </button>
+    </div>
+  );
+}
+
+/* ── Progress dots ── */
+function ProgressDots({ total, current, answers }: { total: number; current: number; answers: Record<number, string> }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 flex-wrap" role="tablist" aria-label="Questions">
+      {Array.from({ length: total }).map((_, i) => (
+        <div key={i} role="tab" aria-selected={i === current}
+          className={`rounded-full transition-all duration-300 ${i === current ? "w-6 h-3 bg-violet-500" : answers[i] !== undefined ? "w-3 h-3 bg-emerald-500" : "w-3 h-3 bg-gray-200"}`} />
+      ))}
     </div>
   );
 }
@@ -137,8 +186,13 @@ function WorkScreen({
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showBreakBanner, setShowBreakBanner] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [mascotState, setMascotState] = useState<'idle' | 'cheer'>('idle');
+  const [cardKey, setCardKey] = useState(0);
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
+  const rm = prefersReducedMotion();
+
+  const subjectPal = getSubjectPalette(parsed?.subject);
 
   const handleSelect = (value: string) => {
     const isNew = answers[currentQ] === undefined;
@@ -147,144 +201,285 @@ function WorkScreen({
       const next = questionsAnswered + 1;
       setQuestionsAnswered(next);
       if (next >= 3) setShowBreakBanner(true);
+      // Briefly cheer the mascot
+      setMascotState('cheer');
+      setTimeout(() => setMascotState('idle'), 800);
     }
   };
 
-  const handleNext = () => { if (currentQ < total - 1) setCurrentQ(currentQ + 1); };
-  const handlePrev = () => { if (currentQ > 0) setCurrentQ(currentQ - 1); };
+  const handleNext = () => {
+    if (currentQ < total - 1) {
+      setCurrentQ(currentQ + 1);
+      setCardKey(k => k + 1);
+    }
+  };
+  const handlePrev = () => {
+    if (currentQ > 0) {
+      setCurrentQ(currentQ - 1);
+      setCardKey(k => k + 1);
+    }
+  };
 
   const handleSubmit = () => {
     spawnConfetti();
+    setMascotState('cheer');
     setSubmitted(true);
-    setTimeout(() => onComplete(answers), 2000);
+    setTimeout(() => onComplete(answers), 2200);
   };
 
   if (submitted) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6"
-        style={{ background: "linear-gradient(135deg, #0f0726, #1a0a35)" }}>
-        <div className="text-8xl animate-bounce">🌟</div>
-        <h2 className="text-3xl font-extrabold text-white">Amazing work!</h2>
-        <p className="text-white/50">Loading your dashboard…</p>
+        style={{ background: dk ? "linear-gradient(135deg, #0f0726, #1a0a35)" : "linear-gradient(135deg, #f5f3ff, #fdf4ff, #eff6ff)" }}>
+        <div className="animate-pop-in text-8xl">🌟</div>
+        <h2 className="font-student animate-spring-in text-3xl font-extrabold"
+          style={{ animationDelay: "120ms", color: dk ? "white" : "#4c1d95" }}>
+          Amazing work!
+        </h2>
+        <p className="animate-slide-up" style={{ animationDelay: "220ms", color: dk ? "rgba(255,255,255,0.5)" : "#7c3aed" }}>
+          Loading your dashboard…
+        </p>
+        {/* Mascot cheering */}
+        <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
+          <Mascot state="cheer" />
+        </div>
       </div>
     );
   }
 
   const todayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
-  const progress = total > 0 ? ((currentQ + 1) / total) * 100 : 0;
+  const answeredCount = Object.keys(answers).length;
+  const progress = total > 0 ? (answeredCount / total) * 100 : 0;
+
+  // Background for light mode: soft subject-tinted gradient
+  const lightBg = `linear-gradient(160deg, ${subjectPal.bg} 0%, #faf9ff 60%, #f0f1ff 100%)`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto" style={{ background: dk ? "#07071a" : "#EFF6FF" }}>
+    <div className="fixed inset-0 z-50 overflow-auto" style={{ background: dk ? "#07071a" : lightBg, touchAction: "pan-y" }}>
+      {/* Break banner */}
       {showBreakBanner && (
-        <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-6 py-3 text-sm font-medium"
+        <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-5 py-3 text-sm font-medium"
           style={{ background: "linear-gradient(90deg, #0e7490, #0891b2)", color: "white" }}>
-          <span>☕ You can take a 10-minute break now!</span>
+          <span>☕ You've earned a 10-minute break!</span>
           <div className="flex gap-3">
-            <button onClick={onBreak} className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 transition-colors cursor-pointer font-semibold">
+            <button onClick={onBreak} className="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 transition-colors cursor-pointer font-bold" style={{ minHeight: 40 }}>
               Take Break
             </button>
-            <button onClick={() => setShowBreakBanner(false)} className="text-white/60 hover:text-white cursor-pointer">✕</button>
+            <button onClick={() => setShowBreakBanner(false)} className="text-white/60 hover:text-white cursor-pointer px-2" style={{ minHeight: 40 }}>✕</button>
           </div>
         </div>
       )}
 
-      <div className={`max-w-xl mx-auto p-6 space-y-5 ${showBreakBanner ? "pt-20" : "pt-8"}`}>
-        <div>
-          <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${dk ? "text-violet-400" : "text-violet-600"}`}>
-            📅 {todayName}'s Work
-          </div>
-          <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>{assignment.title}</h1>
-          {parsed?.subject && (
-            <div className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>{parsed.subject} · {parsed.grade}</div>
-          )}
-        </div>
+      <div className={`max-w-xl mx-auto p-5 space-y-5 ${showBreakBanner ? "pt-20" : "pt-6"}`}>
 
-        <div>
-          <div className={`flex justify-between text-xs font-semibold mb-1.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-            <span>Question {currentQ + 1} of {total}</span>
-            <span>{Object.keys(answers).length} answered</span>
+        {/* ── Header ── */}
+        <div className="animate-slide-up flex items-center gap-3" style={{ animationDelay: "0ms" }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-md"
+            style={{ background: `linear-gradient(135deg, ${subjectPal.border}, ${subjectPal.bg})` }}>
+            {subjectPal.emoji}
           </div>
-          <div className={`h-3 rounded-full overflow-hidden ${dk ? "bg-white/10" : "bg-gray-200"}`}>
-            <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }} />
+          <div>
+            <div className="font-student font-bold text-lg" style={{ color: dk ? "white" : "#1e293b" }}>
+              {assignment.title}
+            </div>
+            <div className="text-xs font-semibold" style={{ color: dk ? "rgba(255,255,255,0.45)" : subjectPal.accent }}>
+              📅 {todayName} · {parsed?.subject || subjectPal.label}
+            </div>
           </div>
         </div>
 
-        {q && <div className={`text-[11px] font-bold uppercase tracking-widest ${dk ? "text-white/25" : "text-gray-400"}`}>{q.sectionTitle}</div>}
+        {/* ── Progress bar ── */}
+        <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold" style={{ color: dk ? "rgba(255,255,255,0.5)" : "#64748b" }}>
+              {answeredCount} of {total} answered ✨
+            </span>
+            <span className="text-xs font-bold" style={{ color: dk ? "rgba(255,255,255,0.35)" : subjectPal.accent }}>
+              {Math.round(progress)}%
+            </span>
+          </div>
+          <div className="rounded-full overflow-hidden" style={{ height: 14, background: dk ? "rgba(255,255,255,0.08)" : "#e2e8f0" }}>
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${progress}%`,
+                background: `linear-gradient(90deg, ${subjectPal.accent}, #7c3aed)`,
+                transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+                boxShadow: progress > 0 ? `0 0 10px ${subjectPal.accent}66` : "none",
+              }}
+            />
+          </div>
+        </div>
 
+        {/* ── Section label ── */}
         {q && (
-          <div className={`rounded-2xl p-6 space-y-5 border ${dk ? "bg-white/[0.04] border-white/[0.06]" : "bg-white border-gray-100 shadow-lg"}`}>
-            <p className={`text-lg font-semibold leading-relaxed ${dk ? "text-white" : "text-gray-900"}`}>{q.q.text}</p>
-
-            {q.q.type === "multiple_choice" && q.q.options && (
-              <div className="space-y-3">
-                {q.q.options.map((opt: string, oi: number) => {
-                  const isSelected = currentAnswer === opt;
-                  return (
-                    <button key={oi} onClick={() => handleSelect(opt)}
-                      className={`w-full text-left px-4 py-4 rounded-xl border-2 font-medium text-sm transition-all duration-150 cursor-pointer
-                        ${isSelected
-                          ? "border-violet-500 bg-violet-500/15 text-violet-300 scale-[1.02]"
-                          : dk ? "border-white/10 bg-white/[0.03] text-white/70 hover:border-violet-500/40 hover:bg-violet-500/5"
-                                 : "border-gray-200 bg-gray-50 text-gray-700 hover:border-violet-400 hover:bg-violet-50"
-                        }`}>
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full border-2 mr-3 text-xs font-bold
-                        ${isSelected ? "border-violet-500 bg-violet-500 text-white" : dk ? "border-white/20 text-white/40" : "border-gray-300 text-gray-400"}`}>
-                        {isSelected ? "✓" : String.fromCharCode(65 + oi)}
-                      </span>
-                      {opt.replace(/^[A-D]\.\s*/, "")}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {q.q.type === "short_answer" && (
-              <textarea value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
-                placeholder="Write your answer here…" rows={q.q.lines || 4}
-                className={`w-full rounded-xl p-3 text-sm border resize-none outline-none transition-colors
-                  ${dk ? "bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
-                         : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-violet-400"}`} />
-            )}
-
-            {q.q.type === "fill_blank" && (
-              <input value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
-                placeholder="Fill in the blank…"
-                className={`w-full rounded-xl p-3 text-sm border outline-none transition-colors
-                  ${dk ? "bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
-                         : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-violet-400"}`} />
-            )}
+          <div className="text-[10px] font-bold uppercase tracking-widest animate-slide-up"
+            style={{ animationDelay: "90ms", color: dk ? "rgba(255,255,255,0.25)" : subjectPal.accent }}>
+            {q.sectionTitle}
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3">
-          <button onClick={handlePrev} disabled={currentQ === 0}
-            className={`px-5 py-3 rounded-xl font-semibold text-sm border transition-all cursor-pointer disabled:opacity-30
-              ${dk ? "border-white/10 text-white/60 hover:bg-white/[0.05]" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-            ← Back
-          </button>
-          {currentQ < total - 1 ? (
-            <button onClick={handleNext}
-              className="flex-1 py-3 rounded-xl font-bold text-sm text-white transition-all cursor-pointer"
-              style={{ background: "linear-gradient(135deg, #8b5cf6, #6366f1)" }}>
-              Next →
-            </button>
+        {/* ── Question card ── */}
+        {q && (
+          <div key={`card-${cardKey}`}
+            className={rm ? "" : "animate-spring-in"}
+            style={{ animationDelay: "120ms" }}>
+            <div className={dk
+              ? "rounded-3xl p-6 space-y-5 border border-white/[0.07] bg-white/[0.04]"
+              : "clay-card p-6 space-y-5"
+            }>
+              {/* Question text */}
+              <p className="font-student text-lg font-semibold leading-relaxed" style={{ color: dk ? "white" : "#1e293b" }}>
+                {q.q.text}
+              </p>
+
+              {/* ── Multiple choice ── */}
+              {q.q.type === "multiple_choice" && q.q.options && (
+                <div className="space-y-3">
+                  {q.q.options.map((opt: string, oi: number) => {
+                    const isSelected = currentAnswer === opt;
+                    const letter = String.fromCharCode(65 + oi);
+                    if (dk) {
+                      return (
+                        <button key={oi} onClick={() => handleSelect(opt)}
+                          className={`w-full text-left px-4 py-4 rounded-2xl border-2 font-semibold text-sm transition-all duration-150 cursor-pointer
+                            ${isSelected
+                              ? "border-violet-500 bg-violet-500/15 text-violet-200 scale-[1.01]"
+                              : "border-white/10 bg-white/[0.04] text-white/70 hover:border-violet-500/40 hover:bg-violet-500/5"
+                            }`}
+                          style={{ minHeight: 60, touchAction: "manipulation" }}>
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full border-2 mr-3 text-xs font-bold
+                            ${isSelected ? "border-violet-500 bg-violet-500 text-white" : "border-white/20 text-white/40"}`}>
+                            {isSelected ? "✓" : letter}
+                          </span>
+                          {opt.replace(/^[A-D]\.\s*/, "")}
+                        </button>
+                      );
+                    }
+                    return (
+                      <button key={oi} onClick={() => handleSelect(opt)}
+                        className={`clay-option animate-spring-in ${isSelected ? "selected" : ""}`}
+                        style={{ animationDelay: `${oi * 55}ms` }}
+                        aria-pressed={isSelected}>
+                        {/* Letter badge */}
+                        <span className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all"
+                          style={{
+                            background: isSelected ? subjectPal.accent : "#f1f5f9",
+                            color: isSelected ? "white" : "#64748b",
+                            border: isSelected ? `2px solid ${subjectPal.accent}` : "2px solid #e2e8f0",
+                          }}>
+                          {isSelected ? "✓" : letter}
+                        </span>
+                        <span className="font-semibold" style={{ color: isSelected ? "#4c1d95" : "#1e293b" }}>
+                          {opt.replace(/^[A-D]\.\s*/, "")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── Short answer ── */}
+              {q.q.type === "short_answer" && (
+                <div>
+                  {dk ? (
+                    <textarea value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
+                      placeholder="Write your answer here…" rows={q.q.lines || 4}
+                      className="w-full rounded-2xl p-4 text-sm border-2 resize-none outline-none transition-colors bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
+                      style={{ fontSize: 16, minHeight: 120 }} />
+                  ) : (
+                    <textarea
+                      value={currentAnswer}
+                      onChange={(e) => handleSelect(e.target.value)}
+                      placeholder="Write your answer here…"
+                      rows={q.q.lines || 4}
+                      className="clay-input"
+                      style={{ minHeight: 120 }}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* ── Fill blank ── */}
+              {q.q.type === "fill_blank" && (
+                dk ? (
+                  <input value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
+                    placeholder="Fill in the blank…"
+                    className="w-full rounded-2xl p-4 text-sm border-2 outline-none transition-colors bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
+                    style={{ fontSize: 16 }} />
+                ) : (
+                  <input
+                    value={currentAnswer}
+                    onChange={(e) => handleSelect(e.target.value)}
+                    placeholder="Fill in the blank…"
+                    className="clay-input"
+                  />
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Navigation buttons ── */}
+        <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "180ms" }}>
+          {dk ? (
+            <>
+              <button onClick={handlePrev} disabled={currentQ === 0}
+                className="px-6 py-3 rounded-2xl font-bold text-sm border-2 transition-all cursor-pointer disabled:opacity-30"
+                style={{ minHeight: 56, borderColor: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", touchAction: "manipulation" }}>
+                ← Back
+              </button>
+              {currentQ < total - 1 ? (
+                <button onClick={handleNext}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white transition-all cursor-pointer"
+                  style={{ minHeight: 56, background: "linear-gradient(135deg, #8b5cf6, #6366f1)", touchAction: "manipulation" }}>
+                  Next Question →
+                </button>
+              ) : (
+                <button onClick={handleSubmit}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white cursor-pointer"
+                  style={{ minHeight: 56, background: "linear-gradient(135deg, #10b981, #059669)", touchAction: "manipulation" }}>
+                  Submit Work ✓
+                </button>
+              )}
+            </>
           ) : (
-            <button onClick={handleSubmit}
-              className="flex-1 py-3 rounded-xl font-bold text-sm text-white cursor-pointer"
-              style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-              Submit Work ✓
-            </button>
+            <>
+              <button onClick={handlePrev} disabled={currentQ === 0}
+                className="clay-btn"
+                style={{ background: "#f1f5f9", color: "#475569", borderColor: "#e2e8f0", minWidth: 100 }}>
+                ← Back
+              </button>
+              {currentQ < total - 1 ? (
+                <button onClick={handleNext}
+                  className="clay-btn flex-1"
+                  style={{ background: `linear-gradient(135deg, #8b5cf6, #6366f1)`, color: "white", borderColor: "rgba(99,102,241,0.3)" }}>
+                  Next →
+                </button>
+              ) : (
+                <button onClick={handleSubmit}
+                  className="clay-btn flex-1"
+                  style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "white", borderColor: "rgba(16,185,129,0.3)", fontSize: 17 }}>
+                  Submit Work ✓
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          {allQuestions.map((_, i) => (
-            <button key={i} onClick={() => setCurrentQ(i)}
-              className={`rounded-full transition-all cursor-pointer ${i === currentQ ? "w-5 h-2.5 bg-violet-500" : answers[i] !== undefined ? "w-2.5 h-2.5 bg-emerald-500" : dk ? "w-2.5 h-2.5 bg-white/20" : "w-2.5 h-2.5 bg-gray-300"}`} />
-          ))}
-        </div>
+        {/* ── Progress dots ── */}
+        <ProgressDots total={total} current={currentQ} answers={answers} />
+
+        <div style={{ height: 80 }} /> {/* spacer so mascot doesn't overlap last button */}
       </div>
+
+      {/* ── Mascot — fixed bottom right ── */}
+      {!dk && (
+        <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none"
+          aria-hidden="true">
+          <Mascot state={mascotState} />
+        </div>
+      )}
     </div>
   );
 }
@@ -293,60 +488,106 @@ function WorkScreen({
 function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any; dk: boolean; onComplete: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const todayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
+  const subjectPal = getSubjectPalette(assignment?.description);
+
+  const lightBg = `linear-gradient(160deg, ${subjectPal.bg} 0%, #faf9ff 60%, #f0f1ff 100%)`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto flex flex-col items-center justify-center p-6"
-      style={{ background: dk ? "#07071a" : "#EFF6FF" }}>
-      <div className={`w-full max-w-lg rounded-3xl p-8 space-y-6 shadow-2xl border
-        ${dk ? "bg-white/[0.04] border-white/[0.07]" : "bg-white border-gray-100"}`}>
-        <div>
-          <div className={`text-xs font-bold uppercase tracking-widest mb-2 ${dk ? "text-violet-400" : "text-violet-600"}`}>
-            📅 {todayName}'s Assignment
+      style={{ background: dk ? "#07071a" : lightBg }}>
+      <div className={`w-full max-w-lg space-y-6 animate-spring-in`}>
+        <div className={dk
+          ? "rounded-3xl p-8 space-y-5 shadow-2xl border border-white/[0.07] bg-white/[0.04]"
+          : "clay-card p-8 space-y-5"
+        }>
+          {/* Subject icon + title */}
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-md flex-shrink-0"
+              style={{ background: `linear-gradient(135deg, ${subjectPal.border}, ${subjectPal.bg})` }}>
+              {subjectPal.emoji}
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: dk ? "rgba(255,255,255,0.4)" : subjectPal.accent }}>
+                📅 {todayName}'s Assignment
+              </div>
+              <h1 className="font-student text-2xl font-extrabold" style={{ color: dk ? "white" : "#1e293b" }}>
+                {assignment.title}
+              </h1>
+            </div>
           </div>
-          <h1 className={`text-2xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>{assignment.title}</h1>
+
+          {/* Instructions box */}
           {assignment.description && (
-            <p className={`mt-2 text-sm leading-relaxed ${dk ? "text-white/50" : "text-gray-600"}`}>{assignment.description}</p>
+            <div className="rounded-2xl p-5 border-2"
+              style={{ background: dk ? "rgba(245,158,11,0.06)" : "#fffbeb", borderColor: dk ? "rgba(245,158,11,0.2)" : "#fde68a" }}>
+              <div className="font-bold text-sm mb-2" style={{ color: dk ? "#fbbf24" : "#92400e" }}>
+                📋 Instructions from your teacher
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: dk ? "rgba(251,191,36,0.7)" : "#78350f" }}>
+                {assignment.description}
+              </p>
+            </div>
           )}
+
           {assignment.due_date && (
-            <p className={`mt-1 text-xs ${dk ? "text-white/30" : "text-gray-400"}`}>
+            <p className="text-xs" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
               Due: {new Date(assignment.due_date).toLocaleDateString()}
             </p>
           )}
-        </div>
 
-        <div className={`rounded-2xl p-5 border text-sm ${dk ? "bg-amber-500/[0.06] border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-          <div className="font-bold mb-1">📋 Instructions from your teacher</div>
-          <p className={dk ? "text-amber-200/70" : "text-amber-700"}>
-            {assignment.description || "Complete this assignment as directed by your teacher. When you're done, click the button below."}
-          </p>
-        </div>
-
-        {!confirming ? (
-          <button onClick={() => setConfirming(true)}
-            className="w-full py-4 rounded-2xl font-bold text-white text-lg cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-            I'm Done ✓
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <p className={`text-center text-sm font-medium ${dk ? "text-white/60" : "text-gray-600"}`}>
-              Are you sure you've finished this assignment?
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirming(false)}
-                className={`flex-1 py-3 rounded-xl font-semibold text-sm border transition-all cursor-pointer
-                  ${dk ? "border-white/10 text-white/50 hover:bg-white/[0.05]" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                Not yet
-              </button>
-              <button onClick={onComplete}
-                className="flex-1 py-3 rounded-xl font-bold text-sm text-white cursor-pointer"
-                style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
-                Yes, submit! 🌟
-              </button>
+          {!confirming ? (
+            <button onClick={() => setConfirming(true)}
+              className={dk
+                ? "w-full py-4 rounded-2xl font-bold text-white text-lg cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
+                : "clay-btn w-full text-lg"
+              }
+              style={{
+                minHeight: 64,
+                background: "linear-gradient(135deg, #10b981, #059669)",
+                color: "white",
+                borderColor: dk ? "transparent" : "rgba(16,185,129,0.3)",
+              }}>
+              I'm Done ✓
+            </button>
+          ) : (
+            <div className="space-y-3 animate-spring-in">
+              <p className="text-center text-sm font-semibold" style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}>
+                Are you sure you've finished?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirming(false)}
+                  className={dk
+                    ? "flex-1 py-3 rounded-2xl font-semibold text-sm border border-white/10 text-white/50 hover:bg-white/[0.05] cursor-pointer"
+                    : "clay-btn flex-1"
+                  }
+                  style={!dk ? { background: "#f1f5f9", color: "#475569", borderColor: "#e2e8f0", fontSize: 15 } : { minHeight: 52 }}>
+                  Not yet
+                </button>
+                <button onClick={onComplete}
+                  className={dk
+                    ? "flex-1 py-3 rounded-2xl font-bold text-sm text-white cursor-pointer"
+                    : "clay-btn flex-1"
+                  }
+                  style={{
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    color: "white",
+                    borderColor: "rgba(16,185,129,0.3)",
+                    ...(dk ? { minHeight: 52 } : {}),
+                  }}>
+                  Yes, submit! 🌟
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Mascot */}
+      {!dk && (
+        <div className="fixed bottom-5 right-5 z-40 pointer-events-none" aria-hidden="true">
+          <Mascot state="idle" />
+        </div>
+      )}
     </div>
   );
 }
@@ -367,12 +608,12 @@ export default function StudentDashboard() {
   const [joinSuccess, setJoinSuccess] = useState(false);
   const [classVideo, setClassVideo] = useState<any>(null);
   const joinBtnRef = useRef<HTMLButtonElement>(null);
+  const [mascotCelebrating, setMascotCelebrating] = useState(false);
 
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
-  const [preBreakPhase, setPreBreakPhase] = useState<Phase>('working');
 
   // Stats
   const [statClasses, setStatClasses] = useState(0);
@@ -388,7 +629,7 @@ export default function StudentDashboard() {
     return () => clearTimeout(t);
   }, []);
 
-  // Load data when entering 'loading' phase
+  // Load data
   useEffect(() => {
     if (phase !== 'loading') return;
     const load = async () => {
@@ -405,7 +646,6 @@ export default function StudentDashboard() {
         setStatSubmitted(subList.length);
         setStatGraded(subList.filter((s: any) => s.grade !== null).length);
 
-        // Check for pending assignments — accept ALL pending, not just AI-structured ones
         let found: any = null;
         let foundParsed: any = null;
         for (const cls of clsList) {
@@ -413,7 +653,7 @@ export default function StudentDashboard() {
             const pending = await api.getPendingAssignments(cls.id);
             if (pending && pending.length > 0) {
               const a = pending[0];
-              found = a; // accept any pending assignment
+              found = a;
               if (a.content) {
                 try {
                   const parsed = JSON.parse(a.content);
@@ -427,7 +667,7 @@ export default function StudentDashboard() {
 
         if (found) {
           setPendingAssignment(found);
-          setParsedAssignment(foundParsed); // may be null for non-AI assignments
+          setParsedAssignment(foundParsed);
           setPhase('working');
         } else {
           setPhase('done');
@@ -473,7 +713,6 @@ export default function StudentDashboard() {
     return () => clearInterval(iv);
   }, [classes]);
 
-  // Presence ping — uses global hook (no dependency on classes being loaded)
   const phaseActivity =
     phase === 'welcome' ? "Just logged in 👋" :
     phase === 'loading' ? "Loading dashboard 🔄" :
@@ -518,9 +757,10 @@ export default function StudentDashboard() {
         await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
       } catch {}
     }
-    // Unlock arcade + projects for the rest of the day
     setWorkUnlocked();
     spawnConfetti();
+    setMascotCelebrating(true);
+    setTimeout(() => setMascotCelebrating(false), 3000);
     try {
       const subs = await api.getMySubmissions();
       setSubmissions(subs);
@@ -530,14 +770,11 @@ export default function StudentDashboard() {
     setPhase('done');
   }, [pendingAssignment]);
 
-  const handleTakeBreak = useCallback(() => {
-    setPreBreakPhase(phase);
-    setPhase('break');
-  }, [phase]);
-
+  const handleTakeBreak = useCallback(() => setPhase('break'), []);
   const handleBreakDone = useCallback(() => setPhase('working'), []);
 
   const myEntry = leaderboard.find((e: any) => e.user_id === user?.id);
+  const rm = prefersReducedMotion();
 
   // ── RENDER ──
 
@@ -555,7 +792,7 @@ export default function StudentDashboard() {
     );
   }
 
-  if (phase === 'welcome') return <WelcomeScreen name={user?.name || "Student"} dk={dk} />;
+  if (phase === 'welcome') return <WelcomeScreen name={user?.name || "Student"} />;
 
   if (phase === 'loading') return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
@@ -577,7 +814,6 @@ export default function StudentDashboard() {
     );
   }
 
-  // Assignment exists but has no structured content — show a simple completion card
   if (phase === 'working' && pendingAssignment && !parsedAssignment) {
     return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
   }
@@ -585,97 +821,112 @@ export default function StudentDashboard() {
   if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
 
   // ── DONE / DASHBOARD ──
+  const unlocked = isWorkUnlocked();
   return (
-    <div className="p-7 space-y-6 animate-page-enter relative">
+    <div className="p-5 space-y-5 animate-page-enter relative" style={{ paddingBottom: unlocked ? 100 : undefined }}>
       {broadcast && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-violet-600 text-white px-6 py-3 text-center text-sm font-medium flex items-center justify-center gap-2">
           <Megaphone size={15} />{broadcast}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between animate-slide-up" style={{ animationDelay: "0ms" }}>
         <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${dk ? "text-white" : "text-gray-900"}`}>
-            Welcome back, {user?.name?.split(" ")[0]} 🌟
+          <h1 className="font-student text-2xl font-extrabold tracking-tight" style={{ color: dk ? "white" : "#1e293b" }}>
+            {unlocked ? "Free time! 🎉" : `Hey, ${user?.name?.split(" ")[0]} 👋`}
           </h1>
-          <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>All done for today!</p>
+          <p className="text-sm mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.4)" : "#64748b" }}>
+            {unlocked ? "All done for today — great work!" : "Welcome back!"}
+          </p>
         </div>
         {myEntry && (
-          <div className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 border ${dk ? "bg-amber-500/[0.08] border-amber-500/20" : "bg-amber-50 border-amber-200"}`}>
+          <div className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5 border"
+            style={{
+              background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb",
+              borderColor: dk ? "rgba(245,158,11,0.2)" : "#fde68a",
+            }}>
             <Trophy size={16} className="text-amber-400" />
             <div>
-              <span className={`text-sm font-bold ${dk ? "text-white" : "text-gray-900"}`}>{myEntry.points} pts</span>
-              <span className={`text-xs ml-2 ${dk ? "text-white/35" : "text-gray-400"}`}>Lvl {myEntry.level}</span>
+              <span className="text-sm font-bold" style={{ color: dk ? "white" : "#1e293b" }}>{myEntry.points} pts</span>
+              <span className="text-xs ml-1.5" style={{ color: dk ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>Lvl {myEntry.level}</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      {/* ── Stats ── */}
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Classes", value: c0, icon: Users, color: "text-cyan-400", bg: dk ? "bg-cyan-500/10" : "bg-cyan-50" },
-          { label: "Submitted", value: c1, icon: CheckCircle, color: "text-emerald-400", bg: dk ? "bg-emerald-500/10" : "bg-emerald-50" },
-          { label: "Graded", value: c2, icon: Star, color: "text-amber-400", bg: dk ? "bg-amber-500/10" : "bg-amber-50" },
+          { label: "Classes", value: c0, icon: Users, color: "#06b6d4", bg: dk ? "rgba(6,182,212,0.1)" : "#ecfeff" },
+          { label: "Submitted", value: c1, icon: CheckCircle, color: "#10b981", bg: dk ? "rgba(16,185,129,0.1)" : "#ecfdf5" },
+          { label: "Graded", value: c2, icon: Star, color: "#f59e0b", bg: dk ? "rgba(245,158,11,0.1)" : "#fffbeb" },
         ].map((s, i) => (
-          <div key={s.label} className="card flex items-center gap-3.5 animate-slide-up" style={{ animationDelay: `${80 + i * 65}ms` }}>
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.bg}`}>
-              <s.icon size={18} className={s.color} />
+          <div key={s.label} className="card flex items-center gap-3 animate-slide-up" style={{ animationDelay: `${80 + i * 60}ms` }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
+              <s.icon size={17} style={{ color: s.color }} />
             </div>
             <div>
-              <div className={`text-2xl font-bold leading-none tabular-nums ${dk ? "text-white" : "text-gray-900"}`}>{s.value}</div>
-              <div className={`text-xs mt-0.5 ${dk ? "text-white/35" : "text-gray-400"}`}>{s.label}</div>
+              <div className="text-2xl font-bold leading-none tabular-nums" style={{ color: dk ? "white" : "#1e293b" }}>{s.value}</div>
+              <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Free time unlocked section */}
-      {isWorkUnlocked() && (
-        <div className="animate-slide-up" style={{ animationDelay: "200ms" }}>
-          <div className={`text-xs font-bold uppercase tracking-widest mb-3 ${dk ? "text-emerald-400" : "text-emerald-600"}`}>
+      {/* ── Free Time Unlocked ── */}
+      {unlocked && (
+        <div className="animate-spring-in" style={{ animationDelay: "200ms" }}>
+          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: dk ? "#34d399" : "#059669" }}>
             🎉 Free Time Unlocked!
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          {/* Responsive grid: 1 col mobile, 2 col 640+, keeps working at all iPad + Chromebook sizes */}
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
             <Link to="/arcade"
-              className="card-hover group flex flex-col items-center justify-center gap-3 py-7 rounded-2xl border-2 text-center transition-all"
+              className="group flex flex-col items-center justify-center gap-3 py-8 rounded-3xl border-2 text-center transition-all arcade-card-press animate-spring-in"
               style={{
-                background: dk ? "linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.08))" : "linear-gradient(135deg, #f5f3ff, #eef2ff)",
+                animationDelay: "240ms",
+                background: dk ? "linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.08))" : "linear-gradient(135deg, #f5f3ff, #ede9fe)",
                 borderColor: dk ? "rgba(139,92,246,0.3)" : "#c4b5fd",
+                boxShadow: dk ? "none" : "0 4px 0 rgba(139,92,246,0.15), 0 8px 20px rgba(139,92,246,0.08)",
               }}>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-md"
                 style={{ background: dk ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.1)" }}>
                 🎮
               </div>
               <div>
-                <div className={`font-bold text-sm ${dk ? "text-violet-300" : "text-violet-700"}`}>Arcade</div>
-                <div className={`text-xs mt-0.5 ${dk ? "text-white/30" : "text-gray-400"}`}>Play games!</div>
+                <div className="font-student font-bold text-base" style={{ color: dk ? "#c4b5fd" : "#5b21b6" }}>Arcade</div>
+                <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#7c3aed" }}>Play games!</div>
               </div>
             </Link>
             <Link to="/projects"
-              className="card-hover group flex flex-col items-center justify-center gap-3 py-7 rounded-2xl border-2 text-center transition-all"
+              className="group flex flex-col items-center justify-center gap-3 py-8 rounded-3xl border-2 text-center transition-all arcade-card-press animate-spring-in"
               style={{
+                animationDelay: "310ms",
                 background: dk ? "linear-gradient(135deg, rgba(16,185,129,0.10), rgba(5,150,105,0.06))" : "linear-gradient(135deg, #ecfdf5, #d1fae5)",
                 borderColor: dk ? "rgba(16,185,129,0.25)" : "#6ee7b7",
+                boxShadow: dk ? "none" : "0 4px 0 rgba(16,185,129,0.15), 0 8px 20px rgba(16,185,129,0.08)",
               }}>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-md"
                 style={{ background: dk ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.1)" }}>
                 💻
               </div>
               <div>
-                <div className={`font-bold text-sm ${dk ? "text-emerald-300" : "text-emerald-700"}`}>Projects</div>
-                <div className={`text-xs mt-0.5 ${dk ? "text-white/30" : "text-gray-400"}`}>Build something!</div>
+                <div className="font-student font-bold text-base" style={{ color: dk ? "#6ee7b7" : "#065f46" }}>Projects</div>
+                <div className="text-xs mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#059669" }}>Build something!</div>
               </div>
             </Link>
           </div>
         </div>
       )}
 
+      {/* Class video */}
       {classVideo && (
         <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: "280ms" }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-            <h2 className={`text-sm font-semibold ${dk ? "text-white/70" : "text-gray-700"}`}>📺 Your Teacher Shared a Video</h2>
-            {classVideo.video_title && <span className={`text-xs ml-auto ${dk ? "text-white/30" : "text-gray-400"}`}>{classVideo.video_title}</span>}
+            <h2 className="text-sm font-semibold" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>📺 Your Teacher Shared a Video</h2>
+            {classVideo.video_title && <span className="text-xs ml-auto" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#9ca3af" }}>{classVideo.video_title}</span>}
           </div>
           <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 12, overflow: "hidden" }}>
             <iframe
@@ -689,49 +940,59 @@ export default function StudentDashboard() {
         </div>
       )}
 
+      {/* Join a class */}
       <div className="card animate-slide-up" style={{ animationDelay: "320ms" }}>
-        <h2 className={`text-sm font-semibold mb-3 ${dk ? "text-white/70" : "text-gray-700"}`}>Join a Class</h2>
+        <h2 className="text-sm font-semibold mb-3" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>Join a Class</h2>
         <div className="flex gap-2">
           <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
             placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
-            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} />
+            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} style={{ minHeight: 48 }} />
           <button ref={joinBtnRef} onClick={handleJoinClass}
-            className={`btn-primary px-4 transition-all duration-200 ${joinSuccess ? "bg-emerald-500 hover:bg-emerald-500" : ""}`}>
+            className={`btn-primary px-4 transition-all duration-200 ${joinSuccess ? "bg-emerald-500 hover:bg-emerald-500" : ""}`}
+            style={{ minHeight: 48 }}>
             {joinSuccess ? "✓" : "Join"}
           </button>
         </div>
       </div>
 
+      {/* Recent grades */}
       <div className="card animate-slide-up" style={{ animationDelay: "400ms" }}>
-        <h2 className={`text-base font-semibold mb-4 ${dk ? "text-white" : "text-gray-900"}`}>Recent Grades</h2>
+        <h2 className="text-base font-semibold mb-4" style={{ color: dk ? "white" : "#1e293b" }}>Recent Grades</h2>
         <div className="space-y-2">
           {submissions.slice(0, 5).map((s: any, i: number) => (
             <div key={s.id} className="list-row animate-slide-in-right" style={{ animationDelay: `${500 + i * 50}ms` }}>
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dk ? "bg-violet-500/10" : "bg-violet-50"}`}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: dk ? "rgba(139,92,246,0.1)" : "#f5f3ff" }}>
                   <CheckCircle size={14} className="text-violet-400" />
                 </div>
                 <div>
-                  <div className={`text-sm font-medium ${dk ? "text-white" : "text-gray-900"}`}>{s.assignment_title || "Assignment"}</div>
-                  <div className={`text-xs flex items-center gap-1 ${dk ? "text-white/30" : "text-gray-400"}`}>
+                  <div className="text-sm font-medium" style={{ color: dk ? "white" : "#1e293b" }}>{s.assignment_title || "Assignment"}</div>
+                  <div className="text-xs flex items-center gap-1" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
                     <Clock size={10} />{new Date(s.submitted_at).toLocaleDateString()}
                   </div>
                 </div>
               </div>
               <div>
                 {s.grade !== null ? (
-                  <span className={`text-sm font-bold ${s.grade >= 70 ? "text-emerald-400" : "text-red-400"}`}>{s.grade}%</span>
+                  <span className="text-sm font-bold" style={{ color: s.grade >= 70 ? "#10b981" : "#ef4444" }}>{s.grade}%</span>
                 ) : (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${dk ? "text-white/30 bg-white/[0.05]" : "text-gray-500 bg-gray-100"}`}>Pending</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8", background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9" }}>Pending</span>
                 )}
               </div>
             </div>
           ))}
           {submissions.length === 0 && (
-            <p className={`text-center text-sm py-8 ${dk ? "text-white/25" : "text-gray-400"}`}>No submissions yet</p>
+            <p className="text-center text-sm py-8" style={{ color: dk ? "rgba(255,255,255,0.25)" : "#9ca3af" }}>No submissions yet</p>
           )}
         </div>
       </div>
+
+      {/* Celebrating mascot on done dashboard */}
+      {!dk && (
+        <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
+          <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
+        </div>
+      )}
     </div>
   );
 }
