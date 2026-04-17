@@ -1,83 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   DESIGN TOKENS — single source of truth for both themes
+   DESIGN TOKENS — "Editorial Paper"
+   Warm cream + deep ink + a single marigold accent.
+   Dark mode: deep charcoal-brown + parchment + same marigold.
+   Mixed corner radii, subtle real shadows, serif display type.
    ═══════════════════════════════════════════════════════════ */
 
 .dark {
   /* Backgrounds */
-  --bg:          #07071a;
-  --bg-sidebar:  #0a0b20;
-  --bg-surface:  #0f1029;
-  --bg-raised:   #141733;
-  --bg-hover:    rgba(255,255,255,0.045);
-  --bg-input:    rgba(255,255,255,0.055);
-  --bg-muted:    rgba(255,255,255,0.03);
+  --bg:          #12110e;    /* deep warm charcoal — not cold blue */
+  --bg-sidebar:  #18171a;
+  --bg-surface:  #1c1b1e;    /* slightly elevated */
+  --bg-raised:   #252328;
+  --bg-hover:    rgba(255,248,230,0.06);
+  --bg-input:    rgba(255,248,230,0.05);
+  --bg-muted:    rgba(255,248,230,0.03);
 
-  /* Borders */
-  --border:      rgba(255,255,255,0.06);
-  --border-md:   rgba(255,255,255,0.10);
-  --border-focus:rgba(139,92,246,0.55);
+  /* Borders — warm, not pure-white */
+  --border:      rgba(247,225,174,0.08);
+  --border-md:   rgba(247,225,174,0.14);
+  --border-focus:rgba(217,119,6,0.55);
 
-  /* Text */
-  --text-1:      #f8fafc;
-  --text-2:      rgba(248,250,252,0.55);
-  --text-3:      rgba(248,250,252,0.28);
-  --text-accent: #a78bfa;
+  /* Text — warm parchment */
+  --text-1:      #f8ecd2;
+  --text-2:      rgba(248,236,210,0.62);
+  --text-3:      rgba(248,236,210,0.32);
+  --text-accent: #f59e0b;
 
-  /* Accent/brand */
-  --accent:      #7c3aed;
-  --accent-hover:#6d28d9;
-  --accent-light: rgba(124,58,237,0.15);
+  /* Accent/brand — marigold */
+  --accent:      #d97706;
+  --accent-hover:#b45309;
+  --accent-light: rgba(217,119,6,0.14);
+
+  /* Secondary accents */
+  --accent-sage: #84a764;
+  --accent-ink:  #e8dcbc;
+  --accent-rust: #c2410c;
 
   /* Focus ring */
-  --ring:        rgba(139,92,246,0.4);
+  --ring:        rgba(217,119,6,0.32);
 
   /* Status */
-  --success:     #10b981;
-  --warning:     #f59e0b;
-  --danger:      #ef4444;
-  --info:        #06b6d4;
+  --success:     #84a764;
+  --warning:     #eab308;
+  --danger:      #dc5a3a;
+  --info:        #5c9ead;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
 
   /* Chat bubbles */
-  --bubble-other-bg:    rgba(255,255,255,0.06);
-  --bubble-other-text:  rgba(248,250,252,0.80);
-  --bubble-other-border:rgba(255,255,255,0.07);
+  --bubble-other-bg:    rgba(247,225,174,0.06);
+  --bubble-other-text:  rgba(248,236,210,0.82);
+  --bubble-other-border:rgba(247,225,174,0.08);
 }
 
 .light {
-  /* Backgrounds */
-  --bg:          #f2f3f8;
-  --bg-sidebar:  #ffffff;
-  --bg-surface:  #ffffff;
-  --bg-raised:   #f8f9fb;
-  --bg-hover:    rgba(0,0,0,0.04);
-  --bg-input:    #f9fafb;
-  --bg-muted:    rgba(0,0,0,0.025);
+  /* Backgrounds — warm cream paper */
+  --bg:          #f6f1e6;    /* cream — not cold gray */
+  --bg-sidebar:  #fdfaf3;
+  --bg-surface:  #fdfaf3;    /* slightly warmer than page bg */
+  --bg-raised:   #f1ead9;
+  --bg-hover:    rgba(24,23,30,0.04);
+  --bg-input:    #fdfaf3;
+  --bg-muted:    rgba(24,23,30,0.025);
 
-  /* Borders */
-  --border:      rgba(0,0,0,0.07);
-  --border-md:   rgba(0,0,0,0.13);
-  --border-focus:rgba(124,58,237,0.50);
+  /* Borders — ink-warm */
+  --border:      rgba(24,23,30,0.10);
+  --border-md:   rgba(24,23,30,0.18);
+  --border-focus:rgba(180,83,9,0.50);
 
-  /* Text */
-  --text-1:      #0f172a;
-  --text-2:      #475569;
-  --text-3:      #94a3b8;
-  --text-accent: #6d28d9;
+  /* Text — deep ink, not black */
+  --text-1:      #18171a;
+  --text-2:      #5a564f;
+  --text-3:      #8a867e;
+  --text-accent: #b45309;
 
-  /* Accent/brand */
-  --accent:      #7c3aed;
-  --accent-hover:#6d28d9;
-  --accent-light: rgba(124,58,237,0.08);
+  /* Accent/brand — marigold */
+  --accent:      #d97706;
+  --accent-hover:#b45309;
+  --accent-light: rgba(217,119,6,0.10);
+
+  /* Secondary accents */
+  --accent-sage: #6b8e4e;
+  --accent-ink:  #18171a;
+  --accent-rust: #b84a3e;
 
   /* Focus ring */
-  --ring:        rgba(124,58,237,0.3);
+  --ring:        rgba(217,119,6,0.25);
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
 
   /* Status */
-  --success:     #059669;
+  --success:     #6b8e4e;
   --warning:     #d97706;
   --danger:      #dc2626;
   --info:        #0891b2;
@@ -92,21 +119,41 @@
    BASE
    ═══════════════════════════════════════════════════════════ */
 @layer base {
-  html { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; }
-  body { color: var(--text-1); background-color: var(--bg); -webkit-font-smoothing: antialiased; }
+  html {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'ss01', 'cv11'; /* subtle stylistic alternates */
+  }
+  body {
+    color: var(--text-1); background-color: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    /* Subtle paper texture on light mode — barely perceptible */
+    background-image: radial-gradient(1200px 600px at 10% -10%, rgba(217,119,6,0.04), transparent 60%),
+                      radial-gradient(1000px 500px at 90% 110%, rgba(107,142,78,0.035), transparent 60%);
+  }
 
-  /* Theme transitions — only on properties that need it, not everything */
+  /* Serif display font utility — use sparingly, high-impact headings only */
+  .font-display {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    font-feature-settings: 'ss01', 'ss02', 'ss03';
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  /* Theme transitions */
   body, aside, main, nav, header, footer,
   .card, .card-hover, .glass, .input, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost,
   .nav-link, .stat-card, .list-row {
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  /* Scrollbar — thin, warm */
+  ::-webkit-scrollbar        { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track  { background: transparent; }
   ::-webkit-scrollbar-thumb  { background: var(--border-md); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.35); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* Selection */
+  ::selection { background: var(--accent); color: white; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -114,74 +161,86 @@
    ═══════════════════════════════════════════════════════════ */
 @layer components {
 
-  /* ── Buttons ── */
+  /* ── Buttons ── 8px radius (not everything should be 16px) ── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2
-           px-4 py-2 rounded-xl font-semibold text-sm text-white
-           bg-violet-600 hover:bg-violet-500 active:bg-violet-700
-           shadow-lg shadow-violet-600/20
-           transition-all duration-200 active:scale-[0.97]
-           disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer;
+           px-4 py-2 font-semibold text-sm text-white
+           transition-colors duration-150 cursor-pointer
+           disabled:opacity-40 disabled:cursor-not-allowed;
+    background: var(--accent);
+    border-radius: var(--r-lg);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.12);
   }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:active { transform: translateY(1px); box-shadow: 0 0 0 rgba(0,0,0,0.1); }
+
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2
-           px-4 py-2 rounded-xl font-medium text-sm
-           transition-all duration-200 active:scale-[0.97] cursor-pointer;
-    background: var(--bg-hover);
+           px-4 py-2 font-medium text-sm
+           transition-colors duration-150 cursor-pointer;
+    background: var(--bg-surface);
     color: var(--text-1);
     border: 1px solid var(--border-md);
+    border-radius: var(--r-lg);
   }
-  .btn-secondary:hover { background: var(--bg-raised); }
+  .btn-secondary:hover { background: var(--bg-raised); border-color: var(--accent); color: var(--text-1); }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2
-           px-4 py-2 rounded-xl font-semibold text-sm text-white
-           bg-red-600 hover:bg-red-500 active:bg-red-700
-           shadow-lg shadow-red-600/15
-           transition-all duration-200 active:scale-[0.97] cursor-pointer;
+           px-4 py-2 font-semibold text-sm text-white
+           transition-colors duration-150 cursor-pointer;
+    background: var(--danger);
+    border-radius: var(--r-lg);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.12);
   }
+  .btn-danger:hover { filter: brightness(1.08); }
+
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2
-           px-4 py-2 rounded-xl font-medium text-sm
-           transition-all duration-200 active:scale-[0.97] cursor-pointer;
-    color: var(--text-3);
+           px-4 py-2 font-medium text-sm
+           transition-colors duration-150 cursor-pointer;
+    color: var(--text-2);
+    border-radius: var(--r-lg);
   }
   .btn-ghost:hover { background: var(--bg-hover); color: var(--text-1); }
 
-  /* ── Cards ── */
+  /* ── Cards — real 1px border, subtle shadow, NOT rounded-2xl ── */
   .card {
-    @apply rounded-2xl p-5 animate-fade-in;
+    @apply p-5 animate-fade-in;
     background: var(--bg-surface);
     border: 1px solid var(--border);
+    border-radius: var(--r-xl);
   }
-  .dark .card { box-shadow: none; }
-  .light .card { box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); }
+  .dark .card { box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+  .light .card { box-shadow: 0 1px 2px rgba(24,23,30,0.05), 0 0 0 1px rgba(24,23,30,0.02); }
 
   .card-hover {
     @apply card cursor-pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
   }
   .card-hover:hover {
-    background: var(--bg-raised);
-    border-color: var(--border-md);
+    border-color: var(--accent);
+    transform: translateY(-1px);
   }
-  .dark .card-hover:hover  { box-shadow: 0 4px 20px rgba(139,92,246,0.06); }
-  .light .card-hover:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .dark .card-hover:hover  { box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 0 0 1px rgba(217,119,6,0.22); }
+  .light .card-hover:hover { box-shadow: 0 4px 14px rgba(24,23,30,0.08), 0 0 0 1px rgba(217,119,6,0.2); }
 
-  /* ── Glass ── */
+  /* ── Glass — used for overlays ── */
   .glass {
-    @apply rounded-2xl backdrop-blur-xl;
-    background: var(--bg-surface);
+    @apply backdrop-blur-xl;
+    background: color-mix(in srgb, var(--bg-surface) 88%, transparent);
     border: 1px solid var(--border);
+    border-radius: var(--r-xl);
   }
 
-  /* ── Inputs ── */
+  /* ── Inputs — tighter radius, subtle treatment ── */
   .input {
-    @apply w-full px-3.5 py-2.5 rounded-xl text-sm
-           transition-all duration-200;
+    @apply w-full px-3 py-2.5 text-sm
+           transition-all duration-150;
     background: var(--bg-input);
     border: 1px solid var(--border-md);
     color: var(--text-1);
+    border-radius: var(--r-md);
     outline: none;
   }
   .input::placeholder { color: var(--text-3); }
@@ -193,45 +252,79 @@
   /* ── Badges ── */
   .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; }
 
+  /* Editorial chip — serif number, small-caps label */
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide;
+    border-radius: var(--r-sm);
+    background: var(--bg-muted);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+
   /* ── Stat cards ── */
   .stat-card { @apply card flex items-center gap-3.5; }
-  .stat-icon  { @apply w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0; }
-
-  /* ── Nav links ── */
-  .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer;
-    color: var(--text-3);
+  .stat-icon  {
+    @apply w-11 h-11 flex items-center justify-center flex-shrink-0;
+    border-radius: var(--r-lg);
   }
-  .nav-link:hover { background: var(--bg-hover); color: var(--text-2); }
+
+  /* ── Nav links — rectangular with left-edge accent bar when active ── */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors duration-150 cursor-pointer;
+    color: var(--text-2);
+    border-radius: var(--r-md);
+    border-left: 2px solid transparent;
+  }
+  .nav-link:hover { background: var(--bg-hover); color: var(--text-1); }
 
   .nav-link-active {
     @apply nav-link;
     background: var(--accent-light);
     color: var(--text-accent);
-    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-left-color: var(--accent);
   }
   .nav-link-active:hover { background: var(--accent-light); }
 
   .nav-link-inactive { @apply nav-link; }
 
   /* ── Table headers ── */
-  .table-header { @apply text-xs uppercase tracking-wide font-semibold; color: var(--text-3); }
+  .table-header { @apply text-[10px] uppercase tracking-[0.08em] font-semibold; color: var(--text-3); }
 
   /* ── List rows ── */
   .list-row {
-    @apply flex items-center justify-between rounded-xl px-4 py-3;
+    @apply flex items-center justify-between px-4 py-3;
     background: var(--bg-muted);
     border: 1px solid var(--border);
+    border-radius: var(--r-md);
   }
   .list-row:hover { background: var(--bg-hover); border-color: var(--border-md); }
 
   /* ── Divider ── */
   .divider { @apply w-full h-px; background: var(--border); }
 
+  /* Section label — small-caps editorial label above a heading */
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em];
+    color: var(--text-accent);
+  }
+
+  /* Stamp — warm subtle "post-it" style used for status highlights */
+  .stamp {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--accent-light);
+    color: var(--text-accent);
+    border-left: 2px solid var(--accent);
+  }
+
   /* ── Chat bubbles ── */
   .bubble-me {
-    @apply rounded-xl px-3 py-2 text-sm text-white
-           bg-gradient-to-br from-violet-600 to-indigo-600;
+    @apply px-3 py-2 text-sm text-white;
+    background: var(--accent);
+    border-radius: var(--r-md);
   }
   .bubble-other {
     @apply rounded-xl px-3 py-2 text-sm;
@@ -278,8 +371,8 @@
 .animate-page-enter { animation: page-enter 0.3s ease-out; }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 0   0   rgba(139,92,246,0);    }
-  50%       { box-shadow: 0 0 18px 3px rgba(139,92,246,0.25); }
+  0%, 100% { box-shadow: 0 0 0   0   rgba(217,119,6,0);    }
+  50%       { box-shadow: 0 0 18px 3px rgba(217,119,6,0.22); }
 }
 .animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
 
