@@ -161,29 +161,37 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${dk ? "text-white" : "text-gray-900"}`}>
-            {user?.role === "admin" ? "Admin Dashboard" : "Teacher Dashboard"}
-          </h1>
-          <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-            Welcome back, {user?.name}
-          </p>
+      {/* ── Editorial masthead header ── */}
+      <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+          <span className="font-mono">{user?.role === "admin" ? "BLOCKFORGE · ADMIN" : "BLOCKFORGE · TEACHER"}</span>
         </div>
-        {/* Emergency panic button — force-unlock every class */}
-        <button
-          onClick={handleForceUnlockAll}
-          title="Clear every active lock system-wide — use if a student gets stuck"
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
-            dk
-              ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25"
-              : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
-          }`}
-        >
-          <LockOpen size={13}/> Force Unlock All
-        </button>
-      </div>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <div className="section-label mb-2">— Today's classroom —</div>
+            <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
+              Morning, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{user?.name?.split(" ")[0]}.</em>
+            </h1>
+            <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
+              Quiet tools for a busy classroom. Monitor students, push assignments, keep the day running.
+            </p>
+          </div>
+          <button
+            onClick={handleForceUnlockAll}
+            title="Clear every active lock system-wide — use if a student gets stuck"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+            style={{
+              color: "var(--danger)",
+              background: "color-mix(in srgb, var(--danger) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)",
+              borderRadius: "var(--r-md)",
+            }}
+          >
+            <LockOpen size={13}/> Force Unlock All
+          </button>
+        </div>
+      </header>
 
       {/* Quick-access tools grid — staggered fade in */}
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">

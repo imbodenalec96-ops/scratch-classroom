@@ -1029,38 +1029,52 @@ export default function StudentDashboard() {
 
   // ── DONE / DASHBOARD ──
   const unlocked = isWorkUnlocked();
+  // Editorial date line "Thursday, April 17" style
+  const dateLine = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
   return (
-    <div className="p-5 space-y-5 animate-page-enter relative" style={{ paddingBottom: unlocked ? 100 : undefined }}>
+    <div className="p-6 space-y-6 animate-page-enter relative" style={{ paddingBottom: unlocked ? 100 : undefined }}>
       {broadcast && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-violet-600 text-white px-6 py-3 text-center text-sm font-medium flex items-center justify-center gap-2">
+        <div className="fixed top-0 left-0 right-0 z-40 px-6 py-3 text-center text-sm font-medium flex items-center justify-center gap-2" style={{ background: "var(--accent)", color: "white", borderBottom: "2px solid var(--accent-hover)" }}>
           <Megaphone size={15} />{broadcast}
         </div>
       )}
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between animate-slide-up" style={{ animationDelay: "0ms" }}>
-        <div>
-          <h1 className="font-student text-2xl font-extrabold tracking-tight" style={{ color: dk ? "white" : "#1e293b" }}>
-            {unlocked ? "Free time! 🎉" : `Hey, ${user?.name?.split(" ")[0]} 👋`}
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: dk ? "rgba(255,255,255,0.4)" : "#64748b" }}>
-            {unlocked ? "All done for today — great work!" : "Welcome back!"}
-          </p>
+      {/* ── Editorial header: masthead + date + headline + leaderboard chip ── */}
+      <header className="border-b pb-5 animate-slide-up" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+          <span>{dateLine}</span>
+          <span className="font-mono">BLOCKFORGE · STUDENT</span>
         </div>
-        {myEntry && (
-          <div className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5 border"
-            style={{
-              background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb",
-              borderColor: dk ? "rgba(245,158,11,0.2)" : "#fde68a",
-            }}>
-            <Trophy size={16} className="text-amber-400" />
-            <div>
-              <span className="text-sm font-bold" style={{ color: dk ? "white" : "#1e293b" }}>{myEntry.points} pts</span>
-              <span className="text-xs ml-1.5" style={{ color: dk ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>Lvl {myEntry.level}</span>
-            </div>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <div className="section-label mb-2">— Today's pages —</div>
+            <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
+              {unlocked
+                ? <>Free time, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>well earned.</em></>
+                : <>Good to see you, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{user?.name?.split(" ")[0]}.</em></>
+              }
+            </h1>
+            <p className="text-sm mt-2 max-w-md" style={{ color: "var(--text-2)" }}>
+              {unlocked ? "Everything's done. Pick a page, enjoy yourself." : "Your work is set up below. Start from the top — you've got this."}
+            </p>
           </div>
-        )}
-      </div>
+          {myEntry && (
+            <div className="flex items-baseline gap-3 px-4 py-3" style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--accent)",
+              borderRadius: "var(--r-md)",
+            }}>
+              <Trophy size={16} style={{ color: "var(--accent)" }} />
+              <div>
+                <div className="font-display text-2xl leading-none" style={{ color: "var(--text-1)" }}>{myEntry.points}</div>
+                <div className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "var(--text-3)" }}>pts · Lvl {myEntry.level}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-3 gap-3">
