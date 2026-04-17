@@ -67,29 +67,53 @@ router.put("/student/:userId", requireRole("teacher", "admin"), async (req: Auth
   }
 });
 
-// Teacher/admin: class overview — all students in a class + their grades.
-// Returns EVERY class_members row regardless of whether they have a
-// user_grade_levels entry yet. No role filter (earlier version required
-// users.role='student' which excluded some enrollment paths).
+// Teacher/admin: class overview — every student in the class + their grades.
+// Two-step approach: fetch the roster first (the simple known-good query used
+// by /classes/:id/students), then the grade rows separately, then merge in JS.
+// This sidesteps the PostgreSQL type mismatch we hit when LEFT JOINing
+// users (uuid) against user_grade_levels (text) — operator error that
+// was silently returning [].
 router.get("/class/:classId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureGradesTable();
   const debug = req.query.debug === '1';
   try {
-    const rows = await db.prepare(
-      `SELECT u.id, u.name, u.email, u.role,
-        COALESCE(g.reading_grade, 3) AS reading_grade,
-        COALESCE(g.math_grade,    3) AS math_grade,
-        COALESCE(g.writing_grade, 3) AS writing_grade,
-        g.updated_at
-       FROM users u
-       JOIN class_members cm ON u.id = cm.user_id
-       LEFT JOIN user_grade_levels g ON g.user_id = u.id
+    // 1) Roster from the known-good users × class_members join
+    const roster = await db.prepare(
+      `SELECT u.id, u.name, u.email, u.role
+       FROM users u JOIN class_members cm ON u.id = cm.user_id
        WHERE cm.class_id = ?
        ORDER BY u.name`
     ).all(req.params.classId) as any[];
-    // Keep role filter OFF by default — only exclude obvious non-students
-    const filtered = rows.filter(r => r.role !== 'admin');
-    res.json(filtered);
+
+    // 2) Grade rows (simple WHERE, no join) — tolerate empty table
+    const userIds = roster.map(r => String(r.id));
+    let gradeRows: any[] = [];
+    if (userIds.length > 0) {
+      try {
+        const placeholders = userIds.map(() => "?").join(",");
+        gradeRows = await db.prepare(
+          `SELECT user_id, reading_grade, math_grade, writing_grade, updated_at
+           FROM user_grade_levels WHERE user_id IN (${placeholders})`
+        ).all(...userIds) as any[];
+      } catch (e) { if (debug) console.error('grade rows err:', e); }
+    }
+    const gradeMap: Record<string, any> = {};
+    for (const g of gradeRows) gradeMap[String(g.user_id)] = g;
+
+    // 3) Merge. Default to grade 3 when no row exists (editable on save).
+    const merged = roster
+      .filter(r => r.role !== 'admin')
+      .map(r => {
+        const g = gradeMap[String(r.id)];
+        return {
+          id: r.id, name: r.name, email: r.email, role: r.role,
+          reading_grade: g?.reading_grade ?? 3,
+          math_grade:    g?.math_grade    ?? 3,
+          writing_grade: g?.writing_grade ?? 3,
+          updated_at:    g?.updated_at    ?? null,
+        };
+      });
+    res.json(merged);
   } catch (e: any) {
     console.error('class grades error:', e);
     if (debug) return res.status(500).json({ error: String(e?.message || e) });
