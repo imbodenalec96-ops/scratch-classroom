@@ -166,9 +166,19 @@ export const api = {
   getClassPresence: (classId: string) =>
     request<any[]>(`/classes/${classId}/presence`),
 
+  // Per-student command pipe (new foundation — gradually replaces class_commands)
+  getMyCommands: () => request<Array<{id:string; command_type:string; payload:string; created_at:string}>>(`/students/me/commands`),
+  consumeMyCommand: (id: string) => request<any>(`/students/me/commands/${id}/consume`, { method: "POST", body: JSON.stringify({}) }),
+
   // GoGuardian classroom control
   getClassroomState: (classId: string, since?: string) =>
     request<any>(`/classes/${classId}/classroom-state${since ? `?since=${encodeURIComponent(since)}` : ''}`),
+  consumeCommand: (classId: string, commandId: string) =>
+    request<any>(`/classes/${classId}/commands/${commandId}/consume`, { method: "DELETE" }),
+  endBreak: (studentId: string) =>
+    request<any>(`/classes/end-break/${studentId}`, { method: "POST" }),
+  endAllBreaks: (classId: string) =>
+    request<any>(`/classes/${classId}/end-all-breaks`, { method: "POST" }),
   lockClass: (classId: string, message?: string) =>
     request<any>(`/classes/${classId}/lock`, { method: "POST", body: JSON.stringify({ message: message || '' }) }),
   unlockClass: (classId: string) =>

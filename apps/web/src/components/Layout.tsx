@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { isWorkUnlocked } from "../lib/workUnlock.ts";
+import { isWorkUnlocked, isAccessAllowed } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
+import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
-import { markWorkStart } from "../lib/breakSystem.ts";
+import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -20,14 +21,25 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  // Re-compute nav whenever location changes so arcade/projects appear
-  // immediately after a student submits their assignment (same session).
-  const [workUnlocked, setWorkUnlocked] = useState(isWorkUnlocked);
-  useEffect(() => { setWorkUnlocked(isWorkUnlocked()); }, [location.pathname]);
+  // Re-compute nav whenever location changes OR break state flips so
+  // arcade/projects appear immediately after submitting work or starting a break.
+  const [accessAllowed, setAccessAllowed] = useState(isAccessAllowed);
+  useEffect(() => { setAccessAllowed(isAccessAllowed()); }, [location.pathname]);
+  useEffect(() => {
+    const refresh = () => setAccessAllowed(isAccessAllowed());
+    window.addEventListener("breakstate-change", refresh);
+    // Also poll every second — break state expires client-side via Date.now().
+    const iv = setInterval(refresh, 1000);
+    return () => { window.removeEventListener("breakstate-change", refresh); clearInterval(iv); };
+  }, []);
 
   // GoGuardian: students poll for lock/commands; teachers/admin skip
   const isStudent = user?.role === "student";
   const classCommands = useClassCommands(isStudent);
+  // New per-student command pipe (runs alongside the class_commands poll
+  // during the rewire — dispatch table is intentionally empty in this
+  // foundation commit; specific actions get wired in follow-up commits).
+  useStudentCommands(isStudent, {});
   // Rich activity labels tied to pathname — every route change re-pings
   usePresencePing(user ? activityFromPath(location.pathname) : "");
   // Screenshot thumbnails for teacher monitor (students only)
@@ -36,7 +48,7 @@ export default function Layout() {
   useEffect(() => { if (isStudent) markWorkStart(); }, [isStudent]);
 
   if (!user) return null;
-  const navItems = getNavItems(user.role, workUnlocked);
+  const navItems = getNavItems(user.role, accessAllowed);
   const dk = theme === "dark";
 
   return (
@@ -171,7 +183,7 @@ export default function Layout() {
   );
 }
 
-function getNavItems(role: string, workDone = isWorkUnlocked()) {
+function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
   const common = [
     { path: "/",           icon: LayoutDashboard, label: "Dashboard"   },
     { path: "/projects",   icon: FolderOpen,      label: "Projects"    },

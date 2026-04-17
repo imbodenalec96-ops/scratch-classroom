@@ -13,6 +13,103 @@ async function ensureVideoColumns() {
   }
 }
 
+// ── Per-student command pipe (Scenario 1 foundation) ───────────────
+// A single durable row-per-action queue so every teacher-to-student action
+// (LOCK, UNLOCK, MESSAGE, GRANT_FREETIME, REVOKE_FREETIME, END_BREAK,
+// NAVIGATE, KICK, BROADCAST_VIDEO, END_BROADCAST) has:
+//   - server-side persistence (survives reload, page navigation, offline gaps)
+//   - exactly-once delivery (consumed_at sentinel + student-scoped consume)
+//   - a clean replacement for the ad-hoc class_commands fan-out we were
+//     using for some actions and forgetting for others.
+// Columns use TEXT to stay compatible with the sqlite dev shim; on prod
+// Neon they're simply TEXT columns — payload is a JSON-string by convention.
+let studentCommandsReady = false;
+async function ensureStudentCommandsTable() {
+  if (studentCommandsReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS student_commands (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        command_type TEXT NOT NULL,
+        payload TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        consumed_at TEXT
+      )
+    `);
+    // Indexed on the pending-for-student lookup we do every 3s from the client.
+    try {
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_student_commands_pending
+        ON student_commands(student_id, consumed_at, created_at)`);
+    } catch { /* sqlite older versions */ }
+    studentCommandsReady = true;
+  } catch (e) {
+    // Fail-open: leave the flag false so we retry on next request.
+    console.error("ensureStudentCommandsTable failed:", e);
+  }
+}
+
+/**
+ * Internal helper used by teacher-action endpoints elsewhere to enqueue a
+ * command for a specific student. Returns the new row id.
+ * Export shape kept simple (no jsonb coercion) since the codebase is
+ * sqlite/pg portable and all existing command payloads are strings.
+ */
+export async function enqueueStudentCommand(
+  studentId: string,
+  commandType: string,
+  payload: string | object = ""
+): Promise<string> {
+  await ensureStudentCommandsTable();
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+  await db.prepare(
+    `INSERT INTO student_commands (id, student_id, command_type, payload, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, studentId, commandType, body, now);
+  return id;
+}
+
+// GET /me/commands — pending commands for the authenticated student.
+// Client polls this every ~3s; returns oldest-first so the client can process
+// in order (e.g. LOCK before MESSAGE if both were sent together).
+router.get("/me/commands", async (req: AuthRequest, res: Response) => {
+  await ensureStudentCommandsTable();
+  try {
+    const rows = await db.prepare(
+      `SELECT id, command_type, payload, created_at
+         FROM student_commands
+        WHERE student_id = ? AND consumed_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 50`
+    ).all(req.user!.id);
+    res.json(rows);
+  } catch (e) {
+    console.error("GET /me/commands failed:", e);
+    res.status(500).json({ error: "Failed to list commands" });
+  }
+});
+
+// POST /me/commands/:id/consume — student acknowledges it processed the
+// command. Scoped to the calling user so a student can never consume another
+// student's row. Idempotent: setting consumed_at twice is a no-op.
+router.post("/me/commands/:id/consume", async (req: AuthRequest, res: Response) => {
+  await ensureStudentCommandsTable();
+  const { id } = req.params;
+  try {
+    const r = await db.prepare(
+      `UPDATE student_commands
+          SET consumed_at = ?
+        WHERE id = ? AND student_id = ? AND consumed_at IS NULL`
+    ).run(new Date().toISOString(), id, req.user!.id);
+    res.json({ ok: true, changes: r.changes });
+  } catch (e) {
+    console.error("POST /me/commands/:id/consume failed:", e);
+    res.status(500).json({ error: "Failed to consume command" });
+  }
+});
+
 // GET / — list students (active only by default, ?all=1 for all)
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
