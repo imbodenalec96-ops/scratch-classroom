@@ -1,11 +1,12 @@
 import React, { useSyncExternalStore } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
+import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
@@ -14,6 +15,7 @@ import BreakChoiceModal from "./BreakChoiceModal.tsx";
 export default function PublicLayout() {
   const { user } = useAuth();
   const loc = useLocation();
+  const navigate = useNavigate();
 
   // Students on public routes (like /arcade) still need the lock overlay +
   // command polling — otherwise teachers can't lock them when they're
@@ -31,6 +33,16 @@ export default function PublicLayout() {
     UNLOCK: () => studentLockStore.setLocked(false, null),
     MESSAGE: (row) => {
       studentMessageStore.setMessage(row.payload || "");
+    },
+    GRANT_FREETIME: (row) => {
+      let until: string | null = null;
+      try { until = JSON.parse(row.payload || "{}").until ?? null; } catch { /* malformed payload — fall through */ }
+      studentFreetimeStore.setGranted(until);
+    },
+    REVOKE_FREETIME: () => {
+      studentFreetimeStore.setRevoked();
+      studentMessageStore.setMessage("Free time ended — back to work 📚");
+      navigate("/assignments");
     },
   });
   const newLock = useSyncExternalStore(

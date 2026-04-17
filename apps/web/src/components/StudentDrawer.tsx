@@ -107,13 +107,25 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
   };
   const handleGrant = async () => {
     if (!confirm(`Grant free time to ${student.name}? They can use arcade/projects immediately.`)) return;
-    try { await api.grantFreeTime(student.id); showFlash("🎁 Free time granted"); }
-    catch (e: any) { alert("Failed: " + e.message); }
+    // Fire new student_commands pipe + legacy class_commands path in parallel.
+    // New pipe is authoritative; legacy stays until it's retired across all actions.
+    try {
+      await Promise.allSettled([
+        api.grantStudentFreeTime(student.id, 15),
+        api.grantFreeTime(student.id),
+      ]);
+      showFlash("🎁 Free time granted");
+    } catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleRevoke = async () => {
     if (!confirm(`Revoke free time for ${student.name}? They'll be pushed back to assignments.`)) return;
-    try { await api.revokeFreeTime(student.id); showFlash("⛔ Free time revoked"); }
-    catch (e: any) { alert("Failed: " + e.message); }
+    try {
+      await Promise.allSettled([
+        api.revokeStudentFreeTime(student.id),
+        api.revokeFreeTime(student.id),
+      ]);
+      showFlash("⛔ Free time revoked");
+    } catch (e: any) { alert("Failed: " + e.message); }
   };
   const handleEndBreak = async () => {
     if (!confirm(`End ${student.name}'s break early? They'll get a toast and go back to /student.`)) return;

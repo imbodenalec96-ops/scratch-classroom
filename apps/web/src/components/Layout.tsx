@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useSyncExternalStore } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { isWorkUnlocked, isAccessAllowed } from "../lib/workUnlock.ts";
@@ -10,6 +10,7 @@ import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
+import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak } from "../lib/breakSystem.ts";
@@ -23,6 +24,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   // Re-compute nav whenever location changes OR break state flips so
   // arcade/projects appear immediately after submitting work or starting a break.
   const [accessAllowed, setAccessAllowed] = useState(isAccessAllowed);
@@ -53,6 +55,16 @@ export default function Layout() {
       // MESSAGE payload shape so the server fan-out writes the same string
       // to both pipes).
       studentMessageStore.setMessage(row.payload || "");
+    },
+    GRANT_FREETIME: (row) => {
+      let until: string | null = null;
+      try { until = JSON.parse(row.payload || "{}").until ?? null; } catch { /* payload malformed — fall back to indefinite-until-revoke */ }
+      studentFreetimeStore.setGranted(until);
+    },
+    REVOKE_FREETIME: () => {
+      studentFreetimeStore.setRevoked();
+      studentMessageStore.setMessage("Free time ended — back to work 📚");
+      navigate("/assignments");
     },
   });
   // Subscribe to the new lock store and OR it into the existing overlay

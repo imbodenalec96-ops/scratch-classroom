@@ -14,6 +14,17 @@ async function ensureVideoColumns() {
   }
 }
 
+// Ensure freetime_revoked_until column exists (idempotent).
+// Stored as TEXT ISO timestamp to match the sqlite-compat shim. When set in
+// the future, the student's assignments flow is force-locked for ~60s so a
+// revoke can't be instantly undone by a stale local unlock.
+let freetimeColumnReady = false;
+async function ensureFreetimeColumn() {
+  if (freetimeColumnReady) return;
+  try { await db.exec(`ALTER TABLE students ADD COLUMN freetime_revoked_until TEXT`); } catch { /* already exists */ }
+  freetimeColumnReady = true;
+}
+
 // ── Per-student command pipe (Scenario 1 foundation) ───────────────
 // A single durable row-per-action queue so every teacher-to-student action
 // (LOCK, UNLOCK, MESSAGE, GRANT_FREETIME, REVOKE_FREETIME, END_BREAK,
@@ -320,6 +331,48 @@ router.post("/:id/unlock", requireRole("teacher", "admin"), async (req: AuthRequ
   } catch (e) {
     console.error("POST /:id/unlock failed:", e);
     res.status(500).json({ error: "Failed to unlock student" });
+  }
+});
+
+// POST /:id/grant-freetime — teacher/admin enqueues a GRANT_FREETIME command.
+// Body: { minutes?: number } default 15. Payload carries `until` ISO so the
+// client can set a local expiry timer without re-polling for the end.
+router.post("/:id/grant-freetime", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const rawMinutes = Number(req.body?.minutes);
+  const minutes = Number.isFinite(rawMinutes) && rawMinutes > 0 ? rawMinutes : 15;
+  try {
+    const until = new Date(Date.now() + minutes * 60_000).toISOString();
+    const cmdId = await enqueueStudentCommand(id, "GRANT_FREETIME", { until });
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/grant-freetime failed:", e);
+    res.status(500).json({ error: "Failed to grant free time" });
+  }
+});
+
+// POST /:id/revoke-freetime — teacher/admin enqueues a REVOKE_FREETIME command.
+// Also writes `freetime_revoked_until = now + 60s` on the student row so the
+// client's unlock precedence treats the revoke as authoritative even if a stale
+// GRANT_FREETIME flag is still pending in local state.
+router.post("/:id/revoke-freetime", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    await ensureFreetimeColumn();
+    const until = new Date(Date.now() + 60_000).toISOString();
+    try {
+      await db.prepare(`UPDATE students SET freetime_revoked_until = ? WHERE id = ?`).run(until, id);
+    } catch (e) {
+      // The `students` table on Neon may or may not have a row for this user-id
+      // (depending on how the auth migration landed). The UPDATE is a best-
+      // effort guard — the command itself is still enqueued below.
+      console.warn("revoke-freetime: UPDATE students.freetime_revoked_until skipped:", e);
+    }
+    const cmdId = await enqueueStudentCommand(id, "REVOKE_FREETIME", "");
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/revoke-freetime failed:", e);
+    res.status(500).json({ error: "Failed to revoke free time" });
   }
 });
 
