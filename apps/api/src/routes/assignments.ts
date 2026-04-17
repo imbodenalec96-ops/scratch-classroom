@@ -8,25 +8,34 @@ const router = Router();
 
 // Ensure grade-target + per-student columns exist on assignments (idempotent).
 let gradeColsReady = false;
+let gradeColsInFlight: Promise<void> | null = null;
 async function ensureGradeCols() {
   if (gradeColsReady) return;
-  for (const col of [
-    "ALTER TABLE assignments ADD COLUMN target_grade_min INTEGER",
-    "ALTER TABLE assignments ADD COLUMN target_grade_max INTEGER",
-    "ALTER TABLE assignments ADD COLUMN target_subject TEXT",
-    "ALTER TABLE assignments ADD COLUMN student_id TEXT",
-    "ALTER TABLE assignments ADD COLUMN week_theme TEXT",
-    "ALTER TABLE assignments ADD COLUMN teacher_notes TEXT",
-    "ALTER TABLE assignments ADD COLUMN question_count INTEGER",
-    "ALTER TABLE assignments ADD COLUMN estimated_minutes INTEGER",
-    "ALTER TABLE assignments ADD COLUMN focus_keywords TEXT",
-    "ALTER TABLE assignments ADD COLUMN learning_objective TEXT",
-    "ALTER TABLE assignments ADD COLUMN hints_allowed INTEGER",
-    "ALTER TABLE assignments ADD COLUMN question_type TEXT",
-  ]) {
-    try { await db.exec(col); } catch { /* column already exists */ }
-  }
-  gradeColsReady = true;
+  // Dedupe concurrent callers — if 10 /generate-slot requests hit a cold
+  // instance simultaneously, only one of them runs the ALTER TABLEs; the
+  // others await the same promise. Prevents thundering-herd lock contention
+  // on Postgres DDL.
+  if (gradeColsInFlight) return gradeColsInFlight;
+  gradeColsInFlight = (async () => {
+    for (const col of [
+      "ALTER TABLE assignments ADD COLUMN target_grade_min INTEGER",
+      "ALTER TABLE assignments ADD COLUMN target_grade_max INTEGER",
+      "ALTER TABLE assignments ADD COLUMN target_subject TEXT",
+      "ALTER TABLE assignments ADD COLUMN student_id TEXT",
+      "ALTER TABLE assignments ADD COLUMN week_theme TEXT",
+      "ALTER TABLE assignments ADD COLUMN teacher_notes TEXT",
+      "ALTER TABLE assignments ADD COLUMN question_count INTEGER",
+      "ALTER TABLE assignments ADD COLUMN estimated_minutes INTEGER",
+      "ALTER TABLE assignments ADD COLUMN focus_keywords TEXT",
+      "ALTER TABLE assignments ADD COLUMN learning_objective TEXT",
+      "ALTER TABLE assignments ADD COLUMN hints_allowed INTEGER",
+      "ALTER TABLE assignments ADD COLUMN question_type TEXT",
+    ]) {
+      try { await db.exec(col); } catch { /* column already exists */ }
+    }
+    gradeColsReady = true;
+  })();
+  try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
 }
 
 // Lazy Anthropic client (same pattern as ai-tasks.ts)

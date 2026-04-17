@@ -429,6 +429,12 @@ export default function AssignmentBuilder() {
   // Real-time progress
   const [fwProgress, setFwProgress] = useState<{ done: number; failed: number; total: number; current?: string; elapsed: number }>({ done: 0, failed: 0, total: 0, elapsed: 0 });
   const fwCancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  // Live per-slot log so the teacher can see real movement — each entry is
+  // {label, status: "start"|"ok"|"fail", t, ms?, err?}
+  const [fwLog, setFwLog] = useState<Array<{ label: string; status: "start" | "ok" | "fail"; t: number; ms?: number; err?: string }>>([]);
+  const [fwShowLog, setFwShowLog] = useState(false);
+  // All in-flight fetch AbortControllers so Cancel actually cancels them
+  const fwInflightRef = useRef<Set<AbortController>>(new Set());
   // Per-class defaults (loaded from class_settings)
   const [fwDefaultQuestionCount, setFwDefaultQuestionCount] = useState<number>(3);
   const [fwDefaultEstimatedMinutes, setFwDefaultEstimatedMinutes] = useState<number>(5);
@@ -567,6 +573,8 @@ export default function AssignmentBuilder() {
     setFullWeekGenerating(true);
     setFullWeekResult(null);
     fwCancelRef.current.cancelled = false;
+    fwInflightRef.current = new Set();
+    setFwLog([]);
 
     // Persist these choices as the class default if requested
     if (fwSaveAsDefault) {
@@ -579,11 +587,26 @@ export default function AssignmentBuilder() {
       }).catch(() => { /* non-blocking */ });
     }
 
-    const CONCURRENCY = 10; // max parallel AI calls — stays well under Anthropic rate limits
+    // Tuned down from 10 → 3. Anthropic Tier 1 concurrent-request limits + pg
+    // default pool size of 10 were causing generate-slot requests to queue
+    // behind each other silently. 3 keeps the bar moving without stalls.
+    const CONCURRENCY = 3;
+    // Per-slot hard timeout. If Vercel's function hangs (cold start + slow
+    // Anthropic response), we abort and retry rather than waiting forever.
+    const SLOT_TIMEOUT_MS = 90_000;
     const t0 = Date.now();
+
+    const appendLog = (entry: { label: string; status: "start" | "ok" | "fail"; ms?: number; err?: string }) => {
+      // Keep last 200 entries in state; log all to console for inspection
+      const full = { ...entry, t: Math.round((Date.now() - t0) / 1000) };
+      // eslint-disable-next-line no-console
+      console.log(`[full-week +${full.t}s] ${full.status.toUpperCase()} ${full.label}${full.ms ? ` (${full.ms}ms)` : ""}${full.err ? ` — ${full.err}` : ""}`);
+      setFwLog(prev => prev.length > 200 ? [...prev.slice(-199), full] : [...prev, full]);
+    };
 
     try {
       // 1) Plan (fast, no AI — returns slot list)
+      const planStart = Date.now();
       const plan = await api.planFullWeek({
         classId,
         weekStarting: fullWeekStart || undefined,
@@ -592,6 +615,8 @@ export default function AssignmentBuilder() {
         difficultyTweak: fullWeekDifficulty,
         varietyLevel: fullWeekVariety,
       });
+      // eslint-disable-next-line no-console
+      console.log(`[full-week] plan returned ${plan?.slots?.length ?? 0} slots in ${Date.now() - planStart}ms`);
       if (!plan?.slots || plan.slots.length === 0) throw new Error("Nothing to generate.");
 
       setFwProgress({ done: 0, failed: 0, total: plan.total, elapsed: 0 });
@@ -601,6 +626,32 @@ export default function AssignmentBuilder() {
       const slots = [...plan.slots];
       const errors: any[] = [];
 
+      const runOne = async (slot: any, tickLabel: string): Promise<boolean> => {
+        const slotWithDefaults = {
+          ...slot,
+          questionCount: fwDefaultQuestionCount,
+          estimatedMinutes: fwDefaultEstimatedMinutes,
+          hintsAllowed: fwDefaultHintsAllowed,
+        };
+        const ctrl = new AbortController();
+        fwInflightRef.current.add(ctrl);
+        const to = setTimeout(() => ctrl.abort(), SLOT_TIMEOUT_MS);
+        const start = Date.now();
+        try {
+          await api.generateAssignmentSlot(slotWithDefaults, ctrl.signal);
+          appendLog({ label: tickLabel, status: "ok", ms: Date.now() - start });
+          return true;
+        } catch (e: any) {
+          const msg = e?.name === "AbortError" ? "timeout/cancelled" : (e?.message || String(e));
+          appendLog({ label: tickLabel, status: "fail", ms: Date.now() - start, err: msg });
+          errors.push({ slot: tickLabel, err: msg });
+          return false;
+        } finally {
+          clearTimeout(to);
+          fwInflightRef.current.delete(ctrl);
+        }
+      };
+
       const worker = async () => {
         while (true) {
           if (fwCancelRef.current.cancelled) return;
@@ -608,19 +659,17 @@ export default function AssignmentBuilder() {
           if (!slot) return;
           const tickLabel = `${slot.studentName} · ${slot.subject} · ${slot.dayName}`;
           setFwProgress(p => ({ ...p, current: tickLabel }));
-          const slotWithDefaults = {
-            ...slot,
-            questionCount: fwDefaultQuestionCount,
-            estimatedMinutes: fwDefaultEstimatedMinutes,
-            hintsAllowed: fwDefaultHintsAllowed,
-          };
-          try {
-            await api.generateAssignmentSlot(slotWithDefaults);
+          appendLog({ label: tickLabel, status: "start" });
+          const ok = await runOne(slot, tickLabel);
+          if (ok) {
             done++;
-          } catch (e: any) {
-            // Retry once
-            try { await api.generateAssignmentSlot(slotWithDefaults); done++; }
-            catch (e2: any) { failed++; errors.push({ slot: tickLabel, err: e2?.message || String(e2) }); }
+          } else if (!fwCancelRef.current.cancelled) {
+            // One retry after a short delay
+            await new Promise(r => setTimeout(r, 800));
+            const ok2 = await runOne(slot, tickLabel + " (retry)");
+            if (ok2) done++; else failed++;
+          } else {
+            failed++;
           }
           setFwProgress(p => ({
             ...p,
@@ -640,6 +689,7 @@ export default function AssignmentBuilder() {
         subjectsPerStudent: plan.subjects,
         elapsed: Math.round((Date.now() - t0) / 1000),
         errors: errors.slice(0, 10),
+        cancelled: fwCancelRef.current.cancelled,
       });
       loadAssignments(classId);
     } catch (e: any) {
@@ -650,10 +700,16 @@ export default function AssignmentBuilder() {
       }
     } finally {
       setFullWeekGenerating(false);
+      fwInflightRef.current.clear();
     }
   };
 
-  const cancelFullWeek = () => { fwCancelRef.current.cancelled = true; };
+  const cancelFullWeek = () => {
+    fwCancelRef.current.cancelled = true;
+    // Actually abort every in-flight fetch so the user doesn't wait for them
+    fwInflightRef.current.forEach(c => { try { c.abort(); } catch { /* noop */ } });
+    fwInflightRef.current.clear();
+  };
 
   const handleAdjust = async (id: string, direction: "easier"|"harder") => {
     setAdjusting(a => ({ ...a, [id]: direction }));
@@ -878,6 +934,45 @@ export default function AssignmentBuilder() {
               {fwProgress.current && (
                 <div className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
                   Currently: {fwProgress.current}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setFwShowLog(v => !v)}
+                className="text-[10px] uppercase tracking-wider cursor-pointer"
+                style={{ color: "var(--text-accent)", background: "transparent", border: "none", padding: 0 }}
+              >
+                {fwShowLog ? "Hide" : "Show"} detail · {fwLog.length} event{fwLog.length === 1 ? "" : "s"}
+              </button>
+              {fwShowLog && (
+                <div
+                  style={{
+                    maxHeight: 180, overflowY: "auto",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--r-sm)",
+                    padding: "6px 8px",
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 10, lineHeight: 1.5,
+                  }}
+                >
+                  {fwLog.length === 0 ? (
+                    <div style={{ color: "var(--text-3)" }}>No events yet…</div>
+                  ) : (
+                    fwLog.slice(-100).map((e, i) => {
+                      const color =
+                        e.status === "ok"   ? "var(--success)" :
+                        e.status === "fail" ? "var(--danger)"  :
+                                              "var(--text-3)";
+                      return (
+                        <div key={i} style={{ color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          +{String(e.t).padStart(3, " ")}s  {e.status.padEnd(5)}  {e.label}
+                          {e.ms ? `  (${e.ms}ms)` : ""}
+                          {e.err ? `  — ${e.err}` : ""}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>

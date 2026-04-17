@@ -16,7 +16,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         ...options?.headers,
       },
     });
-  } catch {
+  } catch (e: any) {
+    // Preserve AbortError so callers can distinguish user-cancel from network failure
+    if (e?.name === "AbortError") throw e;
     throw new Error("Cannot reach server. If running locally, start API with npm run dev:api.");
   }
   if (!res.ok) {
@@ -87,8 +89,8 @@ export const api = {
     studentIds?: string[];
   }) => request<{ slots: any[]; total: number; students: number; subjects: number; days: number }>(
     `/assignments/plan-full-week`, { method: "POST", body: JSON.stringify(data) }),
-  generateAssignmentSlot: (slot: any) => request<any>(`/assignments/generate-slot`, {
-    method: "POST", body: JSON.stringify(slot)
+  generateAssignmentSlot: (slot: any, signal?: AbortSignal) => request<any>(`/assignments/generate-slot`, {
+    method: "POST", body: JSON.stringify(slot), signal,
   }),
   adjustAssignmentDifficulty: (id: string, direction: "easier" | "harder") =>
     request<any>(`/assignments/${id}/adjust-difficulty`, { method: "POST", body: JSON.stringify({ direction }) }),
