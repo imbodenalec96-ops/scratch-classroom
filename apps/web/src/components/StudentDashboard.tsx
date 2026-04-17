@@ -4,7 +4,7 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
-import { isWorkUnlocked, setWorkUnlocked } from "../lib/workUnlock.ts";
+import { isWorkUnlocked, isAccessAllowed, setWorkUnlocked } from "../lib/workUnlock.ts";
 import { isOnBreak, chooseBreak } from "../lib/breakSystem.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
 import { usePresencePing } from "../lib/presence.ts";
@@ -815,9 +815,9 @@ export default function StudentDashboard() {
   // break OR after teacher-granted free time OR after submitting all work.
   // Re-polled every second + on `breakstate-change` + on `storage` so the
   // UI flips without a refresh when any of those flags change.
-  const [accessUnlocked, setAccessUnlocked] = useState<boolean>(() => isWorkUnlocked() || isOnBreak());
+  const [accessUnlocked, setAccessUnlocked] = useState<boolean>(isAccessAllowed);
   useEffect(() => {
-    const refresh = () => setAccessUnlocked(isWorkUnlocked() || isOnBreak());
+    const refresh = () => setAccessUnlocked(isAccessAllowed());
     const onStorage = (e: StorageEvent) => { if (e.key === "workDoneDate" || e.key === null) refresh(); };
     window.addEventListener("breakstate-change", refresh);
     window.addEventListener("storage", onStorage);
