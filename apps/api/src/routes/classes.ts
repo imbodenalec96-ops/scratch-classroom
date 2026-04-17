@@ -1096,4 +1096,109 @@ router.get("/:classId/video", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Class daily schedule — Feature: block-based day table.
+// Drives future auto-nav + dashboard header, but this commit is TABLE + SEED +
+// READ only. No UI, no dispatcher.
+// ─────────────────────────────────────────────────────────────────────────────
+let scheduleTableReady = false;
+async function ensureClassScheduleTable() {
+  if (scheduleTableReady) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS class_schedule (
+        id TEXT PRIMARY KEY,
+        class_id TEXT NOT NULL,
+        block_number INTEGER NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        label TEXT NOT NULL,
+        subject TEXT,
+        is_break INTEGER NOT NULL DEFAULT 0,
+        break_type TEXT,
+        active_days TEXT NOT NULL DEFAULT 'Mon,Tue,Wed,Thu,Fri',
+        content_source TEXT,
+        UNIQUE (class_id, block_number)
+      )
+    `);
+    scheduleTableReady = true;
+  } catch (e) { console.error('ensureClassScheduleTable error:', e); }
+}
+
+// Authoritative seed for the Star class. Order = block_number.
+// [start, end, label, subject|null, is_break, break_type|null]
+type SeedBlock = [string, string, string, string | null, 0 | 1, string | null];
+const STAR_SCHEDULE_SEED: SeedBlock[] = [
+  ["09:10", "09:20", "Daily News",          "daily_news",     0, null],
+  ["09:20", "09:30", "Break",               null,             1, "regular"],
+  ["09:30", "09:40", "SEL",                 "sel",            0, null],
+  ["09:40", "09:50", "Break",               null,             1, "regular"],
+  ["09:50", "10:10", "Math",                "math",           0, null],
+  ["10:10", "10:20", "Break",               null,             1, "regular"],
+  ["10:20", "10:50", "Recess",              "recess",         1, "recess"],
+  ["10:50", "11:00", "Calm Down",           "calm_down",      1, "calm_down"],
+  ["11:00", "11:15", "Video Learning",      "video_learning", 0, null],
+  ["11:15", "11:25", "Writing / Questions", "writing",        0, null],
+  ["11:25", "11:35", "Break",               null,             1, "regular"],
+  ["11:35", "11:50", "Review / Cleanup",    "review",         0, null],
+  ["11:50", "12:00", "Break",               null,             1, "regular"],
+  ["12:00", "12:15", "Cashout",             "cashout",        0, null],
+  ["12:20", "13:15", "Lunch / Recess",      "lunch",          1, "lunch"],
+  ["13:20", "13:40", "Extra Review",        "extra_review",   0, null],
+  ["13:40", "13:50", "Break",               null,             1, "regular"],
+  ["13:50", "14:00", "TED Talk",            "ted_talk",       0, null],
+  ["14:00", "14:10", "Break",               null,             1, "regular"],
+  ["14:10", "15:05", "Coding / Art / Gym",  "coding_art_gym", 0, null],
+  ["15:11", "15:11", "Dismissal",           "dismissal",      0, null],
+];
+
+// Idempotent seed — runs once at startup and is a no-op if any row exists for
+// the Star class. Logs its decision so we can tell a blank DB from a seeded one
+// in Vercel logs.
+let starSeedRan = false;
+async function seedStarSchedule() {
+  if (starSeedRan) return;
+  try {
+    await ensureClassScheduleTable();
+    const star = await db.prepare("SELECT id FROM classes WHERE name = ? LIMIT 1").get("Star") as any;
+    if (!star?.id) { console.log("[schedule-seed] Star class not found — skipping"); starSeedRan = true; return; }
+    const existing = await db.prepare(
+      "SELECT COUNT(*) AS n FROM class_schedule WHERE class_id = ?"
+    ).get(star.id) as any;
+    const n = Number(existing?.n ?? 0);
+    if (n > 0) { console.log(`[schedule-seed] Star already has ${n} blocks — skipping`); starSeedRan = true; return; }
+    for (let i = 0; i < STAR_SCHEDULE_SEED.length; i++) {
+      const [start, end, label, subject, isBreak, breakType] = STAR_SCHEDULE_SEED[i];
+      await db.prepare(
+        `INSERT INTO class_schedule (id, class_id, block_number, start_time, end_time, label, subject, is_break, break_type, active_days, content_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(crypto.randomUUID(), star.id, i + 1, start, end, label, subject, isBreak, breakType, "Mon,Tue,Wed,Thu,Fri", null);
+    }
+    console.log(`[schedule-seed] Seeded ${STAR_SCHEDULE_SEED.length} blocks for Star class (${star.id})`);
+    starSeedRan = true;
+  } catch (e) {
+    console.error("[schedule-seed] error:", e);
+    // Don't flip starSeedRan — next request may retry.
+  }
+}
+// Kick off on module import so cold starts self-heal without waiting for a
+// schedule read. Fire-and-forget; any failure is logged above.
+seedStarSchedule();
+
+router.get("/:id/schedule", async (req: AuthRequest, res: Response) => {
+  await ensureClassScheduleTable();
+  // Attempt the Star seed on every GET as a belt-and-suspenders fallback —
+  // the flag makes it a no-op after the first successful run.
+  await seedStarSchedule();
+  try {
+    const rows = await db.prepare(
+      "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
+    ).all(req.params.id) as any[];
+    res.json(rows);
+  } catch (e) {
+    console.error("schedule GET error:", e);
+    res.status(500).json({ error: "Failed to load schedule" });
+  }
+});
+
 export default router;
