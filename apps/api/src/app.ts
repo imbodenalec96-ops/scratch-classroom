@@ -63,15 +63,21 @@ app.get("/api/status", async (_req, res) => {
 // Auth routes (no middleware)
 app.use("/api/auth", authRoutes);
 
-// Public board endpoint — no auth needed for TV kiosk display
-app.get("/api/board/schedule/:id", async (req: express.Request, res: express.Response) => {
+// Public board endpoint — no auth, for TV kiosk. Accepts class ID or name (e.g. "star").
+app.get("/api/board/class/:nameOrId", async (req: express.Request, res: express.Response) => {
   try {
-    const rows = db.prepare(
+    const { nameOrId } = req.params;
+    let cls = db.prepare("SELECT id, name FROM classes WHERE id = ?").get(nameOrId) as any;
+    if (!cls) {
+      cls = db.prepare("SELECT id, name FROM classes WHERE LOWER(name) = LOWER(?) LIMIT 1").get(nameOrId) as any;
+    }
+    if (!cls) return res.status(404).json({ error: "Class not found" });
+    const schedule = db.prepare(
       "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
-    ).all(req.params.id);
-    res.json(rows);
+    ).all(cls.id);
+    res.json({ id: cls.id, name: cls.name, schedule });
   } catch {
-    res.status(500).json({ error: "Failed to load schedule" });
+    res.status(500).json({ error: "Failed to load board data" });
   }
 });
 

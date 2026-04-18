@@ -158,6 +158,7 @@ export default function App() {
 
           {/* Classroom TV board — no login required */}
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/board/:classId" element={<BoardPage />} />
 
           {/* Teacher admin portal — password-protected, no auth guard */}
           <Route path="/admin" element={<TeacherAdmin />} />
