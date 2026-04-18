@@ -63,6 +63,18 @@ app.get("/api/status", async (_req, res) => {
 // Auth routes (no middleware)
 app.use("/api/auth", authRoutes);
 
+// Public board endpoint — no auth needed for TV kiosk display
+app.get("/api/board/schedule/:id", async (req: express.Request, res: express.Response) => {
+  try {
+    const rows = db.prepare(
+      "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
+    ).all(req.params.id);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to load schedule" });
+  }
+});
+
 // Protected routes
 app.use("/api/classes", authMiddleware, classRoutes);
 app.use("/api/projects", authMiddleware, projectRoutes);
