@@ -506,6 +506,45 @@ export default function AssignmentBuilder() {
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
   const [adjusting, setAdjusting] = useState<Record<string, string>>({});
 
+  // Inline edit: { id, field, draft }. field = "title" | "description".
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; field: "title" | "description"; draft: string } | null>(null);
+
+  // Bulk selection + modal state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkModal, setBulkModal] = useState<"assign" | "grade" | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Reset selection when switching class
+  useEffect(() => { setSelectedIds(new Set()); }, [classId]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === assignments.length ? new Set() : new Set(assignments.map((a) => a.id))
+    );
+  };
+
+  // Inline save — optimistic update, then fire PUT. Revert on error.
+  const saveInline = async (id: string, field: "title" | "description", value: string) => {
+    const prev = assignments.find((x) => x.id === id);
+    if (!prev) return;
+    if ((prev[field] || "") === value) { setInlineEdit(null); return; }
+    setAssignments((list) => list.map((a) => (a.id === id ? { ...a, [field]: value } : a)));
+    setInlineEdit(null);
+    try {
+      await api.updateAssignment(id, field === "title" ? { title: value } : { description: value });
+    } catch (e: any) {
+      setAssignments((list) => list.map((a) => (a.id === id ? prev : a)));
+      alert(`Save failed: ${e?.message || e}`);
+    }
+  };
+
   const SUBJECTS = ["Reading", "Math", "Writing", "Science", "Social Studies", "SEL", "Spelling"];
   const GRADES = ["Kindergarten", "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade"];
 
@@ -1399,17 +1438,87 @@ export default function AssignmentBuilder() {
         </div>
       )}
 
+      {/* Bulk toolbar — appears when any row is selected */}
+      {assignments.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-lg text-sm"
+          style={{ background: selectedIds.size > 0 ? "var(--accent-light)" : "transparent", border: selectedIds.size > 0 ? "1px solid var(--accent)" : "1px solid transparent" }}>
+          <label className="flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-2)" }}>
+            <input type="checkbox"
+              checked={selectedIds.size > 0 && selectedIds.size === assignments.length}
+              ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < assignments.length; }}
+              onChange={toggleSelectAll}
+            />
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              {selectedIds.size === 0 ? "Select all" : `${selectedIds.size} selected`}
+            </span>
+          </label>
+          {selectedIds.size > 0 && (
+            <>
+              <button onClick={() => setBulkModal("assign")}
+                className="text-xs font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+                style={{ border: "1px solid var(--accent)", color: "var(--accent)", background: "var(--surface-1)" }}>
+                📤 Assign to students
+              </button>
+              <button onClick={() => setBulkModal("grade")}
+                className="text-xs font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+                style={{ border: "1px solid color-mix(in srgb, var(--info) 45%, transparent)", color: "var(--info)", background: "var(--surface-1)" }}>
+                🎯 Change grade
+              </button>
+              <button onClick={async () => {
+                  if (!confirm(`Delete ${selectedIds.size} assignment${selectedIds.size === 1 ? "" : "s"}? Submissions will be deleted too. Cannot be undone.`)) return;
+                  setBulkBusy(true);
+                  try {
+                    await api.bulkAssignments({ assignmentIds: Array.from(selectedIds), action: "delete" });
+                    setSelectedIds(new Set());
+                    await loadAssignments(classId);
+                  } catch (e: any) { alert(`Bulk delete failed: ${e?.message || e}`); }
+                  finally { setBulkBusy(false); }
+                }}
+                disabled={bulkBusy}
+                className="text-xs font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+                style={{ border: "1px solid color-mix(in srgb, var(--danger) 45%, transparent)", color: "var(--danger)", background: "var(--surface-1)", marginLeft: "auto" }}>
+                🗑 Delete selected
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Assignments list */}
       <div className="space-y-3">
         {assignments.map((a) => {
           const parsed = (() => { try { return a.content ? JSON.parse(a.content) : null; } catch { return null; } })();
           const isExpanded = expandedId === a.id;
+          const isSelected = selectedIds.has(a.id);
+          const isEditingTitle = !!inlineEdit && inlineEdit.id === a.id && inlineEdit.field === "title";
+          const isEditingDesc = !!inlineEdit && inlineEdit.id === a.id && inlineEdit.field === "description";
           return (
-            <div key={a.id} className="card overflow-hidden">
+            <div key={a.id} className="card overflow-hidden"
+              style={isSelected ? { boxShadow: "0 0 0 2px var(--accent)" } : undefined}>
               <div className="flex items-start justify-between gap-3">
+                <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(a.id)}
+                  className="mt-1 flex-shrink-0 cursor-pointer" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className={`font-semibold ${dk ? "text-white" : "text-gray-900"}`}>{a.title}</h3>
+                    {isEditingTitle ? (
+                      <input
+                        autoFocus
+                        value={inlineEdit!.draft}
+                        onChange={(e) => setInlineEdit({ ...inlineEdit!, draft: e.target.value })}
+                        onBlur={() => saveInline(a.id, "title", inlineEdit!.draft)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); saveInline(a.id, "title", inlineEdit!.draft); }
+                          else if (e.key === "Escape") { setInlineEdit(null); }
+                        }}
+                        className="input text-sm font-semibold flex-1"
+                      />
+                    ) : (
+                      <h3
+                        onClick={() => setInlineEdit({ id: a.id, field: "title", draft: a.title || "" })}
+                        title="Click to edit"
+                        className={`font-semibold cursor-text hover:opacity-70 ${dk ? "text-white" : "text-gray-900"}`}
+                      >{a.title}</h3>
+                    )}
                     {parsed && (
                       <span className="stamp" style={{ background: "var(--accent-light)", color: "var(--text-accent)", borderLeftColor: "var(--accent)" }}>
                         AI Worksheet
@@ -1447,7 +1556,26 @@ export default function AssignmentBuilder() {
                       return <span className="chip">→ Whole class</span>;
                     })()}
                   </div>
-                  <p className={`text-sm mt-0.5 line-clamp-1 ${dk ? "text-white/40" : "text-gray-500"}`}>{a.description}</p>
+                  {isEditingDesc ? (
+                    <textarea
+                      autoFocus
+                      rows={2}
+                      value={inlineEdit!.draft}
+                      onChange={(e) => setInlineEdit({ ...inlineEdit!, draft: e.target.value })}
+                      onBlur={() => saveInline(a.id, "description", inlineEdit!.draft)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveInline(a.id, "description", inlineEdit!.draft); }
+                        else if (e.key === "Escape") { setInlineEdit(null); }
+                      }}
+                      className="input text-sm mt-0.5 w-full"
+                    />
+                  ) : (
+                    <p
+                      onClick={() => setInlineEdit({ id: a.id, field: "description", draft: a.description || "" })}
+                      title="Click to edit"
+                      className={`text-sm mt-0.5 line-clamp-1 cursor-text hover:opacity-70 ${dk ? "text-white/40" : "text-gray-500"}`}
+                    >{a.description || <span style={{ fontStyle: "italic", opacity: 0.5 }}>Click to add description</span>}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {a.due_date && (
@@ -1560,7 +1688,151 @@ export default function AssignmentBuilder() {
           onImported={() => { setShowImport(false); loadAssignments(classId); }}
         />
       )}
+      {bulkModal && (
+        <BulkModal
+          mode={bulkModal}
+          dk={dk}
+          students={classStudents}
+          count={selectedIds.size}
+          busy={bulkBusy}
+          onClose={() => setBulkModal(null)}
+          onSubmit={async (payload) => {
+            setBulkBusy(true);
+            try {
+              await api.bulkAssignments({
+                assignmentIds: Array.from(selectedIds),
+                ...payload,
+              });
+              setSelectedIds(new Set());
+              setBulkModal(null);
+              await loadAssignments(classId);
+            } catch (e: any) {
+              alert(`Bulk ${bulkModal} failed: ${e?.message || e}`);
+            } finally { setBulkBusy(false); }
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Bulk action modal (assign students OR change grade) ────────── */
+function BulkModal({ mode, dk, students, count, busy, onClose, onSubmit }: {
+  mode: "assign" | "grade";
+  dk: boolean;
+  students: any[];
+  count: number;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    action: "assign" | "grade";
+    studentIds?: string[];
+    targetSubject?: string;
+    targetGradeMin?: number;
+    targetGradeMax?: number;
+  }) => void | Promise<void>;
+}) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const [subject, setSubject] = useState<string>("reading");
+  const [gradeMin, setGradeMin] = useState<number>(3);
+  const [gradeMax, setGradeMax] = useState<number>(3);
+
+  const toggleStudent = (id: string) => {
+    setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  };
+
+  return createPortal(
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        className={dk ? "bg-neutral-900 text-white" : "bg-white text-gray-900"}
+        style={{ borderRadius: "var(--r-lg)", maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
+          <h3 className="text-lg font-bold">
+            {mode === "assign" ? "📤 Assign to students" : "🎯 Change grade target"}
+          </h3>
+          <button onClick={onClose} className="text-xl opacity-60 hover:opacity-100 cursor-pointer">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="text-sm" style={{ color: "var(--text-2)" }}>
+            Applying to <b>{count}</b> assignment{count === 1 ? "" : "s"}.
+          </div>
+
+          {mode === "assign" ? (
+            <>
+              <div className="flex items-center gap-2 text-xs">
+                <button onClick={() => setPicked(students.map((s) => s.id))}
+                  className="px-2 py-1 rounded-md cursor-pointer"
+                  style={{ border: "1px solid var(--border-md)", color: "var(--text-2)" }}>Select all</button>
+                <button onClick={() => setPicked([])}
+                  className="px-2 py-1 rounded-md cursor-pointer"
+                  style={{ border: "1px solid var(--border-md)", color: "var(--text-2)" }}>Clear</button>
+                <span className="ml-auto text-xs" style={{ color: "var(--text-3)" }}>
+                  {picked.length}/{students.length} selected
+                </span>
+              </div>
+              <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid var(--border)", borderRadius: "var(--r-md)" }}>
+                {students.length === 0 ? (
+                  <div className="p-4 text-center text-sm" style={{ color: "var(--text-3)" }}>No students in this class.</div>
+                ) : (
+                  students.map((s) => (
+                    <label key={s.id}
+                      className="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm"
+                      style={{ borderBottom: "1px solid var(--border)" }}>
+                      <input type="checkbox" checked={picked.includes(s.id)} onChange={() => toggleStudent(s.id)} />
+                      <span>{s.name || s.username || s.id}</span>
+                      {s.grade != null && <span className="ml-auto text-xs" style={{ color: "var(--text-3)" }}>Gr {s.grade}</span>}
+                    </label>
+                  ))
+                )}
+              </div>
+              <div className="text-xs" style={{ color: "var(--text-3)" }}>
+                Selecting zero students clears the direct-assign list (reverts to whole-class visibility).
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Subject</label>
+                <select value={subject} onChange={(e) => setSubject(e.target.value)} className="input text-sm w-full">
+                  <option value="reading">Reading</option>
+                  <option value="math">Math</option>
+                  <option value="writing">Writing</option>
+                  <option value="spelling">Spelling</option>
+                  <option value="sel">SEL</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Grade min</label>
+                  <input type="number" min={0} max={12} value={gradeMin} onChange={(e) => setGradeMin(Number(e.target.value))} className="input text-sm w-full" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Grade max</label>
+                  <input type="number" min={0} max={12} value={gradeMax} onChange={(e) => setGradeMax(Number(e.target.value))} className="input text-sm w-full" />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-5 py-4 flex items-center gap-2 justify-end" style={{ borderTop: "1px solid var(--border)" }}>
+          <button onClick={onClose} className="btn-ghost text-sm">Cancel</button>
+          <button
+            disabled={busy || (mode === "assign" && students.length === 0)}
+            onClick={() => {
+              if (mode === "assign") onSubmit({ action: "assign", studentIds: picked });
+              else onSubmit({ action: "grade", targetSubject: subject, targetGradeMin: gradeMin, targetGradeMax: gradeMax });
+            }}
+            className="btn-primary text-sm"
+          >
+            {busy ? "Saving…" : mode === "assign"
+              ? `Assign to ${picked.length} student${picked.length === 1 ? "" : "s"}`
+              : `Update ${count} assignment${count === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

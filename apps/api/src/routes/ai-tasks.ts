@@ -238,10 +238,11 @@ Return JSON: {"prompt":"...","hint":"... (includes CCSS code)"}`;
   };
 
   let result = await callOnce();
-  let check = validateTask(subject, grade, result.prompt, result.hint);
-  if (!check.ok) {
-    warnings.push(`first-pass: ${check.reason}`);
-    const correction = `CORRECTION: The previous draft was off-grade — ${check.reason}. Regenerate at exactly ${gLabel}. Stay strictly within the CCSS anchor above.`;
+  const check = validateTask(subject, grade, result.prompt, result.hint);
+  if (check.ok === false) {
+    const firstReason = check.reason;
+    warnings.push(`first-pass: ${firstReason}`);
+    const correction = `CORRECTION: The previous draft was off-grade — ${firstReason}. Regenerate at exactly ${gLabel}. Stay strictly within the CCSS anchor above.`;
     const retry = await callOnce(correction);
     const check2 = validateTask(subject, grade, retry.prompt, retry.hint);
     if (check2.ok) {

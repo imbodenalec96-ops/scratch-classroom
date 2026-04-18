@@ -907,7 +907,14 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
     title, description, dueDate, rubric, content,
     teacherNotes, questionCount, estimatedMinutes,
     focusKeywords, learningObjective, hintsAllowed, questionType,
+    targetSubject, targetGradeMin, targetGradeMax, targetStudentIds,
   } = req.body;
+  const encodedTargetStudents =
+    targetStudentIds === undefined
+      ? null
+      : Array.isArray(targetStudentIds) && targetStudentIds.length > 0
+        ? JSON.stringify(targetStudentIds)
+        : ""; // empty-string sentinel → clear (distinct from COALESCE NULL keep)
   await db.prepare(
     `UPDATE assignments SET
        title = COALESCE(?, title),
@@ -921,7 +928,13 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
        focus_keywords = COALESCE(?, focus_keywords),
        learning_objective = COALESCE(?, learning_objective),
        hints_allowed = COALESCE(?, hints_allowed),
-       question_type = COALESCE(?, question_type)
+       question_type = COALESCE(?, question_type),
+       target_subject = COALESCE(?, target_subject),
+       target_grade_min = COALESCE(?, target_grade_min),
+       target_grade_max = COALESCE(?, target_grade_max),
+       target_student_ids = CASE WHEN ? = '__KEEP__' THEN target_student_ids
+                                 WHEN ? = '' THEN NULL
+                                 ELSE ? END
      WHERE id = ?`
   ).run(
     title, description, dueDate,
@@ -934,11 +947,76 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
     learningObjective ?? null,
     hintsAllowed != null ? (hintsAllowed ? 1 : 0) : null,
     questionType ?? null,
+    targetSubject ?? null,
+    targetGradeMin != null ? Number(targetGradeMin) : null,
+    targetGradeMax != null ? Number(targetGradeMax) : null,
+    encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
+    encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
+    encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
     req.params.id,
   );
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(req.params.id) as any;
   if (row) row.rubric = JSON.parse(row.rubric || "[]");
   res.json(row);
+});
+
+// Bulk operations on multiple assignments at once.
+// Body: { assignmentIds: string[], action: "assign"|"grade"|"delete",
+//         studentIds?: string[], targetSubject?, targetGradeMin?, targetGradeMax? }
+router.post("/bulk", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  const { assignmentIds, action, studentIds, targetSubject, targetGradeMin, targetGradeMax } = req.body || {};
+  if (!Array.isArray(assignmentIds) || assignmentIds.length === 0) {
+    return res.status(400).json({ error: "assignmentIds (non-empty array) required" });
+  }
+  const isAdmin = req.user!.role === "admin";
+  const me = req.user!.id;
+
+  const placeholders = assignmentIds.map(() => "?").join(",");
+  const ownedRows = await db.prepare(
+    `SELECT id, teacher_id FROM assignments WHERE id IN (${placeholders})`
+  ).all(...assignmentIds) as any[];
+  const allowed = ownedRows
+    .filter(r => isAdmin || r.teacher_id === me)
+    .map(r => r.id);
+  if (allowed.length === 0) return res.status(403).json({ error: "No permission on selected assignments" });
+  const allowedPh = allowed.map(() => "?").join(",");
+
+  try {
+    if (action === "assign") {
+      const ids = Array.isArray(studentIds) ? studentIds.filter(Boolean) : [];
+      const encoded = ids.length > 0 ? JSON.stringify(ids) : null;
+      await db.prepare(
+        `UPDATE assignments SET target_student_ids = ? WHERE id IN (${allowedPh})`
+      ).run(encoded, ...allowed);
+      return res.json({ updated: allowed.length, action, studentIds: ids });
+    }
+    if (action === "grade") {
+      await db.prepare(
+        `UPDATE assignments SET
+           target_subject = COALESCE(?, target_subject),
+           target_grade_min = COALESCE(?, target_grade_min),
+           target_grade_max = COALESCE(?, target_grade_max)
+         WHERE id IN (${allowedPh})`
+      ).run(
+        targetSubject ?? null,
+        targetGradeMin != null ? Number(targetGradeMin) : null,
+        targetGradeMax != null ? Number(targetGradeMax) : null,
+        ...allowed,
+      );
+      return res.json({ updated: allowed.length, action });
+    }
+    if (action === "delete") {
+      await db.prepare(`DELETE FROM submissions WHERE assignment_id IN (${allowedPh})`).run(...allowed).catch(() => {});
+      await db.prepare(`DELETE FROM assignment_adjustments WHERE assignment_id IN (${allowedPh})`).run(...allowed).catch(() => {});
+      await db.prepare(`DELETE FROM assignments WHERE id IN (${allowedPh})`).run(...allowed);
+      return res.json({ deleted: allowed.length, action });
+    }
+    return res.status(400).json({ error: `Unknown action: ${action}` });
+  } catch (e: any) {
+    console.error("bulk op error:", e);
+    res.status(500).json({ error: "Bulk op failed", detail: e?.message });
+  }
 });
 
 // POST /api/assignments/:id/grade — teacher stamps a human pass/fail grade on
