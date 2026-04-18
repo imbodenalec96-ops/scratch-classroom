@@ -11,6 +11,7 @@ dotenv.config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../.e
 import db from "./db.js";
 import { authMiddleware } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
+import publicRoutes from "./routes/public.js";
 import classRoutes from "./routes/classes.js";
 import projectRoutes from "./routes/projects.js";
 import assignmentRoutes from "./routes/assignments.js";
@@ -62,6 +63,9 @@ app.get("/api/status", async (_req, res) => {
 
 // Auth routes (no middleware)
 app.use("/api/auth", authRoutes);
+
+// Public routes — no auth (TV board kiosk)
+app.use("/api/public", publicRoutes);
 
 // Protected routes
 app.use("/api/classes", authMiddleware, classRoutes);
