@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { CheckCircle2, XCircle, MessageSquare, Clock, Bot, User as UserIcon } from "lucide-react";
+import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon } from "lucide-react";
 
 type Scope = "today" | "week" | "all";
 
@@ -24,6 +24,17 @@ type Row = {
   graded_by?: string | null;
   graded_at?: string | null;
   status: "graded" | "ai_only" | "needs_review" | "pending";
+};
+
+type StudentCard = {
+  id: string;
+  name: string;
+  email?: string;
+  class_id: string;
+  class_name?: string;
+  reading_grade_level?: number | null;
+  math_grade_level?: number | null;
+  writing_grade_level?: number | null;
 };
 
 const SUBJECT_ICON: Record<string, string> = {
@@ -51,13 +62,19 @@ function StatusBadge({ status }: { status: Row["status"] }) {
 }
 
 export default function TeacherGradebook() {
-  const { studentId } = useParams<{ studentId: string }>();
+  const { studentId: studentIdFromUrl } = useParams<{ studentId?: string }>();
   const { user } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const dk = theme === "dark";
 
-  const [student, setStudent] = useState<any | null>(null);
+  // All students across the teacher's classes
+  const [students, setStudents] = useState<StudentCard[]>([]);
+  // Per-student "week ungraded count" for badge
+  const [ungradedCounts, setUngradedCounts] = useState<Record<string, number>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Assignments table state (selected student)
   const [rows, setRows] = useState<Row[]>([]);
   const [scope, setScope] = useState<Scope>("week");
   const [ungradedOnly, setUngradedOnly] = useState(false);
@@ -67,38 +84,67 @@ export default function TeacherGradebook() {
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [feedbackOpenFor, setFeedbackOpenFor] = useState<string | null>(null);
 
-  // Auth guard — teacher/admin only. Students who stumble on the URL get
-  // bounced to their dashboard. (Route-level guard is in App.tsx too.)
+  // Auth guard
   useEffect(() => {
     if (user && user.role !== "teacher" && user.role !== "admin") {
       navigate("/", { replace: true });
     }
   }, [user, navigate]);
 
-  // Resolve student info — we don't have a direct getUser, so we pull from
-  // the first class the current teacher/admin has that contains the student.
+  // Load every student across teacher's classes + compute ungraded counts
   useEffect(() => {
-    if (!studentId) return;
     let cancelled = false;
     (async () => {
       try {
         const classes = await api.getClasses();
+        const allStudents: StudentCard[] = [];
         for (const c of classes || []) {
-          const students = await api.getStudents(c.id).catch(() => [] as any[]);
-          const hit = (students || []).find((s: any) => s.id === studentId || s.user_id === studentId);
-          if (hit) {
-            if (cancelled) return;
-            setStudent({ ...hit, class_id: c.id, class_name: c.name });
-            return;
+          const list = await api.getStudents(c.id).catch(() => [] as any[]);
+          for (const s of (list || [])) {
+            allStudents.push({
+              id: s.id,
+              name: s.name,
+              email: s.email,
+              class_id: c.id,
+              class_name: c.name,
+              reading_grade_level: s.reading_grade_level,
+              math_grade_level: s.math_grade_level,
+              writing_grade_level: s.writing_grade_level,
+            });
           }
         }
-        if (!cancelled) setStudent({ id: studentId, name: "Unknown student" });
+        if (cancelled) return;
+        setStudents(allStudents);
+
+        // Default-select: URL param wins, else first student
+        const firstId = studentIdFromUrl && allStudents.some((s) => s.id === studentIdFromUrl)
+          ? studentIdFromUrl
+          : allStudents[0]?.id ?? null;
+        setSelectedId(firstId);
+
+        // Per-student ungraded (week) counts — fire in parallel, don't block UI
+        const countPromises = allStudents.map(async (s) => {
+          try {
+            const rows = await api.getStudentAssignments(s.id, "week");
+            const n = (rows || []).filter((r: any) => r.status === "needs_review" || r.status === "ai_only").length;
+            return [s.id, n] as const;
+          } catch { return [s.id, 0] as const; }
+        });
+        const entries = await Promise.all(countPromises);
+        if (!cancelled) setUngradedCounts(Object.fromEntries(entries));
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to load student");
+        if (!cancelled) setError(e?.message || "Failed to load students");
       }
     })();
     return () => { cancelled = true; };
-  }, [studentId]);
+  // Only load students once per user session; URL param only picks default
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectedStudent = useMemo(
+    () => students.find((s) => s.id === selectedId) || null,
+    [students, selectedId],
+  );
 
   const loadRows = async (sid: string, sc: Scope) => {
     setLoading(true);
@@ -113,7 +159,15 @@ export default function TeacherGradebook() {
     }
   };
 
-  useEffect(() => { if (studentId) loadRows(studentId, scope); }, [studentId, scope]);
+  useEffect(() => { if (selectedId) loadRows(selectedId, scope); }, [selectedId, scope]);
+
+  // Keep URL in sync so links to /teacher/gradebook/:id still work as permalinks
+  useEffect(() => {
+    if (!selectedId) return;
+    if (studentIdFromUrl !== selectedId) {
+      navigate(`/teacher/gradebook/${selectedId}`, { replace: true });
+    }
+  }, [selectedId, studentIdFromUrl, navigate]);
 
   const visibleRows = useMemo(() => {
     if (!ungradedOnly) return rows;
@@ -121,19 +175,17 @@ export default function TeacherGradebook() {
   }, [rows, ungradedOnly]);
 
   const totals = useMemo(() => {
-    const weekRows = rows; // scope already applied
-    const submitted = weekRows.filter((r) => !!r.submission_id).length;
-    const humanGraded = weekRows.filter((r) => r.status === "graded").length;
-    const needsReview = weekRows.filter((r) => r.status === "needs_review" || r.status === "ai_only").length;
-    return { total: weekRows.length, submitted, humanGraded, needsReview };
+    const submitted = rows.filter((r) => !!r.submission_id).length;
+    const humanGraded = rows.filter((r) => r.status === "graded").length;
+    const needsReview = rows.filter((r) => r.status === "needs_review" || r.status === "ai_only").length;
+    return { total: rows.length, submitted, humanGraded, needsReview };
   }, [rows]);
 
   const doGrade = async (row: Row, passed: boolean, feedback?: string) => {
-    if (!studentId) return;
+    if (!selectedId) return;
     setSavingId(row.assignment_id);
     try {
-      const res = await api.humanGradeAssignment(row.assignment_id, studentId, passed, feedback);
-      // Merge returned submission into local state without a full refetch.
+      const res = await api.humanGradeAssignment(row.assignment_id, selectedId, passed, feedback);
       setRows((prev) => prev.map((r) => {
         if (r.assignment_id !== row.assignment_id) return r;
         const sub = res.submission || {};
@@ -149,6 +201,14 @@ export default function TeacherGradebook() {
           status: "graded",
         };
       }));
+      // Decrement the student's ungraded badge if the row was previously ungraded
+      const wasUngraded = row.status === "needs_review" || row.status === "ai_only";
+      if (wasUngraded) {
+        setUngradedCounts((prev) => ({
+          ...prev,
+          [selectedId]: Math.max(0, (prev[selectedId] ?? 0) - 1),
+        }));
+      }
       setFeedbackOpenFor(null);
     } catch (e: any) {
       setError(e?.message || "Failed to save grade");
@@ -157,34 +217,71 @@ export default function TeacherGradebook() {
     }
   };
 
-  if (!studentId) {
-    return <div className="p-8 text-t1">No student selected.</div>;
-  }
-
   return (
     <div className="p-6 max-w-6xl mx-auto animate-fade-in">
-      {/* ── Header card ── */}
-      <div className={`rounded-2xl p-5 mb-5 border ${dk ? "bg-white/[0.02] border-white/[0.06]" : "bg-white border-gray-200"}`}>
-        <div className="flex items-start gap-4 flex-wrap">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-violet-600/20 flex-shrink-0">
-            {(student?.name || "?").charAt(0).toUpperCase()}
+      <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-t3 mb-0.5">Gradebook</div>
+          <h1 className="text-2xl font-extrabold text-t1 leading-tight">
+            {selectedStudent?.name || "Pick a student"}
+          </h1>
+          <div className="text-xs text-t3 mt-1 flex flex-wrap gap-3">
+            {selectedStudent?.class_name && <span>📚 {selectedStudent.class_name}</span>}
+            {selectedStudent?.email && <span>✉️ {selectedStudent.email}</span>}
+            {selectedStudent?.reading_grade_level != null && <span>Reading G{selectedStudent.reading_grade_level}</span>}
+            {selectedStudent?.math_grade_level != null && <span>Math G{selectedStudent.math_grade_level}</span>}
+            {selectedStudent?.writing_grade_level != null && <span>Writing G{selectedStudent.writing_grade_level}</span>}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-t3 mb-0.5">Gradebook</div>
-            <h1 className="text-2xl font-extrabold text-t1 leading-tight">{student?.name || "Loading…"}</h1>
-            <div className="text-xs text-t3 mt-1 flex flex-wrap gap-3">
-              {student?.class_name && <span>📚 {student.class_name}</span>}
-              {student?.email && <span>✉️ {student.email}</span>}
-              {student?.reading_grade_level != null && <span>Reading G{student.reading_grade_level}</span>}
-              {student?.math_grade_level != null && <span>Math G{student.math_grade_level}</span>}
-              {student?.writing_grade_level != null && <span>Writing G{student.writing_grade_level}</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Stat label="Assignments" value={totals.total} />
-            <Stat label="Submitted" value={totals.submitted} accent="emerald" />
-            <Stat label="Graded" value={totals.humanGraded} accent="violet" />
-            <Stat label="Needs review" value={totals.needsReview} accent={totals.needsReview > 0 ? "amber" : "gray"} />
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Stat label="Assignments" value={totals.total} />
+          <Stat label="Submitted" value={totals.submitted} accent="emerald" />
+          <Stat label="Graded" value={totals.humanGraded} accent="violet" />
+          <Stat label="Needs review" value={totals.needsReview} accent={totals.needsReview > 0 ? "amber" : "gray"} />
+        </div>
+      </div>
+
+      {/* ── Student row ── */}
+      <div className={`rounded-2xl border p-3 mb-5 ${dk ? "border-white/[0.06] bg-white/[0.02]" : "border-gray-200 bg-white"}`}>
+        <div className="overflow-x-auto">
+          <div className="flex gap-2 pb-1" style={{ minWidth: "min-content" }}>
+            {students.length === 0 && (
+              <div className="text-sm text-t3 py-4 px-2">Loading students…</div>
+            )}
+            {students.map((s) => {
+              const active = s.id === selectedId;
+              const ungraded = ungradedCounts[s.id] ?? 0;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedId(s.id)}
+                  className={`flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer
+                    ${active
+                      ? "border-violet-500 bg-violet-500/20 text-violet-100 shadow-lg shadow-violet-600/20"
+                      : dk
+                        ? "border-white/5 bg-white/[0.02] text-white/70 hover:bg-white/[0.06] hover:border-white/10"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"}`}
+                  title={s.email || s.name}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0
+                    ${active ? "bg-gradient-to-br from-violet-500 to-indigo-600" : "bg-gradient-to-br from-emerald-500 to-green-600"}`}>
+                    {(s.name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate max-w-[140px]">{s.name}</div>
+                    <div className="text-[10px] text-t3 truncate max-w-[140px]">{s.class_name}</div>
+                  </div>
+                  {ungraded > 0 && (
+                    <span
+                      className="flex-shrink-0 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                      title={`${ungraded} ungraded this week`}
+                    >
+                      {ungraded}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -234,15 +331,18 @@ export default function TeacherGradebook() {
           <div>Status</div>
           <div>Actions</div>
         </div>
-        {loading && (
+        {!selectedId && (
+          <div className="py-10 text-center text-t3 text-sm">Select a student above to see their assignments.</div>
+        )}
+        {selectedId && loading && (
           <div className="py-10 text-center text-t3 text-sm">Loading…</div>
         )}
-        {!loading && visibleRows.length === 0 && (
+        {selectedId && !loading && visibleRows.length === 0 && (
           <div className="py-10 text-center text-t3 text-sm">
             {ungradedOnly ? "Everything's graded. 🎉" : "No assignments in this range."}
           </div>
         )}
-        {!loading && visibleRows.map((r) => {
+        {selectedId && !loading && visibleRows.map((r) => {
           const passKey = r.human_grade_pass;
           const isGradedPass = passKey === true;
           const isGradedFail = passKey === false;
@@ -351,7 +451,7 @@ export default function TeacherGradebook() {
 
 function Stat({ label, value, accent = "gray" }: { label: string; value: number; accent?: "gray" | "emerald" | "violet" | "amber" }) {
   const colors: Record<string, string> = {
-    gray: "text-t2",
+    gray: "text-t1",
     emerald: "text-emerald-400",
     violet: "text-violet-400",
     amber: "text-amber-400",
@@ -364,78 +464,7 @@ function Stat({ label, value, accent = "gray" }: { label: string; value: number;
   );
 }
 
-// ── Student picker ─────────────────────────────────────────────
-// Sidebar entry "Gradebook" opens here; user picks a class then a student,
-// then we navigate to /teacher/gradebook/:studentId.
-export function GradebookStudentPicker() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [classes, setClasses] = useState<any[]>([]);
-  const [studentsByClass, setStudentsByClass] = useState<Record<string, any[]>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user || (user.role !== "teacher" && user.role !== "admin")) {
-      navigate("/", { replace: true });
-      return;
-    }
-    (async () => {
-      try {
-        const cls = await api.getClasses();
-        setClasses(cls);
-        const map: Record<string, any[]> = {};
-        for (const c of cls) {
-          try { map[c.id] = await api.getStudents(c.id); } catch { map[c.id] = []; }
-        }
-        setStudentsByClass(map);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user, navigate]);
-
-  return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-extrabold mb-1 text-t1">Gradebook</h1>
-      <p className="text-sm text-t3 mb-6">Pick a student to open their gradebook.</p>
-      {loading ? (
-        <p className="text-sm text-t3">Loading…</p>
-      ) : classes.length === 0 ? (
-        <p className="text-sm text-t3">You don't have any classes yet.</p>
-      ) : (
-        <div className="space-y-6">
-          {classes.map((c) => (
-            <div key={c.id} className="card">
-              <h2 className="text-sm font-bold text-t1 mb-3 flex items-center gap-2">
-                <span>{c.name}</span>
-                <span className="text-xs font-normal text-t3">
-                  ({(studentsByClass[c.id] || []).length} students)
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {(studentsByClass[c.id] || []).map((s) => (
-                  <Link
-                    key={s.id}
-                    to={`/teacher/gradebook/${s.id}`}
-                    className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-xs font-bold shadow">
-                      {(s.name || "?").charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold truncate text-t1">{s.name}</div>
-                      <div className="text-[11px] truncate text-t3">{s.email}</div>
-                    </div>
-                  </Link>
-                ))}
-                {(studentsByClass[c.id] || []).length === 0 && (
-                  <p className="text-xs text-t3 col-span-full py-4 text-center">No students in this class.</p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// Kept as a named export so App.tsx's existing import still compiles. The
+// standalone picker route is no longer used — /teacher/gradebook now renders
+// the full single-page gradebook, so this just re-exports the default page.
+export const GradebookStudentPicker = TeacherGradebook;
