@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon } from "lucide-react";
+import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon, Eye } from "lucide-react";
 
 type Scope = "today" | "week" | "all";
 
@@ -83,6 +83,27 @@ export default function TeacherGradebook() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [feedbackOpenFor, setFeedbackOpenFor] = useState<string | null>(null);
+  // Expanded work view (per assignment_id). Fetches full submission + assignment
+  // content so teacher sees questions paired with the student's actual answers.
+  const [workOpenFor, setWorkOpenFor] = useState<string | null>(null);
+  const [workCache, setWorkCache] = useState<Record<string, any>>({});
+  const [workLoading, setWorkLoading] = useState<string | null>(null);
+
+  const toggleWork = async (row: Row) => {
+    if (workOpenFor === row.assignment_id) { setWorkOpenFor(null); return; }
+    setWorkOpenFor(row.assignment_id);
+    if (!row.submission_id) return; // nothing to fetch
+    if (workCache[row.submission_id]) return;
+    setWorkLoading(row.submission_id);
+    try {
+      const sub = await api.getSubmission(row.submission_id);
+      setWorkCache((p) => ({ ...p, [row.submission_id!]: sub }));
+    } catch (e: any) {
+      setError(e?.message || "Failed to load submission");
+    } finally {
+      setWorkLoading(null);
+    }
+  };
 
   // Auth guard
   useEffect(() => {
@@ -375,6 +396,17 @@ export default function TeacherGradebook() {
               <div><StatusBadge status={r.status} /></div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
+                  onClick={() => toggleWork(r)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
+                    ${workOpenFor === r.assignment_id
+                      ? "bg-sky-500/20 border-sky-500/50 text-sky-200"
+                      : dk ? "border-white/15 text-white/60 hover:bg-white/5" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+                  title={r.submission_id ? "View student's work" : "No submission yet"}
+                  disabled={!r.submission_id}
+                >
+                  <Eye size={11} className="inline mr-0.5" /> View
+                </button>
+                <button
                   onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
                   disabled={saving}
                   className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
@@ -411,6 +443,17 @@ export default function TeacherGradebook() {
                   <MessageSquare size={11} className="inline mr-0.5" /> Feedback
                 </button>
               </div>
+              {workOpenFor === r.assignment_id && (
+                <div className={`col-span-7 mt-2 rounded-xl border p-4 ${dk ? "bg-white/[0.03] border-white/[0.08]" : "bg-gray-50 border-gray-200"}`}>
+                  {!r.submission_id ? (
+                    <p className="text-xs text-t3 italic">Student hasn't submitted yet — nothing to view.</p>
+                  ) : workLoading === r.submission_id ? (
+                    <p className="text-xs text-t3">Loading submission…</p>
+                  ) : (
+                    <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
+                  )}
+                </div>
+              )}
               {fbOpen && (
                 <div className="col-span-7 mt-2 flex gap-2 items-start">
                   <textarea
@@ -460,6 +503,122 @@ function Stat({ label, value, accent = "gray" }: { label: string; value: number;
     <div className="flex flex-col items-end">
       <span className={`text-xl font-extrabold leading-none ${colors[accent]}`}>{value}</span>
       <span className="text-[10px] uppercase tracking-wider text-t3 mt-0.5">{label}</span>
+    </div>
+  );
+}
+
+// Inline viewer: renders question-by-question with the student's answer and a
+// correctness marker when the assignment has an answer key. Falls back to a
+// project-data dump for Scratch-style submissions.
+function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
+  if (!sub) return <p className="text-xs text-t3 italic">No submission data.</p>;
+  const content = sub.assignment_content;
+  const answers: Record<string, any> = sub.answers || {};
+  const auto = sub.auto_grade_result;
+  const when = sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : null;
+
+  // Flatten content.sections[].questions[] so we can pair each with answers[idx]
+  const questions: any[] = [];
+  if (content?.sections) {
+    for (const section of content.sections) {
+      for (const q of (section.questions || [])) questions.push(q);
+    }
+  }
+
+  const normalize = (s: any) => String(s ?? "").replace(/^[A-D]\.\s*/i, "").trim().toLowerCase();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[11px] uppercase tracking-wider text-t3 font-bold">Student's work</div>
+        <div className="text-[11px] text-t3">
+          {sub.student_name && <span>👤 {sub.student_name} · </span>}
+          {when && <span>🕐 {when}</span>}
+          {auto && <span> · AI {auto.score}%</span>}
+        </div>
+      </div>
+
+      {questions.length > 0 ? (
+        <div className="space-y-2">
+          {questions.map((q, i) => {
+            const ans = answers[String(i)] ?? answers[i as any];
+            let correct: boolean | null = null;
+            let correctOpt: string | undefined;
+            if (q.type === "multiple_choice" && Array.isArray(q.options)) {
+              const ci = q.correctIndex;
+              if (ci !== undefined && ci !== null) {
+                const idx = typeof ci === "string" ? parseInt(ci, 10) : Number(ci);
+                correctOpt = isNaN(idx) ? undefined : q.options[idx];
+              }
+              if (!correctOpt && q.correctAnswer) correctOpt = String(q.correctAnswer);
+              if (correctOpt !== undefined) correct = normalize(ans) === normalize(correctOpt);
+            }
+            return (
+              <div key={i} className={`rounded-lg border p-3 ${dk ? "bg-white/[0.02] border-white/[0.06]" : "bg-white border-gray-200"}`}>
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-bold text-t3 mt-0.5">Q{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-t1">{q.text || `Question ${i + 1}`}</div>
+                    {q.type === "multiple_choice" && Array.isArray(q.options) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {q.options.map((opt: string, oi: number) => {
+                          const isStudent = normalize(opt) === normalize(ans);
+                          const isKey = correctOpt !== undefined && normalize(opt) === normalize(correctOpt);
+                          return (
+                            <span
+                              key={oi}
+                              className={`text-[11px] px-2 py-1 rounded-md border ${
+                                isStudent && isKey ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200 font-bold"
+                                : isStudent ? "bg-red-500/15 border-red-500/40 text-red-300 font-bold"
+                                : isKey ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                                : dk ? "border-white/10 text-white/40" : "border-gray-200 text-gray-500"
+                              }`}
+                            >
+                              {isStudent ? "▶ " : ""}{opt}{isKey ? " ✓" : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {(q.type === "short_answer" || q.type === "fill_blank") && (
+                      <div className={`mt-1.5 text-sm whitespace-pre-wrap rounded-md px-2 py-1.5 ${
+                        ans ? (dk ? "bg-white/[0.04] text-white" : "bg-gray-100 text-gray-900")
+                             : (dk ? "text-white/30 italic" : "text-gray-400 italic")
+                      }`}>
+                        {ans || "(no answer)"}
+                      </div>
+                    )}
+                  </div>
+                  {correct === true && <span className="text-xs font-bold text-emerald-400">✓</span>}
+                  {correct === false && <span className="text-xs font-bold text-red-400">✗</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : auto?.checks ? (
+        <div className="space-y-1">
+          {auto.checks.map((c: any, i: number) => (
+            <div key={i} className="text-xs flex items-start gap-2">
+              <span className={c.passed ? "text-emerald-400" : "text-red-400"}>{c.passed ? "✓" : "✗"}</span>
+              <span className="text-t1 font-semibold">{c.label}</span>
+              <span className="text-t3">— {c.detail}</span>
+            </div>
+          ))}
+        </div>
+      ) : sub.project_id ? (
+        <p className="text-xs text-t3 italic">Scratch project submission (ID {String(sub.project_id).slice(0, 8)}…). Open the project workspace to view blocks.</p>
+      ) : (
+        <p className="text-xs text-t3 italic">No answer data in this submission.</p>
+      )}
+
+      {sub.human_grade_feedback && (
+        <div className="mt-2 text-xs rounded-lg border px-2 py-1.5"
+             style={{ background: "rgba(139,92,246,0.08)", borderColor: "rgba(139,92,246,0.3)" }}>
+          <span className="font-bold text-violet-300">Your feedback: </span>
+          <span className="text-t2">{sub.human_grade_feedback}</span>
+        </div>
+      )}
     </div>
   );
 }

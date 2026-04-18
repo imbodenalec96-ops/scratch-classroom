@@ -110,6 +110,7 @@ export const api = {
   gradeSubmission: (id: string, grade: number, feedback: string) => request<any>(`/submissions/${id}/grade`, { method: "PUT", body: JSON.stringify({ grade, feedback }) }),
 
   // Gradebook (per-student)
+  getSubmission: (id: string) => request<any>(`/submissions/${id}`),
   getStudentAssignments: (studentId: string, scope: "today" | "week" | "all" = "week") =>
     request<any[]>(`/students/${studentId}/assignments?scope=${scope}`),
   humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string) =>

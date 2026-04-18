@@ -153,6 +153,31 @@ router.post("/", async (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
+// Single submission — returns submission joined with the assignment content
+// so the gradebook can show question + answer side-by-side. Teacher/admin only
+// because it exposes raw student answers + the assignment's answer key.
+router.get("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const row = await db.prepare(
+    `SELECT s.*, u.name AS student_name, a.title AS assignment_title,
+            a.content AS assignment_content, a.target_subject
+       FROM submissions s
+       JOIN users u ON s.student_id = u.id
+       JOIN assignments a ON s.assignment_id = a.id
+      WHERE s.id = ?`
+  ).get(req.params.id) as any;
+  if (!row) return res.status(404).json({ error: "Submission not found" });
+  if (row.auto_grade_result) {
+    try { row.auto_grade_result = JSON.parse(row.auto_grade_result); } catch {}
+  }
+  if (row.answers) {
+    try { row.answers = JSON.parse(row.answers); } catch {}
+  }
+  if (row.assignment_content) {
+    try { row.assignment_content = JSON.parse(row.assignment_content); } catch {}
+  }
+  res.json(row);
+});
+
 // List submissions for assignment (teacher)
 router.get("/assignment/:assignmentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const rows = await db.prepare(

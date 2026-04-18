@@ -129,7 +129,8 @@ export default function App() {
             <Route path="classes/:id" element={<ClassManager />} />
             <Route path="assignments" element={<AssignmentBuilder />} />
             <Route path="quizzes" element={<QuizBuilder />} />
-            <Route path="grading" element={<GradingPanel />} />
+            {/* Gradebook consolidates the old /grading page — redirect to keep old links working */}
+            <Route path="grading" element={<Navigate to="/teacher/gradebook" replace />} />
             <Route path="analytics" element={<AnalyticsPanel />} />
             <Route path="monitor" element={<MonitorPage />} />
             <Route path="monitor-legacy" element={<MonitorPanel />} />
