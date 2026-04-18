@@ -458,6 +458,9 @@ router.get("/:id/assignments", requireRole("teacher", "admin"), async (req: Auth
   const { id } = req.params;
   const scope = String(req.query.scope || "week");
   try {
+    // Lazy migration: ensure human-grade columns exist before SELECTing them.
+    const { ensureHumanGradeCols } = await import("./submissions.js");
+    await ensureHumanGradeCols();
     // Date window for scope filter (inclusive on both ends, YYYY-MM-DD text).
     const today = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
