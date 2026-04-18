@@ -23,10 +23,46 @@ export default function GradingPanel() {
     }).catch(console.error);
   }, []);
 
+  // Auto-refresh submissions every 20s so newly-submitted work shows up on
+  // the teacher's grading panel without a manual reload. Also re-pulls the
+  // assignments list so submission_count badges update.
+  useEffect(() => {
+    if (!classId) return;
+    const iv = setInterval(() => {
+      if (selectedAssignment) {
+        api.getSubmissions(selectedAssignment).then(setSubmissions).catch(() => {});
+      }
+      api.getAssignments(classId).then((a) => {
+        const sorted = [...a].sort((x: any, y: any) =>
+          Number(y?.submission_count || 0) - Number(x?.submission_count || 0)
+        );
+        setAssignments(sorted);
+      }).catch(() => {});
+    }, 20_000);
+    return () => clearInterval(iv);
+  }, [classId, selectedAssignment]);
+
   const loadAssignments = async (cid: string) => {
     const a = await api.getAssignments(cid);
-    setAssignments(a);
-    if (a.length > 0) { setSelectedAssignment(a[0].id); loadSubmissions(a[0].id, a[0]); }
+    // Sort so assignments that actually have submissions surface to the top —
+    // otherwise the default pick (first by due_date) is almost always empty
+    // and teachers think the grading tab is broken. Ties fall back to
+    // due_date (which is the server's original order).
+    const sorted = [...a].sort((x: any, y: any) => {
+      const sx = Number(x?.submission_count || 0);
+      const sy = Number(y?.submission_count || 0);
+      if (sx !== sy) return sy - sx;
+      return 0;
+    });
+    setAssignments(sorted);
+    if (sorted.length > 0) {
+      setSelectedAssignment(sorted[0].id);
+      loadSubmissions(sorted[0].id, sorted[0]);
+    } else {
+      setSelectedAssignment("");
+      setSubmissions([]);
+      setAssignmentContent(null);
+    }
   };
 
   const loadSubmissions = async (aid: string, asgn?: any) => {
@@ -81,7 +117,11 @@ export default function GradingPanel() {
             loadSubmissions(e.target.value);
           }}
           className="input w-72">
-          {assignments.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          {assignments.map((a) => {
+            const n = Number(a.submission_count || 0);
+            const badge = n > 0 ? ` — ${n} sub${n === 1 ? "" : "s"}` : "";
+            return <option key={a.id} value={a.id}>{a.title}{badge}</option>;
+          })}
         </select>
       </div>
 

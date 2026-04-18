@@ -855,12 +855,22 @@ router.get("/class/:classId/today", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// List assignments for a class
+// List assignments for a class.
+// Includes submission_count so the grading panel can sort/highlight assignments
+// that actually have submissions to grade (otherwise teachers land on an empty
+// assignment and assume grading is broken).
 router.get("/class/:classId", async (req: AuthRequest, res: Response) => {
   const rows = await db.prepare(
-    "SELECT * FROM assignments WHERE class_id = ? ORDER BY due_date ASC"
+    `SELECT a.*,
+            (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id) AS submission_count
+       FROM assignments a
+      WHERE a.class_id = ?
+      ORDER BY a.due_date ASC`
   ).all(req.params.classId) as any[];
-  rows.forEach((r) => { r.rubric = JSON.parse(r.rubric || "[]"); });
+  rows.forEach((r) => {
+    r.rubric = JSON.parse(r.rubric || "[]");
+    r.submission_count = Number(r.submission_count || 0);
+  });
   res.json(rows);
 });
 
