@@ -86,4 +86,48 @@ router.get("/me", async (req: Request, res: Response) => {
   }
 });
 
+// GET /students — public list of student users for the classroom avatar
+// picker. No auth required: this is a kiosk/classroom flow where a student
+// simply taps their face to sign in. Only returns role='student' users.
+router.get("/students", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.prepare(
+      `SELECT id, name, avatar_url FROM users WHERE role = 'student' ORDER BY name ASC`
+    ).all() as any[];
+    res.json(rows.map((r) => ({ id: r.id, name: r.name, avatarUrl: r.avatar_url })));
+  } catch (e) {
+    console.error("list students failed:", e);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /student-login — passwordless avatar login for students. Body: {id}.
+// Verifies the target user is role='student' (teachers/admins must still
+// use password login) and issues a JWT. Safe for classroom use because
+// students only need access to their own dashboard; no destructive admin
+// surface is reachable without role checks.
+router.post("/student-login", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.body?.id || "").trim();
+    if (!id) return res.status(400).json({ error: "id required" });
+    const row = await db.prepare(
+      `SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?`
+    ).get(id) as any;
+    if (!row) return res.status(404).json({ error: "Student not found" });
+    if (row.role !== "student") return res.status(403).json({ error: "Avatar login is for students only" });
+    const user: User = {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      avatarUrl: row.avatar_url,
+      createdAt: row.created_at,
+    };
+    res.json({ token: signToken(user), user });
+  } catch (e) {
+    console.error("student-login failed:", e);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

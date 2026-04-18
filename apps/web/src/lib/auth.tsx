@@ -6,6 +6,7 @@ interface AuthCtx {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginAsStudent: (id: string) => Promise<void>;
   register: (email: string, password: string, name: string, role: string) => Promise<void>;
   logout: () => void;
 }
@@ -31,6 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.user);
   }, []);
 
+  const loginAsStudent = useCallback(async (id: string) => {
+    const res = await api.studentLogin(id);
+    localStorage.setItem("token", res.token);
+    setUser(res.user);
+  }, []);
+
   const register = useCallback(async (email: string, password: string, name: string, role: string) => {
     const res = await api.register(email, password, name, role);
     localStorage.setItem("token", res.token);
@@ -43,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginAsStudent, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

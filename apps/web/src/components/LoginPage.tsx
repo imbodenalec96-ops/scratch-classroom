@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { Sun, Moon, ArrowRight } from "lucide-react";
+import { api } from "../lib/api.ts";
 
 export default function LoginPage() {
-  const { user, login, register } = useAuth();
+  const { user, login, loginAsStudent, register } = useAuth();
   if (user) return <Navigate to="/" replace />;
 
-  const [isRegister, setIsRegister] = useState(false);
+  const [mode, setMode] = useState<"student" | "signin" | "register">("student");
+  const isRegister = mode === "register";
+  const setIsRegister = (v: boolean) => setMode(v ? "register" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -31,12 +34,15 @@ export default function LoginPage() {
 
   return (
     <LoginPageInner
+      mode={mode} setMode={setMode}
       isRegister={isRegister} setIsRegister={setIsRegister}
       name={name} setName={setName} email={email} setEmail={setEmail}
       password={password} setPassword={setPassword}
       role={role} setRole={setRole}
       error={error} loading={loading}
       handleSubmit={handleSubmit}
+      loginAsStudent={loginAsStudent}
+      setError={setError}
     />
   );
 }
@@ -60,9 +66,34 @@ function BrandMark({ size = 44 }: { size?: number }) {
   );
 }
 
-function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEmail, password, setPassword, role, setRole, error, loading, handleSubmit }: any) {
+function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setName, email, setEmail, password, setPassword, role, setRole, error, loading, handleSubmit, loginAsStudent, setError }: any) {
   const { theme, toggleTheme } = useTheme();
   const dk = theme === "dark";
+
+  // Student avatar picker state
+  const [students, setStudents] = useState<Array<{ id: string; name: string; avatarUrl: string | null }>>([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [pickerBusy, setPickerBusy] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode !== "student") return;
+    setStudentsLoading(true);
+    api.listStudentAccounts()
+      .then((rows) => setStudents(rows || []))
+      .catch(() => setStudents([]))
+      .finally(() => setStudentsLoading(false));
+  }, [mode]);
+  const handlePickStudent = async (id: string) => {
+    setError("");
+    setPickerBusy(id);
+    try {
+      await loginAsStudent(id);
+    } catch (err: any) {
+      setError(err?.message || "Sign in failed");
+      setPickerBusy(null);
+    }
+  };
+  const initials = (n: string) => String(n || "").split(/\s+/).filter(Boolean).map(p => p[0]).join("").slice(0, 2).toUpperCase() || "👤";
+  const avatarColors = ["#D97757","#8b5cf6","#059669","#2563eb","#e11d48","#0d9488","#c2410c","#0284c7","#a855f7"];
 
   return (
     <div className="min-h-screen flex" style={{ background: "var(--bg)" }}>
@@ -159,24 +190,84 @@ function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEm
 
           {/* Tab switcher — editorial underline, not a pill */}
           <div className="flex gap-6 mb-6 border-b" style={{ borderColor: "var(--border)" }}>
-            {["Sign In", "Register"].map((label, i) => {
-              const active = (isRegister ? i === 1 : i === 0);
+            {[{ k: "student", l: "I'm a Student" }, { k: "signin", l: "Sign In" }, { k: "register", l: "Register" }].map((t) => {
+              const active = mode === t.k;
               return (
                 <button
-                  key={label}
-                  onClick={() => setIsRegister(i === 1)}
+                  key={t.k}
+                  onClick={() => { setMode(t.k); setError(""); }}
                   className="pb-2.5 text-sm font-semibold cursor-pointer transition-colors"
                   style={{
                     color: active ? "var(--accent)" : "var(--text-3)",
                     borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
                     marginBottom: "-1px",
                   }}>
-                  {label}
+                  {t.l}
                 </button>
               );
             })}
           </div>
 
+          {/* Student avatar picker — passwordless classroom login */}
+          {mode === "student" && (
+            <div>
+              <p className="text-sm mb-4" style={{ color: "var(--text-2)" }}>
+                Tap your picture to sign in. No password needed.
+              </p>
+              {studentsLoading ? (
+                <div className="text-sm" style={{ color: "var(--text-3)" }}>Loading students…</div>
+              ) : students.length === 0 ? (
+                <div className="text-sm" style={{ color: "var(--text-3)" }}>
+                  No student accounts yet. Ask your teacher to add you.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3" style={{ maxHeight: 420, overflowY: "auto" }}>
+                  {students.map((s, i) => {
+                    const color = avatarColors[i % avatarColors.length];
+                    const busy = pickerBusy === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => handlePickStudent(s.id)}
+                        disabled={!!pickerBusy}
+                        className="rounded-2xl p-3 flex flex-col items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                        style={{
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border)",
+                          minHeight: 110,
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
+                      >
+                        <div className="rounded-full flex items-center justify-center font-bold text-white" style={{
+                          width: 56, height: 56, fontSize: 20,
+                          background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+                        }}>
+                          {s.avatarUrl ? (
+                            <img src={s.avatarUrl} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                          ) : busy ? "…" : initials(s.name)}
+                        </div>
+                        <div className="text-xs font-semibold text-center" style={{ color: "var(--text-1)" }}>{s.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {error && (
+                <div className="text-sm p-3 mt-4" style={{
+                  color: "var(--danger)",
+                  background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
+                  borderRadius: "var(--r-md)",
+                  borderLeft: "2px solid var(--danger)",
+                }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode !== "student" && (
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
               <>
@@ -222,6 +313,7 @@ function LoginPageInner({ isRegister, setIsRegister, name, setName, email, setEm
               )}
             </button>
           </form>
+          )}
 
           <p className="text-[10px] uppercase tracking-wider text-center mt-8" style={{ color: "var(--text-3)" }}>
             © {new Date().getFullYear()} · Printed in the browser
