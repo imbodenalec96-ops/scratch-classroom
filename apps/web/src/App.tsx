@@ -26,6 +26,8 @@ import YouTubeManager from "./components/YouTubeManager.tsx";
 import LessonAnalytics from "./components/LessonAnalytics.tsx";
 import ClassGrades from "./components/ClassGrades.tsx";
 import TeacherGradebook, { GradebookStudentPicker } from "./components/TeacherGradebook.tsx";
+import TeacherWebsites from "./components/TeacherWebsites.tsx";
+import WebsiteViewer from "./components/WebsiteViewer.tsx";
 import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
@@ -142,7 +144,11 @@ export default function App() {
             <Route path="class-grades" element={<ClassGrades />} />
             <Route path="teacher/gradebook" element={<GradebookStudentPicker />} />
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
+            <Route path="teacher/websites" element={<TeacherWebsites />} />
           </Route>
+
+          {/* Full-screen embedded website viewer (no sidebar) */}
+          <Route path="/app/:websiteId" element={<ProtectedRoute><WebsiteViewer /></ProtectedRoute>} />
 
           {/* Full-screen project workspace (no sidebar) */}
           <Route path="/project/:id" element={<ProtectedRoute><ProjectWorkspaceRoute /></ProtectedRoute>} />

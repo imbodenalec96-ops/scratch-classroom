@@ -935,6 +935,14 @@ export default function StudentDashboard() {
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
+  // Teacher-granted websites (Poki-style per-student URL library)
+  const [myWebsites, setMyWebsites] = useState<any[]>([]);
+  const [showWebsiteRequest, setShowWebsiteRequest] = useState(false);
+  const [websiteRequestTitle, setWebsiteRequestTitle] = useState("");
+  const [websiteRequestSent, setWebsiteRequestSent] = useState(false);
+  useEffect(() => {
+    api.getMyWebsites().then(setMyWebsites).catch(() => {});
+  }, []);
   const classConfig = useClassConfig();
 
   // Work state
@@ -1492,6 +1500,112 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Learning Apps — teacher-granted websites (only shows if any) */}
+      {(unlocked || isOnBreak()) && (myWebsites.length > 0 || true) && (
+        <div className="card animate-slide-up" style={{ animationDelay: "310ms" }}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
+              🌐 Learning Apps
+              {myWebsites.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(99,102,241,0.15)" : "#e0e7ff", color: dk ? "#a5b4fc" : "#4338ca" }}>
+                  {myWebsites.length}
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+              style={{ background: dk ? "rgba(99,102,241,0.15)" : "#eef2ff", color: dk ? "#a5b4fc" : "#4338ca" }}
+            >
+              📝 Ask for a new website
+            </button>
+          </div>
+
+          {myWebsites.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+              {myWebsites.map((w: any) => (
+                <Link
+                  key={w.id}
+                  to={`/app/${w.id}`}
+                  style={{
+                    textDecoration: "none", borderRadius: 12, overflow: "hidden",
+                    boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
+                    transition: "transform 0.15s",
+                    background: dk ? "rgba(255,255,255,0.04)" : "white",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+                >
+                  <div style={{ aspectRatio: "16/9", background: dk ? "rgba(99,102,241,0.12)" : "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    {w.thumbnail_url ? (
+                      <img src={w.thumbnail_url} alt={w.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ fontSize: 36 }}>🌐</div>
+                    )}
+                  </div>
+                  <div style={{ padding: "8px 10px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: dk ? "rgba(255,255,255,0.85)" : "#1e293b", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{w.title}</div>
+                    {w.category && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 3, color: dk ? "#a5b4fc" : "#4338ca", textTransform: "uppercase", letterSpacing: "0.05em" }}>{w.category}</div>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
+              <div className="text-3xl mb-2">🌐</div>
+              <p className="text-xs">No websites unlocked yet.<br/>Ask your teacher for a site!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Website request modal */}
+      {showWebsiteRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowWebsiteRequest(false)}>
+          <div className="card max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-2" style={{ color: dk ? "white" : "#1e293b" }}>Request a website</h3>
+            <p className="text-sm mb-4" style={{ color: dk ? "rgba(255,255,255,0.5)" : "#64748b" }}>
+              Tell your teacher the name of the site you'd like to use. They'll review it and unlock it for you.
+            </p>
+            {websiteRequestSent ? (
+              <div className="text-center py-4">
+                <div className="text-4xl mb-2">✅</div>
+                <p className="text-sm font-semibold text-emerald-500">Request sent! Your teacher will review it.</p>
+                <button onClick={() => setShowWebsiteRequest(false)} className="btn-primary mt-4">Close</button>
+              </div>
+            ) : (
+              <>
+                <input
+                  autoFocus
+                  value={websiteRequestTitle}
+                  onChange={e => setWebsiteRequestTitle(e.target.value)}
+                  placeholder="e.g. Typing Club, Prodigy, Cool Math…"
+                  className="input w-full mb-4"
+                  maxLength={200}
+                  onKeyDown={async e => {
+                    if (e.key === "Enter" && websiteRequestTitle.trim()) {
+                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
+                    }
+                  }}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowWebsiteRequest(false)} className="px-4 py-2 rounded-lg font-semibold" style={{ background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9", color: dk ? "rgba(255,255,255,0.7)" : "#64748b" }}>Cancel</button>
+                  <button
+                    disabled={!websiteRequestTitle.trim()}
+                    onClick={async () => {
+                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
+                    }}
+                    className="btn-primary disabled:opacity-40"
+                  >
+                    Send request
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Join a class */}

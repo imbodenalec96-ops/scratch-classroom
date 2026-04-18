@@ -111,6 +111,27 @@ export const api = {
 
   // Gradebook (per-student)
   getSubmission: (id: string) => request<any>(`/submissions/${id}`),
+
+  // Websites — per-student URL embed system (teacher-curated library)
+  requestWebsite: (title: string) =>
+    request<any>("/websites/request", { method: "POST", body: JSON.stringify({ title }) }),
+  getMyWebsites: () => request<any[]>("/websites/mine"),
+  getMyWebsite: (id: string) => request<any>(`/websites/mine/${id}`),
+  getPendingWebsiteRequests: () => request<any[]>("/websites/requests/pending"),
+  getWebsiteLibrary: (classId?: string) =>
+    request<any[]>(`/websites/library${classId ? `?classId=${classId}` : ""}`),
+  approveWebsite: (body: { requestId?: string; title: string; url: string; category?: string; classId?: string; thumbnailUrl?: string }) =>
+    request<any>("/websites/approve", { method: "POST", body: JSON.stringify(body) }),
+  denyWebsiteRequest: (requestId: string, note?: string) =>
+    request<any>("/websites/deny", { method: "POST", body: JSON.stringify({ requestId, note }) }),
+  deleteWebsite: (id: string) =>
+    request<any>(`/websites/library/${id}`, { method: "DELETE" }),
+  grantWebsite: (studentId: string, websiteId: string) =>
+    request<any>("/websites/grant", { method: "POST", body: JSON.stringify({ studentId, websiteId }) }),
+  revokeWebsite: (studentId: string, websiteId: string) =>
+    request<any>("/websites/revoke", { method: "POST", body: JSON.stringify({ studentId, websiteId }) }),
+  getStudentWebsiteGrants: (studentId: string) =>
+    request<any[]>(`/websites/student/${studentId}/grants`),
   getStudentAssignments: (studentId: string, scope: "today" | "week" | "all" = "week") =>
     request<any[]>(`/students/${studentId}/assignments?scope=${scope}`),
   humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string) =>

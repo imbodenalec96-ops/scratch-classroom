@@ -19,7 +19,7 @@ import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
-  Sun, Moon, LogOut, Layers, Gamepad2,
+  Sun, Moon, LogOut, Layers, Gamepad2, Globe,
 } from "lucide-react";
 
 export default function Layout() {
@@ -263,6 +263,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
       { path: "/quizzes",         icon: HelpCircle,      label: "Quizzes"    },
       { path: "/class-grades",    icon: Medal,           label: "Class Grades"},
       { path: "/teacher/gradebook", icon: CheckSquare,    label: "Gradebook"  },
+      { path: "/teacher/websites", icon: Globe,           label: "Websites"   },
       { path: "/analytics",       icon: BarChart3,       label: "Analytics"  },
       { path: "/leaderboard",     icon: Trophy,          label: "Leaderboard"},
       { path: "/lessons",         icon: BookOpen,        label: "Lessons"    },
@@ -274,6 +275,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
       { path: "/assignments", icon: ClipboardList, label: "Assignments" },
       { path: "/quizzes",     icon: HelpCircle,    label: "Quizzes"     },
       { path: "/teacher/gradebook", icon: CheckSquare, label: "Gradebook" },
+      { path: "/teacher/websites", icon: Globe,     label: "Websites"    },
       { path: "/analytics",   icon: BarChart3,     label: "Analytics"   },
       { path: "/monitor",     icon: Monitor,       label: "Monitor"     },
       { path: "/leaderboard", icon: Trophy,        label: "Leaderboard" },
