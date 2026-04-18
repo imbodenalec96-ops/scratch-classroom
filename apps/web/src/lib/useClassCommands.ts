@@ -60,6 +60,10 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
   const [isFocused, setIsFocused] = useState(false);
 
   const lastCmdAtRef = useRef(new Date(0).toISOString());
+  // Belt-and-suspenders de-dupe: even if the server re-sends the same command
+  // (e.g. `since` didn't advance, or two hook instances race) we ignore IDs
+  // we've already processed in this session.
+  const seenCmdIdsRef = useRef<Set<string>>(new Set());
   const dismissMessage = useCallback(() => setPendingMessage(null), []);
 
   useEffect(() => {
@@ -95,8 +99,19 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
         setLockedBy(data.lockedBy ?? "");
 
         for (const cmd of data.commands ?? []) {
-          if (cmd.createdAt > lastCmdAtRef.current) {
+          // Skip anything we've already acted on this session, regardless of
+          // whether the server re-sent it (fix for "teacher message keeps
+          // popping up after dismiss").
+          if (cmd.id && seenCmdIdsRef.current.has(cmd.id)) continue;
+          if (cmd.id) seenCmdIdsRef.current.add(cmd.id);
+          if (cmd.createdAt && cmd.createdAt > lastCmdAtRef.current) {
             lastCmdAtRef.current = cmd.createdAt;
+          }
+          // Fire-and-forget: delete the row server-side so other tabs /
+          // future polls don't see it. Ignore errors — client dedup still
+          // covers us.
+          if (cmd.id && classId) {
+            api.consumeCommand(classId, cmd.id).catch(() => {});
           }
           switch (cmd.type) {
             case "NAVIGATE":
@@ -128,6 +143,11 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
             case "GRANT_FREE_TIME":
               try {
                 localStorage.setItem("workDoneDate", new Date().toISOString().slice(0, 10));
+                // Nudge every subscriber (Layout nav, StudentDashboard gate)
+                // to re-check unlock state immediately — the `storage` event
+                // doesn't fire in the same tab that wrote, so we fire our own.
+                window.dispatchEvent(new Event("blockforge:workdone-change"));
+                window.dispatchEvent(new Event("breakstate-change"));
                 setPendingMessage("🎁 Teacher granted you free time! Enjoy.");
                 setTimeout(() => setPendingMessage(null), 8_000);
               } catch {}
@@ -135,9 +155,21 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
             case "REVOKE_FREE_TIME":
               try {
                 localStorage.removeItem("workDoneDate");
+                window.dispatchEvent(new Event("blockforge:workdone-change"));
+                window.dispatchEvent(new Event("breakstate-change"));
                 setPendingMessage("⛔ Free time paused — back to work.");
                 setTimeout(() => setPendingMessage(null), 8_000);
                 navigate(cmd.payload || "/student");
+              } catch {}
+              break;
+            case "END_BREAK":
+              // Teacher cut the break short (Feature 35). BreakChoiceModal
+              // listens for this custom event and resets the break state +
+              // shows a toast + navigates back to /student.
+              try {
+                window.dispatchEvent(new Event("blockforge:end-break"));
+                setPendingMessage("⛔ Your teacher ended break. Back to work 📚");
+                setTimeout(() => setPendingMessage(null), 6_000);
               } catch {}
               break;
           }

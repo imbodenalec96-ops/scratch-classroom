@@ -78,6 +78,23 @@ export function setupWebSocket(io: IOServer) {
       }
     });
 
+    // Teacher/admin: broadcast a YouTube video to the whole class
+    socket.on("class:video", (data: { classId: string; videoId: string; url?: string; title?: string }) => {
+      if (user.role === "teacher" || user.role === "admin") {
+        io.to(`class:${data.classId}`).emit("class:video", {
+          classId: data.classId,
+          videoId: data.videoId,
+          url: data.url,
+          title: data.title,
+        });
+      }
+    });
+    socket.on("class:video:stop", (data: { classId: string }) => {
+      if (user.role === "teacher" || user.role === "admin") {
+        io.to(`class:${data.classId}`).emit("class:video:stop", { classId: data.classId });
+      }
+    });
+
     // Student: send screen preview
     socket.on("student:screen", (data: { classId: string; screenshot: string }) => {
       if (user.role === "student") {

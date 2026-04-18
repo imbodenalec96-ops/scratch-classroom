@@ -448,4 +448,20 @@ router.post("/:id/revoke-freetime", requireRole("teacher", "admin"), async (req:
   }
 });
 
+// POST /:id/message — teacher/admin sends a 1:1 message to a single student
+router.post("/:id/message", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { text } = req.body;
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return res.status(400).json({ error: "text is required" });
+  }
+  try {
+    const cmdId = await enqueueStudentCommand(id, "MESSAGE", { text: text.trim() });
+    res.json({ ok: true, id: cmdId });
+  } catch (e) {
+    console.error("POST /:id/message failed:", e);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
 export default router;
