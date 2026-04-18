@@ -224,6 +224,10 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
           {/* Student avatar picker — tap avatar, then enter password */}
           {mode === "student" && selectedStudent && (
             <div>
+              <style>{`
+                @keyframes sfShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+                .sf-shake { animation: sfShake 0.35s ease-in-out; }
+              `}</style>
               <button
                 onClick={() => { setSelectedStudent(null); setStudentPassword(""); setError(""); }}
                 className="text-sm mb-4 cursor-pointer flex items-center gap-1.5"
@@ -247,15 +251,17 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
                 })()}
                 <div className="font-display text-2xl" style={{ color: "var(--text-1)" }}>{selectedStudent.name}</div>
               </div>
-              <form onSubmit={handleStudentPasswordSubmit} className="space-y-3.5">
+              <form onSubmit={handleStudentPasswordSubmit} className={`space-y-3.5 ${error ? "sf-shake" : ""}`}>
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Password</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Passcode</label>
                   <input
                     type="password"
+                    inputMode="numeric"
                     value={studentPassword}
                     onChange={(e: any) => setStudentPassword(e.target.value)}
                     className="input"
-                    placeholder="Enter your password"
+                    style={error ? { borderColor: "var(--danger)" } : undefined}
+                    placeholder="Enter your passcode"
                     autoFocus
                     required
                   />
@@ -282,8 +288,18 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
 
           {mode === "student" && !selectedStudent && (
             <div>
+              <style>{`
+                @keyframes sfShake {
+                  0%, 100% { transform: translateX(0); }
+                  20% { transform: translateX(-6px); }
+                  40% { transform: translateX(6px); }
+                  60% { transform: translateX(-4px); }
+                  80% { transform: translateX(4px); }
+                }
+                .sf-shake { animation: sfShake 0.35s ease-in-out; }
+              `}</style>
               <p className="text-sm mb-4" style={{ color: "var(--text-2)" }}>
-                Tap your picture, then enter your password.
+                Tap your picture, then enter your passcode.
               </p>
               {studentsLoading ? (
                 <div className="text-sm" style={{ color: "var(--text-3)" }}>Loading students…</div>

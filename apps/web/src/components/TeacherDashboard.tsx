@@ -9,7 +9,7 @@ import {
   Monitor, ClipboardList, HelpCircle, CheckSquare, BarChart3,
   Lock, LockOpen, Megaphone, Eye, Users, Plus, Activity,
   Youtube, Trophy, Navigation, MessageSquare, Gamepad2,
-  Send, X, GraduationCap,
+  Send, X, GraduationCap, Tv,
 } from "lucide-react";
 
 /** Count-up animation for stat numbers */
@@ -179,19 +179,38 @@ export default function TeacherDashboard() {
               Quiet tools for a busy classroom. Monitor students, push assignments, keep the day running.
             </p>
           </div>
-          <button
-            onClick={handleForceUnlockAll}
-            title="Clear every active lock system-wide — use if a student gets stuck"
-            className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
-            style={{
-              color: "var(--danger)",
-              background: "color-mix(in srgb, var(--danger) 8%, transparent)",
-              borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)",
-              borderRadius: "var(--r-md)",
-            }}
-          >
-            <LockOpen size={13}/> Force Unlock All
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {classes[0]?.id && (
+              <a
+                href={`/board?class=${encodeURIComponent(classes[0].id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the classroom board in a new tab — put on a TV or projector"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+                style={{
+                  color: "var(--accent)",
+                  background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)",
+                  borderRadius: "var(--r-md)",
+                }}
+              >
+                <Tv size={13}/> 📺 Open Classroom Board
+              </a>
+            )}
+            <button
+              onClick={handleForceUnlockAll}
+              title="Clear every active lock system-wide — use if a student gets stuck"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+              style={{
+                color: "var(--danger)",
+                background: "color-mix(in srgb, var(--danger) 8%, transparent)",
+                borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)",
+                borderRadius: "var(--r-md)",
+              }}
+            >
+              <LockOpen size={13}/> Force Unlock All
+            </button>
+          </div>
         </div>
       </header>
 

@@ -39,6 +39,7 @@ import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
 import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
+import ClassroomBoard from "./components/ClassroomBoard.tsx";
 
 function AppLoader() {
   return (
@@ -179,6 +180,9 @@ export default function App() {
 
           {/* Student kiosk — no login required */}
           <Route path="/kiosk" element={<StudentKiosk />} />
+
+          {/* Classroom board — TV/projector kiosk view */}
+          <Route path="/board" element={<ProtectedRoute><ClassroomBoard /></ProtectedRoute>} />
 
           {/* Teacher admin portal — password-protected, no auth guard */}
           <Route path="/admin" element={<TeacherAdmin />} />

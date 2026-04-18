@@ -989,9 +989,15 @@ export default function StudentDashboard() {
     return () => clearTimeout(t);
   }, []);
 
-  // Load data
+  // Load data (with 7s global timeout — if anything stalls, fail-open so the
+  // student sees the dashboard rather than an infinite spinner)
   useEffect(() => {
     if (phase !== 'loading') return;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      setPhase('done');
+    }, 7000);
     const load = async () => {
       try {
         const [clsList, subList, lb] = await Promise.all([
@@ -999,6 +1005,7 @@ export default function StudentDashboard() {
           api.getMySubmissions().catch(() => [] as any[]),
           api.getLeaderboard().catch(() => [] as any[]),
         ]);
+        if (timedOut) return;
         setClasses(clsList);
         setSubmissions(subList);
         setLeaderboard(lb);
@@ -1045,11 +1052,14 @@ export default function StudentDashboard() {
         } else {
           setPhase('done');
         }
+        clearTimeout(timer);
       } catch {
+        clearTimeout(timer);
         setPhase('done');
       }
     };
     load();
+    return () => clearTimeout(timer);
   }, [phase]);
 
   // Poll for video

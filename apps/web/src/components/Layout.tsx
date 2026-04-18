@@ -18,10 +18,12 @@ import { studentVideoStore } from "../lib/studentVideoStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
+import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
+import { subjectToRoute } from "../lib/useBlockAutoNav.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
-  Sun, Moon, LogOut, Layers, Gamepad2, Globe, Clock,
+  Sun, Moon, LogOut, Layers, Gamepad2, Globe, Clock, Tv,
 } from "lucide-react";
 
 export default function Layout() {
@@ -125,24 +127,43 @@ export default function Layout() {
   }, [isStudent, user?.id]);
   useBlockAutoNav(isStudent, studentClassId);
 
-  // Assignment takeover: when a student has pending work (i.e. access not yet
-  // allowed — no break, no freetime, no skip-work-day, work not yet done),
-  // lock the entire UI to the dashboard (which renders the WorkScreen). No
-  // sidebar, no escape routes. The only exits are finishing the work or
-  // earning a break via the BreakChoiceModal.
+  // Block-scoped lockdown. Subjects that imply "content mode" (single-route
+  // focus, no sidebar, no escape) vs. "free" blocks (break, coding, review).
+  const currentBlock = useCurrentBlock(isStudent ? studentClassId : null);
+  const blockSubject = (currentBlock?.subject || "").toLowerCase();
+  const LOCKDOWN_SUBJECTS = new Set([
+    "daily_news", "sel", "math", "reading", "writing", "spelling",
+    "video_learning", "ted_talk", "cashout", "dismissal",
+  ]);
+  const blockLockdown = !!(currentBlock && !currentBlock.is_break && LOCKDOWN_SUBJECTS.has(blockSubject));
+  const blockRoute = currentBlock ? subjectToRoute(currentBlock) : null;
+
+  // Takeover = either (a) the current block forces content-only mode, or
+  // (b) no block info yet but access is not allowed (pre-schedule-load grace).
+  // If the student is on a break / has freetime / skip-work-day, accessAllowed
+  // is true and we let them browse.
+  const takeover = isStudent && (blockLockdown || !accessAllowed);
+
+  // Redirect: when locked down, bounce any off-route navigation to the
+  // block's target route (or /student if unknown). Only students, only when
+  // the teacher hasn't recently pushed them elsewhere (5-min grace handled in
+  // useBlockAutoNav).
   useEffect(() => {
-    if (!isStudent) return;
-    if (accessAllowed) return;
+    if (!takeover) return;
     const p = location.pathname;
-    // Allow /student (dashboard root) and /assignments. Redirect everything else.
-    const allowed = p === "/" || p === "/student" || p.startsWith("/assignments");
-    if (!allowed) navigate("/student", { replace: true });
-  }, [isStudent, accessAllowed, location.pathname, navigate]);
+    const target = blockRoute || "/student";
+    // Allow the target route and its /student fallback while loading.
+    const allowed =
+      p === target ||
+      p === "/student" ||
+      p === "/" ||
+      p.startsWith(target + "/");
+    if (!allowed) navigate(target, { replace: true });
+  }, [takeover, blockRoute, location.pathname, navigate]);
 
   if (!user) return null;
   const navItems = getNavItems(user.role, accessAllowed);
   const dk = theme === "dark";
-  const takeover = isStudent && !accessAllowed;
 
   // Takeover mode: full-screen doer, no sidebar, no nav. Break modal + lock
   // overlay + break countdown pill still float above so escape routes
@@ -318,6 +339,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
       { path: "/teacher/gradebook", icon: CheckSquare,    label: "Gradebook"  },
       { path: "/teacher/websites", icon: Globe,           label: "Websites"   },
       { path: "/teacher/schedule", icon: Clock,           label: "Schedule"   },
+      { path: "/board",           icon: Tv,              label: "Board"      },
       { path: "/analytics",       icon: BarChart3,       label: "Analytics"  },
       { path: "/leaderboard",     icon: Trophy,          label: "Leaderboard"},
       { path: "/lessons",         icon: BookOpen,        label: "Lessons"    },
@@ -331,6 +353,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
       { path: "/teacher/gradebook", icon: CheckSquare, label: "Gradebook" },
       { path: "/teacher/websites", icon: Globe,     label: "Websites"    },
       { path: "/teacher/schedule", icon: Clock,     label: "Schedule"    },
+      { path: "/board",       icon: Tv,            label: "Board"       },
       { path: "/analytics",   icon: BarChart3,     label: "Analytics"   },
       { path: "/monitor",     icon: Monitor,       label: "Monitor"     },
       { path: "/leaderboard", icon: Trophy,        label: "Leaderboard" },
