@@ -10,6 +10,7 @@ import { useClassConfig } from "../lib/useClassConfig.ts";
 import { usePresencePing } from "../lib/presence.ts";
 import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
 import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
+import { LearningAppTile, LearningAppGrid } from "./LearningAppTile.tsx";
 
 type Phase = 'welcome' | 'loading' | 'working' | 'break' | 'done';
 
@@ -1524,38 +1525,34 @@ export default function StudentDashboard() {
           </div>
 
           {myWebsites.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+            <LearningAppGrid>
               {myWebsites.map((w: any) => (
-                <Link
-                  key={w.id}
-                  to={`/app/${w.id}`}
-                  style={{
-                    textDecoration: "none", borderRadius: 12, overflow: "hidden",
-                    boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
-                    transition: "transform 0.15s",
-                    background: dk ? "rgba(255,255,255,0.04)" : "white",
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-                >
-                  <div style={{ aspectRatio: "16/9", background: dk ? "rgba(99,102,241,0.12)" : "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                    {w.thumbnail_url ? (
-                      <img src={w.thumbnail_url} alt={w.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ fontSize: 36 }}>🌐</div>
-                    )}
-                  </div>
-                  <div style={{ padding: "8px 10px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: dk ? "rgba(255,255,255,0.85)" : "#1e293b", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{w.title}</div>
-                    {w.category && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 3, color: dk ? "#a5b4fc" : "#4338ca", textTransform: "uppercase", letterSpacing: "0.05em" }}>{w.category}</div>}
-                  </div>
-                </Link>
+                <LearningAppTile key={w.id} app={w} dk={dk} />
               ))}
-            </div>
+            </LearningAppGrid>
           ) : (
-            <div className="text-center py-6" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
-              <div className="text-3xl mb-2">🌐</div>
-              <p className="text-xs">No websites unlocked yet.<br/>Ask your teacher for a site!</p>
+            <div className="text-center py-10 px-4 rounded-2xl" style={{
+              background: dk ? "rgba(255,255,255,0.02)" : "#f8fafc",
+              border: dk ? "1px dashed rgba(255,255,255,0.08)" : "1px dashed #e2e8f0",
+            }}>
+              <div className="text-5xl mb-3">🌐</div>
+              <p className="text-sm font-bold mb-1" style={{ color: dk ? "rgba(255,255,255,0.85)" : "#1e293b" }}>
+                No learning apps yet — ask your teacher!
+              </p>
+              <p className="text-xs mb-4" style={{ color: dk ? "rgba(255,255,255,0.4)" : "#64748b" }}>
+                Got a site you'd love to use? Let them know below.
+              </p>
+              <button
+                onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
+                className="text-sm font-bold px-5 py-2.5 rounded-full cursor-pointer transition-all hover:scale-105"
+                style={{
+                  background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                  color: "white",
+                  boxShadow: "0 6px 16px rgba(99,102,241,0.35)",
+                }}
+              >
+                📝 Ask for a new website
+              </button>
             </div>
           )}
         </div>

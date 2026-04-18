@@ -4,6 +4,9 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { useNavigate } from "react-router-dom";
 import { Globe, Inbox, Grid3x3, Users, Trash2, ExternalLink, Check, X as XIcon } from "lucide-react";
+import { LearningAppTile, LearningAppGrid, inferCategoryIcon } from "./LearningAppTile.tsx";
+
+const ICON_PRESETS = ["🌐", "🎮", "📚", "🧮", "✏️", "🎨", "🔬", "⌨️", "💻", "🧠", "🎬", "🎵", "🌍", "🗺️", "🏆", "⚗️"];
 
 type Tab = "pending" | "library" | "grants";
 
@@ -27,6 +30,7 @@ export default function TeacherWebsites() {
   const [approveTitle, setApproveTitle] = useState("");
   const [approveUrl, setApproveUrl] = useState("");
   const [approveCategory, setApproveCategory] = useState("");
+  const [approveIconEmoji, setApproveIconEmoji] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Route guard
@@ -82,6 +86,7 @@ export default function TeacherWebsites() {
     setApproveTitle(req?.title || "");
     setApproveUrl("");
     setApproveCategory("");
+    setApproveIconEmoji("");
     setErr(null);
   };
 
@@ -96,6 +101,7 @@ export default function TeacherWebsites() {
         title: approveTitle.trim() || approveFor?.title,
         url,
         category: approveCategory.trim() || undefined,
+        iconEmoji: approveIconEmoji || undefined,
       });
       setApproveFor(null);
       await reload();
@@ -215,29 +221,31 @@ export default function TeacherWebsites() {
           {library.length === 0 ? (
             <p className="text-sm text-t3 py-8 text-center">No websites in the library yet. Approve a request or click "Add website".</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <LearningAppGrid>
               {library.map((w) => (
-                <div key={w.id} className={`rounded-2xl border p-4 ${dk ? "bg-white/[0.02] border-white/[0.06]" : "bg-white border-gray-200"}`}>
-                  <div className="flex items-start gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
-                      {w.thumbnail_url ? <img src={w.thumbnail_url} alt="" className="w-full h-full object-cover" /> : <Globe size={16} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-t1 truncate">{w.title}</div>
-                      {w.category && <div className="text-[10px] uppercase tracking-wider text-t3">{w.category}</div>}
-                      <a href={w.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-sky-400 hover:underline truncate block">
-                        <ExternalLink size={10} className="inline mr-0.5" />{w.url}
-                      </a>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <button onClick={() => doDelete(w)} className="text-xs font-bold text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-lg cursor-pointer">
-                      <Trash2 size={11} className="inline mr-1" /> Delete
+                <LearningAppTile
+                  key={w.id}
+                  app={w}
+                  dk={dk}
+                  asLink={false}
+                  onClick={() => window.open(w.url, "_blank", "noopener,noreferrer")}
+                  footer={
+                    <button
+                      onClick={(e) => { e.stopPropagation(); doDelete(w); }}
+                      title="Delete"
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                      style={{
+                        background: dk ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.85)",
+                        color: "#ef4444",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                      }}
+                    >
+                      <Trash2 size={13} />
                     </button>
-                  </div>
-                </div>
+                  }
+                />
               ))}
-            </div>
+            </LearningAppGrid>
           )}
         </div>
       )}
@@ -344,6 +352,29 @@ export default function TeacherWebsites() {
                 placeholder="games, math, reading…"
                 className={`w-full rounded-xl px-3 py-2 text-sm ${dk ? "bg-white/5 border border-white/10 text-white" : "bg-gray-50 border border-gray-200"}`}
               />
+              <label className="block text-xs font-bold text-t3 uppercase tracking-wider mt-2">Icon (optional — otherwise picked from category)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ICON_PRESETS.map((ic) => {
+                  const active = approveIconEmoji === ic;
+                  return (
+                    <button
+                      key={ic}
+                      type="button"
+                      onClick={() => setApproveIconEmoji(active ? "" : ic)}
+                      className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-colors ${
+                        active
+                          ? "bg-sky-500/30 ring-2 ring-sky-400"
+                          : dk ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+                      }`}
+                    >
+                      {ic}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-t3 mt-1">
+                Preview: <span className="text-base">{approveIconEmoji || inferCategoryIcon(approveCategory)}</span>
+              </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setApproveFor(null)} disabled={saving} className="px-3 py-2 rounded-xl text-sm font-bold text-t2 hover:bg-white/5 cursor-pointer">Cancel</button>

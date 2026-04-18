@@ -120,7 +120,7 @@ export const api = {
   getPendingWebsiteRequests: () => request<any[]>("/websites/requests/pending"),
   getWebsiteLibrary: (classId?: string) =>
     request<any[]>(`/websites/library${classId ? `?classId=${classId}` : ""}`),
-  approveWebsite: (body: { requestId?: string; title: string; url: string; category?: string; classId?: string; thumbnailUrl?: string }) =>
+  approveWebsite: (body: { requestId?: string; title: string; url: string; category?: string; classId?: string; thumbnailUrl?: string; iconEmoji?: string }) =>
     request<any>("/websites/approve", { method: "POST", body: JSON.stringify(body) }),
   denyWebsiteRequest: (requestId: string, note?: string) =>
     request<any>("/websites/deny", { method: "POST", body: JSON.stringify({ requestId, note }) }),

@@ -44,6 +44,9 @@ async function ensureTables() {
         granted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Additive columns for existing DBs — ignore "already exists" errors so
+    // the migration is idempotent across pg and sqlite.
+    try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
   } catch (e) {
     console.error("[websites] migration error:", e);
   }
@@ -69,7 +72,7 @@ router.post("/request", async (req: AuthRequest, res: Response) => {
 router.get("/mine", async (req: AuthRequest, res: Response) => {
   await ensureTables();
   const rows = await db.prepare(
-    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.added_at,
+    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
             sw.granted_at
        FROM student_approved_websites sw
        JOIN approved_websites w ON w.id = sw.approved_website_id
@@ -85,7 +88,7 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
 router.get("/mine/:id", async (req: AuthRequest, res: Response) => {
   await ensureTables();
   const row = await db.prepare(
-    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url
+    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
        FROM student_approved_websites sw
        JOIN approved_websites w ON w.id = sw.approved_website_id
       WHERE sw.student_id = ? AND w.id = ?
@@ -143,7 +146,7 @@ router.get("/classes/:classId/requests", requireRole("teacher", "admin"), async 
 // the new library entry via teacher_note (kept simple: stringified refs).
 router.post("/approve", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureTables();
-  const { requestId, title, url, category, classId, thumbnailUrl } = req.body || {};
+  const { requestId, title, url, category, classId, thumbnailUrl, iconEmoji } = req.body || {};
   const cleanTitle = String(title || "").trim();
   const cleanUrl = String(url || "").trim();
   if (!cleanTitle || !cleanUrl) return res.status(400).json({ error: "title and url required" });
@@ -153,9 +156,9 @@ router.post("/approve", requireRole("teacher", "admin"), async (req: AuthRequest
 
   const id = crypto.randomUUID();
   await db.prepare(
-    `INSERT INTO approved_websites (id, class_id, title, url, category, thumbnail_url, added_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, classId || null, cleanTitle, cleanUrl, category || null, thumbnailUrl || null, req.user!.id);
+    `INSERT INTO approved_websites (id, class_id, title, url, category, thumbnail_url, icon_emoji, added_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, classId || null, cleanTitle, cleanUrl, category || null, thumbnailUrl || null, iconEmoji || null, req.user!.id);
 
   if (requestId) {
     await db.prepare(
