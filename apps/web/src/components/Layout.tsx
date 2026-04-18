@@ -2,7 +2,7 @@ import React, { useState, useEffect, useSyncExternalStore } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { isWorkUnlocked, isAccessAllowed, clearWorkUnlock } from "../lib/workUnlock.ts";
+import { isWorkUnlocked, isAccessAllowed, clearWorkUnlock, setWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
@@ -135,14 +135,26 @@ export default function Layout() {
     "daily_news", "sel", "math", "reading", "writing", "spelling",
     "video_learning", "ted_talk", "cashout", "dismissal",
   ]);
+  // Scheduled break block → full free-time (arcade/projects/YouTube/Unity).
+  const scheduledBreakActive = !!(currentBlock?.is_break);
+  // Coding/Art/Gym: free if work already done today; otherwise lockdown to
+  // assignments until the student finishes.
+  const codingArtGymBlock = blockSubject === "coding_art_gym";
+  const workDone = isWorkUnlocked();
+  const codingArtGymLockdown = codingArtGymBlock && !workDone;
   const blockLockdown = !!(currentBlock && !currentBlock.is_break && LOCKDOWN_SUBJECTS.has(blockSubject));
   const blockRoute = currentBlock ? subjectToRoute(currentBlock) : null;
 
+  // Effective access for the sidebar: break blocks + coding/art/gym (once
+  // work is done) grant free-time browsing regardless of the older localStorage
+  // workDoneDate flag.
+  const effectiveAccess = accessAllowed || scheduledBreakActive || (codingArtGymBlock && workDone);
+
   // Takeover = either (a) the current block forces content-only mode, or
-  // (b) no block info yet but access is not allowed (pre-schedule-load grace).
-  // If the student is on a break / has freetime / skip-work-day, accessAllowed
-  // is true and we let them browse.
-  const takeover = isStudent && (blockLockdown || !accessAllowed);
+  // (b) coding/art/gym active but today's work isn't done, or
+  // (c) no block info and access isn't allowed.
+  // Scheduled breaks never trigger takeover — they grant freedom.
+  const takeover = isStudent && !scheduledBreakActive && (blockLockdown || codingArtGymLockdown || (!currentBlock && !accessAllowed));
 
   // Redirect: when locked down, bounce any off-route navigation to the
   // block's target route (or /student if unknown). Only students, only when
@@ -151,7 +163,9 @@ export default function Layout() {
   useEffect(() => {
     if (!takeover) return;
     const p = location.pathname;
-    const target = blockRoute || "/student";
+    // Coding/Art/Gym lockdown (work not done) redirects to assignments,
+    // not to /coding — they have to finish first.
+    const target = codingArtGymLockdown ? "/student" : (blockRoute || "/student");
     // Allow the target route and its /student fallback while loading.
     const allowed =
       p === target ||
@@ -159,10 +173,10 @@ export default function Layout() {
       p === "/" ||
       p.startsWith(target + "/");
     if (!allowed) navigate(target, { replace: true });
-  }, [takeover, blockRoute, location.pathname, navigate]);
+  }, [takeover, blockRoute, location.pathname, navigate, codingArtGymLockdown]);
 
   if (!user) return null;
-  const navItems = getNavItems(user.role, accessAllowed);
+  const navItems = getNavItems(user.role, effectiveAccess);
   const dk = theme === "dark";
 
   // Takeover mode: full-screen doer, no sidebar, no nav. Break modal + lock

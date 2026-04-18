@@ -181,6 +181,20 @@ export default function ClassroomBoard() {
         </div>
       </section>
 
+      {/* Placeholder slot — future modules (behavior stars, levels, specials,
+         music, schedules) will render here. Structural only, no content yet. */}
+      <section
+        data-slot="board-modules"
+        className="mt-10 rounded-2xl p-6"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px dashed rgba(255,255,255,0.12)",
+        }}
+      >
+        <div className="text-xs uppercase tracking-[0.25em] opacity-50">Modules</div>
+        <div className="text-sm opacity-40 mt-2">More classroom controls coming here soon.</div>
+      </section>
+
       {/* Footer */}
       <div className="mt-10 pt-4 text-center text-xs opacity-40 uppercase tracking-[0.2em]">
         BlockForge · auto-refreshes every 15 seconds

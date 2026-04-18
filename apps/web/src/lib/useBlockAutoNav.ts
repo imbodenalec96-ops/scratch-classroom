@@ -108,14 +108,9 @@ export function useBlockAutoNav(enabled: boolean, classId: string | null | undef
       return;
     }
 
-    // coding_art_gym → "free-time" unlock so arcade/projects/Unity are all
-    // available, then drop them on the dashboard for free choice.
+    // coding_art_gym → drop them on the dashboard. Layout handles the
+    // conditional unlock (free if work done, lockdown on assignments if not).
     if ((current.subject || "").toLowerCase() === "coding_art_gym") {
-      try {
-        localStorage.setItem("workDoneDate", new Date().toISOString().slice(0, 10));
-        window.dispatchEvent(new Event("blockforge:workdone-change"));
-        window.dispatchEvent(new Event("breakstate-change"));
-      } catch {}
       navigate("/student");
       return;
     }

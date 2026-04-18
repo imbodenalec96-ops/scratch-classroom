@@ -7,7 +7,7 @@ import {
   Users, GraduationCap, BookOpen, School, Eye,
   LockOpen, Youtube, BarChart3, Trophy,
   ClipboardList, Monitor, HelpCircle, CheckSquare,
-  Download, AlertTriangle,
+  Download, AlertTriangle, Tv,
 } from "lucide-react";
 
 /**
@@ -128,6 +128,23 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {classes[0]?.id && (
+              <a
+                href={`/board?class=${encodeURIComponent(classes[0].id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+                style={{
+                  color: "var(--text-1)",
+                  background: "var(--surface-1)",
+                  borderColor: "var(--border-md)",
+                  borderRadius: "var(--r-md)",
+                }}
+                title="Open the classroom TV/projector board"
+              >
+                <Tv size={13} /> 📺 Classroom Board
+              </a>
+            )}
             <Link to="/teacher" className="btn-secondary gap-1.5 text-xs">
               <Eye size={13} /> View as Teacher
             </Link>
