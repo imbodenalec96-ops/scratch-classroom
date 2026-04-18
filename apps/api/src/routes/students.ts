@@ -506,8 +506,7 @@ router.get("/:id/assignments", requireRole("teacher", "admin"), async (req: Auth
           ON s.assignment_id = a.id AND s.student_id = ?
        WHERE a.class_id IN (${qMarks})
          ${rangeClause}
-    ORDER BY COALESCE(a.scheduled_date, substr(a.due_date, 1, 10)) DESC,
-             a.created_at DESC
+    ORDER BY a.scheduled_date DESC, a.created_at DESC
     `;
     const rows = await db.prepare(sql).all(id, ...classIds, ...rangeArgs) as any[];
 
