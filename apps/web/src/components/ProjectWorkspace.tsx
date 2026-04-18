@@ -810,6 +810,13 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
 
   const handleApplyUnityTemplate = useCallback((template: UnityTemplate) => {
     setMode("unity");
+    // FPS microgame defaults to first-person camera
+    if (template === "unity_fps" && typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(`blockforge:camera-mode.${projectId || "default"}`, "first");
+        window.dispatchEvent(new CustomEvent("blockforge:camera-mode", { detail: "first" }));
+      } catch {}
+    }
     const specs = makeUnityTemplateSpecs(template);
     setSprites((prev) => {
       const targetId = getPlayableSpriteId(prev, selectedSpriteId) || prev[0]?.id;
@@ -1082,7 +1089,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           {mode === "2d" ? (
             <Stage2D sprites={sprites} stage={stage} running={running} selectedSpriteId={selectedSpriteId} onRunningChange={setRunning} onSpriteMove={handleSpriteMove} />
           ) : mode === "3d" ? (
-            <Stage3D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
+            <Stage3D sprites={sprites} stage={stage} running={running} projectId={projectId} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
           ) : (
             <UnityStage />
           )}

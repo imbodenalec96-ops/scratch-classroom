@@ -15,12 +15,24 @@ interface Props {
   sprites: Sprite[];
   stage: StageSettings;
   running: boolean;
+  projectId?: string;
   onSpriteMove?: (id: string, x: number, y: number) => void;
   onAddSprite?: (name: string, shape: Shape3D) => void;
 }
 
 type TransformMode = "translate" | "rotate" | "scale";
+export type CameraMode = "first" | "third" | "top";
 const SCALE = 40;
+
+function readSavedCameraMode(projectId?: string): CameraMode {
+  if (typeof window === "undefined") return "top";
+  try {
+    const key = `blockforge:camera-mode.${projectId || "default"}`;
+    const v = window.localStorage.getItem(key);
+    if (v === "first" || v === "third" || v === "top") return v;
+  } catch {}
+  return "top";
+}
 
 type ThreeDTheme = {
   envPreset: "night" | "city" | "sunset" | "dawn" | "forest" | "park";
@@ -617,16 +629,56 @@ function EnvironmentDecorations({ preset }: { preset: EnvironmentPreset }) {
   );
 }
 
-export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSprite }: Props) {
+export default function Stage3D({ sprites, stage, running, projectId, onSpriteMove, onAddSprite }: Props) {
   const [selectedSprite, setSelectedSprite] = useState<string | null>(null);
   const [transformMode, setTransformMode] = useState<TransformMode>("translate");
   const [showGrid, setShowGrid] = useState(true);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [cameraMode, setCameraMode] = useState<CameraMode>(() => readSavedCameraMode(projectId));
+  const yawRef = useRef(0);
+  const pitchRef = useRef(0);
   const activePreset = inferEnvironmentPreset(stage);
   const theme = ENV3D_THEMES[activePreset];
   const engineRef = useRef<RuntimeEngine | null>(null);
   const spritesRef = useRef(sprites);
   spritesRef.current = sprites;
+
+  /* Persist camera mode per project */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(`blockforge:camera-mode.${projectId || "default"}`, cameraMode);
+    } catch {}
+  }, [cameraMode, projectId]);
+
+  /* Re-read when projectId changes (switching projects) */
+  useEffect(() => {
+    setCameraMode(readSavedCameraMode(projectId));
+  }, [projectId]);
+
+  /* External setters (e.g. FPS template) can request a mode via window event */
+  useEffect(() => {
+    const onExternal = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d === "first" || d === "third" || d === "top") setCameraMode(d);
+    };
+    window.addEventListener("blockforge:camera-mode", onExternal as EventListener);
+    return () => window.removeEventListener("blockforge:camera-mode", onExternal as EventListener);
+  }, []);
+
+  /* 1/2/3 keyboard shortcuts for camera mode (global, regardless of running state) */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "1") setCameraMode("first");
+      else if (e.key === "2") setCameraMode("third");
+      else if (e.key === "3") setCameraMode("top");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   /* ── Start / stop runtime engine ── */
   useEffect(() => {
@@ -676,8 +728,37 @@ export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSp
     onSpriteMove?.(id, Math.round(pos.x * SCALE), Math.round(pos.z * SCALE));
   }, [onSpriteMove]);
 
+  const fpDragRef = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
+  const onCanvasPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (cameraMode !== "first" || !running) return;
+    fpDragRef.current = { active: true, lastX: e.clientX, lastY: e.clientY };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  }, [cameraMode, running]);
+  const onCanvasPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const s = fpDragRef.current;
+    if (!s.active) return;
+    const dx = e.clientX - s.lastX;
+    const dy = e.clientY - s.lastY;
+    s.lastX = e.clientX;
+    s.lastY = e.clientY;
+    yawRef.current -= dx * 0.005;
+    pitchRef.current -= dy * 0.005;
+    pitchRef.current = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitchRef.current));
+  }, []);
+  const onCanvasPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    fpDragRef.current.active = false;
+    try { (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId); } catch {}
+  }, []);
+
   return (
-    <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black" style={{ height: 360 }}>
+    <div
+      className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black"
+      style={{ height: 360, cursor: cameraMode === "first" && running ? "crosshair" : undefined }}
+      onPointerDown={onCanvasPointerDown}
+      onPointerMove={onCanvasPointerMove}
+      onPointerUp={onCanvasPointerUp}
+      onPointerLeave={onCanvasPointerUp}
+    >
       <Canvas
         camera={{ position: [stage.camera?.x ?? 0, stage.camera?.y ?? 5, stage.camera?.z ?? 10], fov: stage.camera?.fov ?? 60 }}
         shadows
@@ -716,7 +797,15 @@ export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSp
             <shadowMaterial opacity={0.25} />
           </mesh>
 
-          <RuntimeStepper engineRef={engineRef} spritesRef={spritesRef} running={running} />
+          <RuntimeStepper
+            engineRef={engineRef}
+            spritesRef={spritesRef}
+            running={running}
+            cameraMode={cameraMode}
+            onCameraModeChange={setCameraMode}
+            yawRef={yawRef}
+            pitchRef={pitchRef}
+          />
           <WeatherParticles engineRef={engineRef} running={running} />
           <EnvironmentDecorations preset={activePreset} />
 
@@ -729,7 +818,7 @@ export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSp
               onTransformChange={handleTransform} />
           ))}
 
-          <OrbitControls makeDefault enableDamping dampingFactor={0.1} enabled={!running} />
+          <OrbitControls makeDefault enableDamping dampingFactor={0.1} enabled={!running && cameraMode === "third"} />
           <Environment preset={theme.envPreset} />
         </Suspense>
       </Canvas>
@@ -744,6 +833,20 @@ export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSp
                 : "bg-black/50 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80"
             }`}>
             {m === "translate" ? "↔ Move" : m === "rotate" ? "↻ Rotate" : "⤢ Scale"}
+          </button>
+        ))}
+        {(["first", "third", "top"] as CameraMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setCameraMode(m)}
+            title={m === "first" ? "First-person (1)" : m === "third" ? "Third-person (2)" : "Top-down (3)"}
+            className={`px-2.5 py-1 text-xs rounded-lg border transition-all font-medium ${
+              cameraMode === m
+                ? "bg-cyan-600/90 border-cyan-400/60 text-white"
+                : "bg-black/50 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80"
+            }`}
+          >
+            {m === "first" ? "1P" : m === "third" ? "3P" : "TD"}
           </button>
         ))}
         <button onClick={() => setShowGrid(!showGrid)}
@@ -782,20 +885,34 @@ export default function Stage3D({ sprites, stage, running, onSpriteMove, onAddSp
           ▶ Running
         </div>
       )}
+      {cameraMode === "first" && running && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="relative w-6 h-6">
+            <div className="absolute left-1/2 top-0 bottom-0 w-px -ml-px bg-white/80 shadow-[0_0_2px_rgba(0,0,0,0.9)]" />
+            <div className="absolute top-1/2 left-0 right-0 h-px -mt-px bg-white/80 shadow-[0_0_2px_rgba(0,0,0,0.9)]" />
+            <div className="absolute left-1/2 top-1/2 w-1 h-1 -ml-0.5 -mt-0.5 rounded-full bg-white/90" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ── Runtime stepper (inside Canvas for useFrame) ── */
-function RuntimeStepper({ engineRef, spritesRef, running }: {
+function RuntimeStepper({ engineRef, spritesRef, running, cameraMode, onCameraModeChange, yawRef, pitchRef }: {
   engineRef: React.MutableRefObject<RuntimeEngine | null>;
   spritesRef: React.MutableRefObject<Sprite[]>;
   running: boolean;
+  cameraMode: CameraMode;
+  onCameraModeChange: (m: CameraMode) => void;
+  yawRef: React.MutableRefObject<number>;
+  pitchRef: React.MutableRefObject<number>;
 }) {
   const { camera, scene } = useThree();
   const shakeRef = useRef({ ox: 0, oy: 0, oz: 0 });
   const camTargetRef = useRef(new THREE.Vector3(0, 5, 10));
   const camLookRef = useRef(new THREE.Vector3(0, 0.5, 0));
+  const lastGlobalModeRef = useRef<string | undefined>(undefined);
 
   useFrame((_, delta) => {
     if (!running || !engineRef.current) return;
@@ -839,36 +956,59 @@ function RuntimeStepper({ engineRef, spritesRef, running }: {
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
     }
 
+    /* ── React to camera_mode global set by unity_setcameramode block ── */
+    const modeGlobal = gv["camera_mode"] as string | undefined;
+    if (modeGlobal && modeGlobal !== lastGlobalModeRef.current) {
+      lastGlobalModeRef.current = modeGlobal;
+      const normalized: CameraMode | null =
+        modeGlobal === "first" || modeGlobal === "1p" || modeGlobal === "fps" ? "first" :
+        modeGlobal === "third" || modeGlobal === "3p" ? "third" :
+        modeGlobal === "top" || modeGlobal === "topdown" || modeGlobal === "top-down" ? "top" :
+        null;
+      if (normalized && normalized !== cameraMode) onCameraModeChange(normalized);
+    }
+
     /* ── Camera follow / manual position ── */
     if (followState) {
-      // 3rd-person camera: behind and above the sprite
       const spriteX = followState.x / SC;
       const spriteZ = -followState.y / SC;
-      // Height above ground for jumping sprites
       const groundLevel = -engine.stageHeight / 2;
       const heightAbove = followState.gravity > 0
         ? Math.max(0, (followState.y - groundLevel) / SC)
         : 0;
       const spriteY = 0.5 + heightAbove;
-
-      // Camera offset: behind (+z), above (+y)
-      const camOffsetY = 4;
-      const camOffsetZ = 7;
       const camRotDeg = Number(gv["env_cam_rot"] ?? 0);
       const camRotRad = -(camRotDeg * Math.PI) / 180;
-      const offsetX = Math.sin(camRotRad) * camOffsetZ;
-      const offsetZ = Math.cos(camRotRad) * camOffsetZ;
 
-      camTargetRef.current.set(spriteX + offsetX, spriteY + camOffsetY, spriteZ + offsetZ);
-      camLookRef.current.set(spriteX, spriteY, spriteZ);
-
-      // Smooth lerp towards target
-      const lerpSpeed = 0.06;
-      camera.position.lerp(camTargetRef.current, lerpSpeed);
-      // Smoothly look at the sprite
-      const currentLook = new THREE.Vector3();
-      camera.getWorldDirection(currentLook);
-      camera.lookAt(camLookRef.current);
+      if (cameraMode === "first") {
+        // First-person: camera AT sprite head, looking forward (yaw + pitch from drag)
+        const headY = spriteY + 0.9;
+        const yaw = yawRef.current + camRotRad;
+        const pitch = pitchRef.current;
+        camera.position.set(spriteX, headY, spriteZ);
+        const lookDist = 5;
+        const lookX = spriteX + Math.sin(yaw) * Math.cos(pitch) * lookDist;
+        const lookY = headY + Math.sin(pitch) * lookDist;
+        const lookZ = spriteZ + Math.cos(yaw) * Math.cos(pitch) * lookDist;
+        camera.lookAt(lookX, lookY, lookZ);
+      } else if (cameraMode === "top") {
+        // Top-down: high above, looking straight down
+        const height = 22;
+        camTargetRef.current.set(spriteX, spriteY + height, spriteZ + 0.01);
+        camLookRef.current.set(spriteX, spriteY, spriteZ);
+        camera.position.lerp(camTargetRef.current, 0.1);
+        camera.lookAt(camLookRef.current);
+      } else {
+        // Third-person: ~3 units behind, slightly above, slight lag
+        const camOffsetY = 2.2;
+        const camOffsetZ = 3.2;
+        const offsetX = Math.sin(camRotRad) * camOffsetZ;
+        const offsetZ = Math.cos(camRotRad) * camOffsetZ;
+        camTargetRef.current.set(spriteX + offsetX, spriteY + camOffsetY, spriteZ + offsetZ);
+        camLookRef.current.set(spriteX, spriteY + 0.4, spriteZ);
+        camera.position.lerp(camTargetRef.current, 0.08);
+        camera.lookAt(camLookRef.current);
+      }
     } else if (gv["env_cam_x"] !== undefined) {
       /* ── Manual camera position (no follow target) ── */
       const camX = Number(gv["env_cam_x"]);

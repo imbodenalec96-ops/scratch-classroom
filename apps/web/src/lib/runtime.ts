@@ -2920,6 +2920,15 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
         case "unity_setfog": { unityBridge("SetFog",{density:getNum(block,"DENSITY",0.02)}); thread.pc++; break; }
         case "unity_setambient": { unityBridge("SetAmbient",{value:getNum(block,"VALUE",0.6)}); thread.pc++; break; }
         case "unity_camerashake": { unityBridge("CameraShake",{intensity:getNum(block,"INTENSITY",0.5)}); thread.pc++; break; }
+        case "unity_setcameramode": {
+          const raw = String(getStr(block,"MODE","third")).toLowerCase().trim();
+          const mode = raw === "first" || raw === "1p" || raw === "fps" ? "first"
+            : raw === "top" || raw === "topdown" || raw === "top-down" ? "top"
+            : "third";
+          engine.globalVariables["camera_mode"] = mode;
+          unityBridge("SetCameraMode",{mode});
+          thread.pc++; break;
+        }
         case "unity_showtext": { unityBridge("ShowText",{text:getStr(block,"TEXT",""),duration:getNum(block,"DURATION",2)}); thread.pc++; break; }
         case "unity_say": { unityBridge("Say",{text:getStr(block,"TEXT","")}); thread.pc++; break; }
         case "unity_playsound": { unityBridge("PlaySound",{type:getStr(block,"TYPE","coin")}); thread.pc++; break; }
