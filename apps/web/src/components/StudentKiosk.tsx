@@ -626,7 +626,7 @@ export default function StudentKiosk() {
           }}>
             <div style={{
               fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase",
-              color: "var(--accent, #d97706)", fontWeight: 700, marginBottom: 10,
+              color: "var(--accent, #D97757)", fontWeight: 700, marginBottom: 10,
             }}>— Who's learning today —</div>
             <h1 style={{
               fontFamily: "'Fraunces', Georgia, serif",
@@ -637,7 +637,7 @@ export default function StudentKiosk() {
               {greeting}.
               <br />
               <em style={{
-                color: "var(--accent, #d97706)", fontStyle: "italic",
+                color: "var(--accent, #D97757)", fontStyle: "italic",
                 fontWeight: 400,
               }}>Tap your name.</em>
             </h1>
@@ -649,7 +649,7 @@ export default function StudentKiosk() {
               {[0,1,2].map(i => (
                 <div key={i} style={{
                   width: 10, height: 10, borderRadius: "50%",
-                  background: "var(--accent, #d97706)", opacity: 0.4,
+                  background: "var(--accent, #D97757)", opacity: 0.4,
                   animation: "kiosk-fade-in 0.6s ease infinite alternate",
                   animationDelay: `${i * 200}ms`,
                 }} />
@@ -686,7 +686,7 @@ export default function StudentKiosk() {
                   }}
                   onMouseEnter={e => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = "var(--accent, #d97706)";
+                    el.style.borderColor = "var(--accent, #D97757)";
                     el.style.transform = "translateY(-2px)";
                     el.style.boxShadow = "0 8px 28px rgba(217,119,6,0.18)";
                     const inner = el.querySelector<HTMLDivElement>("[data-avatar]");

@@ -50,8 +50,8 @@ function BrandMark({ size = 44 }: { size?: number }) {
       <rect x="14" y="14" width="44" height="36" rx="2" fill="#fdfaf3" stroke="#18171a" strokeWidth="2"/>
       <rect x="18" y="10" width="44" height="36" rx="2" fill="#f6f1e6" stroke="#18171a" strokeWidth="2"/>
       {/* Marigold swoosh */}
-      <path d="M26 18 Q40 12 56 22" stroke="#d97706" strokeWidth="3" strokeLinecap="round" fill="none"/>
-      <circle cx="56" cy="22" r="3" fill="#d97706" />
+      <path d="M26 18 Q40 12 56 22" stroke="#D97757" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <circle cx="56" cy="22" r="3" fill="#D97757" />
       {/* Text lines */}
       <line x1="26" y1="28" x2="46" y2="28" stroke="#18171a" strokeWidth="1.5" strokeLinecap="round" opacity="0.4"/>
       <line x1="26" y1="34" x2="52" y2="34" stroke="#18171a" strokeWidth="1.5" strokeLinecap="round" opacity="0.4"/>

@@ -37,7 +37,7 @@ function useCountUp(target: number, duration = 900, delay = 0) {
  *    assignment doer (WorkScreen) so every subject has its own warm backdrop. */
 const STARFALL_PALETTES: Record<string, { bg: string; accent: string; emoji: string; label: string }> = {
   reading:        { bg: "linear-gradient(160deg, #efe3ff 0%, #fff7ec 55%, #ffe9f1 100%)", accent: "#8b5cf6", emoji: "📖", label: "Reading" },
-  math:           { bg: "linear-gradient(160deg, #fff2c8 0%, #ffe4a8 55%, #ffd389 100%)", accent: "#d97706", emoji: "🔢", label: "Math" },
+  math:           { bg: "linear-gradient(160deg, #fff2c8 0%, #ffe4a8 55%, #ffd389 100%)", accent: "#D97757", emoji: "🔢", label: "Math" },
   writing:        { bg: "linear-gradient(160deg, #dcf5e5 0%, #f1fbe0 55%, #e8f3d4 100%)", accent: "#059669", emoji: "✏️", label: "Writing" },
   spelling:       { bg: "linear-gradient(160deg, #daeaff 0%, #e9f4ff 55%, #d0e6ff 100%)", accent: "#2563eb", emoji: "🔤", label: "Spelling" },
   sel:            { bg: "linear-gradient(160deg, #ffe4e6 0%, #fff0e4 55%, #ffe9d9 100%)", accent: "#e11d48", emoji: "💛", label: "SEL" },

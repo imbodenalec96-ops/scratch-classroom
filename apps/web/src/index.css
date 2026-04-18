@@ -5,10 +5,9 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   DESIGN TOKENS — "Editorial Paper"
-   Warm cream + deep ink + a single marigold accent.
-   Dark mode: deep charcoal-brown + parchment + same marigold.
-   Mixed corner radii, subtle real shadows, serif display type.
+   DESIGN TOKENS — "Editorial Paper" (Claude.ai coral tuning)
+   Warm cream + deep ink + a single Anthropic-Coral accent.
+   Dark mode: deep charcoal-brown + parchment + same coral.
    ═══════════════════════════════════════════════════════════ */
 
 .dark {
@@ -24,26 +23,28 @@
   /* Borders — warm, not pure-white */
   --border:      rgba(247,225,174,0.08);
   --border-md:   rgba(247,225,174,0.14);
-  --border-focus:rgba(217,119,6,0.55);
+  --border-focus:rgba(217,119,87,0.55);
 
   /* Text — warm parchment */
   --text-1:      #f8ecd2;
   --text-2:      rgba(248,236,210,0.62);
   --text-3:      rgba(248,236,210,0.32);
-  --text-accent: #f59e0b;
+  --text-accent: #e89073;
 
-  /* Accent/brand — marigold */
-  --accent:      #d97706;
-  --accent-hover:#b45309;
-  --accent-light: rgba(217,119,6,0.14);
+  /* Accent/brand — Anthropic Coral */
+  --accent-coral:       #D97757;
+  --accent-coral-hover: #C4653A;
+  --accent:             #D97757;
+  --accent-hover:       #C4653A;
+  --accent-light:       rgba(217,119,87,0.14);
 
   /* Secondary accents */
   --accent-sage: #84a764;
   --accent-ink:  #e8dcbc;
-  --accent-rust: #c2410c;
+  --accent-rust: #C4653A;
 
   /* Focus ring */
-  --ring:        rgba(217,119,6,0.32);
+  --ring:        rgba(217,119,87,0.32);
 
   /* Status */
   --success:     #84a764;
@@ -51,11 +52,16 @@
   --danger:      #dc5a3a;
   --info:        #5c9ead;
 
-  /* Radii */
+  /* Radii — 4 / 8 / 12 / 16 / 20 */
   --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 10px;
-  --r-xl: 14px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+
+  /* Shadows — soft, restrained */
+  --shadow-ambient: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-hover:   0 4px 12px rgba(0,0,0,0.06);
 
   /* Chat bubbles */
   --bubble-other-bg:    rgba(247,225,174,0.06);
@@ -65,54 +71,61 @@
 
 .light {
   /* Backgrounds — warm cream paper */
-  --bg:          #f6f1e6;    /* cream — not cold gray */
-  --bg-sidebar:  #fdfaf3;
-  --bg-surface:  #fdfaf3;    /* slightly warmer than page bg */
-  --bg-raised:   #f1ead9;
-  --bg-hover:    rgba(24,23,30,0.04);
-  --bg-input:    #fdfaf3;
-  --bg-muted:    rgba(24,23,30,0.025);
+  --bg:          #FAF9F7;    /* claude.ai-style off-white cream */
+  --bg-sidebar:  #FDFBF8;
+  --bg-surface:  #FDFBF8;
+  --bg-raised:   #F3EFE8;
+  --bg-hover:    rgba(26,25,21,0.04);
+  --bg-input:    #FDFBF8;
+  --bg-muted:    rgba(26,25,21,0.025);
 
   /* Borders — ink-warm */
-  --border:      rgba(24,23,30,0.10);
-  --border-md:   rgba(24,23,30,0.18);
-  --border-focus:rgba(180,83,9,0.50);
+  --border:      rgba(26,25,21,0.10);
+  --border-md:   rgba(26,25,21,0.16);
+  --border-focus:rgba(196,101,58,0.50);
 
-  /* Text — deep ink, not black */
-  --text-1:      #18171a;
-  --text-2:      #5a564f;
-  --text-3:      #8a867e;
-  --text-accent: #b45309;
+  /* Text — warm near-black */
+  --text-1:      #1A1915;
+  --text-2:      #5A564F;
+  --text-3:      #8A867E;
+  --text-accent: #C4653A;
 
-  /* Accent/brand — marigold */
-  --accent:      #d97706;
-  --accent-hover:#b45309;
-  --accent-light: rgba(217,119,6,0.10);
+  /* Accent/brand — Anthropic Coral */
+  --accent-coral:       #D97757;
+  --accent-coral-hover: #C4653A;
+  --accent:             #D97757;
+  --accent-hover:       #C4653A;
+  --accent-light:       rgba(217,119,87,0.10);
 
   /* Secondary accents */
   --accent-sage: #6b8e4e;
-  --accent-ink:  #18171a;
-  --accent-rust: #b84a3e;
+  --accent-ink:  #1A1915;
+  --accent-rust: #C4653A;
 
   /* Focus ring */
-  --ring:        rgba(217,119,6,0.25);
+  --ring:        rgba(217,119,87,0.25);
 
-  /* Radii */
+  /* Radii — 4 / 8 / 12 / 16 / 20 */
   --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 10px;
-  --r-xl: 14px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+
+  /* Shadows — soft, restrained */
+  --shadow-ambient: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-hover:   0 4px 12px rgba(0,0,0,0.06);
 
   /* Status */
   --success:     #6b8e4e;
-  --warning:     #d97706;
+  --warning:     #D97757;
   --danger:      #dc2626;
   --info:        #0891b2;
 
   /* Chat bubbles */
-  --bubble-other-bg:    #f1f5f9;
-  --bubble-other-text:  #334155;
-  --bubble-other-border:#e2e8f0;
+  --bubble-other-bg:    #F3EFE8;
+  --bubble-other-text:  #1A1915;
+  --bubble-other-border:rgba(26,25,21,0.10);
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -1242,7 +1242,7 @@ export default function LessonsPage() {
                     <button
                       onClick={() => setQuizMode(true)}
                       className="px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all"
-                      style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "white", border: "none" }}
+                      style={{ background: "linear-gradient(135deg, #D97757, #C4653A)", color: "white", border: "none" }}
                     >
                       🧠 Take the Quiz!
                     </button>

@@ -63,7 +63,7 @@ export function prefersReducedMotion(): boolean {
 
 /** Subject palette — pastel tones for claymorphism cards. */
 export const subjectPalette: Record<string, { bg: string; border: string; accent: string; emoji: string; label: string }> = {
-  math:    { bg: "#fef9ee", border: "#fde68a", accent: "#d97706", emoji: "🔢", label: "Math"    },
+  math:    { bg: "#fef9ee", border: "#fde68a", accent: "#D97757", emoji: "🔢", label: "Math"    },
   reading: { bg: "#f0fdf4", border: "#bbf7d0", accent: "#059669", emoji: "📚", label: "Reading" },
   writing: { bg: "#fdf4ff", border: "#e9d5ff", accent: "#7c3aed", emoji: "✏️", label: "Writing" },
   social:  { bg: "#fdf2f8", border: "#fbcfe8", accent: "#db2777", emoji: "💖", label: "Social"  },

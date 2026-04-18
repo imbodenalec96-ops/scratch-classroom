@@ -444,7 +444,7 @@ function StudentModal({
                   width: 40,
                   height: 40,
                   borderRadius: 10,
-                  border: form.avatar === emoji ? "2px solid var(--accent, #d97706)" : "2px solid var(--border, rgba(24,23,26,0.12))",
+                  border: form.avatar === emoji ? "2px solid var(--accent, #D97757)" : "2px solid var(--border, rgba(24,23,26,0.12))",
                   background: form.avatar === emoji ? "var(--accent-light, #fde8c7)" : "var(--bg-surface, #fffaf0)",
                   cursor: "pointer",
                   display: "flex",
