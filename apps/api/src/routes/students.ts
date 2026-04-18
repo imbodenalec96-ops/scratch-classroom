@@ -448,6 +448,124 @@ router.post("/:id/revoke-freetime", requireRole("teacher", "admin"), async (req:
   }
 });
 
+// GET /:id/assignments?scope=all|today|week — gradebook feed for one student.
+// Returns every assignment targeted at this student (directly via student_id,
+// via target_student_ids JSON array, or whole-class when neither is set),
+// LEFT-JOINed with the student's latest submission for that assignment so the
+// frontend can show Graded / AI-only / Needs-review / Pending states in one
+// table. Scope filters by scheduled_date (falls back to due_date if null).
+router.get("/:id/assignments", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const scope = String(req.query.scope || "week");
+  try {
+    // Date window for scope filter (inclusive on both ends, YYYY-MM-DD text).
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay()); // Sunday
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+
+    let rangeClause = "";
+    const rangeArgs: any[] = [];
+    if (scope === "today") {
+      rangeClause = "AND a.scheduled_date = ?";
+      rangeArgs.push(fmt(today));
+    } else if (scope === "week") {
+      rangeClause = "AND a.scheduled_date BETWEEN ? AND ?";
+      rangeArgs.push(fmt(weekStart), fmt(weekEnd));
+    } else {
+      // "all" — no range filter
+    }
+
+    // Classes this student belongs to (so we can find whole-class assignments).
+    const memberRows = await db.prepare(
+      `SELECT class_id FROM class_members WHERE user_id = ?`
+    ).all(id) as any[];
+    const classIds = memberRows.map((r) => r.class_id).filter(Boolean);
+
+    if (classIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Build IN (?, ?, ?) placeholder list compatible with the pg shim.
+    const qMarks = classIds.map(() => "?").join(",");
+    const sql = `
+      SELECT a.id, a.title, a.description, a.due_date, a.scheduled_date,
+             a.target_subject, a.student_id AS target_student_id,
+             a.target_student_ids, a.content,
+             s.id AS submission_id,
+             s.submitted_at, s.grade AS numeric_grade, s.feedback,
+             s.auto_grade_result,
+             s.human_grade_pass, s.human_grade_feedback,
+             s.graded_by, s.graded_at
+        FROM assignments a
+   LEFT JOIN submissions s
+          ON s.assignment_id = a.id AND s.student_id = ?
+       WHERE a.class_id IN (${qMarks})
+         ${rangeClause}
+    ORDER BY COALESCE(a.scheduled_date, substr(a.due_date, 1, 10)) DESC,
+             a.created_at DESC
+    `;
+    const rows = await db.prepare(sql).all(id, ...classIds, ...rangeArgs) as any[];
+
+    // Filter to only assignments the student is actually targeted by.
+    const filtered = rows.filter((r) => {
+      // Directly assigned
+      if (r.target_student_id) return r.target_student_id === id;
+      // Explicit target list
+      if (r.target_student_ids) {
+        try {
+          const arr = JSON.parse(r.target_student_ids);
+          if (Array.isArray(arr) && arr.length > 0) return arr.includes(id);
+        } catch { /* fall through to whole-class */ }
+      }
+      // Neither set → whole-class assignment
+      return true;
+    });
+
+    // Derive a clean status per row so the UI doesn't have to re-derive.
+    const out = filtered.map((r) => {
+      let auto = null as any;
+      if (r.auto_grade_result) {
+        try { auto = JSON.parse(r.auto_grade_result); } catch { auto = null; }
+      }
+      const hasSubmission = !!r.submission_id;
+      const hasHuman = r.human_grade_pass !== null && r.human_grade_pass !== undefined;
+      let status: "graded" | "ai_only" | "needs_review" | "pending";
+      if (hasHuman) status = "graded";
+      else if (hasSubmission && auto) status = "ai_only";
+      else if (hasSubmission) status = "needs_review";
+      else status = "pending";
+      return {
+        assignment_id: r.id,
+        title: r.title,
+        description: r.description,
+        due_date: r.due_date,
+        scheduled_date: r.scheduled_date,
+        subject: r.target_subject,
+        submission_id: r.submission_id,
+        submitted_at: r.submitted_at,
+        numeric_grade: r.numeric_grade,
+        feedback: r.feedback,
+        ai_grade: auto?.score ?? null,
+        human_grade_pass:
+          r.human_grade_pass === null || r.human_grade_pass === undefined
+            ? null
+            : Number(r.human_grade_pass) === 1,
+        human_grade_feedback: r.human_grade_feedback,
+        graded_by: r.graded_by,
+        graded_at: r.graded_at,
+        status,
+      };
+    });
+
+    res.json(out);
+  } catch (e) {
+    console.error("GET /students/:id/assignments failed:", e);
+    res.status(500).json({ error: "Failed to load student assignments" });
+  }
+});
+
 // POST /:id/message — teacher/admin sends a 1:1 message to a single student
 router.post("/:id/message", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;

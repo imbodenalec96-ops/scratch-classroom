@@ -339,7 +339,12 @@ export default function TeacherDashboard() {
                 </div>
                 <div className="space-y-1.5">
                   {students.map(s => (
-                    <div key={s.id} className="list-row group">
+                    <Link
+                      key={s.id}
+                      to={`/teacher/gradebook/${s.id}`}
+                      className="list-row group cursor-pointer hover:bg-white/[0.04] transition-colors"
+                      title="Open gradebook"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
@@ -352,10 +357,10 @@ export default function TeacherDashboard() {
                           <div className={`text-xs ${dk ? "text-white/25" : "text-gray-400"}`}>{s.email}</div>
                         </div>
                       </div>
-                      <Link to="/monitor" className={`text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity ${dk ? "text-violet-400" : "text-violet-600"}`}>
-                        Monitor
-                      </Link>
-                    </div>
+                      <span className={`text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity ${dk ? "text-violet-400" : "text-violet-600"}`}>
+                        Gradebook →
+                      </span>
+                    </Link>
                   ))}
                   {students.length === 0 && (
                     <p className={`text-sm text-center py-7 ${dk ? "text-white/25" : "text-gray-400"}`}>

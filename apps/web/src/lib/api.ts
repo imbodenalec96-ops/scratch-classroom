@@ -109,6 +109,15 @@ export const api = {
   getMySubmissions: () => request<any[]>("/submissions/mine"),
   gradeSubmission: (id: string, grade: number, feedback: string) => request<any>(`/submissions/${id}/grade`, { method: "PUT", body: JSON.stringify({ grade, feedback }) }),
 
+  // Gradebook (per-student)
+  getStudentAssignments: (studentId: string, scope: "today" | "week" | "all" = "week") =>
+    request<any[]>(`/students/${studentId}/assignments?scope=${scope}`),
+  humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string) =>
+    request<{ ok: boolean; submission: any }>(`/assignments/${assignmentId}/grade`, {
+      method: "POST",
+      body: JSON.stringify({ studentId, passed, feedback: feedback ?? null }),
+    }),
+
   // Quizzes
   getQuizzes: (classId: string) => request<any[]>(`/quizzes/class/${classId}`),
   getPendingQuizzes: (classId: string) => request<any[]>(`/quizzes/class/${classId}/pending`),

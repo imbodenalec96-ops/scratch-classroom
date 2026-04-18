@@ -184,4 +184,23 @@ router.put("/:id/grade", requireRole("teacher", "admin"), async (req: AuthReques
   res.json(row);
 });
 
+// ── Human-grade columns (idempotent migration) ──────────────────────
+// Separate from submissions.grade (numeric 0–100 legacy) — these capture
+// the teacher's explicit pass/needs-redo call plus freeform feedback, with
+// who/when so the gradebook can show an audit trail. Kept as nullable so a
+// submission can exist in "auto-graded only" state (human_grade_pass = null).
+export let humanGradeColsReady = false;
+export async function ensureHumanGradeCols() {
+  if (humanGradeColsReady) return;
+  for (const col of [
+    "ALTER TABLE submissions ADD COLUMN human_grade_pass INTEGER",  // 0/1/NULL
+    "ALTER TABLE submissions ADD COLUMN human_grade_feedback TEXT",
+    "ALTER TABLE submissions ADD COLUMN graded_by TEXT",
+    "ALTER TABLE submissions ADD COLUMN graded_at TEXT",
+  ]) {
+    try { await db.exec(col); } catch { /* column already exists */ }
+  }
+  humanGradeColsReady = true;
+}
+
 export default router;

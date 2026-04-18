@@ -3,6 +3,7 @@ import crypto from "crypto";
 import db from "../db.js";
 import { AuthRequest } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
+import { ensureHumanGradeCols } from "./submissions.js";
 
 const router = Router();
 
@@ -921,6 +922,67 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(req.params.id) as any;
   if (row) row.rubric = JSON.parse(row.rubric || "[]");
   res.json(row);
+});
+
+// POST /api/assignments/:id/grade — teacher stamps a human pass/fail grade on
+// a specific student's submission for this assignment. If the student hasn't
+// submitted yet, we create a zero-content submission row so the grade still
+// records (covers pencil-and-paper work the teacher is grading manually).
+// Body: { studentId: string, passed: boolean, feedback?: string }
+router.post("/:id/grade", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureHumanGradeCols();
+  const { studentId, passed, feedback } = req.body || {};
+  if (!studentId || typeof passed !== "boolean") {
+    return res.status(400).json({ error: "studentId (string) and passed (bool) required" });
+  }
+  const graderId = req.user!.id;
+  const now = new Date().toISOString();
+  const passInt = passed ? 1 : 0;
+  const fb = typeof feedback === "string" ? feedback : null;
+  try {
+    // Find the most recent submission by this student for this assignment.
+    const existing = await db.prepare(
+      `SELECT id FROM submissions
+        WHERE assignment_id = ? AND student_id = ?
+        ORDER BY submitted_at DESC
+        LIMIT 1`
+    ).get(req.params.id, studentId) as any;
+
+    if (existing?.id) {
+      await db.prepare(
+        `UPDATE submissions
+            SET human_grade_pass = ?,
+                human_grade_feedback = COALESCE(?, human_grade_feedback),
+                graded_by = ?,
+                graded_at = ?
+          WHERE id = ?`
+      ).run(passInt, fb, graderId, now, existing.id);
+    } else {
+      // No submission exists — create a placeholder row so the grade has a
+      // home. answers stays empty; auto_grade_result stays null.
+      const subId = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO submissions
+           (id, assignment_id, student_id, submitted_at,
+            human_grade_pass, human_grade_feedback, graded_by, graded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(subId, req.params.id, studentId, now, passInt, fb, graderId, now);
+    }
+
+    const row = await db.prepare(
+      `SELECT * FROM submissions
+        WHERE assignment_id = ? AND student_id = ?
+        ORDER BY submitted_at DESC
+        LIMIT 1`
+    ).get(req.params.id, studentId) as any;
+    if (row?.auto_grade_result) {
+      try { row.auto_grade_result = JSON.parse(row.auto_grade_result); } catch { /* noop */ }
+    }
+    res.json({ ok: true, submission: row });
+  } catch (e) {
+    console.error("POST /assignments/:id/grade failed:", e);
+    res.status(500).json({ error: "Failed to save grade" });
+  }
 });
 
 // How many students have already submitted this assignment? Teacher sees this
