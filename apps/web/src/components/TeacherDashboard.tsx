@@ -4,6 +4,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { Link } from "react-router-dom";
 import { getSocket } from "../lib/ws.ts";
+import DailyNewsAdmin from "./DailyNewsAdmin.tsx";
 import {
   Monitor, ClipboardList, HelpCircle, CheckSquare, BarChart3,
   Lock, LockOpen, Megaphone, Eye, Users, Plus, Activity,
@@ -264,6 +265,9 @@ export default function TeacherDashboard() {
         <div className="col-span-2 space-y-4">
           {selectedClass ? (
             <>
+              {/* Daily News source — teacher pastes today's file URL each morning */}
+              <DailyNewsAdmin classId={selectedClass.id} dk={dk} />
+
               {/* Classroom controls — GoGuardian style */}
               <div className="card animate-slide-in" style={{ animationDelay: "120ms" }}>
                 <div className="flex items-center justify-between mb-3">

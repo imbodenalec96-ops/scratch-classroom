@@ -31,6 +31,7 @@ import aiTasksRoutes from "./routes/ai-tasks.js";
 import lessonsRoutes from "./routes/lessons.js";
 import gradesRoutes from "./routes/grades.js";
 import websitesRoutes from "./routes/websites.js";
+import dailyNewsRoutes from "./routes/daily-news.js";
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use("/api/ai-tasks", authMiddleware, aiTasksRoutes);
 app.use("/api/lessons", authMiddleware, lessonsRoutes);
 app.use("/api/grades", authMiddleware, gradesRoutes);
 app.use("/api/websites", authMiddleware, websitesRoutes);
+app.use("/api/classes", authMiddleware, dailyNewsRoutes);
 
 // File upload endpoint
 app.post("/api/upload", authMiddleware, upload.single("file"), (req, res) => {

@@ -132,6 +132,12 @@ export const api = {
     request<any>("/websites/revoke", { method: "POST", body: JSON.stringify({ studentId, websiteId }) }),
   getStudentWebsiteGrants: (studentId: string) =>
     request<any[]>(`/websites/student/${studentId}/grants`),
+
+  // Daily News source (teacher-paste flow)
+  getDailyNews: (classId: string) =>
+    request<any>(`/classes/${classId}/daily-news`),
+  setDailyNews: (classId: string, body: { todays_file_url: string; todays_file_title?: string; drive_folder_url?: string }) =>
+    request<any>(`/classes/${classId}/daily-news`, { method: "POST", body: JSON.stringify(body) }),
   getStudentAssignments: (studentId: string, scope: "today" | "week" | "all" = "week") =>
     request<any[]>(`/students/${studentId}/assignments?scope=${scope}`),
   humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string) =>
