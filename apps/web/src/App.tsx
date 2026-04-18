@@ -28,6 +28,10 @@ import ClassGrades from "./components/ClassGrades.tsx";
 import TeacherGradebook, { GradebookStudentPicker } from "./components/TeacherGradebook.tsx";
 import TeacherWebsites from "./components/TeacherWebsites.tsx";
 import WebsiteViewer from "./components/WebsiteViewer.tsx";
+import {
+  DailyNewsPage, VideoLearningPage, TedTalkPage, DismissalPage, CashoutPage,
+  AssignmentTodayPage,
+} from "./components/BlockPlaceholder.tsx";
 import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
@@ -145,6 +149,14 @@ export default function App() {
             <Route path="teacher/gradebook" element={<GradebookStudentPicker />} />
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
             <Route path="teacher/websites" element={<TeacherWebsites />} />
+
+            {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
+            <Route path="daily-news" element={<DailyNewsPage />} />
+            <Route path="video-learning" element={<VideoLearningPage />} />
+            <Route path="ted-talk" element={<TedTalkPage />} />
+            <Route path="dismissal" element={<DismissalPage />} />
+            <Route path="cashout" element={<CashoutPage />} />
+            <Route path="assignment/today/:subject" element={<AssignmentTodayPage />} />
           </Route>
 
           {/* Full-screen embedded website viewer (no sidebar) */}

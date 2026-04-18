@@ -9,6 +9,8 @@ import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
+import { useBlockAutoNav } from "../lib/useBlockAutoNav.ts";
+import { api } from "../lib/api.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
 import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
@@ -108,6 +110,19 @@ export default function Layout() {
   useScreenshotCapture(isStudent);
   // Break system: start the work timer the first time a student loads the app
   useEffect(() => { if (isStudent) markWorkStart(); }, [isStudent]);
+
+  // Schedule auto-nav: at block boundaries, push students to the right page
+  // unless the teacher has recently NAVIGATEd them elsewhere (5-min grace).
+  const [studentClassId, setStudentClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isStudent) { setStudentClassId(null); return; }
+    let cancelled = false;
+    api.getClasses()
+      .then((cs: any[]) => { if (!cancelled) setStudentClassId((cs || [])[0]?.id ?? null); })
+      .catch(() => { if (!cancelled) setStudentClassId(null); });
+    return () => { cancelled = true; };
+  }, [isStudent, user?.id]);
+  useBlockAutoNav(isStudent, studentClassId);
 
   if (!user) return null;
   const navItems = getNavItems(user.role, accessAllowed);

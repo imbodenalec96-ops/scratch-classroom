@@ -1,4 +1,6 @@
-import React, { useSyncExternalStore } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
+import { useBlockAutoNav } from "../lib/useBlockAutoNav.ts";
+import { api } from "../lib/api.ts";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { Layers, Gamepad2, Code2, LogIn } from "lucide-react";
@@ -75,6 +77,19 @@ export default function PublicLayout() {
   );
   // Rich activity labels for authenticated users
   usePresencePing(user ? activityFromPath(loc.pathname) : "");
+
+  // Schedule auto-nav — pulls students back to class at block boundaries even
+  // when they're on public routes like /arcade.
+  const [studentClassId, setStudentClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isStudent) { setStudentClassId(null); return; }
+    let cancelled = false;
+    api.getClasses()
+      .then((cs: any[]) => { if (!cancelled) setStudentClassId((cs || [])[0]?.id ?? null); })
+      .catch(() => { if (!cancelled) setStudentClassId(null); });
+    return () => { cancelled = true; };
+  }, [isStudent, user?.id]);
+  useBlockAutoNav(isStudent, studentClassId);
   // Screenshot thumbnails for teacher monitor (students on public routes too)
   useScreenshotCapture(isStudent);
 

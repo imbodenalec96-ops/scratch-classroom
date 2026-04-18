@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api.ts";
+import { markTeacherNav } from "./useBlockAutoNav.ts";
 
 const LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -115,9 +116,10 @@ export function useClassCommands(enabled = true): ClassroomState & { dismissMess
           }
           switch (cmd.type) {
             case "NAVIGATE":
-              if (cmd.payload) navigate(cmd.payload);
+              if (cmd.payload) { markTeacherNav(); navigate(cmd.payload); }
               break;
             case "KICK":
+              markTeacherNav();
               navigate(cmd.payload || "/student");
               break;
             case "MESSAGE":
