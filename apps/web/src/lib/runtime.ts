@@ -482,25 +482,333 @@ function resolveValue(raw: any): any {
   return raw;
 }
 
+/* ── Expression evaluator for block input slots ──────────────────────
+   Lets users write expressions like "mouse x > 100 and key space pressed"
+   in any input slot, so operator/sensing primitives effectively plug into
+   flow-control conditions (if/ifelse/while/repeat-until/wait-until) and
+   any numeric or string slot, without needing a reporter drag-drop UI.
+
+   Supports:
+   - number / quoted-string / true / false literals
+   - variable names (sprite scope, then global scope)
+   - legacy `$var` / `$$globalVar` refs (handled upstream in resolveValue)
+   - sensing reporters: mouse x, mouse y, mouse down, mouse-down?,
+     key <K> pressed, touching <X>, x position, y position, direction,
+     size, timer, answer, loudness, username
+   - comparison: > < >= <= = == !=
+   - logic: and / or / not
+   - arithmetic: + - * / % (and unary -)
+   - call-form functions: random(a,b), round(x), abs, floor, ceil, min,
+     max, sqrt, sin, cos, mod(a,b), length(s), contains(s,t), join(a,b),
+     not(x), and(a,b), or(a,b)
+
+   Returns native JS values (number | string | boolean). Falls back to the
+   raw string if parsing fails, so legacy literal-string inputs keep working.
+*/
+type ExprTok = { t: string; v?: any };
+
+function exprTokenize(s: string): ExprTok[] {
+  const out: ExprTok[] = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === " " || c === "\t" || c === "\n" || c === "\r") { i++; continue; }
+    const prev = out[out.length - 1];
+    const prevIsOperand = prev && (prev.t === "num" || prev.t === "str" || prev.t === "id" || prev.t === "rp");
+    // number (with optional leading - when not following an operand)
+    if ((c >= "0" && c <= "9") || (c === "." && /[0-9]/.test(s[i + 1] || "")) ||
+        (c === "-" && !prevIsOperand && /[0-9.]/.test(s[i + 1] || ""))) {
+      let j = i; if (c === "-") j++;
+      while (j < s.length && /[0-9.]/.test(s[j])) j++;
+      out.push({ t: "num", v: Number(s.slice(i, j)) });
+      i = j; continue;
+    }
+    // quoted string
+    if (c === '"' || c === "'") {
+      const q = c; let j = i + 1;
+      while (j < s.length && s[j] !== q) j++;
+      out.push({ t: "str", v: s.slice(i + 1, j) });
+      i = Math.min(j + 1, s.length); continue;
+    }
+    // two-char operators
+    const two = s.slice(i, i + 2);
+    if (two === ">=" || two === "<=" || two === "!=" || two === "==") {
+      out.push({ t: "op", v: two }); i += 2; continue;
+    }
+    // single-char operators / parens / comma
+    if ("+-*/%<>=".includes(c)) { out.push({ t: "op", v: c }); i++; continue; }
+    if (c === "(") { out.push({ t: "lp" }); i++; continue; }
+    if (c === ")") { out.push({ t: "rp" }); i++; continue; }
+    if (c === ",") { out.push({ t: "comma" }); i++; continue; }
+    // identifier (allow -, _, $, digits after first; allow trailing ?)
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i;
+      while (j < s.length && /[A-Za-z0-9_$\-]/.test(s[j])) j++;
+      if (j < s.length && s[j] === "?") j++;
+      out.push({ t: "id", v: s.slice(i, j) });
+      i = j; continue;
+    }
+    // unknown — skip
+    i++;
+  }
+  return out;
+}
+
+function toBoolVal(v: any): boolean {
+  if (v === true) return true;
+  if (v === false || v === 0 || v === "" || v == null) return false;
+  if (typeof v === "string") { const low = v.toLowerCase(); return !(low === "false" || low === "0"); }
+  return !!v;
+}
+
+class ExprParser {
+  toks: ExprTok[]; pos = 0; state: SpriteState; engine: RuntimeEngine;
+  constructor(toks: ExprTok[], state: SpriteState, engine: RuntimeEngine) {
+    this.toks = toks; this.state = state; this.engine = engine;
+  }
+  peek(o = 0) { return this.toks[this.pos + o]; }
+  eat() { return this.toks[this.pos++]; }
+
+  parse(): any { return this.orExpr(); }
+
+  orExpr(): any {
+    let a = this.andExpr();
+    while (this.peek() && this.peek()!.t === "id" && String(this.peek()!.v).toLowerCase() === "or") {
+      this.eat(); a = toBoolVal(a) || toBoolVal(this.andExpr());
+    }
+    return a;
+  }
+  andExpr(): any {
+    let a = this.notExpr();
+    while (this.peek() && this.peek()!.t === "id" && String(this.peek()!.v).toLowerCase() === "and") {
+      this.eat(); a = toBoolVal(a) && toBoolVal(this.notExpr());
+    }
+    return a;
+  }
+  notExpr(): any {
+    if (this.peek() && this.peek()!.t === "id" && String(this.peek()!.v).toLowerCase() === "not") {
+      this.eat(); return !toBoolVal(this.notExpr());
+    }
+    return this.cmpExpr();
+  }
+  cmpExpr(): any {
+    let a = this.addExpr();
+    while (this.peek() && this.peek()!.t === "op" && [">", "<", "=", "==", "!=", ">=", "<="].includes(this.peek()!.v)) {
+      const op = this.eat()!.v; const b = this.addExpr();
+      switch (op) {
+        case ">": a = Number(a) > Number(b); break;
+        case "<": a = Number(a) < Number(b); break;
+        case ">=": a = Number(a) >= Number(b); break;
+        case "<=": a = Number(a) <= Number(b); break;
+        case "=": case "==": a = (String(a) === String(b)) || (Number(a) === Number(b) && !isNaN(Number(a)) && !isNaN(Number(b))); break;
+        case "!=": a = !((String(a) === String(b)) || (Number(a) === Number(b) && !isNaN(Number(a)) && !isNaN(Number(b)))); break;
+      }
+    }
+    return a;
+  }
+  addExpr(): any {
+    let a = this.mulExpr();
+    while (this.peek() && this.peek()!.t === "op" && (this.peek()!.v === "+" || this.peek()!.v === "-")) {
+      const op = this.eat()!.v; const b = this.mulExpr();
+      if (op === "+") a = (typeof a === "string" || typeof b === "string") ? String(a) + String(b) : Number(a) + Number(b);
+      else a = Number(a) - Number(b);
+    }
+    return a;
+  }
+  mulExpr(): any {
+    let a = this.unary();
+    while (this.peek() && this.peek()!.t === "op" && (this.peek()!.v === "*" || this.peek()!.v === "/" || this.peek()!.v === "%")) {
+      const op = this.eat()!.v; const b = this.unary();
+      if (op === "*") a = Number(a) * Number(b);
+      else if (op === "/") a = Number(b) !== 0 ? Number(a) / Number(b) : 0;
+      else a = Number(b) !== 0 ? Number(a) % Number(b) : 0;
+    }
+    return a;
+  }
+  unary(): any {
+    if (this.peek() && this.peek()!.t === "op" && this.peek()!.v === "-") { this.eat(); return -Number(this.unary()); }
+    return this.primary();
+  }
+  primary(): any {
+    const t = this.peek();
+    if (!t) return 0;
+    if (t.t === "num") { this.eat(); return t.v; }
+    if (t.t === "str") { this.eat(); return t.v; }
+    if (t.t === "lp") {
+      this.eat(); const v = this.orExpr();
+      if (this.peek() && this.peek()!.t === "rp") this.eat();
+      return v;
+    }
+    if (t.t === "id") return this.identPhrase();
+    this.eat(); return 0;
+  }
+
+  // Recognize multi-word reporter phrases + function calls + variable refs
+  identPhrase(): any {
+    const id = String(this.eat()!.v);
+    const low = id.toLowerCase();
+    const state = this.state, engine = this.engine;
+
+    // Function-call form: name(args)
+    if (this.peek() && this.peek()!.t === "lp") {
+      const args: any[] = [];
+      this.eat(); // (
+      if (!(this.peek() && this.peek()!.t === "rp")) {
+        args.push(this.orExpr());
+        while (this.peek() && this.peek()!.t === "comma") { this.eat(); args.push(this.orExpr()); }
+      }
+      if (this.peek() && this.peek()!.t === "rp") this.eat();
+      return this.callFn(low, args);
+    }
+
+    if (low === "true") return true;
+    if (low === "false") return false;
+
+    // "mouse x" / "mouse y" / "mouse down" / "mouse-down?" / "mousedown"
+    if (low === "mousedown" || low === "mouse-down" || low === "mouse-down?") return engine.mouseDown;
+    if (low === "mousex" || low === "mouse_x") return engine.mouseX;
+    if (low === "mousey" || low === "mouse_y") return engine.mouseY;
+    if (low === "mouse") {
+      const nx = this.peek();
+      if (nx && nx.t === "id") {
+        const nv = String(nx.v).toLowerCase();
+        if (nv === "x") { this.eat(); return engine.mouseX; }
+        if (nv === "y") { this.eat(); return engine.mouseY; }
+        if (nv === "down" || nv === "down?") { this.eat(); return engine.mouseDown; }
+      }
+      return 0;
+    }
+
+    // "x position" / "y position"
+    if ((low === "x" || low === "y") && this.peek() && this.peek()!.t === "id" && String(this.peek()!.v).toLowerCase() === "position") {
+      this.eat(); return low === "x" ? state.x : state.y;
+    }
+    if (low === "direction") return state.rotation;
+    if (low === "size") return state.scale * 100;
+
+    // "key <K> pressed" / "key <K> pressed?"
+    if (low === "key") {
+      const keyTok = this.peek();
+      if (keyTok && (keyTok.t === "id" || keyTok.t === "str" || keyTok.t === "num")) {
+        const keyName = String(keyTok.v).toLowerCase();
+        this.eat();
+        const nx = this.peek();
+        if (nx && nx.t === "id" && /^pressed\??$/i.test(String(nx.v))) this.eat();
+        return engine.keysPressed.has(keyName) || (keyName === "space" && engine.keysPressed.has(" "));
+      }
+      return false;
+    }
+
+    // "touching <X>" / "touching <X>?"
+    if (low === "touching" || low === "touching?") {
+      const target = this.peek();
+      if (target && (target.t === "id" || target.t === "str")) {
+        const name = String(target.v).toLowerCase();
+        this.eat();
+        if (name === "edge") {
+          const hw = engine.stageWidth / 2, hh = engine.stageHeight / 2, pad = 20 * state.scale;
+          return state.x > hw - pad || state.x < -hw + pad || state.y > hh - pad || state.y < -hh + pad;
+        }
+        if (name === "mouse") return Math.abs(engine.mouseX - state.x) < 20 * state.scale && Math.abs(engine.mouseY - state.y) < 20 * state.scale;
+        // fallback to last-seen sensing_touching result
+        return !!state.variables["__sensing_touching"];
+      }
+      return !!state.variables["__sensing_touching"];
+    }
+
+    if (low === "timer") return engine.timer;
+    if (low === "answer") return engine.answer;
+    if (low === "loudness") return 0;
+    if (low === "username") return String(state.variables["username"] ?? "");
+
+    // Last operator/sensing result written to shared slots
+    if (low === "__op") return state.variables["__op"];
+    if (low === "__sensing_key") return !!state.variables["__sensing_key"];
+    if (low === "__sensing_touching") return !!state.variables["__sensing_touching"];
+    if (low === "__sensing_mousedown") return !!state.variables["__sensing_mousedown"];
+
+    // Variable refs (sprite scope first, then global)
+    if (id in state.variables) return state.variables[id];
+    if (low in state.variables) return state.variables[low];
+    if (id in engine.globalVariables) return engine.globalVariables[id];
+    if (low in engine.globalVariables) return engine.globalVariables[low];
+
+    // Unknown identifier — return as string so typed labels still render
+    return id;
+  }
+
+  callFn(name: string, args: any[]): any {
+    const n = (i: number, d = 0) => Number(args[i] ?? d);
+    const s = (i: number, d = "") => String(args[i] ?? d);
+    switch (name) {
+      case "random": case "pickrandom": case "pick_random": {
+        const a = n(0, 0), b = n(1, 10);
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+      }
+      case "round": return Math.round(n(0));
+      case "abs": return Math.abs(n(0));
+      case "floor": return Math.floor(n(0));
+      case "ceil": return Math.ceil(n(0));
+      case "min": return Math.min(n(0), n(1));
+      case "max": return Math.max(n(0), n(1));
+      case "sqrt": return Math.sqrt(n(0));
+      case "sin": return Math.sin(n(0));
+      case "cos": return Math.cos(n(0));
+      case "mod": { const b = n(1, 1); return b !== 0 ? n(0) % b : 0; }
+      case "length": return s(0).length;
+      case "contains": return s(0).toLowerCase().includes(s(1).toLowerCase());
+      case "join": return s(0) + s(1);
+      case "not": return !toBoolVal(args[0]);
+      case "and": return toBoolVal(args[0]) && toBoolVal(args[1]);
+      case "or": return toBoolVal(args[0]) || toBoolVal(args[1]);
+    }
+    return 0;
+  }
+}
+
+function evalExpr(raw: any): any {
+  if (raw === null || raw === undefined) return undefined;
+  if (typeof raw === "boolean" || typeof raw === "number") return raw;
+  const str = String(raw);
+  if (!str) return str;
+  // Pure numeric literal — fast path
+  if (/^-?\d+(\.\d+)?$/.test(str.trim())) return Number(str);
+  // Legacy $var / $$globalVar refs
+  if (str.startsWith("$")) return resolveValue(str);
+  if (!_resolveState || !_resolveEngine) return resolveValue(str);
+  try {
+    const toks = exprTokenize(str);
+    if (toks.length === 0) return str;
+    const parser = new ExprParser(toks, _resolveState, _resolveEngine);
+    const result = parser.parse();
+    return result === undefined ? str : result;
+  } catch {
+    return str;
+  }
+}
+
 /* ── Get block input value ── */
 function getVal(block: Block, key: string, fallback: any = 0): any {
   const raw = block.inputs[key]?.value ?? fallback;
-  return resolveValue(raw);
+  return evalExpr(raw);
 }
 function getNum(block: Block, key: string, fallback: number = 0): number {
   const raw = block.inputs[key]?.value ?? fallback;
-  return Number(resolveValue(raw));
+  const v = evalExpr(raw);
+  if (typeof v === "boolean") return v ? 1 : 0;
+  const n = Number(v);
+  return isNaN(n) ? Number(fallback) || 0 : n;
 }
 function getStr(block: Block, key: string, fallback: string = ""): string {
   const raw = block.inputs[key]?.value ?? fallback;
-  return String(resolveValue(raw));
+  const v = evalExpr(raw);
+  return v === undefined || v === null ? String(fallback) : String(v);
 }
 function getBool(block: Block, key: string, fallback: boolean = false): boolean {
-  const raw = block.inputs[key]?.value ?? fallback;
-  const v = resolveValue(raw);
-  if (typeof v === "boolean") return v;
-  if (typeof v === "string") return v !== "false" && v !== "0" && v !== "";
-  return Boolean(v);
+  const raw = block.inputs[key]?.value;
+  if (raw === undefined || raw === null || raw === "") return fallback;
+  return toBoolVal(evalExpr(raw));
 }
 
 /* ── Unity bridge: send a command to the Unity WebGL stage ── */
@@ -555,6 +863,15 @@ function evalCondition(block: Block, state: SpriteState, engine: RuntimeEngine):
   // Numeric truthy
   const num = Number(raw);
   if (!isNaN(num)) return num !== 0;
+
+  // Fall through to the general expression evaluator so users can type
+  // richer conditions like "mouse x > 100 and key space pressed" directly
+  // into the CONDITION input of if / if-else / while / repeat-until / wait-until.
+  try {
+    setResolveCtx(state, engine);
+    const evaluated = evalExpr(raw);
+    return toBoolVal(evaluated);
+  } catch { /* fall through */ }
 
   return !!raw;
 }
