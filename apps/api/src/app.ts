@@ -76,8 +76,8 @@ app.get("/api/board/class/:nameOrId", async (req: express.Request, res: express.
       "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
     ).all(cls.id);
     res.json({ id: cls.id, name: cls.name, schedule });
-  } catch {
-    res.status(500).json({ error: "Failed to load board data" });
+  } catch (e: any) {
+    res.status(500).json({ error: "Failed to load board data", detail: String(e?.message || e) });
   }
 });
 
