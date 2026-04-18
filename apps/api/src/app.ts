@@ -13,7 +13,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
 import classRoutes from "./routes/classes.js";
 import projectRoutes from "./routes/projects.js";
-import assignmentRoutes from "./routes/assignments.js";
+import assignmentRoutes, { servePdfAttachment } from "./routes/assignments.js";
 import submissionRoutes from "./routes/submissions.js";
 import quizRoutes from "./routes/quizzes.js";
 import analyticsRoutes from "./routes/analytics.js";
@@ -68,6 +68,9 @@ app.use("/api/auth", authRoutes);
 // Protected routes
 app.use("/api/classes", authMiddleware, classRoutes);
 app.use("/api/projects", authMiddleware, projectRoutes);
+// Public PDF-serving route (iframes can't send auth headers). Assignment
+// IDs are UUIDs, so this endpoint is not practically enumerable.
+app.get("/api/assignments/:id/pdf", (req, res) => servePdfAttachment(req.params.id, res));
 app.use("/api/assignments", authMiddleware, assignmentRoutes);
 app.use("/api/submissions", authMiddleware, submissionRoutes);
 app.use("/api/quizzes", authMiddleware, quizRoutes);

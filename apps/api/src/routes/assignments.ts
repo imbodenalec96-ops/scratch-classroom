@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import crypto from "crypto";
+import multer from "multer";
 import db from "../db.js";
 import { AuthRequest } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
@@ -34,9 +35,25 @@ async function ensureGradeCols() {
       // JSON-encoded array of user_ids; NULL => broadcast per legacy rules,
       // populated => only those student_ids see this assignment.
       "ALTER TABLE assignments ADD COLUMN target_student_ids TEXT",
+      // Provenance for imported / uploaded content
+      "ALTER TABLE assignments ADD COLUMN source TEXT",
+      "ALTER TABLE assignments ADD COLUMN source_url TEXT",
+      "ALTER TABLE assignments ADD COLUMN attached_pdf_path TEXT",
     ]) {
       try { await db.exec(col); } catch { /* column already exists */ }
     }
+    // Storage for imported/uploaded PDFs (base64 in TEXT — works on both
+    // Neon pg and the sqlite compat shim, survives Vercel's read-only FS)
+    try {
+      await db.exec(`CREATE TABLE IF NOT EXISTS assignment_files (
+        id TEXT PRIMARY KEY,
+        assignment_id TEXT NOT NULL,
+        filename TEXT,
+        content_type TEXT,
+        data_base64 TEXT NOT NULL,
+        created_at TEXT
+      )`);
+    } catch {}
     gradeColsReady = true;
   })();
   try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
@@ -1135,6 +1152,265 @@ router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, 
     console.error('delete assignment error:', e);
     res.status(500).json({ error: 'Delete failed', detail: e?.message });
   }
+});
+
+// ── TPT free-URL import + PDF upload ─────────────────────────────────────────
+// Scope: free resources only. Paid pages are refused at parse time.
+
+const pdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB cap
+});
+
+function slugify(s: string): string {
+  return (s || "untitled")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "untitled";
+}
+
+async function saveAttachedPdf(assignmentId: string, filename: string, buf: Buffer): Promise<string> {
+  const fileId = crypto.randomUUID();
+  const b64 = buf.toString("base64");
+  await db.prepare(
+    `INSERT INTO assignment_files (id, assignment_id, filename, content_type, data_base64, created_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`
+  ).run(fileId, assignmentId, filename, "application/pdf", b64);
+  return `/api/assignments/${assignmentId}/pdf`;
+}
+
+// (PDF-serving handler is registered directly on the app in app.ts so it
+// can run without the Authorization-header requirement — iframes can't send
+// headers. Assignment IDs are UUIDs, so they aren't practically enumerable.)
+
+export async function servePdfAttachment(assignmentId: string, res: Response) {
+  await ensureGradeCols();
+  const row = await db.prepare(
+    `SELECT f.* FROM assignment_files f WHERE f.assignment_id = ? ORDER BY f.created_at DESC LIMIT 1`
+  ).get(assignmentId) as any;
+  if (!row) return res.status(404).json({ error: "No PDF attached" });
+  const buf = Buffer.from(row.data_base64, "base64");
+  res.setHeader("Content-Type", row.content_type || "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${row.filename || "assignment.pdf"}"`);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.send(buf);
+}
+
+// Parse a TPT product page. Returns title, description, gradeMin/Max, previewPdfUrl.
+// TPT pages embed JSON-LD Product schema; we read that first, fall back to meta tags.
+function parseTptPage(html: string): {
+  title: string;
+  description: string;
+  gradeMin?: number;
+  gradeMax?: number;
+  previewPdfUrl?: string;
+  priceDetected?: string | null;
+} {
+  const pick = (re: RegExp) => {
+    const m = html.match(re);
+    return m ? m[1].trim() : "";
+  };
+
+  // JSON-LD blocks
+  const ldBlocks = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
+    .map(m => {
+      try { return JSON.parse(m[1].trim()); } catch { return null; }
+    })
+    .filter(Boolean);
+
+  let ldTitle = "", ldDesc = "", ldPrice: string | null = null;
+  let gradeMin: number | undefined, gradeMax: number | undefined;
+  for (const raw of ldBlocks) {
+    const arr = Array.isArray(raw) ? raw : [raw];
+    for (const node of arr) {
+      if (node?.["@type"] === "Product" || node?.["@type"] === "CreativeWork") {
+        if (node.name && !ldTitle) ldTitle = String(node.name);
+        if (node.description && !ldDesc) ldDesc = String(node.description);
+        const offers = node.offers;
+        if (offers) {
+          const price = Array.isArray(offers) ? offers[0]?.price : offers.price;
+          if (price != null && Number(price) > 0) ldPrice = String(price);
+        }
+        if (node.typicalAgeRange) {
+          const m = String(node.typicalAgeRange).match(/(\d+)[^\d]+(\d+)/);
+          if (m) { gradeMin = Math.max(0, Number(m[1]) - 5); gradeMax = Math.max(0, Number(m[2]) - 5); }
+        }
+      }
+    }
+  }
+
+  const title = ldTitle || pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || pick(/<title>([^<]+)<\/title>/i);
+  const description = ldDesc || pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) || pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
+
+  // Grade inference from body text if not in structured data
+  if (gradeMin == null) {
+    const gradeMatch = html.match(/\b(?:Grade|Grades)[^\w]{1,3}(K|\d)(?:\s*-\s*(\d))?/i);
+    if (gradeMatch) {
+      const g1 = gradeMatch[1].toUpperCase() === "K" ? 0 : Number(gradeMatch[1]);
+      const g2 = gradeMatch[2] ? Number(gradeMatch[2]) : g1;
+      gradeMin = g1; gradeMax = g2;
+    }
+  }
+
+  // Preview PDF — TPT hosts previews on ecdn.teacherspayteachers.com. Look
+  // for PDF URLs in og:image fallbacks, data attributes, or script data.
+  const pdfMatch = html.match(/(https?:\/\/[^\s"'<>]+?\.pdf(?:\?[^\s"'<>]*)?)/i);
+  const previewPdfUrl = pdfMatch ? pdfMatch[1] : undefined;
+
+  // Price signal: look for TPT price badge or ld+json offer price
+  let priceDetected: string | null = ldPrice;
+  if (!priceDetected) {
+    const pm = html.match(/\$(\d+(?:\.\d{2})?)/);
+    if (pm && Number(pm[1]) > 0) priceDetected = pm[1];
+  }
+
+  return { title, description, gradeMin, gradeMax, previewPdfUrl, priceDetected };
+}
+
+router.post("/import-tpt", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  const { url, classId } = req.body || {};
+  if (!url || typeof url !== "string") return res.status(400).json({ error: "Missing url" });
+  if (!/^https?:\/\/(www\.)?teacherspayteachers\.com\//i.test(url)) {
+    return res.status(400).json({ error: "Only teacherspayteachers.com URLs are accepted" });
+  }
+
+  let html: string;
+  try {
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+      },
+      redirect: "follow",
+    });
+    if (r.status === 403 || r.status === 503) {
+      return res.status(502).json({ error: "TPT is blocking our fetch — download the PDF yourself and use Upload PDF instead." });
+    }
+    if (!r.ok) return res.status(502).json({ error: `TPT fetch failed (${r.status})` });
+    html = await r.text();
+  } catch (e: any) {
+    return res.status(502).json({ error: "TPT fetch failed", detail: e?.message });
+  }
+
+  const meta = parseTptPage(html);
+  if (meta.priceDetected) {
+    return res.status(402).json({
+      error: `This is paid content ($${meta.priceDetected}). Purchase it on TPT, download the PDF, then use Upload PDF here.`,
+      title: meta.title,
+      price: meta.priceDetected,
+    });
+  }
+  if (!meta.title) {
+    return res.status(422).json({ error: "Could not parse title from page — not a TPT product page?" });
+  }
+
+  // Create the draft assignment first so we have an id for the PDF record
+  const id = crypto.randomUUID();
+  const tMin = meta.gradeMin ?? null;
+  const tMax = meta.gradeMax ?? meta.gradeMin ?? null;
+  await db.prepare(
+    `INSERT INTO assignments (
+       id, class_id, teacher_id, title, description, due_date, rubric,
+       starter_project_id, content, scheduled_date,
+       target_grade_min, target_grade_max, target_subject,
+       source, source_url
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, classId || null, req.user!.id, meta.title, meta.description || "", null,
+    JSON.stringify([]), null, null, null,
+    tMin, tMax, null,
+    "tpt", url,
+  );
+
+  // Try to download preview PDF. If it fails or is absent, we still return
+  // the draft — the teacher can upload the PDF manually after purchase.
+  let pdfWarning: string | null = null;
+  let attached_pdf_path: string | null = null;
+  if (meta.previewPdfUrl) {
+    try {
+      const pr = await fetch(meta.previewPdfUrl, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        redirect: "follow",
+      });
+      if (pr.ok) {
+        const ab = await pr.arrayBuffer();
+        const buf = Buffer.from(ab);
+        // Magic bytes: %PDF (0x25504446)
+        if (buf.slice(0, 4).toString("ascii") !== "%PDF") {
+          pdfWarning = "preview file is not a PDF (magic-byte check failed)";
+        } else {
+          attached_pdf_path = await saveAttachedPdf(id, `${slugify(meta.title)}-${id}.pdf`, buf);
+          await db.prepare("UPDATE assignments SET attached_pdf_path = ? WHERE id = ?").run(attached_pdf_path, id);
+        }
+      } else {
+        pdfWarning = `preview PDF fetch failed (${pr.status})`;
+      }
+    } catch (e: any) {
+      pdfWarning = "preview PDF fetch errored: " + (e?.message || "unknown");
+    }
+  } else {
+    pdfWarning = "no preview PDF link found on the page";
+  }
+
+  return res.json({
+    id,
+    title: meta.title,
+    description: meta.description,
+    target_grade_min: tMin,
+    target_grade_max: tMax,
+    source: "tpt",
+    source_url: url,
+    attached_pdf_path,
+    pdfWarning,
+  });
+});
+
+router.post("/upload-pdf", requireRole("teacher", "admin"), pdfUpload.single("file"), async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  const buf = req.file.buffer;
+  // Content-type check
+  if (req.file.mimetype !== "application/pdf") {
+    return res.status(400).json({ error: "Only PDF files accepted (content-type mismatch)" });
+  }
+  // Magic-bytes check (%PDF)
+  if (buf.length < 4 || buf.slice(0, 4).toString("ascii") !== "%PDF") {
+    return res.status(400).json({ error: "Not a valid PDF (magic-byte check failed)" });
+  }
+
+  const { classId, title, description, targetGradeMin, targetGradeMax, targetSubject } = req.body || {};
+  const id = crypto.randomUUID();
+  const finalTitle = (title && String(title).trim()) || req.file.originalname.replace(/\.pdf$/i, "") || "Uploaded assignment";
+  const tMin = targetGradeMin != null && targetGradeMin !== "" ? Number(targetGradeMin) : null;
+  const tMax = targetGradeMax != null && targetGradeMax !== "" ? Number(targetGradeMax) : tMin;
+
+  await db.prepare(
+    `INSERT INTO assignments (
+       id, class_id, teacher_id, title, description, due_date, rubric,
+       starter_project_id, content, scheduled_date,
+       target_grade_min, target_grade_max, target_subject,
+       source
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, classId || null, req.user!.id, finalTitle, description || "", null,
+    JSON.stringify([]), null, null, null,
+    tMin, tMax, targetSubject || null,
+    "manual",
+  );
+
+  const attached_pdf_path = await saveAttachedPdf(id, req.file.originalname || `${slugify(finalTitle)}-${id}.pdf`, buf);
+  await db.prepare("UPDATE assignments SET attached_pdf_path = ? WHERE id = ?").run(attached_pdf_path, id);
+
+  return res.json({
+    id,
+    title: finalTitle,
+    source: "manual",
+    attached_pdf_path,
+    bytes: buf.length,
+  });
 });
 
 export default router;

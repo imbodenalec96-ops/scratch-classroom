@@ -213,6 +213,40 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     );
   }
 
+  // PDF-only assignment (TPT import / manual upload) — no questions, just the doc
+  if (assignment && assignment.attached_pdf_path && (!parsed || allQuestions.length === 0)) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div>
+          <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${dk ? "text-violet-400" : "text-violet-600"}`}>
+            📅 {todayName}'s Assignment
+          </div>
+          <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>{assignment.title}</h1>
+          {assignment.description && (
+            <p className={`text-sm mt-1 ${dk ? "text-white/60" : "text-gray-600"}`}>{assignment.description}</p>
+          )}
+          {assignment.source && (
+            <span className="inline-block mt-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{ background: "rgba(99,102,241,0.15)", color: "var(--accent)" }}>
+              📄 PDF · {assignment.source === "tpt" ? "from TPT" : "uploaded"}
+            </span>
+          )}
+        </div>
+        <div className="card p-2" style={{ borderLeft: "3px solid var(--accent)" }}>
+          <iframe
+            src={assignment.attached_pdf_path}
+            title={assignment.title}
+            style={{ width: "100%", height: "75vh", border: "none", borderRadius: 8, background: dk ? "#0a0a0f" : "#fff" }}
+          />
+          <a href={assignment.attached_pdf_path} target="_blank" rel="noreferrer"
+            className="text-xs mt-2 inline-block underline" style={{ color: "var(--accent)" }}>
+            Open PDF in new tab
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (!assignment || !parsed || allQuestions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
@@ -237,9 +271,30 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         </div>
         <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>{assignment.title}</h1>
         <div className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-          {parsed.subject} · {parsed.grade}
+          {parsed?.subject ?? assignment.target_subject ?? ""} {parsed?.grade ? `· ${parsed.grade}` : ""}
+          {assignment.source && (
+            <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{ background: "rgba(99,102,241,0.15)", color: "var(--accent)" }}>
+              📄 PDF · {assignment.source === "tpt" ? "from TPT" : "uploaded"}
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Attached PDF (TPT import or manual upload) */}
+      {assignment.attached_pdf_path && (
+        <div className="card p-2" style={{ borderLeft: "3px solid var(--accent)" }}>
+          <iframe
+            src={assignment.attached_pdf_path}
+            title={assignment.title}
+            style={{ width: "100%", height: "60vh", border: "none", borderRadius: 8, background: dk ? "#0a0a0f" : "#fff" }}
+          />
+          <a href={assignment.attached_pdf_path} target="_blank" rel="noreferrer"
+            className="text-xs mt-2 inline-block underline" style={{ color: "var(--accent)" }}>
+            Open PDF in new tab
+          </a>
+        </div>
+      )}
 
       {/* Progress bar */}
       <div>
@@ -385,6 +440,7 @@ export default function AssignmentBuilder() {
   const [classes, setClasses] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -769,6 +825,9 @@ export default function AssignmentBuilder() {
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setShowFullWeek(v => !v)} className="btn-secondary gap-1.5 text-xs">
               📅 Generate Full Week
+            </button>
+            <button onClick={() => setShowImport(true)} className="btn-secondary gap-1.5 text-xs">
+              📄 Import (TPT / PDF)
             </button>
             <button onClick={() => { setShowForm(!showForm); setGenerated(null); setGenError(""); }} className="btn-primary gap-2">
               {showForm ? <X size={14}/> : <Plus size={14}/>}
@@ -1493,7 +1552,148 @@ export default function AssignmentBuilder() {
           onSaved={() => { setEditingAssignment(null); loadAssignments(classId); }}
         />
       )}
+      {showImport && (
+        <ImportModal
+          dk={dk}
+          classId={classId}
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); loadAssignments(classId); }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Import Modal (TPT URL or PDF upload) ──────────────────────── */
+function ImportModal({ dk, classId, onClose, onImported }: {
+  dk: boolean; classId: string; onClose: () => void; onImported: () => void;
+}) {
+  const [tab, setTab] = useState<"tpt" | "upload">("tpt");
+  const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [gradeMin, setGradeMin] = useState<string>("");
+  const [gradeMax, setGradeMax] = useState<string>("");
+  const [subject, setSubject] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [result, setResult] = useState<any>(null);
+
+  const token = () => localStorage.getItem("token") || "";
+
+  const submitTpt = async () => {
+    setErr(""); setBusy(true); setResult(null);
+    try {
+      const r = await fetch("/api/assignments/import-tpt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ url, classId }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setErr(data.error || "Import failed"); return; }
+      setResult(data);
+    } catch (e: any) { setErr(e?.message || "Import failed"); }
+    finally { setBusy(false); }
+  };
+
+  const submitUpload = async () => {
+    if (!file) { setErr("Choose a PDF file"); return; }
+    setErr(""); setBusy(true); setResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (classId) fd.append("classId", classId);
+      if (title) fd.append("title", title);
+      if (description) fd.append("description", description);
+      if (gradeMin) fd.append("targetGradeMin", gradeMin);
+      if (gradeMax) fd.append("targetGradeMax", gradeMax);
+      if (subject) fd.append("targetSubject", subject);
+      const r = await fetch("/api/assignments/upload-pdf", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      });
+      const data = await r.json();
+      if (!r.ok) { setErr(data.error || "Upload failed"); return; }
+      setResult(data);
+    } catch (e: any) { setErr(e?.message || "Upload failed"); }
+    finally { setBusy(false); }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div className="card w-full max-w-xl" onClick={e => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display text-xl" style={{ color: "var(--text-1)" }}>Import assignment</h3>
+          <button onClick={onClose} className="text-sm" style={{ color: "var(--text-3)" }}>✕</button>
+        </div>
+        <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--border)" }}>
+          <button onClick={() => setTab("tpt")} className="px-3 py-2 text-sm font-semibold"
+            style={{ borderBottom: tab === "tpt" ? "2px solid var(--accent)" : "2px solid transparent", color: tab === "tpt" ? "var(--accent)" : "var(--text-3)" }}>
+            From TPT URL
+          </button>
+          <button onClick={() => setTab("upload")} className="px-3 py-2 text-sm font-semibold"
+            style={{ borderBottom: tab === "upload" ? "2px solid var(--accent)" : "2px solid transparent", color: tab === "upload" ? "var(--accent)" : "var(--text-3)" }}>
+            Upload PDF
+          </button>
+        </div>
+
+        {tab === "tpt" && (
+          <div className="space-y-3">
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>
+              Paste a <strong>free</strong> teacherspayteachers.com product URL. Paid content is rejected — purchase first, then use Upload PDF.
+            </p>
+            <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.teacherspayteachers.com/Product/..."
+              className="w-full px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+            <button onClick={submitTpt} disabled={busy || !url} className="btn-primary w-full">
+              {busy ? "Importing…" : "Import from TPT"}
+            </button>
+          </div>
+        )}
+
+        {tab === "upload" && (
+          <div className="space-y-3">
+            <input type="file" accept="application/pdf,.pdf" onChange={e => setFile(e.target.files?.[0] || null)}
+              className="w-full text-sm" style={{ color: "var(--text-1)" }} />
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title (optional — uses filename)"
+              className="w-full px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description / instructions for students"
+              rows={2} className="w-full px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+            <div className="flex gap-2">
+              <input value={gradeMin} onChange={e => setGradeMin(e.target.value)} placeholder="Grade min (0-5)" type="number" min="0" max="5"
+                className="flex-1 px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+              <input value={gradeMax} onChange={e => setGradeMax(e.target.value)} placeholder="Grade max" type="number" min="0" max="5"
+                className="flex-1 px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+              <select value={subject} onChange={e => setSubject(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-1)" }}>
+                <option value="">Subject…</option>
+                <option value="reading">Reading</option>
+                <option value="writing">Writing</option>
+                <option value="math">Math</option>
+                <option value="spelling">Spelling</option>
+                <option value="sel">SEL</option>
+              </select>
+            </div>
+            <button onClick={submitUpload} disabled={busy || !file} className="btn-primary w-full">
+              {busy ? "Uploading…" : "Upload PDF & create assignment"}
+            </button>
+          </div>
+        )}
+
+        {err && <div className="mt-3 p-2 text-xs rounded" style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>{err}</div>}
+        {result && (
+          <div className="mt-3 p-3 rounded" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.3)" }}>
+            <div className="text-sm font-bold" style={{ color: "var(--text-1)" }}>✓ Imported: {result.title}</div>
+            {result.source && <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>source: {result.source}{result.target_grade_min != null ? ` · grade ${result.target_grade_min}–${result.target_grade_max}` : ""}</div>}
+            {result.pdfWarning && <div className="text-xs mt-1" style={{ color: "var(--warning)" }}>⚠️ {result.pdfWarning}</div>}
+            {result.attached_pdf_path && <a href={result.attached_pdf_path} target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: "var(--accent)" }}>Open PDF</a>}
+            <button onClick={onImported} className="btn-primary mt-2 w-full">Done</button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
