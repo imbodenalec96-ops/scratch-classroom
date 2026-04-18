@@ -67,12 +67,12 @@ app.use("/api/auth", authRoutes);
 app.get("/api/board/class/:nameOrId", async (req: express.Request, res: express.Response) => {
   try {
     const { nameOrId } = req.params;
-    let cls = db.prepare("SELECT id, name FROM classes WHERE id = ?").get(nameOrId) as any;
+    let cls = await db.prepare("SELECT id, name FROM classes WHERE id = ?").get(nameOrId) as any;
     if (!cls) {
-      cls = db.prepare("SELECT id, name FROM classes WHERE LOWER(name) = LOWER(?) LIMIT 1").get(nameOrId) as any;
+      cls = await db.prepare("SELECT id, name FROM classes WHERE LOWER(name) = LOWER(?) LIMIT 1").get(nameOrId) as any;
     }
     if (!cls) return res.status(404).json({ error: "Class not found" });
-    const schedule = db.prepare(
+    const schedule = await db.prepare(
       "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
     ).all(cls.id);
     res.json({ id: cls.id, name: cls.name, schedule });
