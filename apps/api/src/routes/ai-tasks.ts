@@ -1,23 +1,19 @@
 /**
- * AI-Tasks Route — Step 6
+ * AI-Tasks Route — CCSS-anchored grade-level generator.
  * Task generation & grading via claude-sonnet-4-20250514.
  * If ANTHROPIC_API_KEY is not set, returns 503 with a friendly message.
- * All endpoints degrade gracefully so the UI can show a placeholder state.
  */
 
 import { Router, Response } from "express";
 import { AuthRequest } from "../middleware/auth.js";
+import { requireRole } from "../middleware/rbac.js";
 import db from "../db.js";
 
 const router = Router();
 
-// ── Anthropic client (lazy init so missing key doesn't crash on import) ──────
-
 function getAnthropic() {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
-  // Dynamic import keeps the optional dep from crashing at module load time
-  // We use the SDK synchronously after the key check
   const { default: Anthropic } = require("@anthropic-ai/sdk");
   return new Anthropic({ apiKey: key, timeout: 60_000, maxRetries: 1 });
 }
@@ -29,7 +25,6 @@ const AI_UNAVAILABLE = {
 
 const MODEL = "claude-sonnet-4-20250514";
 
-// Theme pool for per-student randomization (seeds variety into prompt)
 const VARIETY_THEMES = [
   "pirates and treasure", "space and planets", "dinosaurs", "ocean creatures",
   "sports", "cooking and food", "superheroes", "farm animals", "forest adventure",
@@ -47,28 +42,246 @@ function hashString(s: string): number {
   return h;
 }
 
-// ── Task generation ───────────────────────────────────────────────────────────
-// POST /api/ai-tasks/generate
-// Body: { student_id, date, subject, grade_min, grade_max, focus?, mode? }
-//   mode: 'individualized' (default) — unique prompt per student, seeded by
-//         student_id + date; 7-day recent-prompt dedup.
-// Returns: array of { id, prompt, hint } — also saves to daily_tasks
+// ── Table bootstrap (idempotent, pg-compatible) ──────────────────────────────
+let tablesReady = false;
+async function ensureTables() {
+  if (tablesReady) return;
+  try {
+    await (db as any).exec(`
+      CREATE TABLE IF NOT EXISTS daily_tasks (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        hint TEXT,
+        student_answer TEXT,
+        passed INTEGER,
+        ai_feedback TEXT,
+        assigned_at TEXT,
+        completed_at TEXT
+      );
+    `);
+  } catch {}
+  try {
+    await (db as any).exec(`
+      CREATE TABLE IF NOT EXISTS task_config (
+        subject TEXT PRIMARY KEY,
+        base_count INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT
+      );
+    `);
+  } catch {}
+  // Idempotent column adds (pg-safe via try/catch; shim has no transactions)
+  for (const sql of [
+    `ALTER TABLE daily_tasks ADD COLUMN generation_warnings TEXT`,
+    `ALTER TABLE daily_tasks ADD COLUMN target_grade INTEGER`,
+  ]) {
+    try { await (db as any).exec(sql); } catch {}
+  }
+  tablesReady = true;
+}
+
+// ── CCSS grade anchors (K-5) ────────────────────────────────────────────────
+// Concise, operational anchors — not a full standards dump. Written to fit
+// in the prompt budget while still constraining vocab + number range tightly.
+const CCSS_ANCHORS: Record<string, Record<number, string>> = {
+  reading: {
+    0: "RF.K.2–3 / RL.K: letter sounds, rhyming, CVC words (cat, dog, run). 3–5 word sentences. Vocabulary: 300–500 common sight words. Avg word length <5 chars.",
+    1: "RF.1.3 / RL.1: blend CVC, digraphs (sh/ch/th), short vowels, simple 1-sentence comprehension. Vocab: ~1000 sight words. Avg word length <5 chars.",
+    2: "RF.2.3 / RL.2: long vowels, vowel teams, 2-syllable decoding, main idea from 2–3 sentence passages. Avg word length <7 chars, no multi-clause sentences.",
+    3: "RF.3.3 / RL.3: prefixes/suffixes, context clues, inferring from a short paragraph. Avg word length <8 chars. Allow multi-clause sentences.",
+    4: "RL.4 / RI.4: figurative language, theme, citing text evidence from a paragraph passage. Academic vocabulary permitted.",
+    5: "RL.5 / RI.5: author's purpose, point of view, multi-paragraph passages, analysis of nonfiction text features.",
+  },
+  writing: {
+    0: "W.K.1–3: label pictures with 1 word, trace letters, write own name, 3-word 'I see' sentences.",
+    1: "W.1.1–3: 'I like/can' sentences with capital + period, 2-sentence opinion or observation, illustrate with caption.",
+    2: "W.2.1–3: 3–4 sentence paragraph (topic + 2 details + closing), basic punctuation including commas in a series.",
+    3: "W.3.1–5: paragraph with topic sentence + 3 details + closing, proper noun capitalization, commas in lists, revise for complete sentences.",
+    4: "W.4.1–3: multi-paragraph narrative/opinion with transitions, dialogue punctuation, concrete details.",
+    5: "W.5.1–4: intro-body-conclusion opinion/informative/narrative essays with evidence and linking words.",
+  },
+  spelling: {
+    0: "L.K.2d: spell 3-letter CVC words from a short word list (cat, pig, mom).",
+    1: "L.1.2d–e: CVC words, short-vowel patterns, common sight words (the, and, was, you).",
+    2: "L.2.2d: long-vowel patterns (silent e, ai, ee), digraphs, basic plurals.",
+    3: "L.3.2: prefixes/suffixes (un-, re-, -ing, -ed), homophones (to/too/two), 2-syllable words.",
+    4: "L.4.2: Greek/Latin roots (tele-, -graph), irregular plurals, commonly confused words.",
+    5: "L.5.2: advanced suffixes, derivational spelling (define→definition), academic vocabulary.",
+  },
+  math: {
+    0: "K.CC / K.OA: numbers 0–20 ONLY, counting, comparing, addition/subtraction within 10, 2D shapes (circle, square, triangle, rectangle).",
+    1: "1.OA / 1.NBT: numbers 0–120, addition/subtraction within 20, place value (tens/ones), comparing 2-digit numbers, telling time to half-hour.",
+    2: "2.OA / 2.NBT / 2.MD: numbers 0–1000, addition/subtraction within 100 (fluently) and 1000 (with regrouping), arrays, skip-counting, money (coins), time to 5-min.",
+    3: "3.OA / 3.NF: multiplication/division within 100, fractions on number line (halves, thirds, fourths, sixths, eighths), area, perimeter, elapsed time.",
+    4: "4.OA / 4.NBT / 4.NF: multi-digit multiplication, long division, equivalent fractions, decimal notation for fractions of 10 and 100, angle measurement.",
+    5: "5.NBT / 5.NF / 5.G: decimal operations to hundredths, fraction +/-/*/÷, volume, coordinate plane (first quadrant), 2D shape categorization.",
+  },
+  sel: {
+    0: "Social skills at kinder level: naming feelings (happy, sad, mad, scared), taking turns, using kind words.",
+    1: "1st-grade SEL: identifying 5–6 feelings, asking for help, giving compliments, sharing.",
+    2: "2nd-grade SEL: perspective-taking (how does a friend feel?), calming strategies, conflict basics.",
+    3: "3rd-grade SEL: empathy, goal-setting, identifying strengths, friendship skills.",
+    4: "4th-grade SEL: self-reflection, responsible decision-making, recognizing peer pressure.",
+    5: "5th-grade SEL: coping strategies, growth mindset, ethical reasoning in realistic scenarios.",
+  },
+};
+
+function anchorFor(subject: string, grade: number): string {
+  const s = CCSS_ANCHORS[subject] ?? CCSS_ANCHORS.reading;
+  const g = Math.max(0, Math.min(5, grade));
+  return s[g] ?? s[3];
+}
+
+function gradeLabel(g: number): string {
+  return g <= 0 ? "Kindergarten" : `Grade ${g}`;
+}
+
+// ── Heuristic validator ──────────────────────────────────────────────────────
+// Cheap post-gen check. Flags off-grade content so we can retry once.
+type ValidationResult = { ok: true } | { ok: false; reason: string };
+
+function validateTask(
+  subject: string,
+  grade: number,
+  prompt: string,
+  hint: string,
+): ValidationResult {
+  const text = `${prompt} ${hint}`;
+  if (!prompt.trim()) return { ok: false, reason: "empty prompt" };
+
+  if (subject === "math") {
+    // Extract integers and decimals, flag if any exceed grade-appropriate range
+    const nums = (text.match(/\b\d{1,6}(?:\.\d+)?\b/g) || []).map(Number);
+    const maxAllowed: Record<number, number> = { 0: 20, 1: 120, 2: 1000, 3: 1000, 4: 1_000_000, 5: 1_000_000 };
+    const cap = maxAllowed[Math.max(0, Math.min(5, grade))] ?? 1000;
+    const over = nums.find(n => n > cap);
+    if (over !== undefined) return { ok: false, reason: `grade-${grade} math contains number ${over} > cap ${cap}` };
+    // Decimals not allowed before grade 4
+    if (grade < 4 && /\d+\.\d+/.test(text)) {
+      return { ok: false, reason: `grade-${grade} math contains decimals (not introduced until grade 4)` };
+    }
+    // Fractions rarely before grade 3 (allowed halves maybe)
+    if (grade < 3 && /\b\d+\/\d+\b/.test(text)) {
+      return { ok: false, reason: `grade-${grade} math contains fractions (not introduced until grade 3)` };
+    }
+  }
+
+  if (subject === "reading" || subject === "writing" || subject === "spelling") {
+    // Avg word length heuristic
+    const words = prompt.replace(/[^\p{L}\s'-]/gu, " ").split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      const avg = words.reduce((s, w) => s + w.length, 0) / words.length;
+      const caps: Record<number, number> = { 0: 4.5, 1: 5.0, 2: 5.5, 3: 6.5, 4: 7.5, 5: 9.0 };
+      const cap = caps[Math.max(0, Math.min(5, grade))] ?? 6.5;
+      if (avg > cap + 0.5) return { ok: false, reason: `grade-${grade} ${subject} avg word length ${avg.toFixed(1)} exceeds ~${cap}` };
+    }
+  }
+
+  return { ok: true };
+}
+
+// ── Core generate-one helper (shared by both routes) ─────────────────────────
+async function generateOne(
+  client: any,
+  params: {
+    subject: string;
+    grade: number;       // canonical grade used for anchors + validation
+    gradeMin: number;
+    gradeMax: number;
+    theme: string;
+    focusHint: string;
+    recentSnippet: string;
+    classwide: boolean;
+    taskIndex: number;
+    totalCount: number;
+  },
+): Promise<{ prompt: string; hint: string; warnings: string[] }> {
+  const { subject, grade, gradeMin, gradeMax, theme, focusHint, recentSnippet, classwide, taskIndex, totalCount } = params;
+  const anchor = anchorFor(subject, grade);
+  const gLabel = gradeLabel(grade);
+
+  const system = `You are a careful elementary teacher writing ONE task that PRECISELY matches Common Core State Standards for the specified grade. You must stay on-grade: no vocabulary, numbers, or concepts above grade level. No preamble. No markdown. Return JSON ONLY: {"prompt": string, "hint": string}. The hint must reference the CCSS anchor code (e.g. "aligns with 2.NBT.5").`;
+
+  const userPrompt = (correction?: string) => `Subject: ${subject}. ${gLabel} (range ${gradeMin}–${gradeMax}). Task ${taskIndex + 1} of ${totalCount}.
+CCSS anchor for this grade: ${anchor}
+Theme seed: ${theme}.
+${focusHint}
+${recentSnippet}
+${correction ?? ""}
+Hard constraints:
+- Match vocabulary and sentence complexity to ${gLabel} exactly.
+- Math: stay within the number range listed in the anchor. No decimals before grade 4. No fractions before grade 3.
+- Reading/writing: keep sentences at ${gLabel} level.
+- Keep under 5 minutes for a student to complete.
+- Vary task type from recent prompts (word problem, visual, short writing, pattern, reflection).
+${classwide ? "Whole-class task; no student-specific references." : ""}
+Return JSON: {"prompt":"...","hint":"... (includes CCSS code)"}`;
+
+  const warnings: string[] = [];
+
+  const callOnce = async (correction?: string) => {
+    const msg = await client.messages.create({
+      model: MODEL,
+      max_tokens: 380,
+      system,
+      messages: [{ role: "user", content: userPrompt(correction) }],
+    });
+    const raw = (msg.content[0] as any).text.trim();
+    try {
+      const parsed = JSON.parse(raw);
+      return { prompt: String(parsed.prompt ?? ""), hint: String(parsed.hint ?? "") };
+    } catch {
+      return { prompt: "", hint: "" };
+    }
+  };
+
+  let result = await callOnce();
+  let check = validateTask(subject, grade, result.prompt, result.hint);
+  if (!check.ok) {
+    warnings.push(`first-pass: ${check.reason}`);
+    const correction = `CORRECTION: The previous draft was off-grade — ${check.reason}. Regenerate at exactly ${gLabel}. Stay strictly within the CCSS anchor above.`;
+    const retry = await callOnce(correction);
+    const check2 = validateTask(subject, grade, retry.prompt, retry.hint);
+    if (check2.ok) {
+      result = retry;
+    } else {
+      warnings.push(`retry-still-off: ${check2.reason}`);
+      // Prefer retry output over bad first pass even if still flagged
+      result = retry.prompt ? retry : result;
+    }
+  }
+
+  if (!result.prompt) {
+    result = { prompt: `Write a short ${subject} response about ${theme}.`, hint: "Use your best thinking!" };
+    warnings.push("fallback-default");
+  }
+
+  return { prompt: result.prompt, hint: result.hint, warnings };
+}
+
+function warningsToJson(w: string[]): string | null {
+  return w.length ? JSON.stringify(w) : null;
+}
+
+// ── Task generation (per-student) ────────────────────────────────────────────
 router.post("/generate", async (req: AuthRequest, res: Response) => {
   const client = getAnthropic();
   if (!client) return res.status(503).json(AI_UNAVAILABLE);
+  await ensureTables();
 
   const { student_id, date, subject, focus } = req.body;
   let { grade_min, grade_max } = req.body;
   if (!student_id || !date || !subject) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-  // If caller didn't supply grades, look them up from user_grade_levels for this student+subject
   if (grade_min == null || grade_max == null) {
     try {
       const g = await db.prepare(
         "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
       ).get(student_id) as any;
-      const col = subject === 'math' ? 'math_grade' : subject === 'writing' ? 'writing_grade' : 'reading_grade';
+      const col = subject === "math" ? "math_grade" : subject === "writing" ? "writing_grade" : "reading_grade";
       const single = g?.[col] ?? 3;
       if (grade_min == null) grade_min = single;
       if (grade_max == null) grade_max = single;
@@ -85,50 +298,33 @@ router.post("/generate", async (req: AuthRequest, res: Response) => {
   ).get(subject) as any;
   const count = configRow?.base_count ?? 1;
 
-  // Recent prompts (last 7 days) to avoid repeating
   const recent = (db as any).prepare(
     `SELECT prompt FROM daily_tasks WHERE student_id=? AND subject=? AND date >= date('now','-7 day')`
   ).all(student_id, subject) as any[];
   const recentSnippet = recent.length
-    ? `AVOID repeating these recent prompts (rephrase or pick a fresh angle):\n${recent.slice(0, 7).map((r: any) => '- ' + (r.prompt || '').slice(0, 80)).join('\n')}`
-    : '';
+    ? `AVOID repeating these recent prompts (rephrase or pick a fresh angle):\n${recent.slice(0, 7).map((r: any) => "- " + (r.prompt || "").slice(0, 80)).join("\n")}`
+    : "";
 
-  // Deterministic per-student variety: pick a theme based on hash
   const seed = hashString(`${student_id}|${date}|${subject}`);
   const theme = VARIETY_THEMES[seed % VARIETY_THEMES.length];
-  const focusHint = focus ? `Teacher focus note: ${focus}.` : '';
+  const focusHint = focus ? `Teacher focus note: ${focus}.` : "";
+
+  const canonicalGrade = Math.round((Number(grade_min) + Number(grade_max)) / 2);
 
   const tasks: any[] = [];
   try {
     for (let i = 0; i < count; i++) {
-      const msg = await client.messages.create({
-        model: MODEL,
-        max_tokens: 320,
-        system: "You are a creative elementary teacher. Return JSON only: {\"prompt\": string, \"hint\": string}. Vary the task type each time (word problem, short writing, visual description, pattern, puzzle, reflection). No preamble. No markdown.",
-        messages: [{
-          role: "user",
-          content: `Subject: ${subject}. Grade: ${grade_min}–${grade_max}. Task #${i + 1} of ${count}.
-Theme seed: ${theme}.
-${focusHint}
-${recentSnippet}
-Write ONE short engaging task (under 5 min) that fits grade level and is different in style from recent prompts. Return JSON.`,
-        }],
+      const { prompt, hint, warnings } = await generateOne(client, {
+        subject, grade: canonicalGrade,
+        gradeMin: grade_min, gradeMax: grade_max,
+        theme, focusHint, recentSnippet,
+        classwide: false, taskIndex: i, totalCount: count,
       });
-
-      let parsed: any = {};
-      try {
-        const raw = (msg.content[0] as any).text.trim();
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = { prompt: `Write a short ${subject} response about ${theme}.`, hint: "Use your imagination!" };
-      }
-
       const id = crypto.randomUUID();
       (db as any).prepare(
-        `INSERT INTO daily_tasks (id, student_id, date, subject, prompt, hint) VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(id, student_id, date, subject, parsed.prompt ?? "", parsed.hint ?? "");
-
-      tasks.push({ id, student_id, date, subject, prompt: parsed.prompt, hint: parsed.hint });
+        `INSERT INTO daily_tasks (id, student_id, date, subject, prompt, hint, target_grade, generation_warnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, student_id, date, subject, prompt, hint, canonicalGrade, warningsToJson(warnings));
+      tasks.push({ id, student_id, date, subject, prompt, hint, target_grade: canonicalGrade, generation_warnings: warningsToJson(warnings) });
     }
     return res.json(tasks);
   } catch (err: any) {
@@ -137,21 +333,17 @@ Write ONE short engaging task (under 5 min) that fits grade level and is differe
   }
 });
 
-// ── Classwide generation ──────────────────────────────────────────────────────
-// POST /api/ai-tasks/generate-classwide
-// Body: { class_id, date, subject, grade_min, grade_max, focus? }
-// Generates ONE set of tasks (based on class's grade range) and inserts a copy
-// for every student in the class. Use this when teacher wants same tasks for all.
+// ── Classwide generation ─────────────────────────────────────────────────────
 router.post("/generate-classwide", async (req: AuthRequest, res: Response) => {
   const client = getAnthropic();
   if (!client) return res.status(503).json(AI_UNAVAILABLE);
+  await ensureTables();
 
   const { class_id, date, subject, grade_min, grade_max, focus } = req.body;
   if (!class_id || !date || !subject || grade_min == null || grade_max == null) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // Students in class
   const students = await db.prepare(
     "SELECT u.id FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
   ).all(class_id) as any[];
@@ -162,30 +354,23 @@ router.post("/generate-classwide", async (req: AuthRequest, res: Response) => {
   ).get(subject) as any;
   const count = configRow?.base_count ?? 1;
 
-  const generated: { prompt: string; hint: string }[] = [];
+  const canonicalGrade = Math.round((Number(grade_min) + Number(grade_max)) / 2);
+  const seed = hashString(`${class_id}|${date}|${subject}`);
+  const theme = VARIETY_THEMES[seed % VARIETY_THEMES.length];
+  const focusHint = focus ? `Teacher focus note: ${focus}.` : "";
+
+  const generated: { prompt: string; hint: string; warnings: string[] }[] = [];
   try {
     for (let i = 0; i < count; i++) {
-      const msg = await client.messages.create({
-        model: MODEL,
-        max_tokens: 320,
-        system: "You are a creative elementary teacher. Return JSON only: {\"prompt\": string, \"hint\": string}. No preamble. No markdown.",
-        messages: [{
-          role: "user",
-          content: `Whole class task. Subject: ${subject}. Grade: ${grade_min}–${grade_max}. Task #${i + 1} of ${count}.
-${focus ? `Focus: ${focus}.` : ''}
-Write ONE engaging task under 5 min for the whole class. Return JSON.`,
-        }],
+      const one = await generateOne(client, {
+        subject, grade: canonicalGrade,
+        gradeMin: grade_min, gradeMax: grade_max,
+        theme, focusHint, recentSnippet: "",
+        classwide: true, taskIndex: i, totalCount: count,
       });
-      let parsed: any = {};
-      try {
-        parsed = JSON.parse((msg.content[0] as any).text.trim());
-      } catch {
-        parsed = { prompt: `Short ${subject} task for the class.`, hint: "Do your best!" };
-      }
-      generated.push({ prompt: parsed.prompt ?? '', hint: parsed.hint ?? '' });
+      generated.push(one);
     }
 
-    // Insert a copy for every student (deleting any existing tasks for today first)
     let inserted = 0;
     for (const s of students) {
       await db.prepare(
@@ -194,23 +379,41 @@ Write ONE engaging task under 5 min for the whole class. Return JSON.`,
       for (const t of generated) {
         const id = crypto.randomUUID();
         await db.prepare(
-          "INSERT INTO daily_tasks (id, student_id, date, subject, prompt, hint) VALUES (?, ?, ?, ?, ?, ?)"
-        ).run(id, s.id, date, subject, t.prompt, t.hint);
+          `INSERT INTO daily_tasks (id, student_id, date, subject, prompt, hint, target_grade, generation_warnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(id, s.id, date, subject, t.prompt, t.hint, canonicalGrade, warningsToJson(t.warnings));
         inserted++;
       }
     }
 
-    return res.json({ studentsAffected: students.length, tasksInserted: inserted, tasks: generated });
+    return res.json({
+      studentsAffected: students.length,
+      tasksInserted: inserted,
+      tasks: generated.map(g => ({ prompt: g.prompt, hint: g.hint, generation_warnings: warningsToJson(g.warnings) })),
+    });
   } catch (err: any) {
     console.error("[ai-tasks/generate-classwide]", err?.message);
     return res.status(500).json({ error: "Classwide generation failed", detail: err?.message });
   }
 });
 
+// ── Recent generation warnings (teacher/admin) ───────────────────────────────
+router.get("/recent-warnings", requireRole("teacher", "admin"), async (_req: AuthRequest, res: Response) => {
+  await ensureTables();
+  try {
+    const rows = (db as any).prepare(
+      `SELECT id, student_id, date, subject, target_grade, prompt, generation_warnings
+       FROM daily_tasks
+       WHERE generation_warnings IS NOT NULL AND generation_warnings <> ''
+       ORDER BY date DESC
+       LIMIT 100`
+    ).all() as any[];
+    return res.json(rows);
+  } catch (err: any) {
+    return res.json([]);
+  }
+});
+
 // ── Task grading (streaming) ──────────────────────────────────────────────────
-// POST /api/ai-tasks/grade
-// Body: { task_id, student_answer, grade_min, grade_max }
-// Streams SSE: data: {"token":"..."}\n\n … then data: {"done":true,"passed":bool,"feedback":"…"}\n\n
 router.post("/grade", async (req: AuthRequest, res: Response) => {
   const client = getAnthropic();
   if (!client) return res.status(503).json(AI_UNAVAILABLE);
@@ -223,7 +426,6 @@ router.post("/grade", async (req: AuthRequest, res: Response) => {
   const task = (db as any).prepare("SELECT * FROM daily_tasks WHERE id=?").get(task_id) as any;
   if (!task) return res.status(404).json({ error: "Task not found" });
 
-  // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -254,7 +456,6 @@ router.post("/grade", async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  // Parse result and save
   let passed = false;
   let feedback = "Great effort! Keep going!";
   try {
@@ -272,9 +473,6 @@ router.post("/grade", async (req: AuthRequest, res: Response) => {
 });
 
 // ── Worksheet search ──────────────────────────────────────────────────────────
-// POST /api/ai-tasks/worksheet-search
-// Body: { query, grade_min, grade_max }
-// Returns: array of { title, url, subject, grade_level, source_site, description }
 const wsSearchCache = new Map<string, { ts: number; results: any[] }>();
 
 router.post("/worksheet-search", async (req: AuthRequest, res: Response) => {
@@ -286,9 +484,7 @@ router.post("/worksheet-search", async (req: AuthRequest, res: Response) => {
 
   const cacheKey = `${query}:${grade_min}:${grade_max}`;
   const cached = wsSearchCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < 3_600_000) {
-    return res.json(cached.results);
-  }
+  if (cached && Date.now() - cached.ts < 3_600_000) return res.json(cached.results);
 
   try {
     const msg = await client.messages.create({
@@ -304,7 +500,6 @@ router.post("/worksheet-search", async (req: AuthRequest, res: Response) => {
     const raw = (msg.content[0] as any).text.trim();
     let results: any[] = [];
     try { results = JSON.parse(raw); } catch { results = []; }
-
     wsSearchCache.set(cacheKey, { ts: Date.now(), results });
     return res.json(results);
   } catch (err: any) {
@@ -312,10 +507,14 @@ router.post("/worksheet-search", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Task config (base count per subject) ─────────────────────────────────────
+// ── Task config ──────────────────────────────────────────────────────────────
 router.get("/task-config", (_req: AuthRequest, res: Response) => {
-  const rows = (db as any).prepare("SELECT * FROM task_config").all();
-  res.json(rows);
+  try {
+    const rows = (db as any).prepare("SELECT * FROM task_config").all();
+    res.json(rows);
+  } catch {
+    res.json([]);
+  }
 });
 
 router.put("/task-config/:subject", async (req: AuthRequest, res: Response) => {

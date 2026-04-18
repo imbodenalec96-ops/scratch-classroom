@@ -27,6 +27,8 @@ export default function AdminDashboard() {
   const [studentsByClass, setStudentsByClass] = useState<Record<string, number>>({});
   const [youtubePending, setYoutubePending] = useState(0);
   const [aiKeySet, setAiKeySet] = useState<boolean | null>(null);
+  const [genWarnings, setGenWarnings] = useState<any[]>([]);
+  const [showWarnings, setShowWarnings] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -48,6 +50,10 @@ export default function AdminDashboard() {
     fetch("/api/ai-tasks/task-config", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
       .then(r => setAiKeySet(r.status !== 503))
       .catch(() => setAiKeySet(false));
+    fetch("/api/ai-tasks/recent-warnings", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => setGenWarnings(Array.isArray(rows) ? rows : []))
+      .catch(() => setGenWarnings([]));
   }, []);
 
   const totalStudents = students.length;
@@ -89,6 +95,7 @@ export default function AdminDashboard() {
   if (unstaffedClasses.length > 0) pendingTasks.push({ severity: "high", label: `${unstaffedClasses.length} class${unstaffedClasses.length === 1 ? "" : "es"} without a teacher`, link: "/admin-dashboard" });
   if (emptyClasses.length > 0)     pendingTasks.push({ severity: "low", label: `${emptyClasses.length} empty class${emptyClasses.length === 1 ? "" : "es"} (no students enrolled)`, link: "/admin-dashboard" });
   if (totalTeachers === 0)         pendingTasks.push({ severity: "high", label: "No teachers on the platform yet", link: "/admin-dashboard" });
+  if (genWarnings.length > 0)      pendingTasks.push({ severity: "med", label: `⚠️ ${genWarnings.length} off-grade task${genWarnings.length === 1 ? "" : "s"} flagged by CCSS validator`, link: "#gen-warnings" });
 
   const ADMIN_TOOLS = [
     { path: "/monitor",          icon: Monitor,        label: "Live Monitor",     desc: "Every student, every class", accent: "var(--accent)" },
@@ -184,8 +191,8 @@ export default function AdminDashboard() {
               const color = t.severity === "high" ? "var(--danger)"
                           : t.severity === "med"  ? "var(--warning)"
                           : "var(--text-3)";
-              return (
-                <Link key={i} to={t.link} className="list-row" style={{ textDecoration: "none" }}>
+              const inner = (
+                <>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <AlertTriangle size={14} style={{ color, flexShrink: 0 }} />
                     <div className="text-sm" style={{ color: "var(--text-1)" }}>{t.label}</div>
@@ -193,10 +200,40 @@ export default function AdminDashboard() {
                   <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color }}>
                     {t.severity === "high" ? "High" : t.severity === "med" ? "Medium" : "Low"}
                   </span>
+                </>
+              );
+              if (t.link === "#gen-warnings") {
+                return (
+                  <button key={i} onClick={() => setShowWarnings(v => !v)} className="list-row" style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer" }}>
+                    {inner}
+                  </button>
+                );
+              }
+              return (
+                <Link key={i} to={t.link} className="list-row" style={{ textDecoration: "none" }}>
+                  {inner}
                 </Link>
               );
             })}
           </div>
+          {showWarnings && genWarnings.length > 0 && (
+            <div className="mt-3 p-3 rounded" style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", maxHeight: 320, overflowY: "auto" }}>
+              <div className="text-xs font-bold mb-2" style={{ color: "var(--text-2)" }}>CCSS Validator flags — recent 100</div>
+              {genWarnings.map((w: any) => {
+                let reasons: string[] = [];
+                try { reasons = JSON.parse(w.generation_warnings || "[]"); } catch {}
+                return (
+                  <div key={w.id} className="mb-2 pb-2" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <div className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                      {w.date} · {w.subject} · grade {w.target_grade ?? "?"} · student {String(w.student_id).slice(0, 8)}
+                    </div>
+                    <div className="text-sm mt-0.5" style={{ color: "var(--text-1)" }}>{w.prompt}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: "var(--warning)" }}>⚠️ {reasons.join("; ")}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
