@@ -40,6 +40,7 @@ import PublicLayout from "./components/PublicLayout.tsx";
 import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
 import ClassroomBoard from "./components/ClassroomBoard.tsx";
+import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
 
 function AppLoader() {
   return (
@@ -153,6 +154,7 @@ export default function App() {
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
             <Route path="teacher/websites" element={<TeacherWebsites />} />
             <Route path="teacher/schedule" element={<TeacherSchedule />} />
+            <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />

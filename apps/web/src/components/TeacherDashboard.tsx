@@ -197,6 +197,19 @@ export default function TeacherDashboard() {
                 <Tv size={13}/> 📺 Open Classroom Board
               </a>
             )}
+            <Link
+              to="/teacher/board-settings"
+              title="Edit everything that shows on the classroom board"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+              style={{
+                color: "var(--text-1)",
+                background: "var(--surface-1)",
+                borderColor: "var(--border-md)",
+                borderRadius: "var(--r-md)",
+              }}
+            >
+              <Tv size={13}/> Board Settings
+            </Link>
             <button
               onClick={handleForceUnlockAll}
               title="Clear every active lock system-wide — use if a student gets stuck"

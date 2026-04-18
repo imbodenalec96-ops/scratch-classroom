@@ -145,6 +145,19 @@ export default function AdminDashboard() {
                 <Tv size={13} /> 📺 Classroom Board
               </a>
             )}
+            <Link
+              to="/teacher/board-settings"
+              title="Edit everything on the classroom board"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
+              style={{
+                color: "var(--text-1)",
+                background: "var(--surface-1)",
+                borderColor: "var(--border-md)",
+                borderRadius: "var(--r-md)",
+              }}
+            >
+              <Tv size={13} /> Board Settings
+            </Link>
             <Link to="/teacher" className="btn-secondary gap-1.5 text-xs">
               <Eye size={13} /> View as Teacher
             </Link>
