@@ -1211,4 +1211,81 @@ router.get("/:id/schedule", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Bulk replace the whole schedule for a class. Body: { blocks: [{...}] }.
+// Deletes all existing rows and inserts the new set. Not wrapped in a true
+// transaction (db shim lacks one) — on partial failure the schedule may be
+// incomplete, but the teacher can re-save. Kept idempotent by class_id wipe.
+const HHMM = /^\d{2}:\d{2}$/;
+router.put("/:id/schedule", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassScheduleTable();
+  const classId = req.params.id;
+  const blocks = Array.isArray(req.body?.blocks) ? req.body.blocks : null;
+  if (!blocks) return res.status(400).json({ error: "blocks array required" });
+
+  // Validate up front so a bad row doesn't leave us with a half-wiped schedule.
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (!b || typeof b !== "object") return res.status(400).json({ error: `block ${i}: must be object` });
+    if (!HHMM.test(String(b.start_time || ""))) return res.status(400).json({ error: `block ${i}: start_time must be HH:MM` });
+    if (!HHMM.test(String(b.end_time || ""))) return res.status(400).json({ error: `block ${i}: end_time must be HH:MM` });
+    if (!String(b.label || "").trim()) return res.status(400).json({ error: `block ${i}: label required` });
+  }
+
+  try {
+    await db.prepare("DELETE FROM class_schedule WHERE class_id = ?").run(classId);
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      const activeDays = Array.isArray(b.active_days)
+        ? b.active_days.join(",")
+        : String(b.active_days || "Mon,Tue,Wed,Thu,Fri");
+      await db.prepare(
+        `INSERT INTO class_schedule (id, class_id, block_number, start_time, end_time, label, subject, is_break, break_type, active_days, content_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        crypto.randomUUID(),
+        classId,
+        i + 1,
+        String(b.start_time),
+        String(b.end_time),
+        String(b.label).trim(),
+        b.subject ? String(b.subject) : null,
+        b.is_break ? 1 : 0,
+        b.break_type ? String(b.break_type) : null,
+        activeDays,
+        b.content_source ? String(b.content_source) : null,
+      );
+    }
+    const rows = await db.prepare(
+      "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
+    ).all(classId) as any[];
+    res.json(rows);
+  } catch (e) {
+    console.error("schedule PUT error:", e);
+    res.status(500).json({ error: "Failed to save schedule" });
+  }
+});
+
+// Reset the class back to the default transcribed daily schedule.
+router.post("/:id/schedule/reset", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureClassScheduleTable();
+  const classId = req.params.id;
+  try {
+    await db.prepare("DELETE FROM class_schedule WHERE class_id = ?").run(classId);
+    for (let i = 0; i < STAR_SCHEDULE_SEED.length; i++) {
+      const [start, end, label, subject, isBreak, breakType] = STAR_SCHEDULE_SEED[i];
+      await db.prepare(
+        `INSERT INTO class_schedule (id, class_id, block_number, start_time, end_time, label, subject, is_break, break_type, active_days, content_source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(crypto.randomUUID(), classId, i + 1, start, end, label, subject, isBreak, breakType, "Mon,Tue,Wed,Thu,Fri", null);
+    }
+    const rows = await db.prepare(
+      "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
+    ).all(classId) as any[];
+    res.json(rows);
+  } catch (e) {
+    console.error("schedule reset error:", e);
+    res.status(500).json({ error: "Failed to reset schedule" });
+  }
+});
+
 export default router;

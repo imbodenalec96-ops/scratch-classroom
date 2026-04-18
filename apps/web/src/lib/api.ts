@@ -133,6 +133,14 @@ export const api = {
   getStudentWebsiteGrants: (studentId: string) =>
     request<any[]>(`/websites/student/${studentId}/grants`),
 
+  // Class schedule
+  getSchedule: (classId: string) =>
+    request<any[]>(`/classes/${classId}/schedule`),
+  updateSchedule: (classId: string, blocks: any[]) =>
+    request<any[]>(`/classes/${classId}/schedule`, { method: "PUT", body: JSON.stringify({ blocks }) }),
+  resetSchedule: (classId: string) =>
+    request<any[]>(`/classes/${classId}/schedule/reset`, { method: "POST" }),
+
   // Daily News source (teacher-paste flow)
   getDailyNews: (classId: string) =>
     request<any>(`/classes/${classId}/daily-news`),

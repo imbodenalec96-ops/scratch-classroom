@@ -27,6 +27,7 @@ import LessonAnalytics from "./components/LessonAnalytics.tsx";
 import ClassGrades from "./components/ClassGrades.tsx";
 import TeacherGradebook, { GradebookStudentPicker } from "./components/TeacherGradebook.tsx";
 import TeacherWebsites from "./components/TeacherWebsites.tsx";
+import TeacherSchedule from "./components/TeacherSchedule.tsx";
 import WebsiteViewer from "./components/WebsiteViewer.tsx";
 import {
   VideoLearningPage, TedTalkPage, DismissalPage, CashoutPage,
@@ -150,6 +151,7 @@ export default function App() {
             <Route path="teacher/gradebook" element={<GradebookStudentPicker />} />
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
             <Route path="teacher/websites" element={<TeacherWebsites />} />
+            <Route path="teacher/schedule" element={<TeacherSchedule />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />
