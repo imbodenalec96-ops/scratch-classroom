@@ -529,35 +529,35 @@ function WorkScreen({
               style={{ padding: "6px 10px" }}>
               ← Back to dashboard
             </button>
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-3)" }}>
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "#6B6860" }}>
               <span style={{ fontSize: 16 }}>{subjectPal.emoji}</span>
               <span>{parsed?.subject || subjectPal.label}</span>
-              <span style={{ color: "var(--border-md)" }}>·</span>
+              <span style={{ color: "#D4CEC2" }}>·</span>
               <span>{todayName}</span>
             </div>
           </div>
 
           {/* Masthead */}
-          <div className="section-label mb-2">— Today's assignment —</div>
-          <h1 className="font-display text-3xl sm:text-4xl leading-[1.05]" style={{ color: "var(--text-1)" }}>
-            {assignment.title}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: starfall.accent }}>— Today's assignment —</div>
+          <h1 className="font-display text-3xl sm:text-4xl leading-[1.05]" style={{ color: "#1A1915" }}>
+            {assignment.title}<em style={{ color: starfall.accent, fontStyle: "italic" }}>.</em>
           </h1>
         </div>
 
         {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
-              Question {currentQ + 1} <span style={{ color: "var(--border-md)" }}>of</span> {total}
+            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#6B6860" }}>
+              Question {currentQ + 1} <span style={{ color: "#D4CEC2" }}>of</span> {total}
             </div>
-            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "var(--accent)" }}>
+            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: starfall.accent }}>
               {answeredCount} answered · {Math.round(progress)}%
             </div>
           </div>
-          <div style={{ height: 3, background: "var(--border)", overflow: "hidden", borderRadius: 2 }}>
+          <div style={{ height: 3, background: "rgba(26,25,21,0.08)", overflow: "hidden", borderRadius: 2 }}>
             <div style={{
               width: `${progress}%`, height: "100%",
-              background: "var(--accent)",
+              background: starfall.accent,
               transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
             }}/>
           </div>
@@ -565,7 +565,7 @@ function WorkScreen({
 
         {/* ── Section label ── */}
         {q && (
-          <div className="section-label animate-slide-up" style={{ animationDelay: "90ms" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] animate-slide-up" style={{ animationDelay: "90ms", color: starfall.accent }}>
             — {q.sectionTitle} —
           </div>
         )}
@@ -578,12 +578,13 @@ function WorkScreen({
             <div className="p-8 sm:p-10 space-y-6" style={{
               background: "#ffffff",
               border: "1px solid rgba(0,0,0,0.05)",
+              borderLeft: `3px solid ${starfall.accent}`,
               borderRadius: 20,
               boxShadow: `0 4px 16px rgba(24,23,30,0.05)`,
             }}>
               {/* Question text — Fraunces serif, typewriter reveal, tap-to-listen */}
               <div className="flex items-start gap-3">
-                <p className="font-display leading-[1.3] flex-1" style={{ color: "var(--text-1)", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
+                <p className="font-display leading-[1.3] flex-1" style={{ color: "#1A1915", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
                   <TypewriterText text={q.q.text} speed={28} />
                 </p>
                 <button
@@ -603,20 +604,20 @@ function WorkScreen({
                 </button>
               </div>
 
-              {/* Hint */}
+              {/* Hint — always light (Starfall surface is always light) */}
               {q.q.hint && (
                 <div>
                   {showHint ? (
                     <div
-                      className="rounded-2xl p-3 border-2 animate-spring-in"
-                      style={{ background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb", borderColor: dk ? "rgba(245,158,11,0.3)" : "#fde68a" }}>
-                      <span className="text-xs font-bold" style={{ color: dk ? "#fbbf24" : "#92400e" }}>💡 Hint: </span>
-                      <span className="text-sm" style={{ color: dk ? "rgba(251,191,36,0.8)" : "#78350f" }}>{q.q.hint}</span>
+                      className="rounded-2xl p-3 border animate-fade-in"
+                      style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
+                      <span className="text-xs font-bold" style={{ color: "#92400e" }}>💡 Hint: </span>
+                      <span className="text-sm" style={{ color: "#5A4B1F" }}>{q.q.hint}</span>
                     </div>
                   ) : (
                     <button onClick={() => setShowHint(true)}
                       className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-all"
-                      style={{ background: dk ? "rgba(245,158,11,0.08)" : "#fffbeb", color: dk ? "#fbbf24" : "#92400e", border: "1px solid " + (dk ? "rgba(245,158,11,0.2)" : "#fde68a") }}>
+                      style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
                       💡 Show Hint
                     </button>
                   )}
@@ -624,12 +625,11 @@ function WorkScreen({
               )}
 
               {/* ── Multiple choice ── */}
-              {q.q.type === "multiple_choice" && q.q.options && (
+              {q.q.type === "multiple_choice" && Array.isArray(q.q.options) && q.q.options.length > 0 ? (
                 <div className="space-y-3">
                   {q.q.options.map((opt: string, oi: number) => {
                     const isSelected = currentAnswer === opt;
                     const letter = String.fromCharCode(65 + oi);
-                    // Starfall-themed big friendly buttons — same look in light + dark
                     return (
                       <button
                         key={oi}
@@ -641,7 +641,7 @@ function WorkScreen({
                           fontSize: 17,
                           background: isSelected ? `${starfall.accent}0d` : "#ffffff",
                           border: `1px solid ${isSelected ? starfall.accent : "rgba(0,0,0,0.08)"}`,
-                          color: isSelected ? starfall.accent : "#334155",
+                          color: "#1A1915",
                           touchAction: "manipulation",
                           animationDelay: `${oi * 40}ms`,
                         }}
@@ -659,102 +659,115 @@ function WorkScreen({
                         >
                           {isSelected ? "✓" : letter}
                         </span>
-                        <span className="flex-1" style={{ fontWeight: 600 }}>
+                        <span className="flex-1" style={{ fontWeight: 600, color: "#1A1915" }}>
                           {opt.replace(/^[A-D]\.\s*/, "")}
                         </span>
                       </button>
                     );
                   })}
                 </div>
-              )}
-
-              {/* ── Short answer ── */}
-              {q.q.type === "short_answer" && (
-                <div>
-                  {dk ? (
-                    <textarea value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
-                      placeholder="Write your answer here…" rows={q.q.lines || 4}
-                      className="w-full rounded-2xl p-4 text-sm border-2 resize-none outline-none transition-colors bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
-                      style={{ fontSize: 16, minHeight: 120 }} />
-                  ) : (
-                    <textarea
-                      value={currentAnswer}
-                      onChange={(e) => handleSelect(e.target.value)}
-                      placeholder="Write your answer here…"
-                      rows={q.q.lines || 4}
-                      className="clay-input"
-                      style={{ minHeight: 120 }}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* ── Fill blank ── */}
-              {q.q.type === "fill_blank" && (
-                dk ? (
-                  <input value={currentAnswer} onChange={(e) => handleSelect(e.target.value)}
-                    placeholder="Fill in the blank…"
-                    className="w-full rounded-2xl p-4 text-sm border-2 outline-none transition-colors bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 focus:border-violet-500/50"
-                    style={{ fontSize: 16 }} />
-                ) : (
-                  <input
-                    value={currentAnswer}
-                    onChange={(e) => handleSelect(e.target.value)}
-                    placeholder="Fill in the blank…"
-                    className="clay-input"
-                  />
-                )
-              )}
+              ) : (() => {
+                /* ── Fallback input for anything that isn't MC: short_answer,
+                   fill_blank, computation, undefined, etc. Math subject →
+                   numeric keypad. Enter advances/submits. ── */
+                const isMath = String(parsed?.subject || "").toLowerCase() === "math";
+                const isShort = q.q.type === "short_answer" && (q.q.lines || 0) > 1;
+                const onEnter = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                  if (e.key === "Enter" && !e.shiftKey && !isShort) {
+                    e.preventDefault();
+                    if (String(currentAnswer).trim()) {
+                      if (currentQ < total - 1) handleNext(); else handleSubmit();
+                    }
+                  }
+                };
+                const sharedStyle: React.CSSProperties = {
+                  width: "100%",
+                  minHeight: isShort ? 140 : 64,
+                  padding: "16px 20px",
+                  fontSize: isShort ? 17 : 22,
+                  fontFamily: isShort ? undefined : "'Fraunces', ui-serif, Georgia, serif",
+                  fontWeight: 600,
+                  color: "#1A1915",
+                  background: "#FAF9F7",
+                  border: `2px solid ${starfall.accent}33`,
+                  borderRadius: 16,
+                  outline: "none",
+                  touchAction: "manipulation",
+                };
+                const placeholder = isShort ? "Write your answer here…" : (isMath ? "Type your answer…" : "Type your answer…");
+                return (
+                  <div>
+                    {isShort ? (
+                      <textarea
+                        value={currentAnswer}
+                        onChange={(e) => handleSelect(e.target.value)}
+                        placeholder={placeholder}
+                        rows={q.q.lines || 4}
+                        style={{ ...sharedStyle, resize: "vertical" }}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = starfall.accent)}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = `${starfall.accent}33`)}
+                      />
+                    ) : (
+                      <input
+                        type={isMath ? "text" : "text"}
+                        inputMode={isMath ? "numeric" : "text"}
+                        autoComplete="off"
+                        autoCorrect={isMath ? "off" : "on"}
+                        value={currentAnswer}
+                        onChange={(e) => handleSelect(e.target.value)}
+                        onKeyDown={onEnter}
+                        placeholder={placeholder}
+                        style={sharedStyle}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = starfall.accent)}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = `${starfall.accent}33`)}
+                      />
+                    )}
+                    <div className="text-[11px] mt-2" style={{ color: "#8A867E" }}>
+                      {isShort ? "Shift + Enter for a new line" : "Press Enter to continue"}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
 
         {/* ── Navigation buttons ── */}
-        <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "180ms" }}>
-          {dk ? (
-            <>
-              <button onClick={handlePrev} disabled={currentQ === 0}
-                className="px-6 py-3 rounded-2xl font-bold text-sm border-2 transition-all cursor-pointer disabled:opacity-30"
-                style={{ minHeight: 56, borderColor: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", touchAction: "manipulation" }}>
+        {(() => {
+          const answered = String(currentAnswer).trim().length > 0;
+          const isLast = currentQ >= total - 1;
+          return (
+            <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "180ms" }}>
+              <button
+                onClick={handlePrev}
+                disabled={currentQ === 0}
+                className="rounded-2xl font-semibold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{
+                  minHeight: 56, minWidth: 100, padding: "0 20px", fontSize: 15,
+                  background: "#ffffff", color: "#5A564F",
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  touchAction: "manipulation",
+                }}>
                 ← Back
               </button>
-              {currentQ < total - 1 ? (
-                <button onClick={handleNext}
-                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white transition-all cursor-pointer"
-                  style={{ minHeight: 56, background: "linear-gradient(135deg, #8b5cf6, #6366f1)", touchAction: "manipulation" }}>
-                  Next Question →
-                </button>
-              ) : (
-                <button onClick={handleSubmit}
-                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white cursor-pointer"
-                  style={{ minHeight: 56, background: "linear-gradient(135deg, #10b981, #059669)", touchAction: "manipulation" }}>
-                  Submit Work ✓
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button onClick={handlePrev} disabled={currentQ === 0}
-                className="clay-btn"
-                style={{ background: "#f1f5f9", color: "#475569", borderColor: "#e2e8f0", minWidth: 100 }}>
-                ← Back
+              <button
+                onClick={isLast ? handleSubmit : handleNext}
+                disabled={!answered}
+                className="flex-1 rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  minHeight: 56, fontSize: 16, color: "white",
+                  background: answered
+                    ? (isLast ? "linear-gradient(135deg, #10b981, #059669)" : starfall.accent)
+                    : "#D4CEC2",
+                  border: "none",
+                  touchAction: "manipulation",
+                }}
+                title={answered ? undefined : "Answer the question to continue"}>
+                {isLast ? "Submit Work ✓" : "Next Question →"}
               </button>
-              {currentQ < total - 1 ? (
-                <button onClick={handleNext}
-                  className="clay-btn flex-1"
-                  style={{ background: `linear-gradient(135deg, #8b5cf6, #6366f1)`, color: "white", borderColor: "rgba(99,102,241,0.3)" }}>
-                  Next →
-                </button>
-              ) : (
-                <button onClick={handleSubmit}
-                  className="clay-btn flex-1"
-                  style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "white", borderColor: "rgba(16,185,129,0.3)", fontSize: 17 }}>
-                  Submit Work ✓
-                </button>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+          );
+        })()}
 
         {/* ── Progress dots ── */}
         <ProgressDots total={total} current={currentQ} answers={answers} />
