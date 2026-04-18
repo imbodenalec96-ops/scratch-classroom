@@ -6,6 +6,7 @@ import { isWorkUnlocked, isAccessAllowed, clearWorkUnlock, setWorkUnlocked } fro
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
+import StudentStarsBadge from "./StudentStarsBadge.tsx";
 import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
@@ -197,6 +198,7 @@ export default function Layout() {
           onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
         <BreakChoiceModal />
+        <StudentStarsBadge />
       </div>
     );
   }
@@ -332,6 +334,7 @@ export default function Layout() {
 
       {/* Break system: modal + countdown banner */}
       {isStudent && <BreakChoiceModal />}
+      <StudentStarsBadge />
     </div>
   );
 }

@@ -363,4 +363,18 @@ export const api = {
   getTaskConfig: () => request<any[]>('/ai-tasks/task-config'),
   updateTaskConfig: (subject: string, base_count: number) =>
     request<any>(`/ai-tasks/task-config/${subject}`, { method: 'PUT', body: JSON.stringify({ base_count }) }),
+
+  // ── Classroom Board (central control) ──
+  getBoardData: (classId: string) => request<any>(`/board/classes/${classId}/data`),
+  bumpStudentStars: (studentId: string, delta: number) =>
+    request<any>(`/board/students/${studentId}/stars`, { method: "POST", body: JSON.stringify({ delta }) }),
+  setStudentLevel: (studentId: string, level: number) =>
+    request<any>(`/board/students/${studentId}/level`, { method: "POST", body: JSON.stringify({ level }) }),
+  saveResourceSchedule: (studentId: string, rows: any[]) =>
+    request<any>(`/board/resource-schedules/${studentId}`, { method: "PUT", body: JSON.stringify({ rows }) }),
+  saveSpecialsRotation: (grade: number, rows: any[]) =>
+    request<any>(`/board/specials-rotation/${grade}`, { method: "PUT", body: JSON.stringify({ rows }) }),
+  saveBoardSetting: (key: string, value: string) =>
+    request<any>(`/board/settings`, { method: "PUT", body: JSON.stringify({ key, value }) }),
+  getMyStars: () => request<{ stars: number; rewards: number }>(`/board/me/stars`),
 };
