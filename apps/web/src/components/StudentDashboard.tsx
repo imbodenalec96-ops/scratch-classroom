@@ -32,6 +32,52 @@ function useCountUp(target: number, duration = 900, delay = 0) {
   return value;
 }
 
+/* ── Starfall palettes: bright, playful, pastel per subject. Used by the
+ *    assignment doer (WorkScreen) so every subject has its own warm backdrop. */
+const STARFALL_PALETTES: Record<string, { bg: string; accent: string; emoji: string; label: string }> = {
+  reading:        { bg: "linear-gradient(160deg, #efe3ff 0%, #fff7ec 55%, #ffe9f1 100%)", accent: "#8b5cf6", emoji: "📖", label: "Reading" },
+  math:           { bg: "linear-gradient(160deg, #fff2c8 0%, #ffe4a8 55%, #ffd389 100%)", accent: "#d97706", emoji: "🔢", label: "Math" },
+  writing:        { bg: "linear-gradient(160deg, #dcf5e5 0%, #f1fbe0 55%, #e8f3d4 100%)", accent: "#059669", emoji: "✏️", label: "Writing" },
+  spelling:       { bg: "linear-gradient(160deg, #daeaff 0%, #e9f4ff 55%, #d0e6ff 100%)", accent: "#2563eb", emoji: "🔤", label: "Spelling" },
+  sel:            { bg: "linear-gradient(160deg, #ffe4e6 0%, #fff0e4 55%, #ffe9d9 100%)", accent: "#e11d48", emoji: "💛", label: "SEL" },
+  daily_news:     { bg: "linear-gradient(160deg, #e2f3ff 0%, #ecf5ff 55%, #dfecff 100%)", accent: "#0284c7", emoji: "📰", label: "Daily News" },
+  review:         { bg: "linear-gradient(160deg, #f4e8ff 0%, #faf0ff 55%, #f0e6ff 100%)", accent: "#a855f7", emoji: "🔁", label: "Review" },
+  science:        { bg: "linear-gradient(160deg, #d1f5ee 0%, #e0faf4 55%, #c8efe5 100%)", accent: "#0d9488", emoji: "🔬", label: "Science" },
+  social_studies: { bg: "linear-gradient(160deg, #fde4c4 0%, #fff0dc 55%, #ffdcb6 100%)", accent: "#c2410c", emoji: "🌎", label: "Social Studies" },
+};
+function getStarfallPalette(subject?: string | null) {
+  const key = String(subject || "").toLowerCase().trim();
+  return STARFALL_PALETTES[key] || {
+    bg: "linear-gradient(160deg, #f4e8ff 0%, #faf0ff 55%, #f0e6ff 100%)",
+    accent: "#8b5cf6",
+    emoji: "📝",
+    label: "Today's Work",
+  };
+}
+
+/* ── Read-aloud: speak question text via Web Speech API. Cancels any in-flight
+ *    utterance first so rapid taps don't queue up. Gracefully no-ops if the
+ *    browser doesn't support SpeechSynthesis. */
+function speakText(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text || ""));
+    u.rate = 0.95;
+    u.pitch = 1.05;
+    u.lang = "en-US";
+    // Prefer a friendly voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const friendly = voices.find(v => /samantha|karen|google us english|child/i.test(v.name));
+    if (friendly) u.voice = friendly;
+    window.speechSynthesis.speak(u);
+  } catch { /* best effort */ }
+}
+function stopSpeaking() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try { window.speechSynthesis.cancel(); } catch {}
+}
+
 /* ── Confetti ── */
 function spawnConfetti() {
   const glyphs = ["🎉", "✨", "🌟", "💫", "🎊", "⭐", "🏆"];
@@ -361,6 +407,11 @@ function WorkScreen({
   const rm = prefersReducedMotion();
 
   const subjectPal = getSubjectPalette(parsed?.subject);
+  // Starfall overlay palette — brighter pastel backdrop per subject
+  const starfall = getStarfallPalette(parsed?.subject);
+  // Stop any in-flight speech when leaving the screen or switching questions
+  useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => { stopSpeaking(); }, [currentQ]);
 
   const handleSelect = (value: string) => {
     const isNew = answers[currentQ] === undefined;
@@ -402,22 +453,37 @@ function WorkScreen({
 
   if (submitted) {
     const submittedCount = Object.keys(answers).length;
+    const starfallSubmit = getStarfallPalette(parsed?.subject);
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6" style={{ background: "var(--bg)" }}>
-        <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
-          style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-        <div className="relative z-10 text-center max-w-md px-6 space-y-3">
-          <div className="animate-pop-in" style={{ fontSize: 80 }}>🌟</div>
-          <div className="section-label animate-slide-up" style={{ animationDelay: "100ms" }}>— Submitted —</div>
-          <h2 className="font-display text-6xl leading-[1.02] animate-spring-in" style={{ animationDelay: "140ms", color: "var(--text-1)" }}>
-            Nice<br/>
-            <em style={{ color: "var(--accent)", fontStyle: "italic" }}>work.</em>
+      <div
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 starfall-doer"
+        style={{ background: starfallSubmit.bg }}
+      >
+        <div
+          className="relative z-10 text-center max-w-md px-8 py-10 rounded-[36px] animate-spring-in"
+          style={{
+            background: "rgba(255,255,255,0.88)",
+            border: "4px solid white",
+            boxShadow: `0 20px 50px ${starfallSubmit.accent}33, 0 4px 0 rgba(255,255,255,0.9) inset`,
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div className="animate-pop-in" style={{ fontSize: 96 }}>🎉</div>
+          <div className="text-xs uppercase tracking-[0.18em] font-bold mt-2 mb-1" style={{ color: starfallSubmit.accent }}>
+            All done!
+          </div>
+          <h2 className="font-display text-6xl leading-[1.02]" style={{ color: "#1e293b" }}>
+            Nice
+            <em style={{ color: starfallSubmit.accent, fontStyle: "italic" }}> work!</em>
           </h2>
-          <p className="text-sm mt-4 animate-slide-up" style={{ animationDelay: "240ms", color: "var(--text-2)" }}>
-            {submittedCount} of {total} answered · heading to your dashboard…
+          <p className="text-base mt-4 font-semibold" style={{ color: "#475569" }}>
+            {submittedCount} of {total} answered · heading home…
           </p>
         </div>
-        <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
+        <div
+          className="fixed bottom-6 right-6 z-40 pointer-events-none"
+          style={{ filter: `drop-shadow(0 10px 20px ${starfallSubmit.accent}55)`, transform: "scale(1.3)" }}
+        >
           <Mascot state="cheer" />
         </div>
       </div>
@@ -428,11 +494,12 @@ function WorkScreen({
   const answeredCount = Object.keys(answers).length;
   const progress = total > 0 ? (answeredCount / total) * 100 : 0;
 
-  // Background for light mode: soft subject-tinted gradient
-  const lightBg = `linear-gradient(160deg, ${subjectPal.bg} 0%, #faf9ff 60%, #f0f1ff 100%)`;
+  // Starfall-themed backdrop — bright pastel per subject, same in light + dark
+  // so kids get the same warm feel regardless of theme.
+  const starfallBg = starfall.bg;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto" style={{ background: dk ? "#07071a" : lightBg, touchAction: "pan-y" }}>
+    <div className="fixed inset-0 z-50 overflow-auto starfall-doer" style={{ background: starfallBg, touchAction: "pan-y" }}>
       {/* Break banner */}
       {showBreakBanner && (
         <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-5 py-3 text-sm font-medium"
@@ -508,16 +575,33 @@ function WorkScreen({
             className={rm ? "" : "animate-spring-in"}
             style={{ animationDelay: "120ms" }}>
             <div className="p-7 sm:p-9 space-y-6" style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderLeft: "3px solid var(--accent)",
-              borderRadius: "var(--r-xl)",
-              boxShadow: dk ? "0 1px 0 rgba(0,0,0,0.4)" : "0 1px 3px rgba(24,23,30,0.04)",
+              background: "rgba(255,255,255,0.92)",
+              border: "3px solid white",
+              borderRadius: 28,
+              boxShadow: `0 14px 40px ${starfall.accent}22, 0 2px 0 rgba(255,255,255,0.9) inset`,
+              backdropFilter: "blur(6px)",
             }}>
-              {/* Question text — Fraunces serif, typewriter reveal */}
-              <p className="font-display text-xl sm:text-2xl leading-[1.35]" style={{ color: "var(--text-1)" }}>
-                <TypewriterText text={q.q.text} speed={28} />
-              </p>
+              {/* Question text — Fraunces serif, typewriter reveal, tap-to-listen */}
+              <div className="flex items-start gap-3">
+                <p className="font-display text-2xl sm:text-3xl leading-[1.3] flex-1" style={{ color: "var(--text-1)" }}>
+                  <TypewriterText text={q.q.text} speed={28} />
+                </p>
+                <button
+                  onClick={() => speakText(q.q.text)}
+                  className="flex-shrink-0 rounded-full flex items-center justify-center font-bold text-white shadow-lg cursor-pointer transition-transform active:scale-95 hover:scale-105"
+                  style={{
+                    width: 52, height: 52,
+                    background: `linear-gradient(135deg, ${starfall.accent}, ${starfall.accent}cc)`,
+                    border: "3px solid white",
+                    boxShadow: `0 6px 16px ${starfall.accent}40`,
+                    touchAction: "manipulation",
+                  }}
+                  title="Read aloud"
+                  aria-label="Read question aloud"
+                >
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>🔊</span>
+                </button>
+              </div>
 
               {/* Hint */}
               {q.q.hint && (
@@ -545,38 +629,44 @@ function WorkScreen({
                   {q.q.options.map((opt: string, oi: number) => {
                     const isSelected = currentAnswer === opt;
                     const letter = String.fromCharCode(65 + oi);
-                    if (dk) {
-                      return (
-                        <button key={oi} onClick={() => handleSelect(opt)}
-                          className={`w-full text-left px-4 py-4 rounded-2xl border-2 font-semibold text-sm transition-all duration-150 cursor-pointer
-                            ${isSelected
-                              ? "border-violet-500 bg-violet-500/15 text-violet-200 scale-[1.01]"
-                              : "border-white/10 bg-white/[0.04] text-white/70 hover:border-violet-500/40 hover:bg-violet-500/5"
-                            }`}
-                          style={{ minHeight: 60, touchAction: "manipulation" }}>
-                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full border-2 mr-3 text-xs font-bold
-                            ${isSelected ? "border-violet-500 bg-violet-500 text-white" : "border-white/20 text-white/40"}`}>
-                            {isSelected ? "✓" : letter}
-                          </span>
-                          {opt.replace(/^[A-D]\.\s*/, "")}
-                        </button>
-                      );
-                    }
+                    // Starfall-themed big friendly buttons — same look in light + dark
                     return (
-                      <button key={oi} onClick={() => handleSelect(opt)}
-                        className={`clay-option animate-spring-in ${isSelected ? "selected" : ""}`}
-                        style={{ animationDelay: `${oi * 55}ms` }}
-                        aria-pressed={isSelected}>
-                        {/* Letter badge */}
-                        <span className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all"
+                      <button
+                        key={oi}
+                        onClick={() => handleSelect(opt)}
+                        className={`w-full text-left rounded-3xl font-semibold transition-all duration-150 cursor-pointer flex items-center gap-4 animate-spring-in ${isSelected ? "scale-[1.02]" : "hover:scale-[1.01]"}`}
+                        style={{
+                          minHeight: 76,
+                          padding: "16px 22px",
+                          fontSize: 18,
+                          background: isSelected
+                            ? `linear-gradient(135deg, ${starfall.accent}22, ${starfall.accent}12)`
+                            : "rgba(255,255,255,0.75)",
+                          border: `3px solid ${isSelected ? starfall.accent : "rgba(255,255,255,0.9)"}`,
+                          color: isSelected ? starfall.accent : "#334155",
+                          boxShadow: isSelected
+                            ? `0 10px 24px ${starfall.accent}33, 0 2px 0 rgba(255,255,255,0.8) inset`
+                            : "0 6px 16px rgba(24,23,30,0.08), 0 2px 0 rgba(255,255,255,0.9) inset",
+                          touchAction: "manipulation",
+                          animationDelay: `${oi * 55}ms`,
+                        }}
+                        aria-pressed={isSelected}
+                      >
+                        <span
+                          className="flex-shrink-0 rounded-full flex items-center justify-center font-extrabold transition-all"
                           style={{
-                            background: isSelected ? subjectPal.accent : "#f1f5f9",
-                            color: isSelected ? "white" : "#64748b",
-                            border: isSelected ? `2px solid ${subjectPal.accent}` : "2px solid #e2e8f0",
-                          }}>
+                            width: 44,
+                            height: 44,
+                            background: isSelected ? starfall.accent : "white",
+                            color: isSelected ? "white" : starfall.accent,
+                            border: `3px solid ${isSelected ? starfall.accent : "white"}`,
+                            fontSize: 18,
+                            boxShadow: isSelected ? "none" : "0 2px 6px rgba(24,23,30,0.1)",
+                          }}
+                        >
                           {isSelected ? "✓" : letter}
                         </span>
-                        <span className="font-semibold" style={{ color: isSelected ? "#4c1d95" : "#1e293b" }}>
+                        <span className="flex-1" style={{ fontWeight: 700 }}>
                           {opt.replace(/^[A-D]\.\s*/, "")}
                         </span>
                       </button>
@@ -679,13 +769,16 @@ function WorkScreen({
         <div style={{ height: 80 }} /> {/* spacer so mascot doesn't overlap last button */}
       </div>
 
-      {/* ── Mascot — fixed bottom right ── */}
-      {!dk && (
-        <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none"
-          aria-hidden="true">
-          <Mascot state={mascotState} />
-        </div>
-      )}
+      {/* ── Mascot — fixed bottom right (Starfall: always on) ── */}
+      <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none"
+        aria-hidden="true"
+        style={{
+          filter: `drop-shadow(0 8px 16px ${starfall.accent}40)`,
+          transform: mascotState === 'cheer' ? "scale(1.15)" : "scale(1)",
+          transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}>
+        <Mascot state={mascotState} />
+      </div>
 
       {/* Flying word-buddy */}
       <FlyingBuddy active={!dk} />
