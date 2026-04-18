@@ -101,20 +101,22 @@ router.get("/students", async (_req: Request, res: Response) => {
   }
 });
 
-// POST /student-login — passwordless avatar login for students. Body: {id}.
-// Verifies the target user is role='student' (teachers/admins must still
-// use password login) and issues a JWT. Safe for classroom use because
-// students only need access to their own dashboard; no destructive admin
-// surface is reachable without role checks.
+// POST /student-login — avatar-picker login for students. Body: {id, password}.
+// Still verifies the password (teachers want students to type it) but keys
+// the lookup off user id from the avatar tap, so students don't have to
+// remember their email.
 router.post("/student-login", async (req: Request, res: Response) => {
   try {
     const id = String(req.body?.id || "").trim();
-    if (!id) return res.status(400).json({ error: "id required" });
+    const password = String(req.body?.password || "");
+    if (!id || !password) return res.status(400).json({ error: "id + password required" });
     const row = await db.prepare(
-      `SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?`
+      `SELECT * FROM users WHERE id = ?`
     ).get(id) as any;
     if (!row) return res.status(404).json({ error: "Student not found" });
     if (row.role !== "student") return res.status(403).json({ error: "Avatar login is for students only" });
+    const valid = await bcrypt.compare(password, row.password_hash);
+    if (!valid) return res.status(401).json({ error: "Wrong password" });
     const user: User = {
       id: row.id,
       email: row.email,

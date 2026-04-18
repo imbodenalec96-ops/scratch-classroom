@@ -125,9 +125,46 @@ export default function Layout() {
   }, [isStudent, user?.id]);
   useBlockAutoNav(isStudent, studentClassId);
 
+  // Assignment takeover: when a student has pending work (i.e. access not yet
+  // allowed — no break, no freetime, no skip-work-day, work not yet done),
+  // lock the entire UI to the dashboard (which renders the WorkScreen). No
+  // sidebar, no escape routes. The only exits are finishing the work or
+  // earning a break via the BreakChoiceModal.
+  useEffect(() => {
+    if (!isStudent) return;
+    if (accessAllowed) return;
+    const p = location.pathname;
+    // Allow /student (dashboard root) and /assignments. Redirect everything else.
+    const allowed = p === "/" || p === "/student" || p.startsWith("/assignments");
+    if (!allowed) navigate("/student", { replace: true });
+  }, [isStudent, accessAllowed, location.pathname, navigate]);
+
   if (!user) return null;
   const navItems = getNavItems(user.role, accessAllowed);
   const dk = theme === "dark";
+  const takeover = isStudent && !accessAllowed;
+
+  // Takeover mode: full-screen doer, no sidebar, no nav. Break modal + lock
+  // overlay + break countdown pill still float above so escape routes
+  // (earn-break, teacher override) keep working.
+  if (takeover) {
+    return (
+      <div className={`min-h-screen ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`}>
+        <main className="min-h-screen animate-page-enter">
+          <Outlet />
+        </main>
+        <VideoOverlay />
+        <ScreenLockOverlay
+          isLocked={classCommands.isLocked || newLock.locked}
+          message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
+          lockedBy={classCommands.lockedBy}
+          pendingMessage={newMessage || classCommands.pendingMessage}
+          onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
+        />
+        <BreakChoiceModal />
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen flex ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`}>

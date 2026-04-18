@@ -916,6 +916,17 @@ export default function StudentDashboard() {
   // Re-polled every second + on `breakstate-change` + on `storage` so the
   // UI flips without a refresh when any of those flags change.
   const [accessUnlocked, setAccessUnlocked] = useState<boolean>(isAccessAllowed);
+  // When access flips from unlocked → locked (e.g. break timer just ended,
+  // teacher revoked freetime), re-fetch pending assignments so the WorkScreen
+  // has fresh data. Without this the dashboard stays on phase='done' and
+  // renders the playground even though the student should be back at work.
+  const prevAccessRef = React.useRef<boolean>(accessUnlocked);
+  useEffect(() => {
+    if (prevAccessRef.current && !accessUnlocked) {
+      setPhase('loading');
+    }
+    prevAccessRef.current = accessUnlocked;
+  }, [accessUnlocked]);
   useEffect(() => {
     const refresh = () => setAccessUnlocked(isAccessAllowed());
     const onStorage = (e: StorageEvent) => { if (e.key === "workDoneDate" || e.key === null) refresh(); };

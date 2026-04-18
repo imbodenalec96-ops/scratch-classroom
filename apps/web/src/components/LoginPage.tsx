@@ -74,6 +74,8 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
   const [students, setStudents] = useState<Array<{ id: string; name: string; avatarUrl: string | null }>>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [pickerBusy, setPickerBusy] = useState<string | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; avatarUrl: string | null } | null>(null);
+  const [studentPassword, setStudentPassword] = useState("");
   useEffect(() => {
     if (mode !== "student") return;
     setStudentsLoading(true);
@@ -82,13 +84,24 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
       .catch(() => setStudents([]))
       .finally(() => setStudentsLoading(false));
   }, [mode]);
-  const handlePickStudent = async (id: string) => {
+  useEffect(() => {
+    setSelectedStudent(null);
+    setStudentPassword("");
+  }, [mode]);
+  const handlePickStudent = (student: { id: string; name: string; avatarUrl: string | null }) => {
     setError("");
-    setPickerBusy(id);
+    setSelectedStudent(student);
+    setStudentPassword("");
+  };
+  const handleStudentPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+    setError("");
+    setPickerBusy(selectedStudent.id);
     try {
-      await loginAsStudent(id);
+      await loginAsStudent(selectedStudent.id, studentPassword);
     } catch (err: any) {
-      setError(err?.message || "Sign in failed");
+      setError(err?.message || "Wrong password");
       setPickerBusy(null);
     }
   };
@@ -208,11 +221,69 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
             })}
           </div>
 
-          {/* Student avatar picker — passwordless classroom login */}
-          {mode === "student" && (
+          {/* Student avatar picker — tap avatar, then enter password */}
+          {mode === "student" && selectedStudent && (
+            <div>
+              <button
+                onClick={() => { setSelectedStudent(null); setStudentPassword(""); setError(""); }}
+                className="text-sm mb-4 cursor-pointer flex items-center gap-1.5"
+                style={{ color: "var(--text-3)" }}
+              >
+                ← Not you? Pick again
+              </button>
+              <div className="flex flex-col items-center gap-3 mb-5">
+                {(() => {
+                  const color = avatarColors[students.findIndex(s => s.id === selectedStudent.id) % avatarColors.length] || avatarColors[0];
+                  return (
+                    <div className="rounded-full flex items-center justify-center font-bold text-white" style={{
+                      width: 72, height: 72, fontSize: 26,
+                      background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+                    }}>
+                      {selectedStudent.avatarUrl ? (
+                        <img src={selectedStudent.avatarUrl} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                      ) : initials(selectedStudent.name)}
+                    </div>
+                  );
+                })()}
+                <div className="font-display text-2xl" style={{ color: "var(--text-1)" }}>{selectedStudent.name}</div>
+              </div>
+              <form onSubmit={handleStudentPasswordSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Password</label>
+                  <input
+                    type="password"
+                    value={studentPassword}
+                    onChange={(e: any) => setStudentPassword(e.target.value)}
+                    className="input"
+                    placeholder="Enter your password"
+                    autoFocus
+                    required
+                  />
+                </div>
+                {error && (
+                  <div className="text-sm p-3" style={{
+                    color: "var(--danger)",
+                    background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
+                    borderRadius: "var(--r-md)",
+                    borderLeft: "2px solid var(--danger)",
+                  }}>{error}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={!!pickerBusy || !studentPassword}
+                  className="btn btn-primary w-full cursor-pointer disabled:opacity-50"
+                >
+                  {pickerBusy ? "Signing in…" : "Sign In"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {mode === "student" && !selectedStudent && (
             <div>
               <p className="text-sm mb-4" style={{ color: "var(--text-2)" }}>
-                Tap your picture to sign in. No password needed.
+                Tap your picture, then enter your password.
               </p>
               {studentsLoading ? (
                 <div className="text-sm" style={{ color: "var(--text-3)" }}>Loading students…</div>
@@ -228,7 +299,7 @@ function LoginPageInner({ mode, setMode, isRegister, setIsRegister, name, setNam
                     return (
                       <button
                         key={s.id}
-                        onClick={() => handlePickStudent(s.id)}
+                        onClick={() => handlePickStudent(s)}
                         disabled={!!pickerBusy}
                         className="rounded-2xl p-3 flex flex-col items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                         style={{

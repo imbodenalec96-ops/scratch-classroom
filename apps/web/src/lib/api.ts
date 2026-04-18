@@ -34,7 +34,7 @@ export const api = {
   register: (email: string, password: string, name: string, role: string) => request<any>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, name, role }) }),
   me: () => request<any>("/auth/me"),
   listStudentAccounts: () => request<Array<{ id: string; name: string; avatarUrl: string | null }>>("/auth/students"),
-  studentLogin: (id: string) => request<any>("/auth/student-login", { method: "POST", body: JSON.stringify({ id }) }),
+  studentLogin: (id: string, password: string) => request<any>("/auth/student-login", { method: "POST", body: JSON.stringify({ id, password }) }),
 
   // Classes
   getClasses: () => request<any[]>("/classes"),
