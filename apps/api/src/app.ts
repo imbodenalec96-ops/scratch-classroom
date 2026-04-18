@@ -63,21 +63,25 @@ app.get("/api/status", async (_req, res) => {
 // Auth routes (no middleware)
 app.use("/api/auth", authRoutes);
 
-// Public board endpoint — no auth, for TV kiosk. Accepts class ID or name (e.g. "star").
+// Public board endpoint — no auth, for TV kiosk. Accepts class ID (UUID) or name (e.g. "star").
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 app.get("/api/board/class/:nameOrId", async (req: express.Request, res: express.Response) => {
   try {
     const { nameOrId } = req.params;
-    let cls = await db.prepare("SELECT id, name FROM classes WHERE id = ?").get(nameOrId) as any;
+    let cls: any = null;
+    if (UUID_RE.test(nameOrId)) {
+      cls = await db.prepare("SELECT id, name FROM classes WHERE id = ?").get(nameOrId);
+    }
     if (!cls) {
-      cls = await db.prepare("SELECT id, name FROM classes WHERE LOWER(name) = LOWER(?) LIMIT 1").get(nameOrId) as any;
+      cls = await db.prepare("SELECT id, name FROM classes WHERE LOWER(name) = LOWER(?) LIMIT 1").get(nameOrId);
     }
     if (!cls) return res.status(404).json({ error: "Class not found" });
     const schedule = await db.prepare(
       "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
     ).all(cls.id);
     res.json({ id: cls.id, name: cls.name, schedule });
-  } catch (e: any) {
-    res.status(500).json({ error: "Failed to load board data", detail: String(e?.message || e) });
+  } catch {
+    res.status(500).json({ error: "Failed to load board data" });
   }
 });
 
