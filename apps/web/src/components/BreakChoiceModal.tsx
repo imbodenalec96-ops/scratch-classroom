@@ -4,6 +4,7 @@ import {
   getBreakState, shouldOfferBreak, chooseBreak, chooseFullWork,
   isOnBreak, breakSecondsRemaining, setBreakState,
 } from "../lib/breakSystem.ts";
+import { clearWorkUnlock } from "../lib/workUnlock.ts";
 
 // Inject keyframes the pill + toast depend on (scaleIn may already exist,
 // but pulseRed is defined only inside BreakSystem.tsx which isn't mounted here).
@@ -66,6 +67,7 @@ export default function BreakChoiceModal() {
   useEffect(() => {
     const onForceEnd = () => {
       setBreakState({ path: null, breakStartAt: 0, breakEndAt: 0, workStartAt: Date.now() });
+      clearWorkUnlock();
       setToast("⛔ Your teacher ended break. Back to work 📚");
       setTimeout(() => setToast(null), 4000);
       navigate("/student");
@@ -82,6 +84,7 @@ export default function BreakChoiceModal() {
       if (s.path === "break" && s.breakEndAt && Date.now() >= s.breakEndAt) {
         // Mark break as used; force-return to assignments
         setBreakState({ path: null, breakStartAt: 0, breakEndAt: 0, workStartAt: Date.now() });
+        clearWorkUnlock();
         setToast("⏰ Break's over — back to work 📚");
         setTimeout(() => setToast(null), 4000);
         navigate("/student");

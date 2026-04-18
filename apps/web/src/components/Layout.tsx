@@ -2,7 +2,7 @@ import React, { useState, useEffect, useSyncExternalStore } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { isWorkUnlocked, isAccessAllowed } from "../lib/workUnlock.ts";
+import { isWorkUnlocked, isAccessAllowed, clearWorkUnlock } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
@@ -76,6 +76,7 @@ export default function Layout() {
       // out the start/end times (matches chooseFullWork's "keep grinding" exit
       // and won't re-prompt because breakOffered stays true).
       setBreakState({ path: "fullwork", breakStartAt: 0, breakEndAt: 0, breakOffered: true });
+      clearWorkUnlock();
       studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
     },
