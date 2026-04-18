@@ -476,13 +476,18 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
         boxShadow: hov
           ? `0 20px 44px ${game.accentColor}44, 0 4px 16px rgba(0,0,0,0.5)`
           : `0 2px 8px rgba(0,0,0,0.4)`,
+        // Kill 300ms tap delay on mobile for card taps
+        touchAction: "manipulation",
       }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => { setHov(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => { setPressed(false); }}
       onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => { setPressed(false); onPlay(); }}
+      // Don't fire onPlay from touchEnd — the synthesized click that follows
+      // will call onClick, which handles both mouse + tap. Firing here too
+      // double-triggers on mobile (a real reported "arcade is glitchy" source).
+      onTouchEnd={() => setPressed(false)}
       onTouchCancel={() => setPressed(false)}
       onClick={onPlay}
     >
@@ -580,14 +585,41 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
 
   // Close on Escape; also prevent scroll keys from bubbling to the page while modal is open
   useEffect(() => {
-    const SCROLL_KEYS = new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","w","W","s","S","a","A","d","D"]);
+    const SCROLL_KEYS = new Set([
+      "ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ",
+      "w","W","s","S","a","A","d","D",
+      "PageUp","PageDown","Home","End",
+    ]);
+    const isTypingTarget = (el: EventTarget | null) => {
+      const n = el as HTMLElement | null;
+      if (!n || !n.tagName) return false;
+      const t = n.tagName;
+      return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (n as any).isContentEditable === true;
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { close(); return; }
+      // Don't swallow keys when the user is typing inside a game input
+      // (e.g. WordSearch guess field, NumberQuiz answer).
+      if (isTypingTarget(e.target)) return;
       if (SCROLL_KEYS.has(e.key)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
+
+  // Lock background page scroll while a game is open — prevents the dashboard
+  // from scrolling behind the modal on mobile / trackpad. Restores prior value
+  // on unmount so we don't leak this style if something else set it.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = (document.body.style as any).overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    (document.body.style as any).overscrollBehavior = "contain";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      (document.body.style as any).overscrollBehavior = prevOverscroll;
+    };
+  }, []);
 
   return (
     <div
@@ -598,6 +630,9 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         backdropFilter: "blur(14px)",
         opacity: closing ? 0 : 1,
         transition: closing ? "opacity 0.18s ease" : undefined,
+        // Stop two-finger pan / rubber-band scrolling the page behind the modal
+        overscrollBehavior: "contain",
+        touchAction: "none",
       }}
       onClick={e => { if (e.target === backdropRef.current) close(); }}
     >
@@ -650,7 +685,7 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         </div>
 
         {/* Game area */}
-        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain" }}>
+        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "manipulation" }}>
           {game.comingSoon ? (
             /* Coming-soon slot — Unity placeholder */
             <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
@@ -981,6 +1016,10 @@ export default function ArcadePage() {
       {/* ── Player modal ── */}
       {playingGame && (
         <PlayerModal
+          // Key by game.id so switching games forces a full unmount of the
+          // previous <game.component /> — guarantees any audio, rAF loops,
+          // intervals, or iframe audio contexts are torn down cleanly.
+          key={playingGame.id}
           game={playingGame}
           onClose={() => { setPlayingGame(null); setAutoLaunched(false); }}
           showBrowseLink={autoLaunched}
