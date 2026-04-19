@@ -1154,18 +1154,20 @@ async function seedStarStudents() {
       }
     }
 
-    // On fresh SQLite (local dev), create the placeholder seed students and link them.
-    // On Postgres (production) the real students already exist and the INSERT will no-op.
-    const bcrypt = await import("bcrypt");
-    const hash = await bcrypt.default.hash("star1234", 10);
-
-    for (const s of STAR_STUDENTS_SEED) {
-      await db.prepare(
-        `INSERT INTO users (id, email, password_hash, name, role, specials_grade) VALUES (?, ?, ?, ?, 'student', ?) ON CONFLICT DO NOTHING`
-      ).run(s.id, s.email, hash, s.name, s.specials_grade ?? null);
-      await db.prepare(
-        `INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING`
-      ).run(s.id, starClassId);
+    // Only create placeholder @star.local users on fresh SQLite (local dev).
+    // In production (DATABASE_URL set), the real students already exist and
+    // these fake IDs (starting with 's') are invalid UUIDs for Postgres anyway.
+    if (!process.env.DATABASE_URL) {
+      const bcrypt = await import("bcrypt");
+      const hash = await bcrypt.default.hash("star1234", 10);
+      for (const s of STAR_STUDENTS_SEED) {
+        await db.prepare(
+          `INSERT INTO users (id, email, password_hash, name, role, specials_grade) VALUES (?, ?, ?, ?, 'student', ?) ON CONFLICT DO NOTHING`
+        ).run(s.id, s.email, hash, s.name, s.specials_grade ?? null);
+        await db.prepare(
+          `INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING`
+        ).run(s.id, starClassId);
+      }
     }
     starStudentSeedRan = true;
     console.log("[star-seed] Done. Star class:", starClassId);

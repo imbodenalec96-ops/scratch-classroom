@@ -64,8 +64,8 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
               COALESCE(bd.level, 1)           AS level
        FROM users u
        JOIN class_members cm ON u.id = cm.user_id
-       LEFT JOIN board_user_data bd ON bd.user_id = u.id
-       WHERE cm.class_id = ? AND u.role = 'student'
+       LEFT JOIN board_user_data bd ON bd.user_id = u.id::text
+       WHERE cm.class_id = ?::uuid AND u.role = 'student'
        ORDER BY u.name ASC`
     ).all(classId);
 
@@ -94,7 +94,7 @@ router.post("/students/:id/stars", requireRole("teacher", "admin"), async (req: 
   const delta = Math.trunc(Number(req.body?.delta ?? 0));
   if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: "delta required" });
   try {
-    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`).get(id);
+    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ?::uuid AND role = 'student'`).get(id);
     if (!user) return res.status(404).json({ error: "student not found" });
 
     await db.prepare(
@@ -127,7 +127,7 @@ router.post("/students/:id/level", requireRole("teacher", "admin"), async (req: 
   const id = req.params.id;
   const level = Math.max(1, Math.min(5, Math.trunc(Number(req.body?.level ?? 1))));
   try {
-    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`).get(id);
+    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ?::uuid AND role = 'student'`).get(id);
     if (!user) return res.status(404).json({ error: "student not found" });
 
     await db.prepare(
