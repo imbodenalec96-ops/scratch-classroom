@@ -62,23 +62,15 @@ export default function TeacherWebsites() {
     return () => clearInterval(iv);
   }, []);
 
-  // Load students (for grants tab) — use kiosk endpoint for reliability
+  // Load students (for grants tab) — fetch classes fresh each time, don't depend on state timing
   useEffect(() => {
     if (tab !== "grants") return;
     (async () => {
       try {
-        // Try direct student list first (faster and doesn't depend on class membership)
-        const allStudents = await api.getStudentsKiosk().catch(() => []);
-        if (allStudents.length > 0) {
-          // Group into a synthetic "all" key so allStudents memo works
-          const map: Record<string, any[]> = { all: allStudents };
-          setStudentsByClass(map);
-          if (!selectedStudentId) setSelectedStudentId(allStudents[0]?.id || null);
-          return;
-        }
-        // Fallback: per-class loading
+        const cls = await api.getClasses().catch(() => [] as any[]);
+        if (!cls.length) return;
         const map: Record<string, any[]> = {};
-        for (const c of classes) {
+        for (const c of cls) {
           try { map[c.id] = await api.getStudents(c.id); } catch { map[c.id] = []; }
         }
         setStudentsByClass(map);

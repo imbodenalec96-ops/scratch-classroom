@@ -4,16 +4,22 @@ import { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 
-// Get leaderboard (top 50) — ordered by behavior_stars then points
+// Get leaderboard (top 50) — all students, even those with 0 points
 router.get("/", async (_req: AuthRequest, res: Response) => {
   const rows = await db.prepare(
-    `SELECT l.*, u.name,
-            COALESCE(bd.behavior_stars, 0) AS behavior_stars,
-            COALESCE(bd.reward_count, 0)   AS reward_count
-     FROM leaderboard l
-     JOIN users u ON l.user_id = u.id
-     LEFT JOIN board_user_data bd ON bd.user_id = l.user_id
-     ORDER BY COALESCE(bd.behavior_stars, 0) DESC, l.points DESC LIMIT 50`
+    `SELECT
+       u.id AS user_id, u.name,
+       COALESCE(l.points, 0)   AS points,
+       COALESCE(l.level, 1)    AS level,
+       COALESCE(l.badges, '[]') AS badges,
+       COALESCE(bd.behavior_stars, 0) AS behavior_stars,
+       COALESCE(bd.reward_count, 0)   AS reward_count
+     FROM users u
+     LEFT JOIN leaderboard l  ON l.user_id  = u.id
+     LEFT JOIN board_user_data bd ON bd.user_id = u.id
+     WHERE u.role = 'student'
+     ORDER BY COALESCE(bd.behavior_stars, 0) DESC, COALESCE(l.points, 0) DESC
+     LIMIT 50`
   ).all() as any[];
   rows.forEach((r) => { r.badges = JSON.parse(r.badges || "[]"); });
   res.json(rows);

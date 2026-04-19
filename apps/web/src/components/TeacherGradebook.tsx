@@ -239,254 +239,301 @@ export default function TeacherGradebook() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto animate-fade-in">
-      <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-t3 mb-0.5">Gradebook</div>
-          <h1 className="text-2xl font-extrabold text-t1 leading-tight">
-            {selectedStudent?.name || "Pick a student"}
-          </h1>
-          <div className="text-xs text-t3 mt-1 flex flex-wrap gap-3">
-            {selectedStudent?.class_name && <span>📚 {selectedStudent.class_name}</span>}
-            {selectedStudent?.email && <span>✉️ {selectedStudent.email}</span>}
-            {selectedStudent?.reading_grade_level != null && <span>Reading G{selectedStudent.reading_grade_level}</span>}
-            {selectedStudent?.math_grade_level != null && <span>Math G{selectedStudent.math_grade_level}</span>}
-            {selectedStudent?.writing_grade_level != null && <span>Writing G{selectedStudent.writing_grade_level}</span>}
-          </div>
+    <div className="flex h-[calc(100vh-56px)] overflow-hidden animate-fade-in" style={{ background: "var(--bg)" }}>
+      {/* ── Left sidebar — student list ── */}
+      <aside
+        className="flex-shrink-0 flex flex-col overflow-hidden border-r"
+        style={{ width: 240, background: "var(--bg-surface)", borderColor: "rgba(255,255,255,0.06)" }}
+      >
+        {/* Sidebar header */}
+        <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-t3 mb-0.5">📓 Gradebook</div>
+          {selectedStudent?.class_name && (
+            <div className="text-xs text-t3 truncate">{selectedStudent.class_name}</div>
+          )}
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Stat label="Assignments" value={totals.total} />
-          <Stat label="Submitted" value={totals.submitted} accent="emerald" />
-          <Stat label="Graded" value={totals.humanGraded} accent="violet" />
-          <Stat label="Needs review" value={totals.needsReview} accent={totals.needsReview > 0 ? "amber" : "gray"} />
-        </div>
-      </div>
 
-      {/* ── Student row ── */}
-      <div className={`rounded-2xl border p-3 mb-5 ${dk ? "border-white/[0.06] bg-white/[0.02]" : "border-gray-200 bg-white"}`}>
-        <div className="overflow-x-auto">
-          <div className="flex gap-2 pb-1" style={{ minWidth: "min-content" }}>
-            {students.length === 0 && (
-              <div className="text-sm text-t3 py-4 px-2">Loading students…</div>
-            )}
-            {students.map((s) => {
-              const active = s.id === selectedId;
-              const ungraded = ungradedCounts[s.id] ?? 0;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedId(s.id)}
-                  className={`flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer
-                    ${active
-                      ? "border-violet-500 bg-violet-500/20 text-violet-100 shadow-lg shadow-violet-600/20"
-                      : dk
-                        ? "border-white/5 bg-white/[0.02] text-white/70 hover:bg-white/[0.06] hover:border-white/10"
-                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"}`}
-                  title={s.email || s.name}
-                >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0
-                    ${active ? "bg-gradient-to-br from-violet-500 to-indigo-600" : "bg-gradient-to-br from-emerald-500 to-green-600"}`}>
-                    {(s.name || "?").charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate max-w-[140px]">{s.name}</div>
-                    <div className="text-[10px] text-t3 truncate max-w-[140px]">{s.class_name}</div>
-                  </div>
-                  {ungraded > 0 && (
-                    <span
-                      className="flex-shrink-0 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40"
-                      title={`${ungraded} ungraded this week`}
-                    >
-                      {ungraded}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Controls ── */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        {(["today", "week", "all"] as Scope[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setScope(s)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer
-              ${scope === s
-                ? "border-violet-500 bg-violet-500/20 text-violet-200"
-                : dk ? "border-white/10 text-white/50 hover:border-violet-500/40" : "border-gray-200 text-gray-500 hover:border-violet-300"}`}
-          >
-            {s === "today" ? "Today" : s === "week" ? "This week" : "All time"}
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
-          <label className="inline-flex items-center gap-2 text-xs text-t2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={ungradedOnly}
-              onChange={(e) => setUngradedOnly(e.target.checked)}
-              className="accent-violet-500"
-            />
-            Ungraded only
-          </label>
-          <Link to="/" className="text-xs text-t3 hover:text-t1 underline-offset-2 hover:underline">← Back</Link>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      {/* ── Table ── */}
-      <div className={`rounded-2xl border overflow-hidden ${dk ? "border-white/[0.06] bg-white/[0.02]" : "border-gray-200 bg-white"}`}>
-        <div className={`grid grid-cols-[110px_36px_1fr_70px_70px_120px_200px] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider border-b ${dk ? "text-white/40 border-white/5" : "text-gray-400 border-gray-100"}`}>
-          <div>Date</div>
-          <div></div>
-          <div>Title</div>
-          <div>AI</div>
-          <div>Human</div>
-          <div>Status</div>
-          <div>Actions</div>
-        </div>
-        {!selectedId && (
-          <div className="py-10 text-center text-t3 text-sm">Select a student above to see their assignments.</div>
-        )}
-        {selectedId && loading && (
-          <div className="py-10 text-center text-t3 text-sm">Loading…</div>
-        )}
-        {selectedId && !loading && visibleRows.length === 0 && (
-          <div className="py-10 text-center text-t3 text-sm">
-            {ungradedOnly ? "Everything's graded. 🎉" : "No assignments in this range."}
-          </div>
-        )}
-        {selectedId && !loading && visibleRows.map((r) => {
-          const passKey = r.human_grade_pass;
-          const isGradedPass = passKey === true;
-          const isGradedFail = passKey === false;
-          const saving = savingId === r.assignment_id;
-          const dateText = r.scheduled_date || (r.due_date ? String(r.due_date).slice(0, 10) : "—");
-          const fbOpen = feedbackOpenFor === r.assignment_id;
-          return (
-            <div
-              key={r.assignment_id}
-              className={`grid grid-cols-[110px_36px_1fr_70px_70px_120px_200px] gap-3 px-4 py-3 text-sm items-center border-b last:border-b-0 ${dk ? "border-white/[0.04]" : "border-gray-100"}`}
-            >
-              <div className="text-xs text-t3 font-mono">{dateText}</div>
-              <div className="text-xl">{subjectIcon(r.subject)}</div>
-              <div className="min-w-0">
-                <div className="font-semibold text-t1 truncate">{r.title}</div>
-                {r.human_grade_feedback && (
-                  <div className="text-[11px] text-t3 italic truncate">“{r.human_grade_feedback}”</div>
+        {/* Student list */}
+        <div className="flex-1 overflow-y-auto py-1">
+          {students.length === 0 && (
+            <div className="px-4 py-6 text-xs text-t3">Loading students…</div>
+          )}
+          {students.map((s) => {
+            const active = s.id === selectedId;
+            const ungraded = ungradedCounts[s.id] ?? 0;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSelectedId(s.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors cursor-pointer relative
+                  ${active
+                    ? "bg-indigo-500/15 text-t1"
+                    : "text-t2 hover:bg-white/[0.04]"}`}
+                style={active ? { boxShadow: "inset 3px 0 0 #6366f1" } : undefined}
+                title={s.email || s.name}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0
+                  ${active ? "bg-gradient-to-br from-indigo-500 to-violet-600" : "bg-gradient-to-br from-slate-600 to-slate-700"}`}>
+                  {(s.name || "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate leading-tight">{s.name}</div>
+                  <div className="text-[10px] text-t3 truncate">{s.class_name}</div>
+                </div>
+                {ungraded > 0 && (
+                  <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {ungraded}
+                  </span>
                 )}
-              </div>
-              <div className="text-xs">
-                {r.ai_grade != null ? (
-                  <span className={`font-bold ${r.ai_grade >= 70 ? "text-emerald-400" : "text-amber-400"}`}>{r.ai_grade}%</span>
-                ) : <span className="text-t3">—</span>}
-              </div>
-              <div className="text-xs">
-                {isGradedPass ? <span className="font-bold text-emerald-400">Pass</span>
-                  : isGradedFail ? <span className="font-bold text-red-400">Redo</span>
-                  : <span className="text-t3">—</span>}
-              </div>
-              <div><StatusBadge status={r.status} /></div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  onClick={() => toggleWork(r)}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
-                    ${workOpenFor === r.assignment_id
-                      ? "bg-sky-500/20 border-sky-500/50 text-sky-200"
-                      : dk ? "border-white/15 text-white/60 hover:bg-white/5" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
-                  title={r.submission_id ? "View student's work" : "No submission yet"}
-                  disabled={!r.submission_id}
-                >
-                  <Eye size={11} className="inline mr-0.5" /> View
-                </button>
-                <button
-                  onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
-                  disabled={saving}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
-                    ${isGradedPass ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
-                      : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"}
-                    disabled:opacity-50 disabled:cursor-wait`}
-                  title="Mark as passed"
-                >
-                  ✓ Pass
-                </button>
-                <button
-                  onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
-                  disabled={saving}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
-                    ${isGradedFail ? "bg-red-500/20 border-red-500/50 text-red-300"
-                      : "border-red-500/30 text-red-400 hover:bg-red-500/10"}
-                    disabled:opacity-50 disabled:cursor-wait`}
-                  title="Mark as needing a redo"
-                >
-                  ✗ Redo
-                </button>
-                <button
-                  onClick={() => {
-                    setFeedbackOpenFor(fbOpen ? null : r.assignment_id);
-                    if (!fbOpen && !(r.assignment_id in feedbackDraft)) {
-                      setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
-                    }
-                  }}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer
-                    ${fbOpen ? "bg-violet-500/20 border-violet-500/50 text-violet-200"
-                      : dk ? "border-white/15 text-white/60 hover:bg-white/5" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
-                  title="Leave feedback"
-                >
-                  <MessageSquare size={11} className="inline mr-0.5" /> Feedback
-                </button>
-              </div>
-              {workOpenFor === r.assignment_id && (
-                <div className={`col-span-7 mt-2 rounded-xl border p-4 ${dk ? "bg-white/[0.03] border-white/[0.08]" : "bg-gray-50 border-gray-200"}`}>
-                  {!r.submission_id ? (
-                    <p className="text-xs text-t3 italic">Student hasn't submitted yet — nothing to view.</p>
-                  ) : workLoading === r.submission_id ? (
-                    <p className="text-xs text-t3">Loading submission…</p>
-                  ) : (
-                    <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
-                  )}
-                </div>
-              )}
-              {fbOpen && (
-                <div className="col-span-7 mt-2 flex gap-2 items-start">
-                  <textarea
-                    value={feedbackDraft[r.assignment_id] ?? ""}
-                    onChange={(e) =>
-                      setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))
-                    }
-                    placeholder="Feedback for the student…"
-                    className={`flex-1 rounded-xl px-3 py-2 text-sm resize-y min-h-[56px] ${
-                      dk ? "bg-white/[0.04] border border-white/[0.08] text-white" : "bg-gray-50 border border-gray-200 text-gray-900"
-                    }`}
-                  />
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50"
-                    >
-                      Pass + save
-                    </button>
-                    <button
-                      onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/40 text-red-200 hover:bg-red-500/30 disabled:opacity-50"
-                    >
-                      Redo + save
-                    </button>
-                  </div>
-                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar footer nav */}
+        <div className="px-4 py-3 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <Link to="/" className="text-[11px] text-t3 hover:text-t1 underline-offset-2 hover:underline">← Back to home</Link>
+        </div>
+      </aside>
+
+      {/* ── Right panel ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <div
+          className="flex-shrink-0 flex items-center justify-between gap-4 px-5 py-3 border-b"
+          style={{ background: "var(--bg-surface)", borderColor: "rgba(255,255,255,0.06)" }}
+        >
+          {/* Student name + stats */}
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold text-t1 leading-tight truncate">
+                {selectedStudent?.name || "Select a student"}
+              </h1>
+              {selectedStudent?.class_name && (
+                <div className="text-[11px] text-t3">{selectedStudent.class_name}</div>
               )}
             </div>
-          );
-        })}
+            <div className="hidden sm:flex items-center gap-3">
+              <StatPill label="Total" value={totals.total} />
+              <StatPill label="Submitted" value={totals.submitted} color="emerald" />
+              <StatPill label="Needs review" value={totals.needsReview} color={totals.needsReview > 0 ? "amber" : "gray"} />
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+              {(["today", "week", "all"] as Scope[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setScope(s)}
+                  className={`px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer
+                    ${scope === s
+                      ? "bg-indigo-500/20 text-indigo-300"
+                      : "text-t3 hover:text-t2 hover:bg-white/[0.04]"}`}
+                >
+                  {s === "today" ? "Today" : s === "week" ? "Week" : "All"}
+                </button>
+              ))}
+            </div>
+            <label className="inline-flex items-center gap-1.5 text-[11px] text-t2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ungradedOnly}
+                onChange={(e) => setUngradedOnly(e.target.checked)}
+                className="accent-violet-500"
+              />
+              Ungraded only
+            </label>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mx-5 mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        {/* ── Assignment table ── */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-sm border-collapse" style={{ minWidth: 680 }}>
+            <thead>
+              <tr
+                className="sticky top-0 z-10 text-[10px] font-bold uppercase tracking-wider text-t3"
+                style={{ background: "var(--bg-surface)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <th className="text-left px-4 py-2.5 font-bold" style={{ minWidth: 200 }}>Assignment</th>
+                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 80 }}>Subject</th>
+                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 90 }}>Date</th>
+                <th className="text-center px-3 py-2.5 font-bold" style={{ width: 70 }}>Score</th>
+                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 100 }}>Status</th>
+                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 80 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!selectedId && (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">
+                    Select a student to view their assignments.
+                  </td>
+                </tr>
+              )}
+              {selectedId && loading && (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">Loading…</td>
+                </tr>
+              )}
+              {selectedId && !loading && visibleRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">
+                    {ungradedOnly ? "Everything is graded." : "No assignments in this range."}
+                  </td>
+                </tr>
+              )}
+              {selectedId && !loading && visibleRows.map((r, idx) => {
+                const passKey = r.human_grade_pass;
+                const isGradedPass = passKey === true;
+                const isGradedFail = passKey === false;
+                const saving = savingId === r.assignment_id;
+                const dateText = r.scheduled_date || (r.due_date ? String(r.due_date).slice(0, 10) : "—");
+                const fbOpen = feedbackOpenFor === r.assignment_id;
+                const rowBg = idx % 2 === 1 ? "rgba(255,255,255,0.015)" : "transparent";
+                return (
+                  <React.Fragment key={r.assignment_id}>
+                    <tr
+                      className="group border-b transition-colors"
+                      style={{
+                        background: rowBg,
+                        borderColor: "rgba(255,255,255,0.04)",
+                        height: 36,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(99,102,241,0.06)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
+                    >
+                      <td className="px-4 py-1.5">
+                        <div className="font-semibold text-t1 truncate max-w-xs leading-tight">{r.title}</div>
+                        {r.human_grade_feedback && (
+                          <div className="text-[10px] text-t3 italic truncate">"{r.human_grade_feedback}"</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-base leading-none">{subjectIcon(r.subject)}</span>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-[11px] text-t3 font-mono tabular-nums">{dateText}</span>
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        {r.numeric_grade != null ? (
+                          <span className={`text-sm font-bold tabular-nums ${r.numeric_grade >= 70 ? "text-emerald-400" : "text-amber-400"}`}>
+                            {r.numeric_grade}
+                          </span>
+                        ) : r.ai_grade != null ? (
+                          <span className={`text-xs font-semibold ${r.ai_grade >= 70 ? "text-emerald-400" : "text-amber-400"}`}>
+                            {r.ai_grade}%
+                          </span>
+                        ) : (
+                          <span className="text-t3 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => toggleWork(r)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer
+                              ${workOpenFor === r.assignment_id
+                                ? "bg-sky-500/20 border-sky-500/50 text-sky-300"
+                                : "border-white/10 text-t3 hover:bg-white/[0.06] hover:text-t2"}`}
+                            title={r.submission_id ? "View work" : "No submission"}
+                            disabled={!r.submission_id}
+                          >
+                            <Eye size={10} className="inline" />
+                          </button>
+                          {isGradedPass ? (
+                            <span className="text-emerald-400 text-xs font-bold px-1">✓</span>
+                          ) : isGradedFail ? (
+                            <span className="text-red-400 text-xs font-bold px-1">✗</span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
+                                disabled={saving}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                                title="Pass"
+                              >✓</button>
+                              <button
+                                onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
+                                disabled={saving}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                                title="Redo"
+                              >✗</button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => {
+                              setFeedbackOpenFor(fbOpen ? null : r.assignment_id);
+                              if (!fbOpen && !(r.assignment_id in feedbackDraft)) {
+                                setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
+                              }
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer
+                              ${fbOpen ? "bg-violet-500/20 border-violet-500/50 text-violet-300" : "border-white/10 text-t3 hover:bg-white/[0.06]"}`}
+                            title="Feedback"
+                          >
+                            <MessageSquare size={10} className="inline" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Work view expansion */}
+                    {workOpenFor === r.assignment_id && (
+                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                        <td colSpan={6} className="px-5 py-4" style={{ background: "rgba(255,255,255,0.02)" }}>
+                          {!r.submission_id ? (
+                            <p className="text-xs text-t3 italic">Student hasn't submitted yet.</p>
+                          ) : workLoading === r.submission_id ? (
+                            <p className="text-xs text-t3">Loading submission…</p>
+                          ) : (
+                            <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    {/* Feedback expansion */}
+                    {fbOpen && (
+                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                        <td colSpan={6} className="px-5 py-3" style={{ background: "rgba(99,102,241,0.04)" }}>
+                          <div className="flex gap-2 items-start">
+                            <textarea
+                              value={feedbackDraft[r.assignment_id] ?? ""}
+                              onChange={(e) => setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
+                              placeholder="Feedback for the student…"
+                              className="flex-1 rounded-lg px-3 py-2 text-sm resize-y min-h-[52px] bg-white/[0.04] border border-white/[0.08] text-white"
+                            />
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
+                                disabled={saving}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50 cursor-pointer"
+                              >Pass + save</button>
+                              <button
+                                onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
+                                disabled={saving}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/40 text-red-200 hover:bg-red-500/30 disabled:opacity-50 cursor-pointer"
+                              >Redo + save</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -504,6 +551,20 @@ function Stat({ label, value, accent = "gray" }: { label: string; value: number;
       <span className={`text-xl font-extrabold leading-none ${colors[accent]}`}>{value}</span>
       <span className="text-[10px] uppercase tracking-wider text-t3 mt-0.5">{label}</span>
     </div>
+  );
+}
+
+function StatPill({ label, value, color = "gray" }: { label: string; value: number; color?: "gray" | "emerald" | "amber" }) {
+  const cfg: Record<string, string> = {
+    gray:    "bg-white/[0.06] text-t2",
+    emerald: "bg-emerald-500/15 text-emerald-300",
+    amber:   "bg-amber-500/15 text-amber-300",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${cfg[color]}`}>
+      <span className="text-base font-extrabold tabular-nums leading-none">{value}</span>
+      <span className="uppercase tracking-wider text-[9px] opacity-70">{label}</span>
+    </span>
   );
 }
 

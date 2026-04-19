@@ -855,7 +855,7 @@ export default function AssignmentBuilder() {
   };
 
   return (
-    <div className="p-7 space-y-5 animate-page-enter">
+    <div className="p-6 space-y-5 animate-page-enter max-w-screen-xl mx-auto">
       {/* Header */}
       <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
@@ -866,13 +866,22 @@ export default function AssignmentBuilder() {
           <div>
             <div className="section-label mb-2">— Planning this week —</div>
             <h1 className="font-display text-4xl leading-tight" style={{ color: "var(--text-1)" }}>
-              Assignments<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
+              <span style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>✏️ Assignment</span>
+              <em style={{ color: "var(--accent)", fontStyle: "italic" }}> Builder</em>
             </h1>
             <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
               AI-generated, per student, per grade. One click makes the whole week.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Class selector in header */}
+            <select
+              value={classId}
+              onChange={(e) => { setClassId(e.target.value); loadAssignments(e.target.value); }}
+              className="input text-sm h-9"
+            >
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
             <button onClick={() => setShowFullWeek(v => !v)} className="btn-secondary gap-1.5 text-xs">
               📅 Generate Full Week
             </button>
@@ -1126,10 +1135,10 @@ export default function AssignmentBuilder() {
         </div>
       )}
 
-      {/* Class selector */}
-      <select value={classId} onChange={(e) => { setClassId(e.target.value); loadAssignments(e.target.value); }} className="input w-56 text-sm">
-        {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
+      {/* ── Two-column layout: left controls + right preview ── */}
+      <div className="flex gap-6 items-start">
+        {/* LEFT COLUMN — controls (40%) */}
+        <div className="flex-shrink-0 space-y-5" style={{ width: "40%" }}>
 
       {/* Assignment form */}
       {showForm && (
@@ -1429,22 +1438,10 @@ export default function AssignmentBuilder() {
             {genError && <p className="text-red-400 text-xs mt-2">{genError}</p>}
           </div>
 
-          {/* Paper preview */}
           {generated && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Check size={14} className="text-emerald-400" />
-                <span className={`text-sm font-semibold ${dk ? "text-emerald-300" : "text-emerald-700"}`}>Worksheet generated! Preview:</span>
-                <button
-                  onClick={() => window.print()}
-                  className={`ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                    dk ? "border-white/10 text-white/50 hover:text-white/80" : "border-gray-200 text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  <Printer size={12} /> Print Preview
-                </button>
-              </div>
-              <PaperPreview assignment={generated} dk={dk} />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <Check size={13} className="text-emerald-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-emerald-300">Worksheet generated — preview in the panel on the right</span>
             </div>
           )}
 
@@ -1466,6 +1463,98 @@ export default function AssignmentBuilder() {
         </div>
       )}
 
+          {/* Assignment list below form — compact */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-t3 px-1">
+              {assignments.length > 0 ? `${assignments.length} assignment${assignments.length === 1 ? "" : "s"}` : ""}
+            </div>
+            {assignments.slice(0, 12).map((a) => {
+              const isSelected = selectedIds.has(a.id);
+              return (
+                <div
+                  key={a.id}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all group
+                    ${isSelected
+                      ? "border-indigo-500/50 bg-indigo-500/10"
+                      : "border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03]"}`}
+                  style={{ background: isSelected ? undefined : "var(--bg-surface)" }}
+                  onClick={() => toggleSelect(a.id)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(a.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-shrink-0 cursor-pointer accent-violet-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate text-t1">{a.title}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {a.target_subject && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300">
+                          {a.target_subject}
+                        </span>
+                      )}
+                      {a.created_at && (
+                        <span className="text-[10px] text-t3">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); window.open(`/print/assignment/${a.id}`, "_blank", "noopener"); }}
+                    className="opacity-0 group-hover:opacity-100 text-[10px] text-t3 hover:text-t1 cursor-pointer transition-all"
+                    title="Print"
+                  >🖨</button>
+                </div>
+              );
+            })}
+            {assignments.length > 12 && (
+              <div className="text-[11px] text-t3 text-center py-1">+{assignments.length - 12} more…</div>
+            )}
+          </div>
+
+        </div>{/* end LEFT COLUMN */}
+
+        {/* RIGHT COLUMN — preview area (60%) */}
+        <div className="flex-1 min-w-0">
+
+          {/* RIGHT: Paper preview when form is showing + assignment generated */}
+          {showForm && generated && (
+            <div className="sticky top-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <Check size={13} /> Worksheet preview
+                </div>
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-white/10 text-t3 hover:text-t1 cursor-pointer transition-colors"
+                >
+                  <Printer size={11} /> Print
+                </button>
+              </div>
+              <PaperPreview assignment={generated} dk={dk} />
+            </div>
+          )}
+
+          {/* RIGHT: placeholder when no preview */}
+          {(!showForm || !generated) && (
+            <div
+              className="sticky top-4 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-20 text-center"
+              style={{ borderColor: "rgba(255,255,255,0.07)", minHeight: 340 }}
+            >
+              <div className="text-4xl mb-3 opacity-20">📄</div>
+              <p className="text-sm font-semibold text-t3">Generate an assignment to preview it here</p>
+              <p className="text-xs text-t3 mt-1 opacity-60">Fill in the form and click "Generate Worksheet"</p>
+            </div>
+          )}
+
+        </div>{/* end RIGHT COLUMN */}
+
+      </div>{/* end two-column flex wrapper */}
+
+      {/* ── Full assignments table / bulk toolbar ── */}
       {/* Bulk toolbar — appears when any row is selected */}
       {assignments.length > 0 && (
         <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-lg text-sm"

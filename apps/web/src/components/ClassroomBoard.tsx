@@ -86,6 +86,21 @@ const ANIM = `
     0%,100% { transform:translateY(0); }
     50%     { transform:translateY(-3px); }
   }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulseRing {
+    0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
+    70%  { box-shadow: 0 0 0 10px rgba(139,92,246,0); }
+    100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+  }
+  @keyframes starPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.35) rotate(-5deg); }
+    70%  { transform: scale(0.9) rotate(3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
 `;
 
 export default function ClassroomBoard() {
@@ -334,7 +349,7 @@ export default function ClassroomBoard() {
                   }} />
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "8px 6px 7px", display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                  <div style={{ flex: 1, padding: "6px 4px 5px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                     {/* Avatar */}
                     <div style={{
                       width: 50, height: 50, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
@@ -345,6 +360,7 @@ export default function ClassroomBoard() {
                         : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
                       border: `3px solid ${isFull ? "rgba(245,158,11,.7)" : lc.color + "55"}`,
                       boxShadow: isFull ? `0 0 16px rgba(245,158,11,.5)` : `0 0 10px ${lc.glow}`,
+                      animation: isFull ? "popIn .4s ease both, pulseRing 2s ease-in-out 0.5s infinite" : undefined,
                     }}>
                       {s.avatar_url
                         ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -369,16 +385,46 @@ export default function ClassroomBoard() {
                       ))}
                     </div>
 
-                    {/* Progress bar */}
-                    <div style={{ width: "85%", height: 5, borderRadius: 5, background: g(0.1), overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: 5, transition: "width .6s ease",
-                        width: `${(stars / 5) * 100}%`,
-                        background: isFull
-                          ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)"
-                          : `linear-gradient(90deg,${lc.color}cc,${lc.color})`,
-                        boxShadow: `0 0 6px ${lc.glow}`,
-                      }} />
+                    {/* Schedule pills */}
+                    {(() => {
+                      const todayAbbr = now.toLocaleDateString('en-US', { weekday: 'short' });
+                      const studentSchedules = board.schedules
+                        .filter((sc: { student_id: string; activity: string; start_time: string; end_time: string; active_days: string }) =>
+                          sc.student_id === s.id && (sc.active_days || '').includes(todayAbbr))
+                        .sort((a: { start_time: string }, b: { start_time: string }) => a.start_time.localeCompare(b.start_time))
+                        .slice(0, 2);
+                      return studentSchedules.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', maxWidth: '100%' }}>
+                          {studentSchedules.map((sc: { activity: string; start_time: string }, i: number) => (
+                            <span key={i} style={{
+                              fontSize: 8, padding: '1px 5px', borderRadius: 10,
+                              background: 'rgba(99,102,241,0.2)', color: 'rgba(167,139,250,0.9)',
+                              border: '1px solid rgba(99,102,241,0.3)', whiteSpace: 'nowrap' as const,
+                              fontWeight: 700, letterSpacing: '0.03em',
+                              animation: `slideIn .3s ease ${i * 0.08}s both`,
+                            }}>
+                              {sc.start_time.slice(0, 5)} {sc.activity}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Segmented star progress dots */}
+                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <div key={i} style={{
+                          width: i < stars ? 10 : 6,
+                          height: i < stars ? 10 : 6,
+                          borderRadius: '50%',
+                          transition: 'all 0.4s ease',
+                          background: i < stars
+                            ? (isFull ? 'radial-gradient(circle, #fef08a, #f59e0b)' : `radial-gradient(circle, ${lc.color}, ${lc.color}88)`)
+                            : 'rgba(255,255,255,0.1)',
+                          boxShadow: i < stars ? (isFull ? '0 0 6px rgba(245,158,11,0.8)' : `0 0 5px ${lc.glow}`) : 'none',
+                          animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.2}s infinite` : undefined,
+                        }} />
+                      ))}
                     </div>
 
                     {/* Level label + reward */}
@@ -577,6 +623,7 @@ export default function ClassroomBoard() {
         position: "relative", zIndex: 1,
         ...card, borderRadius: 12,
         display: "flex", alignItems: "center", gap: 8, padding: "0 12px", overflow: "hidden", flexShrink: 0,
+        animation: "pulseRing 2.5s ease-in-out infinite",
       }}>
         <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.25em", flexShrink: 0 }}>Behavior Levels</div>
         <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", overflow: "hidden" }}>
