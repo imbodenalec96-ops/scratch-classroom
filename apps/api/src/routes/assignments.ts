@@ -920,6 +920,8 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       }
       // If no grade target set, assignment is for everyone in class
       if (r.target_grade_min == null) return true;
+      // If student has no grade levels configured, show them all grade-targeted assignments
+      if (!studentGrades) return true;
       const tMin = Number(r.target_grade_min);
       const tMax = r.target_grade_max != null ? Number(r.target_grade_max) : tMin;
       const g = gradeFor(r.target_subject);
