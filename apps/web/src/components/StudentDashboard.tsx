@@ -586,12 +586,6 @@ function WorkScreen({
             {submittedCount} of {total} answered · heading home…
           </p>
         </div>
-        <div
-          className="fixed top-5 right-5 z-40 pointer-events-none"
-          style={{ transform: "scale(0.55)", transformOrigin: "top right", opacity: 0.9 }}
-        >
-          <Mascot state="cheer" />
-        </div>
       </div>
     );
   }
@@ -898,21 +892,6 @@ function WorkScreen({
         <div style={{ height: 80 }} /> {/* spacer so mascot doesn't overlap last button */}
       </div>
 
-      {/* ── Mascot — small corner badge, top-right, doesn't overlap card ── */}
-      <div className="fixed top-4 right-4 z-40 pointer-events-none select-none"
-        aria-hidden="true"
-        style={{
-          transform: mascotState === 'cheer' ? "scale(0.6)" : "scale(0.5)",
-          transformOrigin: "top right",
-          opacity: 0.85,
-          transition: "transform 0.4s ease-out",
-        }}>
-        <Mascot state={mascotState} />
-      </div>
-
-      {/* Flying word-buddy */}
-      <FlyingBuddy active={!dk} />
-
       {/* Streak counter */}
       <StreakCounter streak={streak} />
     </div>
@@ -1017,12 +996,6 @@ function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any;
         </div>
       </div>
 
-      {/* Mascot */}
-      {!dk && (
-        <div className="fixed bottom-5 right-5 z-40 pointer-events-none" aria-hidden="true">
-          <Mascot state="idle" />
-        </div>
-      )}
     </div>
   );
 }
@@ -1562,33 +1535,51 @@ export default function StudentDashboard() {
           ))}
         </div>
 
-        {/* ── EARN: Stars / Rank / Awards ── */}
-        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, animation: "dbSlide .4s ease both" }}>
+        {/* ── Stars & Stats ── */}
+        <div style={{ marginTop: 16, display: "flex", gap: 10, animation: "dbSlide .4s ease both" }}>
+          {/* Stars — wider card, SVG stars instead of emoji */}
           <div style={{
-            borderRadius: 14, padding: "14px 10px", textAlign: "center",
-            background: starsCount >= 5 ? "linear-gradient(135deg,rgba(245,158,11,.35),rgba(234,179,8,.2))" : "rgba(255,255,255,0.05)",
-            border: starsCount >= 5 ? "1px solid rgba(245,158,11,.5)" : "1px solid rgba(255,255,255,0.1)",
+            flex: 2, borderRadius: 14, padding: "14px 16px",
+            background: starsCount >= 4
+              ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
+              : "rgba(255,255,255,0.05)",
+            border: starsCount >= 4
+              ? "1px solid rgba(245,158,11,0.35)"
+              : "1px solid rgba(255,255,255,0.08)",
           }}>
-            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Stars</div>
-            <div style={{ fontSize: 10, lineHeight: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 8 }}>Behavior Stars</div>
+            <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
               {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} style={{ opacity: i < starsCount ? 1 : 0.15, fontSize: 14, animation: i < starsCount && starsCount >= 5 ? "dbStarPulse 2s ease-in-out infinite" : undefined, animationDelay: `${i * 0.12}s` }}>⭐</span>
+                <svg key={i} width="20" height="20" viewBox="0 0 24 24"
+                  fill={i < starsCount ? "#fbbf24" : "none"}
+                  stroke={i < starsCount ? "#f59e0b" : "rgba(255,255,255,0.18)"}
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ filter: i < starsCount && starsCount >= 5 ? "drop-shadow(0 0 4px rgba(251,191,36,0.7))" : "none", transition: "all 0.3s" }}
+                >
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
               ))}
             </div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{starsCount}/5</div>
-            {starsCount >= 5 && <div style={{ fontSize: 9, color: "#fcd34d", fontWeight: 700, marginTop: 2 }}>McDonald's! 🎉</div>}
+            <div style={{ fontSize: 14, fontWeight: 700, color: starsCount >= 4 ? "#fbbf24" : "rgba(255,255,255,0.55)" }}>
+              {starsCount}<span style={{ fontWeight: 400, opacity: 0.6 }}> / 5</span>
+              {starsCount >= 5 && <span style={{ marginLeft: 8, fontSize: 11, color: "#fcd34d" }}>Reward earned!</span>}
+            </div>
           </div>
-          <div style={{ borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Rank</div>
-            <div style={{ fontSize: 28, lineHeight: 1, marginBottom: 4 }}>
+
+          {/* Rank */}
+          <div style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Rank</div>
+            <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>
               {myRank <= 3 && myRank > 0 ? ["🥇","🥈","🥉"][myRank - 1] : "🏅"}
             </div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{myRank > 0 ? `#${myRank}` : "—"}</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{myRank > 0 ? `#${myRank}` : "—"}</div>
           </div>
-          <div style={{ borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Awards</div>
-            <div style={{ fontSize: 28, lineHeight: 1, marginBottom: 4 }}>🏆</div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
+
+          {/* Awards */}
+          <div style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Awards</div>
+            <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>🏆</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
           </div>
         </div>
 
