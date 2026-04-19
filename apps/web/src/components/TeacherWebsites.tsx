@@ -106,18 +106,26 @@ export default function TeacherWebsites() {
     if (!/^https?:\/\//i.test(url)) { setErr("URL must start with http:// or https://"); return; }
     setSaving(true);
     try {
-      await api.approveWebsite({
+      const newSite = await api.approveWebsite({
         requestId: approveFor?.id,
         title: approveTitle.trim() || approveFor?.title,
         url,
         category: approveCategory.trim() || undefined,
         iconEmoji: approveIconEmoji || undefined,
       });
+      // Close immediately — don't block on reload()
+      setSaving(false);
       setApproveFor(null);
-      await reload();
+      // Optimistically add to library so it shows instantly
+      if (newSite) setLibrary(prev => [newSite, ...prev.filter(w => w.id !== newSite.id)]);
+      if (approveFor?.id) setPending(prev => prev.filter(r => r.id !== approveFor.id));
       setTab("library");
-    } catch (e: any) { setErr(e?.message || "Failed to approve"); }
-    finally { setSaving(false); }
+      // Reload in background to sync full state
+      reload().catch(() => {});
+    } catch (e: any) {
+      setSaving(false);
+      setErr(e?.message || "Failed to approve");
+    }
   };
 
   const doDeny = async (req: any) => {
