@@ -4,25 +4,46 @@ import { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 
+// Ensure board_user_data exists before joining against it
+let boardTableReady = false;
+async function ensureBoardUserData() {
+  if (boardTableReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS board_user_data (
+      user_id TEXT PRIMARY KEY,
+      behavior_stars INTEGER NOT NULL DEFAULT 0,
+      reward_count INTEGER NOT NULL DEFAULT 0,
+      level INTEGER NOT NULL DEFAULT 1
+    )`);
+    boardTableReady = true;
+  } catch { boardTableReady = true; }
+}
+
 // Get leaderboard (top 50) — all students, even those with 0 points
 router.get("/", async (_req: AuthRequest, res: Response) => {
-  const rows = await db.prepare(
-    `SELECT
-       u.id AS user_id, u.name,
-       COALESCE(l.points, 0)   AS points,
-       COALESCE(l.level, 1)    AS level,
-       COALESCE(l.badges, '[]') AS badges,
-       COALESCE(bd.behavior_stars, 0) AS behavior_stars,
-       COALESCE(bd.reward_count, 0)   AS reward_count
-     FROM users u
-     LEFT JOIN leaderboard l  ON l.user_id  = u.id
-     LEFT JOIN board_user_data bd ON bd.user_id = u.id
-     WHERE u.role = 'student'
-     ORDER BY COALESCE(bd.behavior_stars, 0) DESC, COALESCE(l.points, 0) DESC
-     LIMIT 50`
-  ).all() as any[];
-  rows.forEach((r) => { r.badges = JSON.parse(r.badges || "[]"); });
-  res.json(rows);
+  try {
+    await ensureBoardUserData();
+    const rows = await db.prepare(
+      `SELECT
+         u.id AS user_id, u.name,
+         COALESCE(l.points, 0)   AS points,
+         COALESCE(l.level, 1)    AS level,
+         COALESCE(l.badges, '[]') AS badges,
+         COALESCE(bd.behavior_stars, 0) AS behavior_stars,
+         COALESCE(bd.reward_count, 0)   AS reward_count
+       FROM users u
+       LEFT JOIN leaderboard l  ON l.user_id  = u.id
+       LEFT JOIN board_user_data bd ON bd.user_id = u.id
+       WHERE u.role = 'student'
+       ORDER BY COALESCE(bd.behavior_stars, 0) DESC, COALESCE(l.points, 0) DESC
+       LIMIT 50`
+    ).all() as any[];
+    rows.forEach((r) => { r.badges = JSON.parse(r.badges || "[]"); });
+    res.json(rows);
+  } catch (e: any) {
+    console.error("[leaderboard GET]", e?.message || e);
+    res.status(500).json({ error: e?.message || "Failed to load leaderboard" });
+  }
 });
 
 // Assignment completion leaderboard

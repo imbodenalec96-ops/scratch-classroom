@@ -320,20 +320,21 @@ export default function Layout() {
             border: "1px solid rgba(124,58,237,0.25)",
             minWidth: 194,
           }}>
-            {/* User identity */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            {/* User identity — avatar centered with name below */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 10 }}>
               <div style={{
-                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+                background: user.avatarEmoji ? "rgba(139,92,246,0.22)" : "linear-gradient(135deg, #7c3aed, #4f46e5)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                color: "white", fontSize: 13, fontWeight: 800,
-                boxShadow: "0 2px 8px rgba(124,58,237,0.4)",
+                color: "white", fontSize: user.avatarEmoji ? 28 : 18, fontWeight: 800,
+                border: "2.5px solid rgba(139,92,246,0.5)",
+                boxShadow: "0 0 16px rgba(124,58,237,0.4)",
               }}>
-                {user.name.charAt(0).toUpperCase()}
+                {user.avatarEmoji || user.name.charAt(0).toUpperCase()}
               </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Student</div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.95)" }}>{user.name.split(" ")[0]}</div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Student</div>
               </div>
             </div>
             {/* Stats row */}

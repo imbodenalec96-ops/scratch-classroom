@@ -145,6 +145,80 @@ function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: stri
   );
 }
 
+/* ── Avatar Gallery ── */
+const AVATAR_GALLERY = [
+  // Animals
+  "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵",
+  "🐔","🐧","🐦","🦅","🦆","🦉","🦋","🐢","🐬","🐳","🦓","🦒","🦘","🐘","🦏",
+  // Sports & activities
+  "⚽","🏀","🏈","⚾","🎾","🏐","🎮","🎨","🎵","🎸","🎹","🎯","🏆","⭐","🌟",
+  // Food & fun
+  "🍕","🍦","🍩","🌈","🎃","🎄","🚀","🤖","👾","🦄","🐉","🧸","🎠","🏰","🌊",
+  // Nature
+  "🌺","🌻","🌴","🍀","🌙","☀️","❄️","⚡","🔥","🌈","🍁","🌸","🎋","🌵","🪐",
+];
+
+function AvatarPickerModal({ userId, current, onSelect, onClose }: {
+  userId: string; current: string; onSelect: (e: string) => void; onClose: () => void;
+}) {
+  const [saving, setSaving] = React.useState(false);
+  const pick = async (emoji: string) => {
+    setSaving(true);
+    try {
+      await api.setMyAvatar(userId, emoji);
+      onSelect(emoji);
+      onClose();
+    } catch { setSaving(false); }
+  };
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 16,
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "linear-gradient(160deg, #1a0d3a, #0d1a3a)",
+        border: "1px solid rgba(139,92,246,0.35)",
+        borderRadius: 20, padding: "20px 20px 24px",
+        maxWidth: 420, width: "100%",
+        boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
+        animation: "dbPop .25s ease both",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "white" }}>Choose Your Avatar</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Pick something that's you!</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>✕</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 6 }}>
+          {AVATAR_GALLERY.map((emoji) => (
+            <button key={emoji} onClick={() => pick(emoji)} disabled={saving} style={{
+              width: 36, height: 36, borderRadius: 10, fontSize: 20, lineHeight: 1,
+              border: emoji === current ? "2px solid #a78bfa" : "1.5px solid rgba(255,255,255,0.1)",
+              background: emoji === current ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.05)",
+              cursor: "pointer", transition: "all 0.15s",
+              boxShadow: emoji === current ? "0 0 12px rgba(139,92,246,0.5)" : "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.25)"; (e.currentTarget as HTMLElement).style.transform = "scale(1.18)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = emoji === current ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
+            >{emoji}</button>
+          ))}
+        </div>
+        {current && (
+          <div style={{ marginTop: 14, textAlign: "center" }}>
+            <button onClick={() => pick("")} style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+              Remove avatar (use initials instead)
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Flying Word-Buddy (butterfly companion) ── */
 function FlyingBuddy({ active = true }: { active?: boolean }) {
   const rm = prefersReducedMotion();
@@ -1018,6 +1092,10 @@ export default function StudentDashboard() {
     return () => { cancelled = true; clearInterval(iv); };
   }, [user?.role]);
 
+  // Avatar emoji (persisted to server)
+  const [avatarEmoji, setAvatarEmoji] = useState<string>((user as any)?.avatarEmoji || "");
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
   // Welcome → loading transition
   useEffect(() => {
     const t = setTimeout(() => setPhase('loading'), 1800);
@@ -1289,6 +1367,16 @@ export default function StudentDashboard() {
         </div>
       )}
 
+      {/* Avatar picker modal */}
+      {showAvatarPicker && user && (
+        <AvatarPickerModal
+          userId={user.id}
+          current={avatarEmoji}
+          onSelect={setAvatarEmoji}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
+
       {/* ── Header ── */}
       <header style={{
         padding: "24px 20px 20px",
@@ -1296,24 +1384,49 @@ export default function StudentDashboard() {
         animation: "dbPop .5s ease both",
       }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 4 }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* Avatar circle — clickable to open picker */}
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              title="Change your avatar"
+              style={{
+                width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
+                background: avatarEmoji
+                  ? "rgba(139,92,246,0.25)"
+                  : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                border: "3px solid rgba(139,92,246,0.55)",
+                boxShadow: "0 0 20px rgba(139,92,246,0.35)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: avatarEmoji ? 36 : 24, fontWeight: 900, color: "white",
+                cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 28px rgba(139,92,246,0.55)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 20px rgba(139,92,246,0.35)"; }}
+            >
+              {avatarEmoji || firstName[0].toUpperCase()}
+            </button>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 4 }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </div>
+              <h1 style={{
+                fontSize: "clamp(22px, 5vw, 36px)", fontWeight: 900, margin: 0, lineHeight: 1.1,
+                background: unlocked
+                  ? "linear-gradient(90deg,#6ee7b7,#34d399,#a7f3d0)"
+                  : "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
+                backgroundSize: "200% auto",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                animation: "dbGrad 4s linear infinite",
+              }}>
+                {unlocked ? `Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
+              </h1>
+              <p style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
+                {unlocked ? "Work done — you've earned it. Play something!" : "Ready to learn? Your work is below."}
+              </p>
+              <button onClick={() => setShowAvatarPicker(true)} style={{ marginTop: 4, fontSize: 10, color: "rgba(139,92,246,0.7)", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
+                ✏️ Edit avatar
+              </button>
             </div>
-            <h1 style={{
-              fontSize: "clamp(28px, 6vw, 42px)", fontWeight: 900, margin: 0, lineHeight: 1.1,
-              background: unlocked
-                ? "linear-gradient(90deg,#6ee7b7,#34d399,#a7f3d0)"
-                : "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
-              backgroundSize: "200% auto",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              animation: "dbGrad 4s linear infinite",
-            }}>
-              {unlocked ? `Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
-            </h1>
-            <p style={{ fontSize: 13, opacity: 0.55, marginTop: 4 }}>
-              {unlocked ? "Work done — you've earned it. Play something!" : "Ready to learn? Your work is below."}
-            </p>
           </div>
 
           {/* Stars display */}

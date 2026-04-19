@@ -24,7 +24,7 @@ router.post("/register", async (req: Request, res: Response) => {
       if (e.code === "SQLITE_CONSTRAINT_UNIQUE" || e.code === "23505") return res.status(409).json({ error: "Email taken" });
       throw e;
     }
-      const row = await db.prepare("SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?").get(id) as any;
+      const row = await db.prepare("SELECT id, email, name, role, avatar_url, avatar_emoji, created_at FROM users WHERE id = ?").get(id) as any;
     const user: User = {
       id: row.id,
       email: row.email,
@@ -71,7 +71,7 @@ router.get("/me", async (req: Request, res: Response) => {
   try {
     const jwt = await import("jsonwebtoken");
     const payload = jwt.default.verify(header.slice(7), process.env.JWT_SECRET || "dev-secret") as any;
-    const row = await db.prepare("SELECT id, email, name, role, avatar_url, created_at FROM users WHERE id = ?").get(payload.id) as any;
+    const row = await db.prepare("SELECT id, email, name, role, avatar_url, avatar_emoji, created_at FROM users WHERE id = ?").get(payload.id) as any;
     if (!row) return res.status(401).json({ error: "User not found" });
     res.json({
       id: row.id,
@@ -79,6 +79,7 @@ router.get("/me", async (req: Request, res: Response) => {
       name: row.name,
       role: row.role,
       avatarUrl: row.avatar_url,
+      avatarEmoji: row.avatar_emoji || null,
       createdAt: row.created_at,
     });
   } catch {

@@ -73,14 +73,11 @@ async function ensureGradeCols() {
   try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
 }
 
-// Lazy Anthropic client (same pattern as ai-tasks.ts)
-function getAnthropic() {
+// Lazy Anthropic client — uses dynamic import (ESM-safe, no require())
+async function getAnthropic() {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
-  const { default: Anthropic } = require("@anthropic-ai/sdk");
-  // 60s per-request timeout + 1 retry only. Default SDK config is 10min
-  // timeout with 2 retries — that turns a single slow call into 30min of
-  // hanging, which is what was blowing past our client-side 90s abort.
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
   return new Anthropic({ apiKey: key, timeout: 45_000, maxRetries: 0 });
 }
 const AI_MODEL = "claude-sonnet-4-20250514";
@@ -374,7 +371,7 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
   const { classId, title, subject = "Reading", description, rubric, weekTheme } = req.body;
   await ensureGradeCols();
 
-  const client = getAnthropic();
+  const client = await getAnthropic();
   if (!client) {
     return res.status(503).json({
       error: "AI features not configured. Add ANTHROPIC_API_KEY in Vercel env vars to enable weekly generation.",
@@ -532,7 +529,7 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
   } = req.body;
   await ensureGradeCols();
 
-  const client = getAnthropic();
+  const client = await getAnthropic();
   if (!client) {
     return res.status(503).json({
       error: "AI features not configured. Add ANTHROPIC_API_KEY in Vercel env vars.",
@@ -794,7 +791,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   const T0 = Date.now();
   const tag = `[slot ${Math.random().toString(36).slice(2, 6)}]`;
   console.log(`${tag} ENTER +0ms body=${JSON.stringify(req.body).slice(0,200)}`);
-  const client = getAnthropic();
+  const client = await getAnthropic();
   if (!client) {
     console.log(`${tag} NO_KEY +${Date.now()-T0}ms`);
     return res.status(503).json({ error: "ANTHROPIC_API_KEY not set", code: "AI_NOT_CONFIGURED" });
@@ -1193,7 +1190,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     return res.status(400).json({ error: "direction must be 'easier' or 'harder'" });
   }
   await ensureAdjLog();
-  const client = getAnthropic();
+  const client = await getAnthropic();
   if (!client) {
     return res.status(503).json({ error: "AI features not configured. Add ANTHROPIC_API_KEY." });
   }
@@ -1247,7 +1244,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
 // current and recent history
 // POST /assignments/:id/regenerate
 router.post("/:id/regenerate", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  const client = getAnthropic();
+  const client = await getAnthropic();
   if (!client) return res.status(503).json({ error: "AI features not configured. Add ANTHROPIC_API_KEY." });
 
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(req.params.id) as any;
@@ -1523,48 +1520,51 @@ router.post("/import-tpt", requireRole("teacher", "admin"), async (req: AuthRequ
 });
 
 router.post("/upload-pdf", requireRole("teacher", "admin"), pdfUpload.single("file"), async (req: AuthRequest, res: Response) => {
-  await ensureGradeCols();
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const buf = req.file.buffer;
-  // Content-type check
-  if (req.file.mimetype !== "application/pdf") {
-    return res.status(400).json({ error: "Only PDF files accepted (content-type mismatch)" });
+  try {
+    await ensureGradeCols();
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const buf = req.file.buffer;
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ error: "Only PDF files accepted (content-type mismatch)" });
+    }
+    if (buf.length < 4 || buf.slice(0, 4).toString("ascii") !== "%PDF") {
+      return res.status(400).json({ error: "Not a valid PDF (magic-byte check failed)" });
+    }
+
+    const { classId, title, description, targetGradeMin, targetGradeMax, targetSubject } = req.body || {};
+    const id = crypto.randomUUID();
+    const finalTitle = (title && String(title).trim()) || req.file.originalname.replace(/\.pdf$/i, "") || "Uploaded assignment";
+    const tMin = targetGradeMin != null && targetGradeMin !== "" ? Number(targetGradeMin) : null;
+    const tMax = targetGradeMax != null && targetGradeMax !== "" ? Number(targetGradeMax) : tMin;
+
+    await db.prepare(
+      `INSERT INTO assignments (
+         id, class_id, teacher_id, title, description, due_date, rubric,
+         starter_project_id, content, scheduled_date,
+         target_grade_min, target_grade_max, target_subject,
+         source
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id, classId || null, req.user!.id, finalTitle, description || "", null,
+      JSON.stringify([]), null, null, null,
+      tMin, tMax, targetSubject || null,
+      "manual",
+    );
+
+    const attached_pdf_path = await saveAttachedPdf(id, req.file.originalname || `${slugify(finalTitle)}-${id}.pdf`, buf);
+    await db.prepare("UPDATE assignments SET attached_pdf_path = ? WHERE id = ?").run(attached_pdf_path, id);
+
+    return res.json({
+      id,
+      title: finalTitle,
+      source: "manual",
+      attached_pdf_path,
+      bytes: buf.length,
+    });
+  } catch (e: any) {
+    console.error("[upload-pdf]", e?.message || e);
+    return res.status(500).json({ error: e?.message || "Failed to upload PDF" });
   }
-  // Magic-bytes check (%PDF)
-  if (buf.length < 4 || buf.slice(0, 4).toString("ascii") !== "%PDF") {
-    return res.status(400).json({ error: "Not a valid PDF (magic-byte check failed)" });
-  }
-
-  const { classId, title, description, targetGradeMin, targetGradeMax, targetSubject } = req.body || {};
-  const id = crypto.randomUUID();
-  const finalTitle = (title && String(title).trim()) || req.file.originalname.replace(/\.pdf$/i, "") || "Uploaded assignment";
-  const tMin = targetGradeMin != null && targetGradeMin !== "" ? Number(targetGradeMin) : null;
-  const tMax = targetGradeMax != null && targetGradeMax !== "" ? Number(targetGradeMax) : tMin;
-
-  await db.prepare(
-    `INSERT INTO assignments (
-       id, class_id, teacher_id, title, description, due_date, rubric,
-       starter_project_id, content, scheduled_date,
-       target_grade_min, target_grade_max, target_subject,
-       source
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id, classId || null, req.user!.id, finalTitle, description || "", null,
-    JSON.stringify([]), null, null, null,
-    tMin, tMax, targetSubject || null,
-    "manual",
-  );
-
-  const attached_pdf_path = await saveAttachedPdf(id, req.file.originalname || `${slugify(finalTitle)}-${id}.pdf`, buf);
-  await db.prepare("UPDATE assignments SET attached_pdf_path = ? WHERE id = ?").run(attached_pdf_path, id);
-
-  return res.json({
-    id,
-    title: finalTitle,
-    source: "manual",
-    attached_pdf_path,
-    bytes: buf.length,
-  });
 });
 
 // ── PDF → structured-assignment JSON via Claude ───────────────────────────────
@@ -1597,14 +1597,17 @@ router.post("/parse-pdf", requireRole("teacher", "admin"), async (req: AuthReque
     return res.status(404).json({ error: "PDF not found for that fileId" });
   }
 
-  const client = getAnthropic();
+  let client: any;
+  try { client = await getAnthropic(); } catch (e: any) {
+    return res.status(500).json({ error: "Failed to init AI client: " + (e?.message || "unknown") });
+  }
   if (!client) {
-    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on the server" });
   }
 
   try {
     const response = await client.messages.create({
-      model: "claude-opus-4-7",
+      model: "claude-sonnet-4-6",
       max_tokens: 4096,
       messages: [{
         role: "user",
