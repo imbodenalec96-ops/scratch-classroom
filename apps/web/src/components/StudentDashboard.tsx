@@ -146,22 +146,23 @@ function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: stri
 }
 
 /* ── Avatar Gallery ── */
-const AVATAR_GALLERY = [
-  // Animals
-  "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵",
-  "🐔","🐧","🐦","🦅","🦆","🦉","🦋","🐢","🐬","🐳","🦓","🦒","🦘","🐘","🦏",
-  // Sports & activities
-  "⚽","🏀","🏈","⚾","🎾","🏐","🎮","🎨","🎵","🎸","🎹","🎯","🏆","⭐","🌟",
-  // Food & fun
-  "🍕","🍦","🍩","🌈","🎃","🎄","🚀","🤖","👾","🦄","🐉","🧸","🎠","🏰","🌊",
-  // Nature
-  "🌺","🌻","🌴","🍀","🌙","☀️","❄️","⚡","🔥","🌈","🍁","🌸","🎋","🌵","🪐",
+const AVATAR_SECTIONS = [
+  { label: "🐾 Animals", items: ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🦅","🦆","🦉","🦋","🐢","🐬","🐳","🦈","🦓","🦒","🦘","🐘","🦏","🐆","🦝","🦦","🦥","🐿️","🦔","🐇","🦌","🐓","🦃","🦚","🦜","🦩","🐾"] },
+  { label: "⚽ Sports", items: ["⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏸","🏒","🎿","⛷️","🏄","🤸","🏋️","🤼","🥊","🎯","🏹","🛹","🛼","🚴","🧗","🤺","🏊","🏇","⛸️","🥋","🏌️"] },
+  { label: "🚀 Sci-fi & Fantasy", items: ["🚀","🤖","👾","🛸","🌌","🔭","🪐","⭐","🌟","💫","✨","🌠","🧙","🧚","🧜","🧝","🦄","🐉","🔮","🧿","🗺️","⚔️","🛡️","🪄","🏰","🗡️","🌀","🌊","🔥","⚡"] },
+  { label: "🎨 Arts & Music", items: ["🎨","🖌️","✏️","📐","🎵","🎸","🎹","🥁","🎺","🎻","🎤","🎧","📸","🎬","🎭","🎪","🖼️","🎠","🎡","🎢","🃏","🎲","🧩","♟️","🎰","🎳"] },
+  { label: "🍕 Food & Treats", items: ["🍕","🍦","🍩","🍪","🎂","🧁","🍫","🍬","🍭","🍿","🌮","🍔","🌯","🥞","🧇","🍣","🍜","🧃","🥤","☕","🍵","🧋","🍓","🍇","🍉","🍒","🍑","🥝","🍋","🍊"] },
+  { label: "🌿 Nature", items: ["🌺","🌻","🌸","🌷","🌹","🌼","💐","🌴","🌵","🎋","🍀","🌿","🍁","🍂","🌾","🌱","🪴","🌲","🌳","🌙","☀️","⛅","🌈","❄️","⚡","🔥","🌊","🌪️","🪐","🗻"] },
+  { label: "🚗 Vehicles", items: ["🚀","✈️","🚁","🛸","🚂","🚢","🚗","🚕","🏎️","🚒","🚑","🚓","🚜","🚛","🛻","🏍️","🛵","🚲","🛺","⛵","🛥️","🚤","🛶","🚡","🚟","🛳️","🛰️","🪂","🚠","🚃"] },
+  { label: "✨ Magic & Objects", items: ["🎃","🎄","🎁","🎀","🎈","🎉","🎊","🪆","🧸","🪀","🪁","🎏","🔮","🪄","💎","👑","🏆","🥇","🌟","💫","⭐","🌠","🌈","🎆","🎇","✨","💥","🔔","📯","🪘"] },
 ];
+const AVATAR_GALLERY = AVATAR_SECTIONS.flatMap(s => s.items);
 
 function AvatarPickerModal({ userId, current, onSelect, onClose }: {
   userId: string; current: string; onSelect: (e: string) => void; onClose: () => void;
 }) {
   const [saving, setSaving] = React.useState(false);
+  const [activeSection, setActiveSection] = React.useState(0);
   const pick = async (emoji: string) => {
     setSaving(true);
     try {
@@ -170,47 +171,63 @@ function AvatarPickerModal({ userId, current, onSelect, onClose }: {
       onClose();
     } catch { setSaving(false); }
   };
+  const section = AVATAR_SECTIONS[activeSection];
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+      background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 16,
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
         background: "linear-gradient(160deg, #1a0d3a, #0d1a3a)",
         border: "1px solid rgba(139,92,246,0.35)",
-        borderRadius: 20, padding: "20px 20px 24px",
-        maxWidth: 420, width: "100%",
+        borderRadius: 24, padding: "20px",
+        maxWidth: 500, width: "100%",
         boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
         animation: "dbPop .25s ease both",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: "white" }}>Choose Your Avatar</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Pick something that's you!</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "white" }}>Choose Your Avatar</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+              {current ? `Current: ${current}` : "Pick something that's you!"}
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>✕</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 6 }}>
-          {AVATAR_GALLERY.map((emoji) => (
-            <button key={emoji} onClick={() => pick(emoji)} disabled={saving} style={{
-              width: 36, height: 36, borderRadius: 10, fontSize: 20, lineHeight: 1,
-              border: emoji === current ? "2px solid #a78bfa" : "1.5px solid rgba(255,255,255,0.1)",
-              background: emoji === current ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.05)",
+        {/* Category tabs */}
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 10, scrollbarWidth: "none" }}>
+          {AVATAR_SECTIONS.map((s, i) => (
+            <button key={i} onClick={() => setActiveSection(i)} style={{
+              flexShrink: 0, padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+              border: i === activeSection ? "1.5px solid rgba(139,92,246,0.7)" : "1.5px solid rgba(255,255,255,0.1)",
+              background: i === activeSection ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.04)",
+              color: i === activeSection ? "#c4b5fd" : "rgba(255,255,255,0.5)",
               cursor: "pointer", transition: "all 0.15s",
-              boxShadow: emoji === current ? "0 0 12px rgba(139,92,246,0.5)" : "none",
+            }}>{s.label}</button>
+          ))}
+        </div>
+        {/* Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+          {section.items.map((emoji) => (
+            <button key={emoji} onClick={() => pick(emoji)} disabled={saving} style={{
+              width: "100%", aspectRatio: "1", borderRadius: 12, fontSize: 26, lineHeight: 1,
+              border: emoji === current ? "2.5px solid #a78bfa" : "1.5px solid rgba(255,255,255,0.08)",
+              background: emoji === current ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.04)",
+              cursor: "pointer", transition: "all 0.13s",
+              boxShadow: emoji === current ? "0 0 16px rgba(139,92,246,0.6)" : "none",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.25)"; (e.currentTarget as HTMLElement).style.transform = "scale(1.18)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = emoji === current ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.28)"; (e.currentTarget as HTMLElement).style.transform = "scale(1.22)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = emoji === current ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.04)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
             >{emoji}</button>
           ))}
         </div>
         {current && (
           <div style={{ marginTop: 14, textAlign: "center" }}>
             <button onClick={() => pick("")} style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-              Remove avatar (use initials instead)
+              Use initials instead
             </button>
           </div>
         )}
@@ -1095,6 +1112,7 @@ export default function StudentDashboard() {
   // Avatar emoji (persisted to server)
   const [avatarEmoji, setAvatarEmoji] = useState<string>((user as any)?.avatarEmoji || "");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
   // Welcome → loading transition
   useEffect(() => {
@@ -1464,6 +1482,43 @@ export default function StudentDashboard() {
 
       <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
 
+      {/* ── Quick Stats: Stars / Rank / Awards ── */}
+      {(() => {
+        const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
+        const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, animation: "dbSlide .4s ease both" }}>
+            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
+              background: starsCount >= 5 ? "linear-gradient(135deg,rgba(245,158,11,.35),rgba(234,179,8,.2))" : "rgba(255,255,255,0.05)",
+              border: starsCount >= 5 ? "1px solid rgba(245,158,11,.5)" : "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Stars</div>
+              <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} style={{ opacity: i < starsCount ? 1 : 0.15, fontSize: 16 }}>⭐</span>
+                ))}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{starsCount}/5</div>
+            </div>
+            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Rank</div>
+              <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 4 }}>
+                {myRank <= 3 && myRank > 0 ? ["🥇","🥈","🥉"][myRank - 1] : "🏅"}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>
+                {myRank > 0 ? `#${myRank}` : "—"}
+              </div>
+            </div>
+            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Awards</div>
+              <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 4 }}>🏆</div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Current Block Banner ── */}
       {(blockInfo.state === "current" && !(blockInfo as any).block.is_break) && (
         <div style={{
@@ -1710,23 +1765,59 @@ export default function StudentDashboard() {
                 <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>31 games · keep it fun</div>
               </div>
             </Link>
-            <Link to="/projects" style={{ textDecoration: "none" }}>
-              <div style={{
-                padding: "20px 18px", borderRadius: 18, cursor: "pointer",
-                background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
-                border: "1px solid rgba(16,185,129,.55)",
-                boxShadow: "0 0 30px rgba(16,185,129,.18)",
-                animation: "dbPop .5s ease .31s both",
-                transition: "transform .15s, box-shadow .15s",
-              }}
-              onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(16,185,129,.38)"; }}
-              onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(16,185,129,.18)"; }}
+            <div style={{ position: "relative" }}>
+              <div
+                onClick={() => setShowProjectMenu(v => !v)}
+                style={{
+                  padding: "20px 18px", borderRadius: 18, cursor: "pointer",
+                  background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
+                  border: "1px solid rgba(16,185,129,.55)",
+                  boxShadow: "0 0 30px rgba(16,185,129,.18)",
+                  animation: "dbPop .5s ease .31s both",
+                  transition: "transform .15s, box-shadow .15s",
+                  userSelect: "none",
+                }}
+                onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(16,185,129,.38)"; }}
+                onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(16,185,129,.18)"; }}
               >
                 <div style={{ fontSize: 36, marginBottom: 8 }}>💻</div>
                 <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Projects</div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>BlockForge · 2D & 3D stages</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>2D · 3D · Unity ▾</div>
               </div>
-            </Link>
+              {showProjectMenu && (
+                <div style={{
+                  position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30,
+                  background: "rgba(15,10,35,0.97)", border: "1px solid rgba(16,185,129,.45)",
+                  borderRadius: 14, overflow: "hidden",
+                  boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+                  animation: "dbSlide .18s ease both",
+                }}>
+                  {[
+                    { label: "🎨 2D Stage", sub: "Sprites & blocks", to: "/projects?mode=2d" },
+                    { label: "🧊 3D Stage", sub: "3D world builder", to: "/projects?mode=3d" },
+                    { label: "🎮 Unity", sub: "Coming soon", to: null },
+                  ].map(opt => (
+                    <button
+                      key={opt.label}
+                      disabled={!opt.to}
+                      onClick={() => { setShowProjectMenu(false); if (opt.to) navigate(opt.to); }}
+                      style={{
+                        width: "100%", padding: "12px 16px", background: "none", border: "none",
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        color: opt.to ? "white" : "rgba(255,255,255,0.35)",
+                        cursor: opt.to ? "pointer" : "default",
+                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
+                      }}
+                      onMouseEnter={e => { if (opt.to) (e.currentTarget as any).style.background = "rgba(16,185,129,.15)"; }}
+                      onMouseLeave={e => { (e.currentTarget as any).style.background = "none"; }}
+                    >
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, opacity: 0.45 }}>{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1755,8 +1846,8 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library nav card — only during free time or break */}
-      {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
+      {/* YouTube Library nav card */}
+      {classConfig.youtubeEnabled && (
         <button
           onClick={() => navigate("/student/videos")}
           style={{
@@ -1804,8 +1895,8 @@ export default function StudentDashboard() {
         </button>
       )}
 
-      {/* Learning Apps */}
-      {(unlocked || isOnBreak()) && (myWebsites.length > 0 || true) && (
+      {/* Learning Apps — always visible; educational tools not gated behind free time */}
+      {(true) && (
         <div style={{
           borderRadius: 16, padding: "14px",
           background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
@@ -1820,12 +1911,16 @@ export default function StudentDashboard() {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-              style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}
-            >
-              📝 Ask for a new website
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => navigate("/websites")}
+                style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}
+              >See all →</button>
+              <button
+                onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
+                style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)" }}
+              >📝 Request</button>
+            </div>
           </div>
 
           {myWebsites.length > 0 ? (

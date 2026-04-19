@@ -122,34 +122,51 @@ router.post("/request", async (req: AuthRequest, res: Response) => {
 
 // ── Student: my granted websites ───────────────────────────────────
 router.get("/mine", async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  await seedDefaultsIfEmpty();
-  const userId = req.user!.id;
-  // Individually granted sites
-  const granted = await db.prepare(
-    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
-            sw.granted_at
-       FROM student_approved_websites sw
-       JOIN approved_websites w ON w.id = sw.approved_website_id
-      WHERE sw.student_id = ?
-      ORDER BY sw.granted_at DESC`
-  ).all(userId) as any[];
-  // Class-library sites: websites in classes the student is enrolled in, plus global (class_id IS NULL) entries
-  const classLibrary = await db.prepare(
-    `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
-            w.added_at AS granted_at
-       FROM approved_websites w
-      WHERE w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
-         OR w.class_id IS NULL
-      ORDER BY w.added_at DESC`
-  ).all(userId) as any[];
-  // Merge: deduplicate by id, granted entries take priority
-  const seen = new Set<string>();
-  const merged: any[] = [];
-  for (const w of [...granted, ...classLibrary]) {
-    if (!seen.has(w.id)) { seen.add(w.id); merged.push(w); }
+  try {
+    await ensureTables();
+    await seedDefaultsIfEmpty();
+    const userId = req.user!.id;
+    // Individually granted sites
+    const granted = await db.prepare(
+      `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
+              sw.granted_at
+         FROM student_approved_websites sw
+         JOIN approved_websites w ON w.id = sw.approved_website_id
+        WHERE sw.student_id = ?
+        ORDER BY sw.granted_at DESC`
+    ).all(userId) as any[];
+    // Class-library sites: websites in classes the student is enrolled in, plus global (class_id IS NULL) entries
+    let classLibrary: any[] = [];
+    try {
+      classLibrary = await db.prepare(
+        `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
+                w.added_at AS granted_at
+           FROM approved_websites w
+          WHERE w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
+             OR w.class_id IS NULL
+          ORDER BY w.added_at DESC`
+      ).all(userId) as any[];
+    } catch {
+      // Fallback: just return global (class_id IS NULL) sites if class_members query fails
+      classLibrary = await db.prepare(
+        `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
+                w.added_at AS granted_at
+           FROM approved_websites w
+          WHERE w.class_id IS NULL
+          ORDER BY w.added_at DESC`
+      ).all() as any[];
+    }
+    // Merge: deduplicate by id, granted entries take priority
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const w of [...granted, ...classLibrary]) {
+      if (!seen.has(w.id)) { seen.add(w.id); merged.push(w); }
+    }
+    res.json(merged);
+  } catch (e: any) {
+    console.error("[websites/mine]", e);
+    res.status(500).json({ error: e?.message || "Failed to load websites" });
   }
-  res.json(merged);
 });
 
 // ── Student: resolve one website by id (for the embedded viewer) ───
