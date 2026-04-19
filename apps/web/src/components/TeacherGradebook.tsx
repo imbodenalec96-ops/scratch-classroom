@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon, Eye, ChevronLeft, X } from "lucide-react";
+import { MessageSquare, Eye, ChevronLeft, ChevronDown, ChevronRight, X, MoreHorizontal } from "lucide-react";
 
 type Scope = "today" | "week" | "all";
 
@@ -42,9 +42,41 @@ const SUBJECT_ICON: Record<string, string> = {
   math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛",
   daily_news: "📰", review: "🔁", science: "🔬", social_studies: "🌎",
 };
+const SUBJECT_LABEL: Record<string, string> = {
+  math: "Math", reading: "Reading", writing: "Writing", spelling: "Spelling", sel: "SEL",
+  daily_news: "Daily News", review: "Review", science: "Science", social_studies: "Social Studies",
+};
 function subjectIcon(s: string | null | undefined): string {
   if (!s) return "📝";
   return SUBJECT_ICON[s] || "📝";
+}
+function subjectLabel(s: string | null | undefined): string {
+  if (!s) return "Other";
+  return SUBJECT_LABEL[s] || s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Status → { label, color, dotBg } for the consolidated Status column. */
+function statusMeta(status: Row["status"], hasSubmission: boolean): {
+  label: string; fg: string; bg: string; border: string;
+} {
+  if (status === "graded")       return { label: "Graded",       fg: "#34d399", bg: "rgba(52,211,153,0.12)", border: "rgba(52,211,153,0.28)" };
+  if (status === "needs_review") return { label: "Needs review", fg: "#fbbf24", bg: "rgba(251,191,36,0.12)", border: "rgba(251,191,36,0.3)" };
+  if (status === "ai_only")      return { label: "AI graded",    fg: "#a78bfa", bg: "rgba(124,58,237,0.14)", border: "rgba(124,58,237,0.35)" };
+  if (hasSubmission)             return { label: "Submitted",    fg: "#93c5fd", bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.28)" };
+  return                                { label: "Not started",  fg: "rgba(255,255,255,0.38)", bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.07)" };
+}
+
+function formatDueDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const s = String(iso);
+  // Handles both "2026-04-24" and full ISO timestamps
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return s;
+  const [, , mo, d] = match;
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const miNum = parseInt(mo, 10) - 1;
+  if (miNum < 0 || miNum > 11) return s;
+  return `${MONTHS[miNum]} ${parseInt(d, 10)}`;
 }
 
 /** Color-coded grade cell — maps score to green/yellow/red/gray */
@@ -64,21 +96,6 @@ function gradeCell(score: number | null | undefined, pass: boolean | null, statu
   if (s >= 70) return { bg: "rgba(251,191,36,0.13)",  text: "#fbbf24", border: "rgba(251,191,36,0.3)",  label: `${s}` };
   if (s >= 60) return { bg: "rgba(251,146,60,0.13)",  text: "#fb923c", border: "rgba(251,146,60,0.28)", label: `${s}` };
   return           { bg: "rgba(239,68,68,0.13)",   text: "#f87171", border: "rgba(239,68,68,0.28)",  label: `${s}` };
-}
-
-function StatusDot({ status }: { status: Row["status"] }) {
-  const dot: Record<Row["status"], string> = {
-    graded:       "bg-emerald-400",
-    ai_only:      "bg-violet-400",
-    needs_review: "bg-amber-400",
-    pending:      "bg-white/20",
-  };
-  const tip: Record<Row["status"], string> = {
-    graded: "Graded", ai_only: "AI graded", needs_review: "Needs review", pending: "Pending",
-  };
-  return (
-    <span title={tip[status]} className={`inline-block w-1.5 h-1.5 rounded-full ${dot[status]}`} />
-  );
 }
 
 /* ── Letter → numeric map ── */
@@ -132,6 +149,14 @@ export default function TeacherGradebook() {
 
   // Feature O: assignment preview panel
   const [previewAssignment, setPreviewAssignment] = useState<Row | null>(null);
+
+  // Collapsed subject groups (by subject key)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((p) => ({ ...p, [key]: !p[key] }));
+
+  // Per-row overflow menu
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
 
   const toggleWork = async (row: Row) => {
     if (workOpenFor === row.assignment_id) { setWorkOpenFor(null); return; }
@@ -239,6 +264,18 @@ export default function TeacherGradebook() {
     return rows.filter((r) => r.status === "needs_review" || r.status === "ai_only");
   }, [rows, ungradedOnly]);
 
+  // Group by subject, preserving first-seen order
+  const grouped = useMemo(() => {
+    const order: string[] = [];
+    const map: Record<string, Row[]> = {};
+    for (const r of visibleRows) {
+      const key = r.subject || "other";
+      if (!(key in map)) { map[key] = []; order.push(key); }
+      map[key].push(r);
+    }
+    return order.map((key) => ({ key, rows: map[key] }));
+  }, [visibleRows]);
+
   const totals = useMemo(() => {
     const submitted  = rows.filter((r) => !!r.submission_id).length;
     const humanGraded= rows.filter((r) => r.status === "graded").length;
@@ -297,10 +334,6 @@ export default function TeacherGradebook() {
     if (!parsed) return;
     doGrade(row, parsed.passed, feedbackDraft[row.assignment_id], parsed.score);
   };
-
-  /* ── Layout constants ── */
-  const STUDENT_COL_W = 180;
-  const CELL_W        = 64;
 
   /* ── Styles ── */
   const surfaceBg  = "rgba(255,255,255,0.03)";
@@ -514,7 +547,7 @@ export default function TeacherGradebook() {
           </div>
         )}
 
-        {/* ── Spreadsheet grid ── */}
+        {/* ── Assignments table ── */}
         <div className="flex-1 overflow-auto" style={{ position: "relative" }}>
           {!selectedId && (
             <div className="flex items-center justify-center h-full" style={{ color: "var(--t3)" }}>
@@ -539,340 +572,404 @@ export default function TeacherGradebook() {
           {selectedId && !loading && visibleRows.length > 0 && (
             <table
               style={{
+                width: "100%",
+                minWidth: 720,
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                width: STUDENT_COL_W + visibleRows.length * CELL_W + 200,
               }}
             >
-              {/* ── Column definitions ── */}
+              {/* ── Column widths ── */}
               <colgroup>
-                {/* frozen student name col */}
-                <col style={{ width: STUDENT_COL_W }} />
-                {/* assignment cols */}
-                {visibleRows.map((r) => (
-                  <col key={r.assignment_id} style={{ width: CELL_W }} />
-                ))}
-                {/* trailing details col */}
-                <col style={{ width: 200 }} />
+                <col /* Assignment (flex) */ />
+                <col style={{ width: 130 }} /* Subject */ />
+                <col style={{ width: 90 }}  /* Due */ />
+                <col style={{ width: 140 }} /* Status */ />
+                <col style={{ width: 78 }}  /* Grade */ />
+                <col style={{ width: 120 }} /* Actions */ />
               </colgroup>
 
-              {/* ── Sticky header row ── */}
+              {/* ── Header ── */}
               <thead>
                 <tr>
-                  {/* Corner cell */}
-                  <th
-                    style={{
-                      position: "sticky", top: 0, left: 0, zIndex: 30,
-                      background: headerBg,
-                      borderBottom: `2px solid ${borderCol}`,
-                      borderRight: `2px solid rgba(255,255,255,0.1)`,
-                      padding: "0 12px",
-                      height: 40,
-                      textAlign: "left",
-                      fontSize: 10, fontWeight: 700,
-                      letterSpacing: "0.1em", textTransform: "uppercase",
-                      color: "var(--t3)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Assignment
-                  </th>
-
-                  {/* Assignment header cells */}
-                  {visibleRows.map((r) => {
-                    const dateText = r.scheduled_date || (r.due_date ? String(r.due_date).slice(5, 10) : "");
-                    return (
-                      <th
-                        key={r.assignment_id}
-                        title={r.title}
-                        style={{
-                          position: "sticky", top: 0, zIndex: 20,
-                          background: headerBg,
-                          borderBottom: `2px solid ${borderCol}`,
-                          borderRight: `1px solid ${borderCol}`,
-                          padding: "0 4px",
-                          height: 40,
-                          width: CELL_W,
-                          textAlign: "center",
-                          verticalAlign: "bottom",
-                        }}
-                      >
-                        {/* Rotated label container */}
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "flex-end",
-                            gap: 2,
-                            paddingBottom: 6,
-                          }}
-                        >
-                          <span style={{ fontSize: 13, lineHeight: 1 }}>
-                            {subjectIcon(r.subject)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 9, fontWeight: 700, color: "var(--t3)",
-                              letterSpacing: "0.05em", textTransform: "uppercase",
-                              maxWidth: CELL_W - 6, overflow: "hidden",
-                              textOverflow: "ellipsis", whiteSpace: "nowrap",
-                              display: "block",
-                            }}
-                          >
-                            {dateText}
-                          </span>
-                        </div>
-                      </th>
-                    );
-                  })}
-
-                  {/* Details column header */}
-                  <th
-                    style={{
-                      position: "sticky", top: 0, zIndex: 20,
-                      background: headerBg,
-                      borderBottom: `2px solid ${borderCol}`,
-                      borderLeft: `1px solid ${borderCol}`,
-                      padding: "0 12px",
-                      height: 40,
-                      textAlign: "left",
-                      fontSize: 10, fontWeight: 700,
-                      letterSpacing: "0.1em", textTransform: "uppercase",
-                      color: "var(--t3)",
-                    }}
-                  >
-                    Actions
-                  </th>
+                  {["Assignment", "Subject", "Due", "Status", "Grade", "Actions"].map((h, i) => (
+                    <th
+                      key={h}
+                      style={{
+                        position: "sticky", top: 0, zIndex: 20,
+                        background: headerBg,
+                        borderBottom: `1px solid ${borderCol}`,
+                        padding: "10px 14px",
+                        height: 40,
+                        textAlign: i >= 4 ? "center" : "left",
+                        fontSize: 10, fontWeight: 700,
+                        letterSpacing: "0.1em", textTransform: "uppercase",
+                        color: "var(--t3)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
-              {/* ── Body: one row = one student (here just one selected student, each assignment is a column) ── */}
-              {/* Actually: Infinite Campus layout for single-student view = each assignment row in the roster.
-                  We render a TRANSPOSED view: rows = assignments, first col = assignment name info. */}
+              {/* ── Body: rows grouped by subject ── */}
               <tbody>
-                {visibleRows.map((r, idx) => {
-                  // Feature N: determine displayed grade score
-                  const savedScore = r.human_grade_score ?? r.numeric_grade ?? r.ai_grade;
-                  const cell    = gradeCell(savedScore, r.human_grade_pass, r.status);
-                  const saving  = savingId === r.assignment_id;
-                  const fbOpen  = feedbackOpenFor === r.assignment_id;
-                  const wkOpen  = workOpenFor === r.assignment_id;
-                  const rowBase = idx % 2 === 1 ? "rgba(255,255,255,0.015)" : "transparent";
-
-                  // Feature N: current grade input value
-                  const gradeInputVal = gradeInputs[r.assignment_id] !== undefined
-                    ? gradeInputs[r.assignment_id]
-                    : (savedScore != null ? String(savedScore) : "");
-
+                {grouped.map(({ key: subjectKey, rows: groupRows }) => {
+                  const collapsed = !!collapsedGroups[subjectKey];
                   return (
-                    <React.Fragment key={r.assignment_id}>
-                      <tr
-                        style={{ background: rowBase, height: 36, transition: "background 0.1s" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(124,58,237,0.07)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = rowBase)}
-                      >
-                        {/* Frozen assignment name cell — Feature O: clickable title */}
+                    <React.Fragment key={subjectKey}>
+                      {/* Subject group header */}
+                      <tr>
                         <td
+                          colSpan={6}
                           style={{
-                            position: "sticky", left: 0, zIndex: 10,
-                            background: "inherit",
-                            borderRight: `2px solid rgba(255,255,255,0.08)`,
+                            background: "rgba(255,255,255,0.025)",
+                            borderTop: `1px solid ${borderCol}`,
                             borderBottom: `1px solid ${borderCol}`,
-                            padding: "0 12px",
-                            width: STUDENT_COL_W,
-                            overflow: "hidden",
+                            padding: "8px 12px",
+                            cursor: "pointer",
+                            userSelect: "none",
                           }}
+                          onClick={() => toggleGroup(subjectKey)}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <StatusDot status={r.status} />
-                            <button
-                              onClick={() => {
-                                setPreviewAssignment(r);
-                                loadSubmissionForPreview(r);
-                                if (!(r.assignment_id in feedbackDraft)) {
-                                  setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
-                                }
-                              }}
-                              style={{
-                                background: "none", border: "none", padding: 0,
-                                cursor: "pointer", textAlign: "left",
-                                fontSize: 12, fontWeight: 600, color: "var(--t1)",
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                maxWidth: STUDENT_COL_W - 48,
-                                textDecoration: "none",
-                              }}
-                              title={`Preview: ${r.title}`}
-                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#a78bfa"; }}
-                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--t1)"; }}
-                            >
-                              {r.title}
-                            </button>
-                          </div>
-                        </td>
-
-                        {/* Feature N: Grade input cell replacing static grade chip */}
-                        <td
-                          style={{
-                            borderRight: `1px solid ${borderCol}`,
-                            borderBottom: `1px solid ${borderCol}`,
-                            padding: 4,
-                            textAlign: "center",
-                            width: CELL_W,
-                            background: cell.bg,
-                          }}
-                        >
-                          <input
-                            type="text"
-                            value={gradeInputVal}
-                            placeholder="—"
-                            onChange={(e) => setGradeInputs((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.currentTarget.blur();
-                                commitGradeInput(r);
-                              }
-                              if (e.key === "Escape") {
-                                setGradeInputs((p) => {
-                                  const next = { ...p };
-                                  delete next[r.assignment_id];
-                                  return next;
-                                });
-                                e.currentTarget.blur();
-                              }
-                            }}
-                            onBlur={() => commitGradeInput(r)}
-                            onFocus={() => {
-                              // Initialize input with current saved value when focused
-                              if (gradeInputs[r.assignment_id] === undefined) {
-                                setGradeInputs((p) => ({
-                                  ...p,
-                                  [r.assignment_id]: savedScore != null ? String(savedScore) : "",
-                                }));
-                              }
-                            }}
-                            style={{
-                              width: 52, height: 26, borderRadius: 4,
-                              background: "transparent",
-                              color: cell.text,
-                              border: `1px solid ${cell.border}`,
-                              fontSize: 11, fontWeight: 800,
-                              fontVariantNumeric: "tabular-nums",
-                              letterSpacing: "-0.01em",
-                              textAlign: "center",
-                              outline: "none",
-                              cursor: "text",
-                            }}
-                          />
-                        </td>
-
-                        {/* Remaining assignment columns (empty — this view is one student wide) */}
-                        {visibleRows.slice(idx + 1, idx + 1).map(() => null)}
-
-                        {/* Actions cell */}
-                        <td
-                          style={{
-                            borderLeft: `1px solid ${borderCol}`,
-                            borderBottom: `1px solid ${borderCol}`,
-                            padding: "0 10px",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            {/* View work */}
-                            <ActionBtn
-                              active={wkOpen}
-                              disabled={!r.submission_id}
-                              title={r.submission_id ? "View work" : "No submission"}
-                              onClick={() => toggleWork(r)}
-                            >
-                              <Eye size={10} />
-                            </ActionBtn>
-
-                            {/* Pass / redo quick buttons — always shown but styled differently if already graded */}
-                            <ActionBtn
-                              color="emerald"
-                              disabled={saving}
-                              title="Pass"
-                              onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
-                            >
-                              ✓
-                            </ActionBtn>
-                            <ActionBtn
-                              color="red"
-                              disabled={saving}
-                              title="Redo"
-                              onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
-                            >
-                              ✗
-                            </ActionBtn>
-
-                            {/* Feedback */}
-                            <ActionBtn
-                              active={fbOpen}
-                              title="Feedback"
-                              onClick={() => {
-                                setFeedbackOpenFor(fbOpen ? null : r.assignment_id);
-                                if (!fbOpen && !(r.assignment_id in feedbackDraft)) {
-                                  setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
-                                }
-                              }}
-                            >
-                              <MessageSquare size={10} />
-                            </ActionBtn>
-
-                            {/* Subject + date inline */}
-                            <span style={{ marginLeft: 6, fontSize: 10, color: "var(--t3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                              {r.scheduled_date || (r.due_date ? String(r.due_date).slice(0, 10) : "—")}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {collapsed
+                              ? <ChevronRight size={13} style={{ color: "var(--t3)" }} />
+                              : <ChevronDown  size={13} style={{ color: "var(--t3)" }} />}
+                            <span style={{ fontSize: 14 }}>{subjectIcon(subjectKey)}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--t2)", letterSpacing: "0.02em" }}>
+                              {subjectLabel(subjectKey)}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--t3)" }}>
+                              · {groupRows.length} {groupRows.length === 1 ? "assignment" : "assignments"}
                             </span>
                           </div>
                         </td>
                       </tr>
 
-                      {/* Work view expansion */}
-                      {wkOpen && (
-                        <tr>
-                          <td colSpan={3} style={{ borderBottom: `1px solid ${borderCol}`, padding: "12px 16px", background: "rgba(255,255,255,0.02)" }}>
-                            {!r.submission_id ? (
-                              <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>Student hasn't submitted yet.</p>
-                            ) : workLoading === r.submission_id ? (
-                              <p style={{ fontSize: 12, color: "var(--t3)" }}>Loading submission…</p>
-                            ) : (
-                              <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
-                            )}
-                          </td>
-                        </tr>
-                      )}
+                      {/* Rows within the group */}
+                      {!collapsed && groupRows.map((r) => {
+                        const savedScore    = r.human_grade_score ?? r.numeric_grade ?? r.ai_grade;
+                        const cell          = gradeCell(savedScore, r.human_grade_pass, r.status);
+                        const saving        = savingId === r.assignment_id;
+                        const fbOpen        = feedbackOpenFor === r.assignment_id;
+                        const wkOpen        = workOpenFor === r.assignment_id;
+                        const menuOpen      = menuOpenFor === r.assignment_id;
+                        const hasSub        = !!r.submission_id;
+                        const status        = statusMeta(r.status, hasSub);
+                        const notStarted    = r.status === "pending" && !hasSub;
+                        const rowBg         = notStarted ? "transparent" : "transparent";
+                        const rowOpacity    = notStarted ? 0.55 : 1;
 
-                      {/* Feedback expansion */}
-                      {fbOpen && (
-                        <tr>
-                          <td colSpan={3} style={{ borderBottom: `1px solid ${borderCol}`, padding: "10px 16px", background: "rgba(124,58,237,0.04)" }}>
-                            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <textarea
-                                value={feedbackDraft[r.assignment_id] ?? ""}
-                                onChange={(e) => setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
-                                placeholder="Feedback for the student…"
+                        const gradeInputVal = gradeInputs[r.assignment_id] !== undefined
+                          ? gradeInputs[r.assignment_id]
+                          : (savedScore != null ? String(savedScore) : "");
+
+                        // Primary CTA depends on status
+                        const needsAction = r.status === "needs_review" || r.status === "ai_only" || (hasSub && r.status !== "graded");
+                        const primaryLabel = r.status === "graded" ? "Review" : needsAction ? "Grade" : hasSub ? "View" : "—";
+
+                        const openPreview = () => {
+                          setPreviewAssignment(r);
+                          loadSubmissionForPreview(r);
+                          if (!(r.assignment_id in feedbackDraft)) {
+                            setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
+                          }
+                        };
+
+                        return (
+                          <React.Fragment key={r.assignment_id}>
+                            <tr
+                              style={{
+                                background: rowBg,
+                                opacity: rowOpacity,
+                                transition: "background 0.1s",
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(124,58,237,0.06)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
+                            >
+                              {/* Assignment */}
+                              <td
                                 style={{
-                                  flex: 1, borderRadius: 6, padding: "6px 10px",
-                                  fontSize: 12, resize: "vertical", minHeight: 52,
-                                  background: "rgba(255,255,255,0.04)",
-                                  border: "1px solid rgba(255,255,255,0.08)",
-                                  color: "var(--t1)",
-                                  outline: "none",
+                                  padding: "10px 14px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                  overflow: "hidden",
                                 }}
-                              />
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <FeedbackSaveBtn color="emerald" disabled={saving} onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}>
-                                  Pass + save
-                                </FeedbackSaveBtn>
-                                <FeedbackSaveBtn color="red" disabled={saving} onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}>
-                                  Redo + save
-                                </FeedbackSaveBtn>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                              >
+                                <button
+                                  onClick={openPreview}
+                                  title={`Preview: ${r.title}`}
+                                  style={{
+                                    background: "none", border: "none", padding: 0,
+                                    cursor: "pointer", textAlign: "left",
+                                    fontSize: 13, fontWeight: 600, color: "var(--t1)",
+                                    maxWidth: "100%",
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                    width: "100%",
+                                  }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#a78bfa"; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--t1)"; }}
+                                >
+                                  {r.title}
+                                </button>
+                              </td>
+
+                              {/* Subject */}
+                              <td
+                                style={{
+                                  padding: "10px 14px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                  fontSize: 12, color: "var(--t2)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden", textOverflow: "ellipsis",
+                                }}
+                              >
+                                <span style={{ marginRight: 6 }}>{subjectIcon(r.subject)}</span>
+                                {subjectLabel(r.subject)}
+                              </td>
+
+                              {/* Due */}
+                              <td
+                                style={{
+                                  padding: "10px 14px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                  fontSize: 12, color: "var(--t3)",
+                                  fontVariantNumeric: "tabular-nums",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {formatDueDate(r.scheduled_date || r.due_date)}
+                              </td>
+
+                              {/* Status */}
+                              <td
+                                style={{
+                                  padding: "10px 14px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 6,
+                                    padding: "3px 8px", borderRadius: 99,
+                                    background: status.bg, color: status.fg,
+                                    border: `1px solid ${status.border}`,
+                                    fontSize: 11, fontWeight: 700,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 6, height: 6, borderRadius: 99,
+                                      background: status.fg, flexShrink: 0,
+                                    }}
+                                  />
+                                  {status.label}
+                                </span>
+                              </td>
+
+                              {/* Grade */}
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                  textAlign: "center",
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  value={gradeInputVal}
+                                  placeholder="—"
+                                  onChange={(e) => setGradeInputs((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.currentTarget.blur();
+                                      commitGradeInput(r);
+                                    }
+                                    if (e.key === "Escape") {
+                                      setGradeInputs((p) => {
+                                        const next = { ...p };
+                                        delete next[r.assignment_id];
+                                        return next;
+                                      });
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  onBlur={() => commitGradeInput(r)}
+                                  onFocus={() => {
+                                    if (gradeInputs[r.assignment_id] === undefined) {
+                                      setGradeInputs((p) => ({
+                                        ...p,
+                                        [r.assignment_id]: savedScore != null ? String(savedScore) : "",
+                                      }));
+                                    }
+                                  }}
+                                  style={{
+                                    width: 56, height: 28, borderRadius: 5,
+                                    background: cell.bg,
+                                    color: cell.text,
+                                    border: `1px solid ${cell.border}`,
+                                    fontSize: 12, fontWeight: 800,
+                                    fontVariantNumeric: "tabular-nums",
+                                    letterSpacing: "-0.01em",
+                                    textAlign: "center",
+                                    outline: "none",
+                                    cursor: "text",
+                                  }}
+                                />
+                              </td>
+
+                              {/* Actions — primary button + overflow */}
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  borderBottom: `1px solid ${borderCol}`,
+                                  textAlign: "center",
+                                  position: "relative",
+                                }}
+                              >
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                  <button
+                                    onClick={openPreview}
+                                    disabled={primaryLabel === "—"}
+                                    style={{
+                                      height: 28, padding: "0 12px",
+                                      borderRadius: 5,
+                                      background: needsAction
+                                        ? "rgba(124,58,237,0.22)"
+                                        : "rgba(255,255,255,0.06)",
+                                      color: needsAction ? "#c4b5fd" : "var(--t2)",
+                                      border: `1px solid ${needsAction ? "rgba(124,58,237,0.45)" : "rgba(255,255,255,0.1)"}`,
+                                      fontSize: 11, fontWeight: 700,
+                                      cursor: primaryLabel === "—" ? "not-allowed" : "pointer",
+                                      opacity: primaryLabel === "—" ? 0.35 : 1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                    title={primaryLabel === "—" ? "No submission yet" : `${primaryLabel} ${r.title}`}
+                                  >
+                                    {primaryLabel}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setMenuOpenFor(menuOpen ? null : r.assignment_id);
+                                    }}
+                                    title="More actions"
+                                    style={{
+                                      width: 28, height: 28,
+                                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                      background: menuOpen ? "rgba(124,58,237,0.18)" : "rgba(255,255,255,0.04)",
+                                      border: `1px solid ${menuOpen ? "rgba(124,58,237,0.4)" : "rgba(255,255,255,0.1)"}`,
+                                      borderRadius: 5,
+                                      color: "var(--t2)",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    <MoreHorizontal size={13} />
+                                  </button>
+                                </div>
+
+                                {menuOpen && (
+                                  <div
+                                    onMouseLeave={() => setMenuOpenFor(null)}
+                                    style={{
+                                      position: "absolute",
+                                      top: "100%", right: 10,
+                                      zIndex: 15,
+                                      marginTop: 2,
+                                      minWidth: 180,
+                                      background: "rgba(22,22,28,0.98)",
+                                      border: "1px solid rgba(255,255,255,0.12)",
+                                      borderRadius: 6,
+                                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                                      padding: 4,
+                                      textAlign: "left",
+                                    }}
+                                  >
+                                    <MenuItem
+                                      icon={<Eye size={12} />}
+                                      label="View work inline"
+                                      disabled={!hasSub}
+                                      onClick={() => { setMenuOpenFor(null); toggleWork(r); }}
+                                    />
+                                    <MenuItem
+                                      icon={<MessageSquare size={12} />}
+                                      label="Quick feedback"
+                                      onClick={() => {
+                                        setMenuOpenFor(null);
+                                        setFeedbackOpenFor(r.assignment_id);
+                                        if (!(r.assignment_id in feedbackDraft)) {
+                                          setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
+                                        }
+                                      }}
+                                    />
+                                    <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
+                                    <MenuItem
+                                      label="Mark pass"
+                                      accent="emerald"
+                                      disabled={saving}
+                                      onClick={() => { setMenuOpenFor(null); doGrade(r, true, feedbackDraft[r.assignment_id]); }}
+                                    />
+                                    <MenuItem
+                                      label="Mark redo"
+                                      accent="red"
+                                      disabled={saving}
+                                      onClick={() => { setMenuOpenFor(null); doGrade(r, false, feedbackDraft[r.assignment_id]); }}
+                                    />
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Inline work view (opened from overflow menu) */}
+                            {wkOpen && (
+                              <tr>
+                                <td colSpan={6} style={{ borderBottom: `1px solid ${borderCol}`, padding: "12px 16px", background: "rgba(255,255,255,0.02)" }}>
+                                  {!r.submission_id ? (
+                                    <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>Student hasn't submitted yet.</p>
+                                  ) : workLoading === r.submission_id ? (
+                                    <p style={{ fontSize: 12, color: "var(--t3)" }}>Loading submission…</p>
+                                  ) : (
+                                    <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+
+                            {/* Inline feedback drawer */}
+                            {fbOpen && (
+                              <tr>
+                                <td colSpan={6} style={{ borderBottom: `1px solid ${borderCol}`, padding: "10px 16px", background: "rgba(124,58,237,0.04)" }}>
+                                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                    <textarea
+                                      value={feedbackDraft[r.assignment_id] ?? ""}
+                                      onChange={(e) => setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
+                                      placeholder="Feedback for the student…"
+                                      style={{
+                                        flex: 1, borderRadius: 6, padding: "6px 10px",
+                                        fontSize: 12, resize: "vertical", minHeight: 52,
+                                        background: "rgba(255,255,255,0.04)",
+                                        border: "1px solid rgba(255,255,255,0.08)",
+                                        color: "var(--t1)",
+                                        outline: "none",
+                                      }}
+                                    />
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                      <FeedbackSaveBtn color="emerald" disabled={saving} onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}>
+                                        Pass + save
+                                      </FeedbackSaveBtn>
+                                      <FeedbackSaveBtn color="red" disabled={saving} onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}>
+                                        Redo + save
+                                      </FeedbackSaveBtn>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </React.Fragment>
                   );
                 })}
@@ -1192,36 +1289,41 @@ function AssignmentPreviewPanel({
 
 /* ── Small reusable pieces ─────────────────────────────── */
 
-function ActionBtn({
-  children, onClick, disabled = false, active = false, title = "",
-  color = "default",
+function MenuItem({
+  icon, label, onClick, disabled = false, accent,
 }: {
-  children: React.ReactNode;
+  icon?: React.ReactNode;
+  label: string;
   onClick?: () => void;
   disabled?: boolean;
-  active?: boolean;
-  title?: string;
-  color?: "default" | "emerald" | "red";
+  accent?: "emerald" | "red";
 }) {
-  const palette = {
-    default: { bg: active ? "rgba(124,58,237,0.22)" : "rgba(255,255,255,0.06)", text: active ? "#c4b5fd" : "rgba(255,255,255,0.45)", border: active ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.1)" },
-    emerald:  { bg: "rgba(52,211,153,0.1)",  text: "#34d399", border: "rgba(52,211,153,0.3)" },
-    red:      { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.28)" },
-  }[color];
+  const color =
+    accent === "emerald" ? "#6ee7b7" :
+    accent === "red"     ? "#fca5a5" :
+    "var(--t2)";
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
       style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: 22, height: 22, borderRadius: 4,
-        background: palette.bg, color: palette.text, border: `1px solid ${palette.border}`,
-        fontSize: 10, fontWeight: 800, cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.4 : 1, transition: "opacity 0.1s",
+        width: "100%",
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "7px 10px",
+        background: "transparent",
+        border: "none",
+        borderRadius: 4,
+        color,
+        fontSize: 12, fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        textAlign: "left",
       }}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
     >
-      {children}
+      {icon && <span style={{ display: "inline-flex", width: 14, justifyContent: "center" }}>{icon}</span>}
+      <span>{label}</span>
     </button>
   );
 }

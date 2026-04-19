@@ -95,6 +95,44 @@ function buildSelContent(videoUrl: string, assignmentUrl: string): string | null
   return JSON.stringify(obj);
 }
 
+/**
+ * Generic block-content helpers — coexist with the SEL-specific ones above.
+ *
+ * `content_source` is shared storage. SEL packs `{ videoUrl, assignmentUrl }`;
+ * academic blocks pack `{ assignmentId?, videoUrl? }`. We tolerate unknown
+ * keys on parse so a block that was once SEL (assignmentUrl) and becomes
+ * math (assignmentId) doesn't explode if the teacher just changes subject.
+ */
+export interface BlockContent {
+  assignmentId?: string;
+  videoUrl?: string;
+}
+
+export function parseBlockContent(raw: string | null | undefined): BlockContent {
+  if (!raw) return {};
+  try {
+    const p = JSON.parse(raw);
+    const out: BlockContent = {};
+    if (typeof p.assignmentId === "string" && p.assignmentId) out.assignmentId = p.assignmentId;
+    if (typeof p.videoUrl === "string" && p.videoUrl) out.videoUrl = p.videoUrl;
+    return out;
+  } catch { return {}; }
+}
+
+export function buildBlockContent(next: BlockContent): string | null {
+  const obj: Record<string, string> = {};
+  if (next.assignmentId && next.assignmentId.trim()) obj.assignmentId = next.assignmentId.trim();
+  if (next.videoUrl && next.videoUrl.trim()) obj.videoUrl = next.videoUrl.trim();
+  if (!Object.keys(obj).length) return null;
+  return JSON.stringify(obj);
+}
+
+/** Subjects that should show an assignment picker. SEL keeps its bespoke UI. */
+const ACADEMIC_ASSIGNMENT_SUBJECTS = new Set([
+  "math", "reading", "writing", "spelling",
+  "daily_news", "review", "extra_review",
+]);
+
 function normalizeDays(d: string | string[] | undefined): string[] {
   if (Array.isArray(d)) return d;
   if (!d) return ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -128,6 +166,7 @@ export default function TeacherSchedule() {
   const [classes, setClasses] = useState<any[]>([]);
   const [classId, setClassId] = useState<string>("");
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -149,6 +188,18 @@ export default function TeacherSchedule() {
       })
       .catch((e) => setError(e?.message || "Failed to load classes"));
   }, []);
+
+  // Pull the class's assignments once per classId — powers the per-block
+  // assignment dropdown below. Silent failure keeps the schedule usable even
+  // if /assignments 500s.
+  useEffect(() => {
+    if (!classId) { setAssignments([]); return; }
+    let cancelled = false;
+    api.getAssignments(classId)
+      .then((rows: any[]) => { if (!cancelled) setAssignments(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setAssignments([]); });
+    return () => { cancelled = true; };
+  }, [classId]);
 
   useEffect(() => {
     if (!classId) return;
@@ -359,6 +410,27 @@ export default function TeacherSchedule() {
               const color = getBlockColor(b);
               const isExpanded = expandedIndex === i;
               const selContent = b.subject === "sel" ? parseSelContent(b.content_source) : null;
+              // Academic blocks share `content_source` with SEL but shape it as
+              // `{ assignmentId, videoUrl }` — the dropdown below reads/writes
+              // the assignmentId half via the generic helpers.
+              const isAcademic = !!b.subject && ACADEMIC_ASSIGNMENT_SUBJECTS.has(b.subject);
+              const blockContent = isAcademic ? parseBlockContent(b.content_source) : null;
+              // Filter the class's assignments by the block's subject when the
+              // assignment carries one. Fall back to description substring match
+              // (some legacy rows only tag subject in description) and finally
+              // to "show everything" so the teacher can always pick something.
+              const assignmentOptions = isAcademic
+                ? assignments.filter((a: any) => {
+                    const subj = b.subject as string;
+                    if (!a) return false;
+                    if (a.target_subject && String(a.target_subject).toLowerCase() === subj) return true;
+                    if (a.subject && String(a.subject).toLowerCase() === subj) return true;
+                    if (typeof a.description === "string" && a.description.toLowerCase().includes(subj)) return true;
+                    // If the assignment has no subject tag at all, keep it visible
+                    // rather than hiding useful content.
+                    return !a.target_subject && !a.subject;
+                  })
+                : [];
 
               return (
                 <Fragment key={i}>
@@ -551,6 +623,53 @@ export default function TeacherSchedule() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Academic assignment picker — same storage slot as SEL
+                            (`content_source`), just a different JSON shape. */}
+                        {isAcademic && blockContent && (
+                          <div className="rounded-xl p-3 mb-3 border"
+                            style={{ background: "rgba(124,58,237,0.06)", borderColor: "rgba(124,58,237,0.2)" }}>
+                            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
+                              Today's {SUBJECTS.find(s => s.value === b.subject)?.label || b.subject} Assignment
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>
+                                  Pick an assignment
+                                  {assignmentOptions.length === 0 && assignments.length > 0 && (
+                                    <span className="ml-1.5 opacity-70">(no matches for this subject — showing none)</span>
+                                  )}
+                                </span>
+                                <select
+                                  value={blockContent.assignmentId || ""}
+                                  onChange={(e) => updateBlock(i, {
+                                    content_source: buildBlockContent({
+                                      ...blockContent,
+                                      assignmentId: e.target.value || undefined,
+                                    }),
+                                  })}
+                                  className="input text-xs"
+                                >
+                                  <option value="">— None (use default) —</option>
+                                  {assignmentOptions.map((a: any) => (
+                                    <option key={a.id} value={a.id}>
+                                      {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
+                                    </option>
+                                  ))}
+                                  {/* If the saved assignmentId no longer matches the
+                                      filtered list (e.g. subject changed), still show
+                                      it so the teacher can see what's stored. */}
+                                  {blockContent.assignmentId &&
+                                    !assignmentOptions.some((a: any) => a.id === blockContent.assignmentId) && (
+                                    <option value={blockContent.assignmentId}>
+                                      (currently saved: {blockContent.assignmentId.slice(0, 8)}…)
+                                    </option>
+                                  )}
+                                </select>
+                              </label>
+                            </div>
+                          </div>
+                        )}
 
                         {/* SEL content sub-row */}
                         {selContent && (
