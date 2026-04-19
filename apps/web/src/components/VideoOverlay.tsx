@@ -1,9 +1,16 @@
-import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { getSocket } from "../lib/ws.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { api } from "../lib/api.ts";
 import { studentVideoStore } from "../lib/studentVideoStore.ts";
+
+// iOS Safari blocks autoplay in iframes without a prior user gesture.
+// iPads report MacIntel + many touch points in newer Safari.
+const isIOS =
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
 interface VideoState {
   videoId: string;
@@ -30,6 +37,8 @@ function extractYouTubeId(url: string): string | null {
 export default function VideoOverlay() {
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoState | null>(null);
+  const [iosStarted, setIosStarted] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const classIdsRef = useRef<string[]>([]);
   // New student_commands pipe is authoritative when present — dispatched by
   // Layout/PublicLayout into this module-level store. Coexists with the
@@ -147,10 +156,30 @@ export default function VideoOverlay() {
   // class_video DELETE propagation.
   const activeVideoId = cmdVideo.videoId || video?.videoId || null;
   const activeTitle = (video?.title) || (cmdVideo.videoId ? "Class Video" : "");
+
+  // Reset iOS tap state whenever the video changes so the tap-to-play
+  // screen appears fresh for each new broadcast.
+  const prevVideoId = useRef<string | null>(null);
+  if (activeVideoId !== prevVideoId.current) {
+    prevVideoId.current = activeVideoId;
+    if (iosStarted) setIosStarted(false);
+  }
+
+  // iOS: user taps the play screen → postMessage playVideo to the iframe
+  const handleIOSTap = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: "playVideo", args: "" }),
+      "*"
+    );
+    setIosStarted(true);
+  }, []);
+
   if (!activeVideoId || user?.role !== "student") return null;
 
-  // Privacy-enhanced embed + full lockdown params
-  const src = `https://www.youtube-nocookie.com/embed/${activeVideoId}?autoplay=1&modestbranding=1&rel=0&fs=0&iv_load_policy=3&disablekb=1&playsinline=1`;
+  // On iOS, omit autoplay from the URL — we trigger play via postMessage
+  // after the student taps (satisfying Safari's user-gesture requirement).
+  const autoplayParam = isIOS ? "" : "&autoplay=1";
+  const src = `https://www.youtube-nocookie.com/embed/${activeVideoId}?modestbranding=1&rel=0&fs=0&iv_load_policy=3&disablekb=1&playsinline=1&enablejsapi=1${autoplayParam}`;
 
   return createPortal(
     <div
@@ -192,6 +221,7 @@ export default function VideoOverlay() {
         padding: 12,
       }}>
         <div style={{
+          position: "relative",
           width: "100%", height: "100%",
           maxWidth: "calc((100vh - 92px) * 16 / 9)",
           maxHeight: "calc((100vw - 24px) * 9 / 16)",
@@ -201,11 +231,42 @@ export default function VideoOverlay() {
           overflow: "hidden",
         }}>
           <iframe
+            ref={iframeRef}
             src={src}
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             title={activeTitle}
           />
+          {/* iOS tap-to-play overlay — appears until the student taps */}
+          {isIOS && !iosStarted && (
+            <div
+              onClick={handleIOSTap}
+              style={{
+                position: "absolute", inset: 0,
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.75)",
+                cursor: "pointer", gap: 16,
+              }}
+            >
+              <div style={{
+                width: 80, height: 80, borderRadius: "50%",
+                background: "rgba(255,255,255,0.15)",
+                border: "3px solid rgba(255,255,255,0.6)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg viewBox="0 0 24 24" fill="white" width={36} height={36}>
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              <span style={{
+                color: "#fff", fontSize: 18, fontWeight: 700,
+                textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+              }}>
+                Tap to watch
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
