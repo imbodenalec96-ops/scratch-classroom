@@ -42,14 +42,8 @@ router.get("/library", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     if (!userId) return res.json([]);
-    // For teachers/admin: all videos. For students: videos from their enrolled classes.
-    const rows = req.user?.role === 'teacher' || req.user?.role === 'admin'
-      ? await db.prepare("SELECT * FROM youtube_library ORDER BY added_at DESC").all()
-      : await db.prepare(
-          `SELECT * FROM youtube_library
-           WHERE class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
-           ORDER BY added_at DESC`
-        ).all(userId);
+    // All roles see the full library — teacher-curated content is appropriate for all students.
+    const rows = await db.prepare("SELECT * FROM youtube_library ORDER BY added_at DESC").all();
     res.json(rows);
   } catch (e) { res.json([]); }
 });

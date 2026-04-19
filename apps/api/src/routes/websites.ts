@@ -143,15 +143,14 @@ router.get("/requests/pending", requireRole("teacher", "admin"), async (req: Aut
         ORDER BY r.requested_at DESC`
     ).all() as any[];
   } else {
+    // Show all pending requests — teacher doesn't need to own the class
     rows = await db.prepare(
-      `SELECT DISTINCT r.*, u.name AS student_name
+      `SELECT r.*, u.name AS student_name
          FROM website_requests r
          JOIN users u ON u.id = r.student_id
-         JOIN class_members cm ON cm.user_id = r.student_id
-         JOIN classes c ON c.id = cm.class_id
-        WHERE r.status = 'pending' AND c.teacher_id = ?
+        WHERE r.status = 'pending'
         ORDER BY r.requested_at DESC`
-    ).all(req.user!.id) as any[];
+    ).all() as any[];
   }
   res.json(rows);
 });
