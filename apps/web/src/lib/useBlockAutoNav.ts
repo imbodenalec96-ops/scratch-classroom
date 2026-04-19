@@ -29,7 +29,9 @@ export function markTeacherNav(): void {
   try { localStorage.setItem(TEACHER_NAV_KEY, String(Date.now())); } catch {}
 }
 
-function teacherRecentlyPushed(): boolean {
+/** True if a teacher NAVIGATE landed within the 5-minute grace window. Exported
+ * so other hooks (e.g. `useBlockLockdown`) can honor the same override. */
+export function teacherRecentlyPushed(): boolean {
   try {
     const raw = localStorage.getItem(TEACHER_NAV_KEY);
     if (!raw) return false;

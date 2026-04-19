@@ -11,6 +11,7 @@ import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { useBlockAutoNav } from "../lib/useBlockAutoNav.ts";
+import { useBlockLockdown } from "../lib/useBlockLockdown.ts";
 import { api } from "../lib/api.ts";
 import { studentLockStore } from "../lib/studentLockStore.ts";
 import { studentMessageStore } from "../lib/studentMessageStore.ts";
@@ -131,6 +132,10 @@ export default function Layout() {
     return () => { cancelled = true; };
   }, [isStudent, user?.id]);
   useBlockAutoNav(isStudent, studentClassId);
+  // Stay-put enforcement: if the student wanders off the current block's page,
+  // bounce them back. Respects the same teacher-override grace window and the
+  // freetime/break/coding_art_gym exceptions that useBlockAutoNav respects.
+  useBlockLockdown(isStudent, studentClassId);
 
   // Block-scoped lockdown. Subjects that imply "content mode" (single-route
   // focus, no sidebar, no escape) vs. "free" blocks (break, coding, review).

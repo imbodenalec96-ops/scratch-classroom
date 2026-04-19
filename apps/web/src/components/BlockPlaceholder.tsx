@@ -117,8 +117,25 @@ export function SELPage() {
   );
 }
 
+/**
+ * Parse the generic block content_source shape — mirrors `parseBlockContent`
+ * in TeacherSchedule.tsx. Kept local to avoid cross-importing a teacher
+ * component into the student runtime bundle.
+ */
+function parseGenericBlockContent(raw: string | null | undefined): { assignmentId?: string; videoUrl?: string } {
+  if (!raw) return {};
+  try {
+    const p = JSON.parse(raw);
+    const out: { assignmentId?: string; videoUrl?: string } = {};
+    if (typeof p.assignmentId === "string" && p.assignmentId) out.assignmentId = p.assignmentId;
+    if (typeof p.videoUrl === "string" && p.videoUrl) out.videoUrl = p.videoUrl;
+    return out;
+  } catch { return {}; }
+}
+
 export function AssignmentTodayPage() {
   const { subject } = useParams<{ subject: string }>();
+  const { user } = useAuth();
   const map: Record<string, { emoji: string; title: string }> = {
     sel:      { emoji: "💛", title: "SEL" },
     math:     { emoji: "🔢", title: "Math" },
@@ -127,5 +144,65 @@ export function AssignmentTodayPage() {
     spelling: { emoji: "🔤", title: "Spelling" },
   };
   const meta = (subject && map[subject]) || { emoji: "📘", title: subject || "Subject" };
+
+  // Look up the student's class, then the active schedule block. If the
+  // block's content_source nominates a specific assignment, we load it and
+  // show that one instead of the generic "waiting for teacher" placeholder.
+  const [classId, setClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    api.getClasses()
+      .then((cs: any[]) => setClassId((cs || [])[0]?.id ?? null))
+      .catch(() => setClassId(null));
+  }, [user?.id]);
+
+  const currentBlock = useCurrentBlock(classId);
+  const blockContent = useMemo(() => parseGenericBlockContent(currentBlock?.content_source), [currentBlock?.content_source]);
+
+  // Pull the class assignment list so we can render the title/description of
+  // the selected one without a second round-trip. Skip entirely when there's
+  // no assignmentId — keeps this page cheap for the common case.
+  const [assignments, setAssignments] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!classId || !blockContent.assignmentId) { setAssignments(null); return; }
+    let cancelled = false;
+    api.getAssignments(classId)
+      .then((rows: any[]) => { if (!cancelled) setAssignments(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setAssignments([]); });
+    return () => { cancelled = true; };
+  }, [classId, blockContent.assignmentId]);
+
+  const selectedAssignment = useMemo(() => {
+    if (!blockContent.assignmentId || !assignments) return null;
+    return assignments.find((a: any) => a?.id === blockContent.assignmentId) || null;
+  }, [blockContent.assignmentId, assignments]);
+
+  if (selectedAssignment) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center px-6 py-12 text-center">
+        <div className="text-7xl mb-5" aria-hidden>{meta.emoji}</div>
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-violet-400 mb-2">
+          Today's {meta.title}
+        </div>
+        <h1 className="text-3xl font-extrabold mb-3 text-t1">{selectedAssignment.title}</h1>
+        {selectedAssignment.description && (
+          <p className="text-base text-t2 max-w-lg mb-6">{selectedAssignment.description}</p>
+        )}
+        <Link
+          to="/assignments"
+          className="rounded-2xl border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/15 px-6 py-3 text-sm font-bold text-violet-300 transition-colors"
+        >
+          Start assignment →
+        </Link>
+        <Link
+          to={user?.role === "student" ? "/student" : "/"}
+          className="mt-6 text-sm font-semibold text-violet-400 hover:text-violet-300"
+        >
+          ← Back to dashboard
+        </Link>
+      </div>
+    );
+  }
+
   return <BlockPlaceholder emoji={meta.emoji} title={`Today's ${meta.title}`} subtitle="Your teacher will push today's assignment in a moment." />;
 }
