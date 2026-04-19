@@ -7,9 +7,32 @@ import { requireRole } from "../middleware/rbac.js";
 const router = Router();
 
 // ── Idempotent migrations ──────────────────────────────────────────
-// Columns kept TEXT-compatible so the sqlite-shim + pg adapter both work.
-// We run this lazily on first request — no cold-start cost for unrelated paths.
 let migrated = false;
+let seeded = false;
+
+const DEFAULT_WEBSITES = [
+  { title: "Cool Math Games",          url: "https://www.coolmathgames.com",              category: "Math Games",        icon: "🧮" },
+  { title: "Poki",                     url: "https://poki.com",                           category: "Games",             icon: "🎮" },
+  { title: "Khan Academy",             url: "https://www.khanacademy.org",               category: "Learning",          icon: "📚" },
+  { title: "Scratch",                  url: "https://scratch.mit.edu",                   category: "Coding",            icon: "💻" },
+  { title: "ABCya!",                   url: "https://www.abcya.com",                     category: "Educational Games", icon: "🎯" },
+  { title: "Typing.com",               url: "https://www.typing.com",                   category: "Typing",            icon: "⌨️" },
+  { title: "NASA Kids' Club",          url: "https://www.nasa.gov/nasa-kids-club",       category: "Science",           icon: "🚀" },
+  { title: "National Geographic Kids", url: "https://kids.nationalgeographic.com",       category: "Science",           icon: "🌍" },
+  { title: "Prodigy Math",             url: "https://www.prodigygame.com",               category: "Math Games",        icon: "⚔️" },
+  { title: "Google Arts & Culture",    url: "https://artsandculture.google.com",          category: "Art",               icon: "🎨" },
+  { title: "Code.org",                 url: "https://code.org",                          category: "Coding",            icon: "🖥️" },
+  { title: "Funbrain",                 url: "https://www.funbrain.com",                  category: "Educational Games", icon: "🧠" },
+  { title: "Starfall",                 url: "https://www.starfall.com",                  category: "Reading",           icon: "⭐" },
+  { title: "PBS Kids",                 url: "https://pbskids.org",                       category: "Educational",       icon: "📺" },
+  { title: "BrainPOP",                 url: "https://www.brainpop.com",                  category: "Learning",          icon: "🎬" },
+  { title: "Spelling City",            url: "https://www.spellingcity.com",              category: "Reading",           icon: "🔤" },
+  { title: "iXL Learning",             url: "https://www.ixl.com",                       category: "Math Games",        icon: "📐" },
+  { title: "Storyline Online",         url: "https://storylineonline.net",               category: "Reading",           icon: "📖" },
+  { title: "Google Earth",             url: "https://earth.google.com/web",              category: "Science",           icon: "🌎" },
+  { title: "Tynker",                   url: "https://www.tynker.com",                    category: "Coding",            icon: "🤖" },
+];
+
 async function ensureTables() {
   if (migrated) return;
   try {
@@ -45,44 +68,32 @@ async function ensureTables() {
         granted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Additive migration for existing DBs that predate icon_emoji
     try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
-
-    // Seed default school-appropriate websites if library is empty
-    try {
-      const existing = await db.prepare(`SELECT COUNT(*) as n FROM approved_websites`).get() as any;
-      if ((existing?.n ?? 0) === 0) {
-        const defaults = [
-          { title: "Cool Math Games",   url: "https://www.coolmathgames.com",        category: "Math Games",    icon: "🧮" },
-          { title: "Poki",              url: "https://poki.com",                     category: "Games",         icon: "🎮" },
-          { title: "Khan Academy",      url: "https://www.khanacademy.org",          category: "Learning",      icon: "📚" },
-          { title: "Scratch",           url: "https://scratch.mit.edu",             category: "Coding",        icon: "💻" },
-          { title: "ABCya!",            url: "https://www.abcya.com",               category: "Educational Games", icon: "🎯" },
-          { title: "Typing.com",        url: "https://www.typing.com",              category: "Typing",        icon: "⌨️" },
-          { title: "NASA Kids' Club",   url: "https://www.nasa.gov/nasa-kids-club", category: "Science",       icon: "🚀" },
-          { title: "National Geographic Kids", url: "https://kids.nationalgeographic.com", category: "Science", icon: "🌍" },
-          { title: "Prodigy Math",      url: "https://www.prodigygame.com",         category: "Math Games",    icon: "⚔️" },
-          { title: "Google Arts & Culture", url: "https://artsandculture.google.com", category: "Art",         icon: "🎨" },
-          { title: "Code.org",          url: "https://code.org",                    category: "Coding",        icon: "🖥️" },
-          { title: "Funbrain",          url: "https://www.funbrain.com",            category: "Educational Games", icon: "🧠" },
-          { title: "Starfall",          url: "https://www.starfall.com",            category: "Reading",       icon: "⭐" },
-          { title: "PBS Kids",          url: "https://pbskids.org",                 category: "Educational",   icon: "📺" },
-          { title: "BrainPOP",          url: "https://www.brainpop.com",            category: "Learning",      icon: "🎬" },
-        ];
-        for (const site of defaults) {
-          const id = crypto.randomUUID();
-          await db.prepare(
-            `INSERT INTO approved_websites (id, class_id, title, url, category, icon_emoji, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).run(id, null, site.title, site.url, site.category, site.icon, "system");
-        }
-      }
-    } catch (e) {
-      console.error("[websites] seed error:", e);
-    }
   } catch (e) {
     console.error("[websites] migration error:", e);
   }
   migrated = true;
+}
+
+// Separate seed fn — runs once per process, checks row count each time so it
+// works even when tables already existed before this code was deployed.
+async function seedDefaultsIfEmpty() {
+  if (seeded) return;
+  seeded = true;
+  try {
+    const row = await db.prepare(`SELECT COUNT(*) as n FROM approved_websites WHERE added_by = 'system'`).get() as any;
+    if ((row?.n ?? 0) > 0) return; // already seeded
+    for (const site of DEFAULT_WEBSITES) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO approved_websites (id, class_id, title, url, category, icon_emoji, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, null, site.title, site.url, site.category, site.icon, "system");
+    }
+    console.log(`[websites] seeded ${DEFAULT_WEBSITES.length} default sites`);
+  } catch (e) {
+    seeded = false; // allow retry on next request if DB wasn't ready
+    console.error("[websites] seed error:", e);
+  }
 }
 
 // ── Student: submit a new website request ──────────────────────────
@@ -103,6 +114,7 @@ router.post("/request", async (req: AuthRequest, res: Response) => {
 // ── Student: my granted websites ───────────────────────────────────
 router.get("/mine", async (req: AuthRequest, res: Response) => {
   await ensureTables();
+  await seedDefaultsIfEmpty();
   const userId = req.user!.id;
   // Individually granted sites
   const granted = await db.prepare(
@@ -265,6 +277,7 @@ router.post("/deny", requireRole("teacher", "admin"), async (req: AuthRequest, r
 router.get("/library", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   try {
     await ensureTables();
+    await seedDefaultsIfEmpty();
     const classId = req.query.classId ? String(req.query.classId) : null;
     const rows = classId
       ? await db.prepare(
