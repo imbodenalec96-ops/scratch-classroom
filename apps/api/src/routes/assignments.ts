@@ -1096,16 +1096,28 @@ router.post("/bulk", requireRole("teacher", "admin"), async (req: AuthRequest, r
 // a specific student's submission for this assignment. If the student hasn't
 // submitted yet, we create a zero-content submission row so the grade still
 // records (covers pencil-and-paper work the teacher is grading manually).
-// Body: { studentId: string, passed: boolean, feedback?: string }
+// Body: { studentId: string, passed: boolean, feedback?: string, score?: number }
+// score accepts 0-100; passed is derived automatically when score is provided
 router.post("/:id/grade", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   await ensureHumanGradeCols();
-  const { studentId, passed, feedback } = req.body || {};
-  if (!studentId || typeof passed !== "boolean") {
-    return res.status(400).json({ error: "studentId (string) and passed (bool) required" });
+  const { studentId, passed, feedback, score } = req.body || {};
+  if (!studentId) {
+    return res.status(400).json({ error: "studentId required" });
+  }
+  // Derive passed from score if score provided; otherwise require explicit boolean
+  let resolvedPassed: boolean;
+  let resolvedScore: number | null = null;
+  if (typeof score === "number" && !isNaN(score)) {
+    resolvedScore = Math.max(0, Math.min(100, Math.round(score)));
+    resolvedPassed = resolvedScore >= 60;
+  } else if (typeof passed === "boolean") {
+    resolvedPassed = passed;
+  } else {
+    return res.status(400).json({ error: "Either score (number) or passed (bool) required" });
   }
   const graderId = req.user!.id;
   const now = new Date().toISOString();
-  const passInt = passed ? 1 : 0;
+  const passInt = resolvedPassed ? 1 : 0;
   const fb = typeof feedback === "string" ? feedback : null;
   try {
     // Find the most recent submission by this student for this assignment.
@@ -1120,21 +1132,21 @@ router.post("/:id/grade", requireRole("teacher", "admin"), async (req: AuthReque
       await db.prepare(
         `UPDATE submissions
             SET human_grade_pass = ?,
+                human_grade_score = ?,
                 human_grade_feedback = COALESCE(?, human_grade_feedback),
                 graded_by = ?,
                 graded_at = ?
           WHERE id = ?`
-      ).run(passInt, fb, graderId, now, existing.id);
+      ).run(passInt, resolvedScore, fb, graderId, now, existing.id);
     } else {
-      // No submission exists — create a placeholder row so the grade has a
-      // home. answers stays empty; auto_grade_result stays null.
+      // No submission exists — create a placeholder row so the grade has a home.
       const subId = crypto.randomUUID();
       await db.prepare(
         `INSERT INTO submissions
            (id, assignment_id, student_id, submitted_at,
-            human_grade_pass, human_grade_feedback, graded_by, graded_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(subId, req.params.id, studentId, now, passInt, fb, graderId, now);
+            human_grade_pass, human_grade_score, human_grade_feedback, graded_by, graded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(subId, req.params.id, studentId, now, passInt, resolvedScore, fb, graderId, now);
     }
 
     const row = await db.prepare(

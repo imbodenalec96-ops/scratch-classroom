@@ -85,7 +85,7 @@ export default function Leaderboard() {
 
   function getStat(entry: any) {
     if (tab === "stars") {
-      const behaviorStars = Math.max(0, Math.min(5, entry.behavior_stars || 0));
+      const behaviorStars = entry.behavior_stars || 0;
       return {
         primary: behaviorStars,
         secondary: `${(entry.points || 0).toLocaleString()} pts · Lv${entry.level || 1}`,
@@ -259,21 +259,36 @@ export default function Leaderboard() {
                   </div>
 
                   {/* Stat */}
-                  <div style={{
-                    fontWeight: 900,
-                    fontSize: isFirst ? 22 : 18,
-                    color: tier.textCol,
-                    lineHeight: 1,
-                    marginBottom: 2,
-                    fontVariantNumeric: "tabular-nums",
-                  }}>
-                    {tab === "stars" ? (
-                      <span style={{ fontSize: isFirst ? 18 : 14 }}>
-                        {"⭐".repeat(stat.primary as number)}
-                        <span style={{ opacity: 0.2 }}>{"⭐".repeat(5 - (stat.primary as number))}</span>
-                      </span>
-                    ) : stat.primary}
-                  </div>
+                  {tab === "stars" ? (
+                    <div style={{ textAlign: "center", marginBottom: 2 }}>
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                        fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                        fontSize: isFirst ? 28 : 22,
+                        color: tier.textCol,
+                        lineHeight: 1,
+                      }}>
+                        <span>{stat.primary as number}</span>
+                        <span style={{ fontSize: isFirst ? 22 : 18 }}>⭐</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: text2, marginTop: 2 }}>
+                        {Math.floor((stat.primary as number) / 5) > 0
+                          ? `${Math.floor((stat.primary as number) / 5)} McDonald's set${Math.floor((stat.primary as number) / 5) !== 1 ? "s" : ""}`
+                          : ""}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      fontWeight: 900,
+                      fontSize: isFirst ? 22 : 18,
+                      color: tier.textCol,
+                      lineHeight: 1,
+                      marginBottom: 2,
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {stat.primary}
+                    </div>
+                  )}
                   <div style={{ fontSize: 10, color: text2, textAlign: "center" }}>{stat.secondary}</div>
 
                   {/* Podium block */}
@@ -311,7 +326,6 @@ export default function Leaderboard() {
               const rank = i + 4;
               const isMe = entry.user_id === user?.id;
               const stat = getStat(entry);
-              const behaviorStars = Math.max(0, Math.min(5, entry.behavior_stars || 0));
 
               return (
                 <div
@@ -371,17 +385,17 @@ export default function Leaderboard() {
                     <div style={{ fontSize: 11, color: text2, marginTop: 1 }}>{stat.secondary}</div>
                   </div>
 
-                  {/* Stat — stars row or number */}
+                  {/* Stat — star count or number */}
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     {tab === "stars" ? (
-                      <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-                        {Array.from({ length: 5 }, (_, si) => (
-                          <span key={si} style={{
-                            fontSize: 14, lineHeight: 1,
-                            opacity: si < behaviorStars ? 1 : 0.14,
-                            filter: si < behaviorStars ? "none" : "grayscale(1)",
-                          }}>⭐</span>
-                        ))}
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3,
+                        fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                        fontSize: 20, lineHeight: 1,
+                        color: "#fbbf24",
+                      }}>
+                        <span>{stat.primary as number}</span>
+                        <span style={{ fontSize: 16 }}>⭐</span>
                       </div>
                     ) : (
                       <div style={{ fontSize: 20, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: text1 }}>
