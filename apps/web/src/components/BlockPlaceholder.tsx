@@ -121,16 +121,51 @@ export function SELPage() {
  * Parse the generic block content_source shape — mirrors `parseBlockContent`
  * in TeacherSchedule.tsx. Kept local to avoid cross-importing a teacher
  * component into the student runtime bundle.
+ *
+ * Supports the `byDay` override shape: `{ Mon: { assignmentId, videoUrl, newsUrl } }`.
  */
-function parseGenericBlockContent(raw: string | null | undefined): { assignmentId?: string; videoUrl?: string } {
+type GenericBlockDay = { assignmentId?: string; videoUrl?: string; newsUrl?: string };
+type GenericBlockContent = GenericBlockDay & { byDay?: Partial<Record<string, GenericBlockDay>> };
+
+function sanitizeDay(raw: any): GenericBlockDay {
+  const out: GenericBlockDay = {};
+  if (raw && typeof raw === "object") {
+    if (typeof raw.assignmentId === "string" && raw.assignmentId) out.assignmentId = raw.assignmentId;
+    if (typeof raw.videoUrl === "string" && raw.videoUrl) out.videoUrl = raw.videoUrl;
+    if (typeof raw.newsUrl === "string" && raw.newsUrl) out.newsUrl = raw.newsUrl;
+  }
+  return out;
+}
+
+function parseGenericBlockContent(raw: string | null | undefined): GenericBlockContent {
   if (!raw) return {};
   try {
     const p = JSON.parse(raw);
-    const out: { assignmentId?: string; videoUrl?: string } = {};
-    if (typeof p.assignmentId === "string" && p.assignmentId) out.assignmentId = p.assignmentId;
-    if (typeof p.videoUrl === "string" && p.videoUrl) out.videoUrl = p.videoUrl;
+    const out: GenericBlockContent = sanitizeDay(p);
+    if (p && typeof p.byDay === "object" && p.byDay) {
+      const byDay: Partial<Record<string, GenericBlockDay>> = {};
+      for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+        const day = sanitizeDay((p.byDay as any)[d]);
+        if (Object.keys(day).length) byDay[d] = day;
+      }
+      if (Object.keys(byDay).length) out.byDay = byDay;
+    }
     return out;
   } catch { return {}; }
+}
+
+const DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** Merge root defaults with the per-day override for "today". */
+function resolveBlockContentForToday(raw: string | null | undefined): GenericBlockDay {
+  const parsed = parseGenericBlockContent(raw);
+  const today = DAY_LETTERS[new Date().getDay()];
+  const dayOverride = parsed.byDay?.[today] || {};
+  return {
+    assignmentId: dayOverride.assignmentId ?? parsed.assignmentId,
+    videoUrl: dayOverride.videoUrl ?? parsed.videoUrl,
+    newsUrl: dayOverride.newsUrl ?? parsed.newsUrl,
+  };
 }
 
 export function AssignmentTodayPage() {
@@ -157,7 +192,9 @@ export function AssignmentTodayPage() {
   }, [user?.id]);
 
   const currentBlock = useCurrentBlock(classId);
-  const blockContent = useMemo(() => parseGenericBlockContent(currentBlock?.content_source), [currentBlock?.content_source]);
+  // Resolve today's effective content: per-day override (byDay[Mon|Tue|…])
+  // wins, falling back to the root defaults the teacher set as "Same for every day".
+  const blockContent = useMemo(() => resolveBlockContentForToday(currentBlock?.content_source), [currentBlock?.content_source]);
 
   // Pull the class assignment list so we can render the title/description of
   // the selected one without a second round-trip. Skip entirely when there's

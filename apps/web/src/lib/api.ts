@@ -424,4 +424,36 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ paper_only: paperOnly }),
     }),
+
+  // ── Store (ClassDojo-style points + redeemable items) ──
+  // Balance is backed by users.dojo_points — NOT board_user_data.reward_count.
+  getMyBalance: () => request<{ dojo_points: number }>(`/store/me/balance`),
+  getStoreItems: () => request<Array<{ id: string; name: string; emoji: string | null; price: number; stock: number | null; enabled: number }>>(`/store/items`),
+  redeemStoreItem: (itemId: string) =>
+    request<{ ok: boolean; dojo_points: number; item: { id: string; name: string; price: number } }>(`/store/redeem`, {
+      method: "POST",
+      body: JSON.stringify({ itemId }),
+    }),
+  getStoreTransactions: (studentId?: string) =>
+    request<any[]>(`/store/transactions${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ""}`),
+  getStoreClassTransactions: (classId: string) =>
+    request<any[]>(`/store/transactions/class/${classId}`),
+  createStoreItem: (data: { name: string; emoji?: string; price: number; stock?: number | null }) =>
+    request<any>(`/store/items`, { method: "POST", body: JSON.stringify(data) }),
+  updateStoreItem: (id: string, data: { name?: string; emoji?: string; price?: number; stock?: number | null; enabled?: boolean }) =>
+    request<any>(`/store/items/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteStoreItem: (id: string) =>
+    request<any>(`/store/items/${id}`, { method: "DELETE" }),
+  getClassPoints: (classId: string) =>
+    request<Array<{ id: string; name: string; avatar_emoji: string | null; dojo_points: number }>>(`/store/points?classId=${encodeURIComponent(classId)}`),
+  adjustStudentPoints: (studentId: string, delta: number, reason?: string) =>
+    request<{ dojo_points: number }>(`/store/points/${studentId}/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ delta, reason }),
+    }),
+  adjustClassPoints: (classId: string, delta: number, reason?: string) =>
+    request<{ updated: number }>(`/store/points/class/${classId}/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ delta, reason }),
+    }),
 };

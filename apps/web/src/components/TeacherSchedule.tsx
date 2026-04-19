@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle, Coffee } from "lucide-react";
+import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle, Coffee, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 
@@ -99,30 +99,79 @@ function buildSelContent(videoUrl: string, assignmentUrl: string): string | null
  * Generic block-content helpers — coexist with the SEL-specific ones above.
  *
  * `content_source` is shared storage. SEL packs `{ videoUrl, assignmentUrl }`;
- * academic blocks pack `{ assignmentId?, videoUrl? }`. We tolerate unknown
- * keys on parse so a block that was once SEL (assignmentUrl) and becomes
- * math (assignmentId) doesn't explode if the teacher just changes subject.
+ * academic blocks pack `{ assignmentId?, videoUrl?, newsUrl?, byDay? }` where
+ * `byDay` is `{ Mon: {...}, Tue: {...}, ... }` with per-day overrides. Root
+ * fields remain the default/fallback for any day not in `byDay`. We tolerate
+ * unknown keys on parse so a block that was once SEL (assignmentUrl) and
+ * becomes math (assignmentId) doesn't explode if the teacher just changes
+ * subject.
  */
-export interface BlockContent {
+export interface BlockContentDay {
   assignmentId?: string;
   videoUrl?: string;
+  newsUrl?: string;
+}
+
+export interface BlockContent extends BlockContentDay {
+  /** Per-day overrides. Keys are "Mon"…"Fri". Each value narrows the default. */
+  byDay?: Partial<Record<string, BlockContentDay>>;
+}
+
+function sanitizeDayContent(raw: any): BlockContentDay {
+  const out: BlockContentDay = {};
+  if (raw && typeof raw === "object") {
+    if (typeof raw.assignmentId === "string" && raw.assignmentId) out.assignmentId = raw.assignmentId;
+    if (typeof raw.videoUrl === "string" && raw.videoUrl) out.videoUrl = raw.videoUrl;
+    if (typeof raw.newsUrl === "string" && raw.newsUrl) out.newsUrl = raw.newsUrl;
+  }
+  return out;
 }
 
 export function parseBlockContent(raw: string | null | undefined): BlockContent {
   if (!raw) return {};
   try {
     const p = JSON.parse(raw);
-    const out: BlockContent = {};
-    if (typeof p.assignmentId === "string" && p.assignmentId) out.assignmentId = p.assignmentId;
-    if (typeof p.videoUrl === "string" && p.videoUrl) out.videoUrl = p.videoUrl;
+    const out: BlockContent = sanitizeDayContent(p);
+    if (p && typeof p.byDay === "object" && p.byDay) {
+      const byDay: Partial<Record<string, BlockContentDay>> = {};
+      for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+        const day = sanitizeDayContent((p.byDay as any)[d]);
+        if (Object.keys(day).length) byDay[d] = day;
+      }
+      if (Object.keys(byDay).length) out.byDay = byDay;
+    }
     return out;
   } catch { return {}; }
 }
 
+function trimmedOrUndef(s?: string): string | undefined {
+  const v = (s || "").trim();
+  return v ? v : undefined;
+}
+
 export function buildBlockContent(next: BlockContent): string | null {
-  const obj: Record<string, string> = {};
-  if (next.assignmentId && next.assignmentId.trim()) obj.assignmentId = next.assignmentId.trim();
-  if (next.videoUrl && next.videoUrl.trim()) obj.videoUrl = next.videoUrl.trim();
+  const obj: Record<string, any> = {};
+  const aId = trimmedOrUndef(next.assignmentId);
+  const vUrl = trimmedOrUndef(next.videoUrl);
+  const nUrl = trimmedOrUndef(next.newsUrl);
+  if (aId) obj.assignmentId = aId;
+  if (vUrl) obj.videoUrl = vUrl;
+  if (nUrl) obj.newsUrl = nUrl;
+  if (next.byDay) {
+    const byDay: Record<string, BlockContentDay> = {};
+    for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+      const raw = next.byDay[d] || {};
+      const day: BlockContentDay = {};
+      const dA = trimmedOrUndef(raw.assignmentId);
+      const dV = trimmedOrUndef(raw.videoUrl);
+      const dN = trimmedOrUndef(raw.newsUrl);
+      if (dA) day.assignmentId = dA;
+      if (dV) day.videoUrl = dV;
+      if (dN) day.newsUrl = dN;
+      if (Object.keys(day).length) byDay[d] = day;
+    }
+    if (Object.keys(byDay).length) obj.byDay = byDay;
+  }
   if (!Object.keys(obj).length) return null;
   return JSON.stringify(obj);
 }
@@ -132,6 +181,14 @@ const ACADEMIC_ASSIGNMENT_SUBJECTS = new Set([
   "math", "reading", "writing", "spelling",
   "daily_news", "review", "extra_review",
 ]);
+
+/** Loose YouTube URL validator — matches the patterns the server accepts. */
+function isValidYouTubeUrl(url: string): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return true;
+  return /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[A-Za-z0-9_-]{11}/.test(trimmed);
+}
 
 function normalizeDays(d: string | string[] | undefined): string[] {
   if (Array.isArray(d)) return d;
@@ -174,6 +231,9 @@ export default function TeacherSchedule() {
   const [dirty, setDirty] = useState(false);
   const [now, setNow] = useState(nowHHMM());
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  // SEL "Generate from video" ephemeral state, keyed by block index so each
+  // SEL block gets its own spinner / success / error message independently.
+  const [selGenState, setSelGenState] = useState<Record<number, { status: "idle" | "loading" | "success" | "error"; message?: string }>>({});
 
   useEffect(() => {
     const iv = setInterval(() => setNow(nowHHMM()), 30_000);
@@ -625,83 +685,335 @@ export default function TeacherSchedule() {
                         </div>
 
                         {/* Academic assignment picker — same storage slot as SEL
-                            (`content_source`), just a different JSON shape. */}
-                        {isAcademic && blockContent && (
-                          <div className="rounded-xl p-3 mb-3 border"
-                            style={{ background: "rgba(124,58,237,0.06)", borderColor: "rgba(124,58,237,0.2)" }}>
-                            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
-                              Today's {SUBJECTS.find(s => s.value === b.subject)?.label || b.subject} Assignment
-                            </div>
-                            <div className="grid grid-cols-1 gap-2">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>
-                                  Pick an assignment
-                                  {assignmentOptions.length === 0 && assignments.length > 0 && (
-                                    <span className="ml-1.5 opacity-70">(no matches for this subject — showing none)</span>
-                                  )}
-                                </span>
-                                <select
-                                  value={blockContent.assignmentId || ""}
-                                  onChange={(e) => updateBlock(i, {
-                                    content_source: buildBlockContent({
-                                      ...blockContent,
-                                      assignmentId: e.target.value || undefined,
-                                    }),
+                            (`content_source`), just a different JSON shape.
+                            Renders a "Same for every day" default picker on top
+                            and a compact row of per-day mini-pickers below. */}
+                        {isAcademic && blockContent && (() => {
+                          const subjLabel = SUBJECTS.find(s => s.value === b.subject)?.label || b.subject;
+                          const isDailyNews = b.subject === "daily_news";
+                          const renderAssignmentOptions = () => (
+                            <>
+                              <option value="">— Use default —</option>
+                              {assignmentOptions.map((a: any) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
+                                </option>
+                              ))}
+                            </>
+                          );
+                          return (
+                            <div className="rounded-xl p-3 mb-3 border"
+                              style={{ background: "rgba(124,58,237,0.06)", borderColor: "rgba(124,58,237,0.2)" }}>
+                              <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
+                                {subjLabel} Assignment
+                              </div>
+
+                              {/* "Same for every day" default — root-level fallback. */}
+                              <div className="mb-3">
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>
+                                    Same for every day (default)
+                                    {assignmentOptions.length === 0 && assignments.length > 0 && (
+                                      <span className="ml-1.5 opacity-70">(no matches for this subject — showing none)</span>
+                                    )}
+                                  </span>
+                                  <select
+                                    value={blockContent.assignmentId || ""}
+                                    onChange={(e) => updateBlock(i, {
+                                      content_source: buildBlockContent({
+                                        ...blockContent,
+                                        assignmentId: e.target.value || undefined,
+                                      }),
+                                    })}
+                                    className="input text-xs"
+                                  >
+                                    <option value="">— None —</option>
+                                    {assignmentOptions.map((a: any) => (
+                                      <option key={a.id} value={a.id}>
+                                        {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
+                                      </option>
+                                    ))}
+                                    {blockContent.assignmentId &&
+                                      !assignmentOptions.some((a: any) => a.id === blockContent.assignmentId) && (
+                                      <option value={blockContent.assignmentId}>
+                                        (currently saved: {blockContent.assignmentId.slice(0, 8)}…)
+                                      </option>
+                                    )}
+                                  </select>
+                                </label>
+                              </div>
+
+                              {/* Per-day mini-pickers — one per active day. */}
+                              <div className="mb-1">
+                                <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
+                                  Per day (overrides default)
+                                </div>
+                                <div className="grid gap-2"
+                                  style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
+                                  {DAYS.filter((d) => days.includes(d)).map((d) => {
+                                    const dayVal = blockContent.byDay?.[d] || {};
+                                    return (
+                                      <label key={d} className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold" style={{ color: color.text }}>{d}</span>
+                                        <select
+                                          value={dayVal.assignmentId || ""}
+                                          onChange={(e) => {
+                                            const next: BlockContent = {
+                                              ...blockContent,
+                                              byDay: { ...(blockContent.byDay || {}) },
+                                            };
+                                            const cur = { ...(next.byDay![d] || {}) };
+                                            if (e.target.value) cur.assignmentId = e.target.value;
+                                            else delete cur.assignmentId;
+                                            if (Object.keys(cur).length) next.byDay![d] = cur;
+                                            else delete next.byDay![d];
+                                            updateBlock(i, { content_source: buildBlockContent(next) });
+                                          }}
+                                          className="input text-[11px] py-1 px-1.5"
+                                          title={`${d} assignment`}
+                                        >
+                                          {renderAssignmentOptions()}
+                                          {dayVal.assignmentId &&
+                                            !assignmentOptions.some((a: any) => a.id === dayVal.assignmentId) && (
+                                            <option value={dayVal.assignmentId}>
+                                              (saved: {dayVal.assignmentId.slice(0, 6)}…)
+                                            </option>
+                                          )}
+                                        </select>
+                                      </label>
+                                    );
                                   })}
-                                  className="input text-xs"
-                                >
-                                  <option value="">— None (use default) —</option>
-                                  {assignmentOptions.map((a: any) => (
-                                    <option key={a.id} value={a.id}>
-                                      {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
-                                    </option>
-                                  ))}
-                                  {/* If the saved assignmentId no longer matches the
-                                      filtered list (e.g. subject changed), still show
-                                      it so the teacher can see what's stored. */}
-                                  {blockContent.assignmentId &&
-                                    !assignmentOptions.some((a: any) => a.id === blockContent.assignmentId) && (
-                                    <option value={blockContent.assignmentId}>
-                                      (currently saved: {blockContent.assignmentId.slice(0, 8)}…)
-                                    </option>
+                                  {days.length === 0 && (
+                                    <span className="text-[10px] col-span-full" style={{ color: "var(--t3)" }}>
+                                      Turn on at least one active day to pick per-day assignments.
+                                    </span>
                                   )}
-                                </select>
-                              </label>
+                                </div>
+                              </div>
+
+                              {/* Daily News URL — default + per-day. Only visible
+                                  for daily_news blocks. */}
+                              {isDailyNews && (
+                                <div className="mt-3 pt-3 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
+                                  <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
+                                    News Article / RSS URL
+                                  </div>
+                                  <label className="flex flex-col gap-1 mb-3">
+                                    <span className="text-[10px]" style={{ color: "var(--t3)" }}>
+                                      Same for every day (default)
+                                    </span>
+                                    <input
+                                      type="url"
+                                      placeholder="https://… news article or RSS feed"
+                                      value={blockContent.newsUrl || ""}
+                                      onChange={(e) => updateBlock(i, {
+                                        content_source: buildBlockContent({
+                                          ...blockContent,
+                                          newsUrl: e.target.value || undefined,
+                                        }),
+                                      })}
+                                      className="input text-xs"
+                                    />
+                                  </label>
+                                  <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
+                                    Per day (overrides default)
+                                  </div>
+                                  <div className="grid gap-2"
+                                    style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
+                                    {DAYS.filter((d) => days.includes(d)).map((d) => {
+                                      const dayVal = blockContent.byDay?.[d] || {};
+                                      return (
+                                        <label key={d} className="flex flex-col gap-1">
+                                          <span className="text-[10px] font-bold" style={{ color: color.text }}>{d}</span>
+                                          <input
+                                            type="url"
+                                            placeholder="URL"
+                                            value={dayVal.newsUrl || ""}
+                                            onChange={(e) => {
+                                              const next: BlockContent = {
+                                                ...blockContent,
+                                                byDay: { ...(blockContent.byDay || {}) },
+                                              };
+                                              const cur = { ...(next.byDay![d] || {}) };
+                                              if (e.target.value) cur.newsUrl = e.target.value;
+                                              else delete cur.newsUrl;
+                                              if (Object.keys(cur).length) next.byDay![d] = cur;
+                                              else delete next.byDay![d];
+                                              updateBlock(i, { content_source: buildBlockContent(next) });
+                                            }}
+                                            className="input text-[11px] py-1 px-1.5"
+                                            title={`${d} news URL`}
+                                          />
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* SEL content sub-row */}
-                        {selContent && (
-                          <div className="rounded-xl p-3 mb-3 border"
-                            style={{ background: "rgba(245,158,11,0.07)", borderColor: "rgba(245,158,11,0.2)" }}>
-                            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#fbbf24" }}>
-                              SEL Content Links
+                        {selContent && (() => {
+                          const gen = selGenState[i] || { status: "idle" as const };
+                          const canGenerate = isValidYouTubeUrl(selContent.videoUrl) && gen.status !== "loading";
+                          const runGenerate = async () => {
+                            setSelGenState((prev) => ({ ...prev, [i]: { status: "loading" } }));
+                            try {
+                              // Step 1 — generate the assignment content from the
+                              // YouTube transcript. The endpoint returns the raw
+                              // assignment payload only; it doesn't persist, so we
+                              // follow up with createAssignment and then select the
+                              // new row for the block (honoring any byDay overrides
+                              // that are already present for "today").
+                              const generated = await api.generateAssignmentFromVideo({
+                                videoUrl: selContent.videoUrl,
+                                subject: "sel",
+                                questionCount: 6,
+                                title: b.label || "SEL Reflection",
+                                grade: "3-5",
+                              });
+                              if (!generated) throw new Error("Empty response");
+
+                              // Step 2 — persist it so the block can reference an id.
+                              // The assignments POST expects { classId, title,
+                              // description, rubric, content, ...targeting }.
+                              // `content` is the stringified assignment JSON —
+                              // mirrors AssignmentBuilder's save flow so downstream
+                              // readers (take-over, grading) render identically.
+                              const rubric = Array.isArray(generated.sections)
+                                ? generated.sections.flatMap((sec: any) =>
+                                    Array.isArray(sec?.questions)
+                                      ? sec.questions.map((q: any) => ({
+                                          label: String(q?.text || "Question").slice(0, 60),
+                                          maxPoints: Number(q?.points) || 1,
+                                        }))
+                                      : []
+                                  )
+                                : [];
+                              const saved = generated.id
+                                ? generated
+                                : await api.createAssignment({
+                                    classId,
+                                    title: generated.title || b.label || "SEL Reflection",
+                                    description: generated.instructions || "",
+                                    rubric,
+                                    content: JSON.stringify({
+                                      title: generated.title || b.label || "SEL Reflection",
+                                      subject: generated.subject || "SEL",
+                                      grade: generated.grade || "3-5",
+                                      instructions: generated.instructions || "",
+                                      totalPoints: generated.totalPoints,
+                                      sections: generated.sections || [],
+                                    }),
+                                    targetSubject: "sel",
+                                    videoUrl: generated.videoUrl || selContent.videoUrl,
+                                  });
+
+                              if (saved?.id) {
+                                // Refresh the assignments list so the new row shows
+                                // in dropdowns.
+                                try {
+                                  const rows = await api.getAssignments(classId);
+                                  if (Array.isArray(rows)) setAssignments(rows);
+                                } catch {}
+                                // Wire the saved assignment back into the SEL
+                                // block's assignmentUrl so the student's SEL page
+                                // shows the "Open Today's Assignment" button
+                                // pointing at the newly-saved Thign assignment.
+                                const selAssignmentUrl = `/assignments/${saved.id}`;
+                                updateBlock(i, {
+                                  content_source: buildSelContent(selContent.videoUrl, selAssignmentUrl),
+                                });
+                              }
+                              setSelGenState((prev) => ({
+                                ...prev,
+                                [i]: {
+                                  status: "success",
+                                  message: saved?.id
+                                    ? `Saved "${saved.title || "SEL Reflection"}" and linked it to this block.`
+                                    : "Generated — but could not persist. Check server logs.",
+                                },
+                              }));
+                            } catch (err: any) {
+                              setSelGenState((prev) => ({
+                                ...prev,
+                                [i]: { status: "error", message: err?.message || "Generation failed" },
+                              }));
+                            }
+                          };
+                          return (
+                            <div className="rounded-xl p-3 mb-3 border"
+                              style={{ background: "rgba(245,158,11,0.07)", borderColor: "rgba(245,158,11,0.2)" }}>
+                              <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#fbbf24" }}>
+                                SEL Content Links
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>Video URL</span>
+                                  <input
+                                    type="url"
+                                    placeholder="YouTube, Vimeo…"
+                                    value={selContent.videoUrl}
+                                    onChange={(e) => {
+                                      updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) });
+                                      // Reset any prior success/error when the URL
+                                      // changes — keeps the feedback from looking stale.
+                                      if (selGenState[i] && selGenState[i].status !== "loading") {
+                                        setSelGenState((prev) => ({ ...prev, [i]: { status: "idle" } }));
+                                      }
+                                    }}
+                                    className="input text-xs"
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>Assignment URL</span>
+                                  <input
+                                    type="url"
+                                    placeholder="Google Form…"
+                                    value={selContent.assignmentUrl}
+                                    onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
+                                    className="input text-xs"
+                                  />
+                                </label>
+                              </div>
+
+                              {/* Generate-from-video action row */}
+                              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={runGenerate}
+                                  disabled={!canGenerate}
+                                  className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                  style={{
+                                    background: "rgba(245,158,11,0.15)",
+                                    borderColor: "rgba(245,158,11,0.35)",
+                                    color: "#fbbf24",
+                                  }}
+                                  title={canGenerate ? "Generate an SEL worksheet from the video transcript" : "Paste a YouTube URL first"}
+                                >
+                                  {gen.status === "loading" ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <Sparkles size={12} />
+                                  )}
+                                  {gen.status === "loading" ? "Generating…" : "Generate SEL from video"}
+                                </button>
+                                {gen.status === "success" && (
+                                  <span className="flex items-center gap-1 text-[11px]" style={{ color: "#34d399" }}>
+                                    <CheckCircle2 size={12} /> {gen.message}
+                                  </span>
+                                )}
+                                {gen.status === "error" && (
+                                  <span className="flex items-center gap-1 text-[11px]" style={{ color: "#fca5a5" }}>
+                                    <AlertCircle size={12} /> {gen.message}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>Video URL</span>
-                                <input
-                                  type="url"
-                                  placeholder="YouTube, Vimeo…"
-                                  value={selContent.videoUrl}
-                                  onChange={(e) => updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) })}
-                                  className="input text-xs"
-                                />
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>Assignment URL</span>
-                                <input
-                                  type="url"
-                                  placeholder="Google Form…"
-                                  value={selContent.assignmentUrl}
-                                  onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
-                                  className="input text-xs"
-                                />
-                              </label>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* Delete action */}
                         <div className="flex justify-end pt-1">
