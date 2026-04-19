@@ -963,6 +963,16 @@ export default function StudentDashboard() {
   }, []);
   const classConfig = useClassConfig();
 
+  // Reload YouTube library whenever class list is available (covers break + dashboard states)
+  useEffect(() => {
+    if (classes.length === 0) return;
+    api.getYouTubeLibrary(classes[0].id).then(setYoutubeLibrary).catch(() => {});
+    const iv = setInterval(() => {
+      api.getYouTubeLibrary(classes[0].id).then(setYoutubeLibrary).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(iv);
+  }, [classes]);
+
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);

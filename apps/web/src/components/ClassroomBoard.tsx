@@ -21,11 +21,11 @@ const GRADE_COLORS: Record<number, { from: string; to: string; border: string; t
 };
 
 const BEHAVIOR_LEVELS: Record<number, { label: string; short: string; icon: string; color: string; bg: string; glow: string }> = {
-  1: { label: "Needs Redirection", short: "Redirect",   icon: "↩", color: "#fca5a5", bg: "rgba(239,68,68,0.28)",   glow: "rgba(239,68,68,0.3)" },
-  2: { label: "Developing",        short: "Developing",  icon: "📈", color: "#fdba74", bg: "rgba(251,146,60,0.28)", glow: "rgba(251,146,60,0.3)" },
-  3: { label: "On Track",          short: "On Track",    icon: "✓",  color: "#fcd34d", bg: "rgba(245,158,11,0.28)", glow: "rgba(245,158,11,0.3)" },
-  4: { label: "Consistent",        short: "Consistent",  icon: "💪", color: "#86efac", bg: "rgba(34,197,94,0.28)",  glow: "rgba(34,197,94,0.3)" },
-  5: { label: "Role Model",        short: "Role Model",  icon: "⭐", color: "#6ee7b7", bg: "rgba(16,185,129,0.32)", glow: "rgba(16,185,129,0.35)" },
+  1: { label: "Level 1",  short: "Lv 1",  icon: "1", color: "#fca5a5", bg: "rgba(239,68,68,0.22)",   glow: "rgba(239,68,68,0.25)" },
+  2: { label: "Level 2",  short: "Lv 2",  icon: "2", color: "#fdba74", bg: "rgba(251,146,60,0.22)", glow: "rgba(251,146,60,0.25)" },
+  3: { label: "Level 3",  short: "Lv 3",  icon: "3", color: "#fcd34d", bg: "rgba(245,158,11,0.22)", glow: "rgba(245,158,11,0.25)" },
+  4: { label: "Level 4",  short: "Lv 4",  icon: "4", color: "#86efac", bg: "rgba(34,197,94,0.22)",  glow: "rgba(34,197,94,0.25)" },
+  5: { label: "Level 5",  short: "Lv 5",  icon: "5", color: "#6ee7b7", bg: "rgba(16,185,129,0.25)", glow: "rgba(16,185,129,0.3)" },
 };
 
 const ACTIVITY_EMOJI: Array<[string, string]> = [
@@ -316,11 +316,12 @@ export default function ClassroomBoard() {
             <div style={{ fontSize: 11, opacity: 0.35 }}>5 = McDonald's</div>
           </div>
           <div style={{
-            flex: 1, overflow: "hidden", minHeight: 0,
+            overflowY: "auto", flex: 1,
             display: "grid",
-            gridTemplateColumns: `repeat(${Math.min(5, Math.max(3, board.students.length))}, 1fr)`,
-            gridAutoRows: "1fr",
-            gap: 6,
+            gridTemplateColumns: `repeat(auto-fill, minmax(90px, 1fr))`,
+            gridAutoRows: "auto",
+            alignContent: "start",
+            gap: 5,
           }}>
             {board.students.map((s, idx) => {
               const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
@@ -385,22 +386,21 @@ export default function ClassroomBoard() {
                       ))}
                     </div>
 
-                    {/* Schedule pills */}
+                    {/* Schedule pills — show all entries, no day filter */}
                     {(() => {
-                      const todayAbbr = now.toLocaleDateString('en-US', { weekday: 'short' });
                       const studentSchedules = board.schedules
-                        .filter((sc: { student_id: string; activity: string; start_time: string; end_time: string; active_days: string }) =>
-                          sc.student_id === s.id && (sc.active_days || '').includes(todayAbbr))
-                        .sort((a: { start_time: string }, b: { start_time: string }) => a.start_time.localeCompare(b.start_time))
-                        .slice(0, 2);
+                        .filter((sc: any) => sc.student_id === s.id)
+                        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time))
+                        .slice(0, 3);
                       return studentSchedules.length > 0 ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', maxWidth: '100%' }}>
-                          {studentSchedules.map((sc: { activity: string; start_time: string }, i: number) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', maxWidth: '100%' }}>
+                          {studentSchedules.map((sc: any, i: number) => (
                             <span key={i} style={{
-                              fontSize: 8, padding: '1px 5px', borderRadius: 10,
-                              background: 'rgba(99,102,241,0.2)', color: 'rgba(167,139,250,0.9)',
-                              border: '1px solid rgba(99,102,241,0.3)', whiteSpace: 'nowrap' as const,
-                              fontWeight: 700, letterSpacing: '0.03em',
+                              fontSize: 8, padding: '1px 6px', borderRadius: 10,
+                              background: 'rgba(99,102,241,0.18)', color: 'rgba(167,139,250,0.9)',
+                              border: '1px solid rgba(99,102,241,0.28)', whiteSpace: 'nowrap' as const,
+                              fontWeight: 700, letterSpacing: '0.02em', maxWidth: '100%',
+                              overflow: 'hidden', textOverflow: 'ellipsis',
                               animation: `slideIn .3s ease ${i * 0.08}s both`,
                             }}>
                               {sc.start_time.slice(0, 5)} {sc.activity}
@@ -410,15 +410,16 @@ export default function ClassroomBoard() {
                       ) : null;
                     })()}
 
-                    {/* Level label + reward */}
+                    {/* Level badge */}
                     <div style={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
                       <div style={{
-                        fontSize: 8, padding: "1px 5px", borderRadius: 20,
-                        background: lc.bg, color: lc.color, fontWeight: 800,
-                        border: `1px solid ${lc.color}44`,
-                        letterSpacing: "0.03em",
+                        fontSize: 9, width: 18, height: 18, borderRadius: "50%",
+                        background: lc.bg, color: lc.color, fontWeight: 900,
+                        border: `1px solid ${lc.color}55`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        lineHeight: 1,
                       }}>
-                        {lc.icon} {lc.short}
+                        {lv}
                       </div>
                       {s.reward_count > 0 && (
                         <div style={{

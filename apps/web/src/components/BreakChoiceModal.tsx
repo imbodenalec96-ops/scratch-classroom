@@ -6,50 +6,57 @@ import {
 } from "../lib/breakSystem.ts";
 import { clearWorkUnlock } from "../lib/workUnlock.ts";
 
-// Inject keyframes the pill + toast depend on (scaleIn may already exist,
-// but pulseRed is defined only inside BreakSystem.tsx which isn't mounted here).
-const BREAK_MODAL_CSS = `
-@keyframes blockforgeBreakPulse {
-  0%,100% { box-shadow: 0 4px 20px rgba(239,68,68,0.55), 0 0 0 0 rgba(239,68,68,0); }
-  50%     { box-shadow: 0 4px 20px rgba(239,68,68,0.8),  0 0 0 10px rgba(239,68,68,0.22); }
+const CSS = `
+@keyframes bcmFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-@keyframes blockforgeBreakToastIn {
-  0%   { opacity: 0; transform: translate(-50%, 24px) scale(0.92); }
-  60%  { opacity: 1; transform: translate(-50%, -6px) scale(1.03); }
-  100% { opacity: 1; transform: translate(-50%, 0)    scale(1);    }
+@keyframes bcmSlideUp {
+  from { opacity: 0; transform: translateY(32px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes bcmPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
+  60%     { box-shadow: 0 0 0 12px rgba(139,92,246,0); }
+}
+@keyframes bcmUrgentPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  60%     { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+}
+@keyframes bcmToastIn {
+  from { opacity: 0; transform: translate(-50%, 20px) scale(0.92); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes bcmSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes bcmBounce {
+  0%,100% { transform: translateY(0); }
+  40%     { transform: translateY(-8px); }
 }
 `;
-let breakModalCssInjected = false;
-function injectBreakModalCss() {
-  if (breakModalCssInjected || typeof document === "undefined") return;
-  breakModalCssInjected = true;
+
+let cssInjected = false;
+function injectCss() {
+  if (cssInjected || typeof document === "undefined") return;
+  cssInjected = true;
   const el = document.createElement("style");
-  el.textContent = BREAK_MODAL_CSS;
+  el.textContent = CSS;
   document.head.appendChild(el);
 }
 
-/**
- * BreakChoiceModal + BreakCountdownBanner
- *
- * - After 10 min of continuous work (tracked via breakSystem.workStartAt)
- *   the modal auto-appears exactly once per day.
- * - If student picks "Take break" → limited-arcade mode kicks in globally.
- * - If student picks "Earn full access" → the existing isWorkUnlocked flow
- *   awards everything once all work is done.
- * - During a break, a bottom banner counts down and force-returns the
- *   student to /student at 0:00.
- */
-
 export default function BreakChoiceModal() {
-  injectBreakModalCss();
+  injectCss();
   const navigate = useNavigate();
   const location = useLocation();
   const [offered, setOffered] = useState(false);
   const [onBreak, setOnBreak] = useState(false);
   const [secLeft, setSecLeft] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [hoverA, setHoverA] = useState(false);
+  const [hoverB, setHoverB] = useState(false);
 
-  // Poll break system state (modal offer + countdown)
   useEffect(() => {
     const tick = () => {
       setOffered(shouldOfferBreak());
@@ -58,17 +65,16 @@ export default function BreakChoiceModal() {
     };
     tick();
     const iv = setInterval(tick, 1000);
-    const onChange = () => tick();
-    window.addEventListener("breakstate-change", onChange);
-    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", onChange); };
+    window.addEventListener("breakstate-change", tick);
+    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", tick); };
   }, []);
 
-  // Teacher-forced end ("End Break Now"): reset state and kick back to work.
+  // Teacher force-end break
   useEffect(() => {
     const onForceEnd = () => {
       setBreakState({ path: null, breakStartAt: 0, breakEndAt: 0, workStartAt: Date.now() });
       clearWorkUnlock();
-      setToast("⛔ Your teacher ended break. Back to work 📚");
+      setToast("⛔ Your teacher ended break — back to work!");
       setTimeout(() => setToast(null), 4000);
       navigate("/student");
     };
@@ -76,16 +82,14 @@ export default function BreakChoiceModal() {
     return () => window.removeEventListener("blockforge:end-break", onForceEnd);
   }, [navigate]);
 
-  // When break ends, force-return to assignments and clear break path so
-  // student can't re-enter the arcade until next work cycle earns another
+  // Auto-return when break ends
   useEffect(() => {
     if (!onBreak && secLeft === 0) {
       const s = getBreakState();
       if (s.path === "break" && s.breakEndAt && Date.now() >= s.breakEndAt) {
-        // Mark break as used; force-return to assignments
         setBreakState({ path: null, breakStartAt: 0, breakEndAt: 0, workStartAt: Date.now() });
         clearWorkUnlock();
-        setToast("⏰ Break's over — back to work 📚");
+        setToast("⏰ Break's over — let's get back to it!");
         setTimeout(() => setToast(null), 4000);
         navigate("/student");
       }
@@ -93,14 +97,8 @@ export default function BreakChoiceModal() {
   }, [onBreak, secLeft, navigate]);
 
   const handleTakeBreak = () => {
-    chooseBreak();                         // writes localStorage + fires breakstate-change
+    chooseBreak();
     setOffered(false);
-    // STAY on /student — the dashboard listens for breakstate-change and
-    // auto-flips to the "playground" view with arcade/projects/youtube cards
-    // + the pill pinned top-right. If the student wants the full Arcade they
-    // can click it in the nav. Navigating to /arcade here caused the old
-    // "restarted the assignments" bug because the layout remounted before
-    // the playground render propagated. Leave them on /student.
     if (location.pathname !== "/student") navigate("/student");
   };
 
@@ -109,136 +107,175 @@ export default function BreakChoiceModal() {
     setOffered(false);
   };
 
+  const mm = Math.floor(secLeft / 60);
+  const ss = String(secLeft % 60).padStart(2, "0");
+  const urgent = secLeft > 0 && secLeft <= 60;
+  const pct = secLeft > 0 ? (secLeft / (10 * 60)) * 100 : 0;
+  const circumference = 2 * Math.PI * 28;
+
   return (
     <>
-      {/* The 10-min-work choice modal */}
+      {/* Break choice modal */}
       {offered && !onBreak && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 900,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+          background: "rgba(5,2,18,0.85)",
+          backdropFilter: "blur(8px)",
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: 20,
+          animation: "bcmFadeIn 0.2s ease",
         }}>
           <div style={{
-            maxWidth: 560, width: "100%",
-            background: "linear-gradient(135deg, #0f0726, #1a0a35)",
-            borderRadius: 20,
-            border: "1px solid rgba(139,92,246,0.3)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-            padding: 32,
-            textAlign: "center",
-            animation: "scaleIn 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+            maxWidth: 500, width: "100%",
+            background: "linear-gradient(160deg, #0d0828 0%, #130d2e 50%, #0a1428 100%)",
+            borderRadius: 24,
+            border: "1px solid rgba(139,92,246,0.25)",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
+            padding: "32px 28px 28px",
+            animation: "bcmSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1)",
           }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
-            <h2 style={{ color: "white", fontSize: 22, fontWeight: 800, margin: "0 0 4px" }}>
-              You earned a choice!
-            </h2>
-            <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, margin: "0 0 24px" }}>
-              You've been working hard for 10 minutes. Pick one:
-            </p>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 44, marginBottom: 8, animation: "bcmBounce 2s ease-in-out infinite" }}>🎉</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "white", letterSpacing: "-0.01em" }}>
+                You've been working hard!
+              </h2>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+                10 minutes of solid work. Choose your next move:
+              </p>
+            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {/* Option A: Break */}
-              <button onClick={handleTakeBreak}
+            {/* Options */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {/* Break option */}
+              <button
+                onClick={handleTakeBreak}
+                onMouseEnter={() => setHoverA(true)}
+                onMouseLeave={() => setHoverA(false)}
                 style={{
-                  padding: "20px 16px", borderRadius: 16,
-                  background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
-                  border: "1px solid rgba(139,92,246,0.5)",
+                  padding: "20px 14px", borderRadius: 16,
+                  background: hoverA
+                    ? "linear-gradient(145deg, #7c3aed, #4f46e5)"
+                    : "linear-gradient(145deg, #6d28d9, #4338ca)",
+                  border: "1px solid rgba(139,92,246,0.4)",
                   color: "white", cursor: "pointer",
-                  display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start",
+                  display: "flex", flexDirection: "column", gap: 8,
                   textAlign: "left",
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                  touchAction: "manipulation", minHeight: 140,
+                  transition: "transform 0.15s, box-shadow 0.15s, background 0.15s",
+                  transform: hoverA ? "translateY(-3px)" : "none",
+                  boxShadow: hoverA ? "0 12px 32px rgba(109,40,217,0.45)" : "0 4px 16px rgba(109,40,217,0.25)",
+                  touchAction: "manipulation",
+                  animation: "bcmPulse 3s ease-in-out infinite",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(139,92,246,0.3)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
               >
-                <span style={{ fontSize: 32 }}>🎮</span>
-                <span style={{ fontWeight: 800, fontSize: 15 }}>Take a 10-min break</span>
-                <span style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.4 }}>
-                  Full Arcade, Projects, and YouTube library unlocked for 10 min.
-                  Auto-return to work when the timer hits 0:00.
-                </span>
+                <span style={{ fontSize: 28 }}>☕</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Take a break</div>
+                  <div style={{ fontSize: 11, opacity: 0.8, lineHeight: 1.45 }}>
+                    10 minutes of free time — Arcade, YouTube &amp; more. Timer runs out, you're back to work.
+                  </div>
+                </div>
               </button>
 
-              {/* Option B: Earn full access */}
-              <button onClick={handleEarnAccess}
+              {/* Earn access option */}
+              <button
+                onClick={handleEarnAccess}
+                onMouseEnter={() => setHoverB(true)}
+                onMouseLeave={() => setHoverB(false)}
                 style={{
-                  padding: "20px 16px", borderRadius: 16,
-                  background: "linear-gradient(135deg, #10b981, #059669)",
-                  border: "1px solid rgba(16,185,129,0.5)",
+                  padding: "20px 14px", borderRadius: 16,
+                  background: hoverB
+                    ? "linear-gradient(145deg, #059669, #0284c7)"
+                    : "linear-gradient(145deg, #047857, #0369a1)",
+                  border: "1px solid rgba(16,185,129,0.35)",
                   color: "white", cursor: "pointer",
-                  display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start",
+                  display: "flex", flexDirection: "column", gap: 8,
                   textAlign: "left",
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                  touchAction: "manipulation", minHeight: 140,
+                  transition: "transform 0.15s, box-shadow 0.15s, background 0.15s",
+                  transform: hoverB ? "translateY(-3px)" : "none",
+                  boxShadow: hoverB ? "0 12px 32px rgba(5,150,105,0.4)" : "0 4px 16px rgba(5,150,105,0.2)",
+                  touchAction: "manipulation",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(16,185,129,0.3)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
               >
-                <span style={{ fontSize: 32 }}>⚡</span>
-                <span style={{ fontWeight: 800, fontSize: 15 }}>Earn full access</span>
-                <span style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.4 }}>
-                  Finish all your work. Unlocks the full arcade,
-                  Projects, BlockForge Studio, and the 3D stage.
-                </span>
+                <span style={{ fontSize: 28 }}>⚡</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Keep going</div>
+                  <div style={{ fontSize: 11, opacity: 0.8, lineHeight: 1.45 }}>
+                    Finish all your work today and unlock the full arcade + everything else.
+                  </div>
+                </div>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating break countdown pill (top-right) */}
-      {onBreak && secLeft > 0 && (() => {
-        const mm = Math.floor(secLeft / 60);
-        const ss = String(secLeft % 60).padStart(2, "0");
-        const urgent = secLeft <= 60;
-        return (
-          <div style={{
-            position: "fixed", top: 16, right: 16, zIndex: 9500,
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "8px 14px 8px 10px",
-            borderRadius: 999,
-            background: urgent
-              ? "linear-gradient(135deg, #ef4444, #f59e0b)"
-              : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            color: "white",
-            fontSize: 13, fontWeight: 700,
-            boxShadow: urgent
-              ? "0 4px 20px rgba(239,68,68,0.55)"
-              : "0 4px 18px rgba(139,92,246,0.45)",
-            border: "1.5px solid rgba(255,255,255,0.2)",
-            backdropFilter: "blur(6px)",
-            animation: urgent ? "blockforgeBreakPulse 1.1s ease-in-out infinite" : undefined,
-            pointerEvents: "none",
-            userSelect: "none",
-          }}
-          aria-live="polite"
-          >
-            <span style={{ fontSize: 16 }}>☕</span>
-            <span style={{ opacity: 0.9, fontWeight: 600 }}>Break</span>
-            <span style={{
-              background: "rgba(0,0,0,0.28)", padding: "3px 10px", borderRadius: 999,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              fontSize: 13, fontVariantNumeric: "tabular-nums",
-              letterSpacing: "0.03em",
-            }}>
-              {mm}:{ss}
-            </span>
+      {/* Break countdown pill — top right */}
+      {onBreak && secLeft > 0 && (
+        <div style={{
+          position: "fixed", top: 14, right: 14, zIndex: 9500,
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "8px 16px 8px 10px",
+          borderRadius: 999,
+          background: urgent
+            ? "linear-gradient(135deg, #dc2626, #f59e0b)"
+            : "linear-gradient(135deg, #5b21b6, #4f46e5)",
+          color: "white",
+          boxShadow: urgent
+            ? "0 4px 24px rgba(220,38,38,0.5), inset 0 1px 0 rgba(255,255,255,0.15)"
+            : "0 4px 20px rgba(91,33,182,0.5), inset 0 1px 0 rgba(255,255,255,0.1)",
+          border: urgent
+            ? "1.5px solid rgba(251,191,36,0.4)"
+            : "1.5px solid rgba(139,92,246,0.4)",
+          backdropFilter: "blur(8px)",
+          animation: urgent ? "bcmUrgentPulse 1s ease-in-out infinite" : undefined,
+          pointerEvents: "none",
+          userSelect: "none",
+          minWidth: 120,
+        }}>
+          {/* Mini circular timer */}
+          <div style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+            <svg width="32" height="32" style={{ transform: "rotate(-90deg)" }} viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="5" />
+              <circle
+                cx="32" cy="32" r="28" fill="none"
+                stroke={urgent ? "#fbbf24" : "rgba(255,255,255,0.85)"}
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={`${circumference}`}
+                strokeDashoffset={`${circumference * (1 - pct / 100)}`}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 8, fontWeight: 900, color: urgent ? "#fbbf24" : "rgba(255,255,255,0.9)",
+            }}>☕</div>
           </div>
-        );
-      })()}
+          <div>
+            <div style={{ fontSize: 10, opacity: 0.65, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Break</div>
+            <div style={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: 16, fontWeight: 900, lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+              color: urgent ? "#fbbf24" : "white",
+            }}>{mm}:{ss}</div>
+          </div>
+        </div>
+      )}
 
-      {/* End-of-break toast */}
+      {/* Toast notification */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 32, left: "50%",
+          position: "fixed", bottom: 28, left: "50%",
           transform: "translateX(-50%)", zIndex: 9600,
-          background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+          background: "linear-gradient(135deg, #1e1b4b, #312e81)",
           color: "white", padding: "14px 28px", borderRadius: 16,
-          fontSize: 15, fontWeight: 700,
-          boxShadow: "0 12px 40px rgba(79,70,229,0.45)",
-          animation: "blockforgeBreakToastIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards",
+          fontSize: 14, fontWeight: 700,
+          boxShadow: "0 16px 48px rgba(30,27,75,0.5), inset 0 1px 0 rgba(255,255,255,0.1)",
+          border: "1px solid rgba(139,92,246,0.3)",
+          animation: "bcmToastIn 0.35s cubic-bezier(0.22,1,0.36,1) forwards",
+          whiteSpace: "nowrap",
         }}>
           {toast}
         </div>
