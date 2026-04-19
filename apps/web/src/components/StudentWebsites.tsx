@@ -8,8 +8,11 @@ export default function StudentWebsites() {
   const { theme } = useTheme();
   const dk = theme === "dark";
 
-  const [sites, setSites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const WS_CACHE = "sw_cache_v1";
+  const [sites, setSites] = useState<any[]>(() => {
+    try { const c = localStorage.getItem(WS_CACHE); return c ? JSON.parse(c) : []; } catch { return []; }
+  });
+  const [loading, setLoading] = useState(sites.length === 0);
   const [showRequest, setShowRequest] = useState(false);
   const [requestTitle, setRequestTitle] = useState("");
   const [requesting, setRequesting] = useState(false);
@@ -18,8 +21,12 @@ export default function StudentWebsites() {
 
   useEffect(() => {
     api.getMyWebsites()
-      .then(data => setSites(data || []))
-      .catch(() => setError("Failed to load websites"))
+      .then(data => {
+        const list = data || [];
+        setSites(list);
+        try { localStorage.setItem(WS_CACHE, JSON.stringify(list)); } catch {}
+      })
+      .catch(() => { if (sites.length === 0) setError("Failed to load websites"); })
       .finally(() => setLoading(false));
   }, []);
 

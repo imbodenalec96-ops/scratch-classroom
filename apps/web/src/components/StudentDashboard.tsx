@@ -1047,12 +1047,21 @@ export default function StudentDashboard() {
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
   // Teacher-granted websites (Poki-style per-student URL library)
-  const [myWebsites, setMyWebsites] = useState<any[]>([]);
+  const WS_CACHE = "sw_cache_v1";
+  const [myWebsites, setMyWebsites] = useState<any[]>(() => {
+    try { const c = localStorage.getItem(WS_CACHE); return c ? JSON.parse(c) : []; } catch { return []; }
+  });
+  const [websitesLoading, setWebsitesLoading] = useState(myWebsites.length === 0);
   const [showWebsiteRequest, setShowWebsiteRequest] = useState(false);
   const [websiteRequestTitle, setWebsiteRequestTitle] = useState("");
   const [websiteRequestSent, setWebsiteRequestSent] = useState(false);
   useEffect(() => {
-    api.getMyWebsites().then(setMyWebsites).catch(() => {});
+    api.getMyWebsites().then(data => {
+      const list = data || [];
+      setMyWebsites(list);
+      setWebsitesLoading(false);
+      try { localStorage.setItem(WS_CACHE, JSON.stringify(list)); } catch {}
+    }).catch(() => setWebsitesLoading(false));
   }, []);
   const classConfig = useClassConfig();
   const blockInfo = useBlockInfo(classes[0]?.id ?? null);
@@ -1929,6 +1938,17 @@ export default function StudentDashboard() {
                 <LearningAppTile key={w.id} app={w} dk={true} />
               ))}
             </LearningAppGrid>
+          ) : websitesLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} style={{
+                  height: 120, borderRadius: 14,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  animation: `pulse 1.5s ease-in-out ${i * 0.1}s infinite`,
+                }} />
+              ))}
+            </div>
           ) : (
             <div style={{ textAlign: "center", padding: "24px 16px", opacity: 0.35 }}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>🌐</div>
