@@ -10,6 +10,8 @@ import {
   Lock, LockOpen, Megaphone, Eye, Users, Plus, Activity,
   Youtube, Trophy, Navigation, MessageSquare,
   Send, GraduationCap, Tv,
+  LayoutDashboard, BookOpen, Gamepad2, FileText,
+  Wifi, WifiOff, Radio,
 } from "lucide-react";
 
 function useCountUp(target: number, duration = 700) {
@@ -39,17 +41,19 @@ const TOOLS = [
   { path: "/class-grades",     icon: GraduationCap, label: "Class Grades",  desc: "Per-student levels",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.3)" },
 ];
 
+/* Push-to-page entries with icons and accent colours */
 const PUSH_PAGES = [
-  { label: "Dashboard",   path: "/student" },
-  { label: "Lessons",     path: "/lessons" },
-  { label: "Assignments", path: "/assignments" },
-  { label: "Arcade",      path: "/arcade" },
+  { label: "Dashboard",   path: "/student",      icon: LayoutDashboard, color: "#8b5cf6", desc: "Home screen" },
+  { label: "Lessons",     path: "/lessons",      icon: BookOpen,        color: "#3b82f6", desc: "Reading & content" },
+  { label: "Assignments", path: "/assignments",  icon: FileText,        color: "#10b981", desc: "Tasks & projects" },
+  { label: "Arcade",      path: "/arcade",       icon: Gamepad2,        color: "#f59e0b", desc: "Games & challenges" },
 ];
 
 const ANIM = `
   @keyframes td-fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
   @keyframes td-shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
   @keyframes td-pulse { 0%,100%{opacity:1;} 50%{opacity:.45;} }
+  @keyframes td-live-dot { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(0.65);opacity:0.5;} }
 `;
 
 export default function TeacherDashboard() {
@@ -57,18 +61,18 @@ export default function TeacherDashboard() {
   const { theme } = useTheme();
   const dk = theme === "dark";
 
-  const [classes, setClasses]           = useState<any[]>([]);
-  const [newClassName, setNewClassName] = useState("");
-  const [selectedClass, setSelectedClass] = useState<any>(null);
-  const [students, setStudents]         = useState<any[]>([]);
-  const [announcement, setAnnouncement] = useState("");
-  const [announceSent, setAnnounceSent] = useState(false);
+  const [classes, setClasses]               = useState<any[]>([]);
+  const [newClassName, setNewClassName]     = useState("");
+  const [selectedClass, setSelectedClass]   = useState<any>(null);
+  const [students, setStudents]             = useState<any[]>([]);
+  const [announcement, setAnnouncement]     = useState("");
+  const [announceSent, setAnnounceSent]     = useState(false);
   const [recentActivity, setRecentActivity] = useState<{ name: string; action: string; time: string }[]>([]);
-  const [isClassLocked, setIsClassLocked] = useState(false);
-  const [lockMsg, setLockMsg]           = useState("");
-  const [showPushMenu, setShowPushMenu] = useState(false);
-  const [showMsgModal, setShowMsgModal] = useState(false);
-  const [msgText, setMsgText]           = useState("");
+  const [isClassLocked, setIsClassLocked]   = useState(false);
+  const [lockMsg, setLockMsg]               = useState("");
+  const [showPushMenu, setShowPushMenu]     = useState(false);
+  const [showMsgModal, setShowMsgModal]     = useState(false);
+  const [msgText, setMsgText]               = useState("");
   const [pendingYouTube, setPendingYouTube] = useState(0);
 
   const studentCount = useCountUp(students.length);
@@ -142,19 +146,23 @@ export default function TeacherDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const surface = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
-  const border  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
-  const text1   = dk ? "#f1f5f9" : "#0f172a";
-  const text2   = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const surface   = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
+  const border    = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
+  const text1     = dk ? "#f1f5f9" : "#0f172a";
+  const text2     = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
   const cardStyle = {
     background: surface, border: `1px solid ${border}`,
     borderRadius: 20, backdropFilter: "blur(16px)",
   } as const;
 
+  /* Activity dot colour cycle */
+  const actDotColors = ["#a78bfa","#34d399","#60a5fa","#f9a8d4","#fbbf24"];
+
   return (
     <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8", color: text1, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
+      {/* ─── Message modal ─── */}
       {showMsgModal && (
         <div style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center" }}
           onClick={e => { if (e.target === e.currentTarget) setShowMsgModal(false); }}>
@@ -170,6 +178,7 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {/* ─── Hero header ─── */}
       <div style={{
         background: dk
           ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
@@ -218,14 +227,15 @@ export default function TeacherDashboard() {
 
       <div style={{ padding: "0 40px 48px", maxWidth: 1280, margin: "0 auto" }}>
 
+        {/* ─── Tool quick-links ─── */}
         <div style={{
-          display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:28,
+          display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:32,
           animation: "td-fadeUp .5s ease .08s both",
         }}>
           {TOOLS.map((t, i) => (
             <Link key={t.path} to={t.path} style={{
-              display:"flex",flexDirection:"column",gap:12,padding:"16px 14px",
-              borderRadius:16, textDecoration:"none",
+              display:"flex",flexDirection:"column",gap:0,padding:0,
+              borderRadius:16, textDecoration:"none", overflow:"hidden",
               background: surface, border:`1px solid ${border}`,
               transition:"all 0.2s ease",
               animationDelay: `${i * 40}ms`,
@@ -242,31 +252,39 @@ export default function TeacherDashboard() {
                 (e.currentTarget as HTMLElement).style.borderColor = border;
               }}
             >
-              <div style={{
-                width: 38, height: 38, borderRadius: 11, flexShrink: 0,
-                background: t.grad, display:"flex", alignItems:"center", justifyContent:"center",
-                boxShadow: `0 6px 16px ${t.glow}`,
-              }}>
-                <t.icon size={17} color="white" />
-              </div>
-              <div style={{ minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:text1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"0.01em" }}>
-                  {t.label}
-                  {t.label === "YouTube" && pendingYouTube > 0 && (
-                    <span style={{ marginLeft:5, fontSize:9, background:"#ef4444", color:"white", borderRadius:20, padding:"2px 6px", fontWeight:800, verticalAlign:"middle" }}>{pendingYouTube}</span>
-                  )}
+              {/* coloured top stripe */}
+              <div style={{ height:2, background:t.grad, flexShrink:0 }} />
+              <div style={{ padding:"13px 14px 15px", display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+                  background: t.grad, display:"flex", alignItems:"center", justifyContent:"center",
+                  boxShadow: `0 6px 16px ${t.glow}`,
+                }}>
+                  <t.icon size={17} color="white" />
                 </div>
-                <div style={{ fontSize:10, color:text2, marginTop:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.desc}</div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:text1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"0.01em" }}>
+                    {t.label}
+                    {t.label === "YouTube" && pendingYouTube > 0 && (
+                      <span style={{ marginLeft:5, fontSize:9, background:"#ef4444", color:"white", borderRadius:20, padding:"2px 6px", fontWeight:800, verticalAlign:"middle" }}>{pendingYouTube}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize:10, color:text2, marginTop:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.desc}</div>
+                </div>
               </div>
             </Link>
           ))}
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"210px 1fr", gap:16, animation:"td-fadeUp .5s ease .15s both" }}>
+        {/* ─── Main layout: sidebar + content ─── */}
+        <div style={{ display:"grid", gridTemplateColumns:"220px 1fr", gap:16, animation:"td-fadeUp .5s ease .15s both" }}>
 
-          <div style={{ ...cardStyle, padding:"18px 16px" }}>
-            <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:text2, marginBottom:12 }}>My Classes</div>
-            <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+          {/* ─── Class selector sidebar (polished tab strip) ─── */}
+          <div style={{ ...cardStyle, padding:"18px 0", display:"flex", flexDirection:"column" }}>
+            <div style={{ padding:"0 16px 10px", fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:text2 }}>My Classes</div>
+
+            {/* Create new class input */}
+            <div style={{ display:"flex", gap:6, padding:"0 10px", marginBottom:10 }}>
               <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="New class…"
                 className="input text-sm flex-1" style={{ fontSize:12 }}
                 onKeyDown={e => e.key === "Enter" && handleCreateClass()} />
@@ -274,120 +292,205 @@ export default function TeacherDashboard() {
                 <Plus size={13}/>
               </button>
             </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-              {classes.map(cls => (
-                <button key={cls.id}
-                  onClick={() => { setSelectedClass(cls); loadStudents(cls.id); setIsClassLocked(false); }}
-                  style={{
-                    textAlign:"left", padding:"9px 11px", borderRadius:12, fontSize:12, cursor:"pointer",
-                    border:`1px solid ${selectedClass?.id === cls.id ? "rgba(124,58,237,0.35)" : "transparent"}`,
-                    background: selectedClass?.id === cls.id
-                      ? "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(79,70,229,0.1))"
-                      : "transparent",
-                    color: selectedClass?.id === cls.id ? "#c4b5fd" : text2,
-                    transition:"all 0.15s ease",
-                  }}>
-                  <div style={{ fontWeight:700, fontSize:12 }}>{cls.name}</div>
-                  <div style={{ fontFamily:"monospace", fontSize:10, opacity:0.5, marginTop:2 }}>{cls.code}</div>
-                </button>
-              ))}
+
+            {/* Tab items */}
+            <div style={{ display:"flex", flexDirection:"column", gap:2, padding:"0 8px", flex:1 }}>
+              {classes.map(cls => {
+                const active = selectedClass?.id === cls.id;
+                return (
+                  <button key={cls.id}
+                    onClick={() => { setSelectedClass(cls); loadStudents(cls.id); setIsClassLocked(false); }}
+                    style={{
+                      textAlign:"left", padding:"10px 10px", borderRadius:11, fontSize:12, cursor:"pointer",
+                      border:"none",
+                      background: active
+                        ? "linear-gradient(135deg, rgba(124,58,237,0.22), rgba(79,70,229,0.12))"
+                        : "transparent",
+                      color: active ? "#c4b5fd" : text2,
+                      transition:"all 0.15s ease",
+                      position:"relative",
+                    }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"; }}
+                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
+                    {/* active indicator bar */}
+                    {active && (
+                      <div style={{ position:"absolute", left:0, top:"20%", bottom:"20%", width:3, borderRadius:4, background:"linear-gradient(180deg,#8b5cf6,#6d28d9)" }} />
+                    )}
+                    <div style={{ fontWeight: active ? 700 : 500, fontSize:12, paddingLeft: active ? 8 : 4 }}>{cls.name}</div>
+                    <div style={{ fontFamily:"monospace", fontSize:10, opacity:0.45, marginTop:1, paddingLeft: active ? 8 : 4 }}>{cls.code}</div>
+                  </button>
+                );
+              })}
               {classes.length === 0 && <p style={{ fontSize:12, textAlign:"center", padding:"24px 0", color:text2 }}>No classes yet</p>}
             </div>
           </div>
 
+          {/* ─── Right content pane ─── */}
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
             {selectedClass ? (
               <>
                 <DailyNewsAdmin classId={selectedClass.id} dk={dk} />
 
-                <div style={{ ...cardStyle, padding:"18px 20px" }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                      <div style={{ fontSize:13, fontWeight:800, color:text1, letterSpacing:"-0.01em" }}>Classroom Controls</div>
-                      <span style={{ fontSize:11, color:text2, padding:"3px 9px", borderRadius:8, background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.04)", border:`1px solid ${border}` }}>{selectedClass.name}</span>
-                    </div>
-                    {isClassLocked && (
-                      <span style={{ display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:800,padding:"4px 12px",borderRadius:20,
-                        background:"rgba(239,68,68,0.12)", color:"#f87171", border:"1px solid rgba(239,68,68,0.25)",
-                        animation:"td-pulse 2s infinite", letterSpacing:"0.06em",
-                      }}>
-                        <Lock size={11}/> LOCKED
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                    <input value={announcement} onChange={e => setAnnouncement(e.target.value)}
-                      placeholder="Type announcement…" className="input text-sm flex-1"
-                      onKeyDown={e => e.key === "Enter" && handleBroadcast()} />
-                    <button onClick={handleBroadcast}
-                      style={{ display:"flex",alignItems:"center",gap:7,padding:"8px 16px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
-                        border:"none",
-                        background: announceSent ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#8b5cf6,#7c3aed)",
-                        color:"white", transition:"all 0.2s ease", whiteSpace:"nowrap",
-                      }}>
-                      {announceSent ? "Sent!" : <><Megaphone size={13}/> Broadcast</>}
-                    </button>
-                  </div>
-
-                  <input value={lockMsg} onChange={e => setLockMsg(e.target.value)}
-                    placeholder="Lock screen message (optional)…" className="input text-sm w-full" style={{ marginBottom:12 }} />
-
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
-                    <button onClick={() => handleLockScreens(true)} style={{
-                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
-                      background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.28)",color:"#f87171",opacity:isClassLocked?0.5:1,
-                    }}><Lock size={12}/> Lock Screens</button>
-
-                    <button onClick={() => handleLockScreens(false)} style={{
-                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
-                      background: surface, border:`1px solid ${border}`, color:text2,
-                    }}><LockOpen size={12}/> Unlock</button>
-
-                    <div style={{ position:"relative" }}>
-                      <button onClick={() => setShowPushMenu(v => !v)} style={{
-                        display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
-                        background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.25)",color:"#93c5fd",
-                      }}><Navigation size={12}/> Push to Page</button>
-                      {showPushMenu && (
-                        <div style={{ position:"absolute",top:"calc(100% + 6px)",left:0,borderRadius:14,boxShadow:"0 16px 48px rgba(0,0,0,0.35)",
-                          border:`1px solid ${border}`, background:dk?"#0e0c1f":"white", overflow:"hidden",zIndex:50,minWidth:168 }}>
-                          {PUSH_PAGES.map(p => (
-                            <button key={p.path} onClick={() => handlePushToPage(p.path)}
-                              style={{ display:"block",width:"100%",textAlign:"left",padding:"10px 16px",fontSize:12,cursor:"pointer",
-                                color:text1, background:"transparent", border:"none", fontWeight:500,
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              {p.label}
-                            </button>
-                          ))}
+                {/* ─── Broadcast & Controls (elevated prominence) ─── */}
+                <div style={{
+                  ...cardStyle,
+                  padding:"0",
+                  overflow:"hidden",
+                  border: isClassLocked ? "1px solid rgba(239,68,68,0.3)" : `1px solid ${border}`,
+                }}>
+                  {/* purple top bar to signal this is the "command" zone */}
+                  <div style={{ height:3, background:"linear-gradient(90deg,#8b5cf6,#6d28d9,#4f46e5)" }} />
+                  <div style={{ padding:"18px 20px" }}>
+                    {/* Header row */}
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(139,92,246,0.3)" }}>
+                          <Radio size={14} color="white"/>
                         </div>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:800, color:text1, letterSpacing:"-0.01em", lineHeight:1 }}>Classroom Controls</div>
+                          <div style={{ fontSize:10, color:text2, marginTop:2 }}>{selectedClass.name}</div>
+                        </div>
+                      </div>
+                      {isClassLocked ? (
+                        <span style={{ display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,
+                          background:"rgba(239,68,68,0.12)", color:"#f87171", border:"1px solid rgba(239,68,68,0.25)",
+                          animation:"td-pulse 2s infinite", letterSpacing:"0.06em",
+                        }}>
+                          <Lock size={11}/> LOCKED
+                        </span>
+                      ) : (
+                        <span style={{ display:"flex",alignItems:"center",gap:5,fontSize:10,fontWeight:700,padding:"4px 10px",borderRadius:20,
+                          background:"rgba(52,211,153,0.08)", color:"#34d399", border:"1px solid rgba(52,211,153,0.2)", letterSpacing:"0.04em" }}>
+                          <div style={{ width:6,height:6,borderRadius:"50%",background:"#34d399",animation:"td-live-dot 1.8s ease infinite" }} />
+                          LIVE
+                        </span>
                       )}
                     </div>
 
-                    <button onClick={() => setShowMsgModal(true)} style={{
-                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
-                      background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.25)",color:"#c4b5fd",
-                    }}><MessageSquare size={12}/> Message All</button>
+                    {/* Broadcast row — most prominent action */}
+                    <div style={{
+                      background: dk ? "rgba(139,92,246,0.07)" : "rgba(139,92,246,0.04)",
+                      border:"1px solid rgba(139,92,246,0.18)",
+                      borderRadius:14,
+                      padding:"14px 16px",
+                      marginBottom:12,
+                    }}>
+                      <div style={{ fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.14em", color:"#a78bfa", marginBottom:10, display:"flex",alignItems:"center",gap:6 }}>
+                        <Megaphone size={11}/> Broadcast to class
+                      </div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <input value={announcement} onChange={e => setAnnouncement(e.target.value)}
+                          placeholder="Type announcement to all students…" className="input text-sm flex-1"
+                          onKeyDown={e => e.key === "Enter" && handleBroadcast()} />
+                        <button onClick={handleBroadcast}
+                          style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 20px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
+                            border:"none", whiteSpace:"nowrap",
+                            background: announceSent ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#8b5cf6,#7c3aed)",
+                            color:"white", transition:"all 0.2s ease",
+                            boxShadow: announceSent ? "0 4px 14px rgba(16,185,129,0.35)" : "0 4px 14px rgba(139,92,246,0.35)",
+                          }}>
+                          {announceSent ? "Sent!" : <><Megaphone size={13}/> Send</>}
+                        </button>
+                      </div>
+                    </div>
 
-                    <Link to="/monitor" style={{ marginLeft:"auto",display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:700,
-                      textDecoration:"none",
-                      background:"linear-gradient(135deg,rgba(236,72,153,0.15),rgba(244,63,94,0.08))",
-                      border:"1px solid rgba(236,72,153,0.28)",color:"#f9a8d4",
-                    }}><Eye size={12}/> Open Monitor</Link>
+                    {/* Lock message */}
+                    <input value={lockMsg} onChange={e => setLockMsg(e.target.value)}
+                      placeholder="Lock screen message (optional)…" className="input text-sm w-full" style={{ marginBottom:12 }} />
+
+                    {/* Action buttons row */}
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
+                      <button onClick={() => handleLockScreens(true)} style={{
+                        display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
+                        background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.28)",color:"#f87171",opacity:isClassLocked?0.5:1,
+                      }}><Lock size={12}/> Lock</button>
+
+                      <button onClick={() => handleLockScreens(false)} style={{
+                        display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                        background: surface, border:`1px solid ${border}`, color:text2,
+                      }}><LockOpen size={12}/> Unlock</button>
+
+                      {/* Push to page — dropdown with page icons */}
+                      <div style={{ position:"relative" }}>
+                        <button onClick={() => setShowPushMenu(v => !v)} style={{
+                          display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                          background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.25)",color:"#93c5fd",
+                        }}><Navigation size={12}/> Push to Page</button>
+                        {showPushMenu && (
+                          <div style={{ position:"absolute",top:"calc(100% + 8px)",left:0,borderRadius:16,
+                            boxShadow:"0 20px 56px rgba(0,0,0,0.4)",
+                            border:`1px solid ${border}`, background:dk?"#0e0c1f":"white",
+                            overflow:"hidden",zIndex:50,minWidth:210 }}>
+                            <div style={{ padding:"10px 14px 8px", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.16em", color:text2, borderBottom:`1px solid ${border}` }}>
+                              Navigate all students to
+                            </div>
+                            {PUSH_PAGES.map(p => (
+                              <button key={p.path} onClick={() => handlePushToPage(p.path)}
+                                style={{ display:"flex",alignItems:"center",gap:11,width:"100%",textAlign:"left",padding:"11px 14px",fontSize:12,cursor:"pointer",
+                                  color:text1, background:"transparent", border:"none", fontWeight:500,
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                <div style={{ width:30,height:30,borderRadius:9,background:`${p.color}18`,border:`1px solid ${p.color}28`,
+                                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                                  <p.icon size={14} style={{ color:p.color }} />
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight:600,fontSize:12,color:text1 }}>{p.label}</div>
+                                  <div style={{ fontSize:10,color:text2,marginTop:1 }}>{p.desc}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <button onClick={() => setShowMsgModal(true)} style={{
+                        display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                        background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.25)",color:"#c4b5fd",
+                      }}><MessageSquare size={12}/> Message All</button>
+
+                      <Link to="/monitor" style={{ marginLeft:"auto",display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:700,
+                        textDecoration:"none",
+                        background:"linear-gradient(135deg,rgba(236,72,153,0.15),rgba(244,63,94,0.08))",
+                        border:"1px solid rgba(236,72,153,0.28)",color:"#f9a8d4",
+                      }}><Eye size={12}/> Open Monitor</Link>
+                    </div>
                   </div>
                 </div>
 
+                {/* ─── Students + Activity ─── */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+
+                  {/* Students list with class-health indicator */}
                   <div style={{ ...cardStyle, padding:"18px 20px" }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
                         <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#14b8a6,#0d9488)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(20,184,166,0.25)" }}>
                           <Users size={13} color="white"/>
                         </div>
-                        <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Students</span>
-                        <span style={{ fontSize:12,fontWeight:700,color:text2 }}>{studentCount}</span>
+                        <div>
+                          <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Students</span>
+                          {/* class-health badge */}
+                          <div style={{ display:"flex",alignItems:"center",gap:5,marginTop:2 }}>
+                            <span style={{ fontSize:10,fontWeight:700,color:students.length>0?"#34d399":text2 }}>
+                              {studentCount} enrolled
+                            </span>
+                            {students.length > 0 && (
+                              <span style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:20,
+                                background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.2)",letterSpacing:"0.04em" }}>
+                                <Wifi size={9}/> Active
+                              </span>
+                            )}
+                            {students.length === 0 && (
+                              <span style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:20,
+                                background:"rgba(239,68,68,0.08)",color:"#f87171",border:"1px solid rgba(239,68,68,0.18)",letterSpacing:"0.04em" }}>
+                                <WifiOff size={9}/> Empty
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <Link to="/monitor" style={{ fontSize:11,fontWeight:600,color:"#a78bfa",textDecoration:"none",padding:"3px 9px",borderRadius:7,background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.18)" }}>
                         Monitor
@@ -412,38 +515,65 @@ export default function TeacherDashboard() {
                         </Link>
                       ))}
                       {students.length === 0 && (
-                        <p style={{ fontSize:12,textAlign:"center",padding:"28px 0",color:text2,lineHeight:1.6 }}>
-                          Share code{" "}
-                          <strong style={{ color:"#a78bfa",fontFamily:"monospace",background:"rgba(124,58,237,0.1)",padding:"2px 7px",borderRadius:6 }}>{selectedClass.code}</strong>
-                          {" "}to add students
-                        </p>
+                        <div style={{ textAlign:"center",padding:"28px 0" }}>
+                          <div style={{ width:36,height:36,borderRadius:11,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",border:`1px solid ${border}` }}>
+                            <Users size={16} style={{ opacity:0.2 }} />
+                          </div>
+                          <p style={{ fontSize:12,color:text2,lineHeight:1.6 }}>
+                            Share code{" "}
+                            <strong style={{ color:"#a78bfa",fontFamily:"monospace",background:"rgba(124,58,237,0.1)",padding:"2px 7px",borderRadius:6 }}>{selectedClass.code}</strong>
+                            {" "}to add students
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
 
+                  {/* Recent Activity feed — richer design */}
                   <div style={{ ...cardStyle, padding:"18px 20px" }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:9,marginBottom:14 }}>
-                      <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
-                        <Activity size={13} color="white"/>
+                    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:9,marginBottom:14 }}>
+                      <div style={{ display:"flex",alignItems:"center",gap:9 }}>
+                        <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
+                          <Activity size={13} color="white"/>
+                        </div>
+                        <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Recent Activity</span>
                       </div>
-                      <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Recent Activity</span>
+                      {recentActivity.length > 0 && (
+                        <span style={{ fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,
+                          background:"rgba(139,92,246,0.1)",color:"#a78bfa",border:"1px solid rgba(139,92,246,0.2)",letterSpacing:"0.06em" }}>
+                          LIVE
+                        </span>
+                      )}
                     </div>
                     {recentActivity.length > 0 ? (
-                      <div style={{ display:"flex",flexDirection:"column",gap:1 }}>
+                      <div style={{ display:"flex",flexDirection:"column",gap:2 }}>
                         {recentActivity.map((a, i) => (
-                          <div key={i} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${border}`,fontSize:11 }}>
-                            <span style={{ width:6,height:6,borderRadius:"50%",background:"rgba(139,92,246,0.7)",flexShrink:0 }} />
-                            <span style={{ color:text2,flex:1 }}><strong style={{ color:text1,fontWeight:600 }}>{a.name}</strong> {a.action}</span>
-                            <span style={{ color:text2,flexShrink:0,fontSize:10 }}>{a.time}</span>
+                          <div key={i} style={{ display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<recentActivity.length-1?`1px solid ${border}`:"none" }}>
+                            <div style={{ width:28,height:28,borderRadius:8,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",border:`1px solid ${border}`,
+                              display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                              <div style={{ width:7,height:7,borderRadius:"50%",background:actDotColors[i%actDotColors.length] }} />
+                            </div>
+                            <div style={{ flex:1,minWidth:0 }}>
+                              <div style={{ fontSize:12,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                                <strong style={{ fontWeight:700 }}>{a.name}</strong>
+                                {" "}<span style={{ color:text2 }}>{a.action}</span>
+                              </div>
+                            </div>
+                            <span style={{ fontSize:10,color:text2,flexShrink:0,whiteSpace:"nowrap",
+                              background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",padding:"2px 7px",borderRadius:6,border:`1px solid ${border}` }}>
+                              {a.time}
+                            </span>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div style={{ textAlign:"center",padding:"36px 0" }}>
-                        <div style={{ width:40,height:40,borderRadius:12,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:`1px solid ${border}` }}>
-                          <Activity size={18} style={{ opacity:0.25 }} />
+                        <div style={{ width:44,height:44,borderRadius:13,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",
+                          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:`1px solid ${border}` }}>
+                          <Activity size={20} style={{ opacity:0.2 }} />
                         </div>
-                        <p style={{ fontSize:12,color:text2 }}>Quiet right now. Check back when class starts.</p>
+                        <p style={{ fontSize:12,fontWeight:600,color:text2,marginBottom:4 }}>Quiet right now</p>
+                        <p style={{ fontSize:11,color:text2,opacity:0.7,lineHeight:1.5 }}>Activity appears here live as students<br/>work on their projects.</p>
                       </div>
                     )}
                   </div>

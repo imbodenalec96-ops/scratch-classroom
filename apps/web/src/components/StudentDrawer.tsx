@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import {
-  X, Lock, LockOpen, Send, Navigation, MessageSquare, Gift, Ban,
-  RefreshCcw, ExternalLink, Clock, Zap, Coffee, Youtube, Square,
+  X, Lock, LockOpen, Send, Navigation, Gift, Ban,
+  Coffee, Youtube, Square, MessageSquare, Shield, Zap,
+  Clock, Monitor, ChevronDown, ChevronRight, Check,
+  Wifi, WifiOff, BookOpen, Gamepad2,
 } from "lucide-react";
 
 interface Props {
@@ -16,59 +17,126 @@ interface Props {
 }
 
 const PUSH_PAGES = [
-  { label: "Dashboard",   path: "/student" },
-  { label: "Assignments", path: "/assignments" },
-  { label: "Lessons",     path: "/lessons" },
-  { label: "Arcade",      path: "/arcade" },
+  { label: "Dashboard",   path: "/student",      icon: "🏠" },
+  { label: "Assignments", path: "/assignments",   icon: "📝" },
+  { label: "Lessons",     path: "/lessons",       icon: "📖" },
+  { label: "Arcade",      path: "/arcade",        icon: "🎮" },
 ];
 
-/**
- * StudentDrawer — right-side panel for fine-grained per-student control.
- * Opens when teacher clicks a tile on the Monitor.
- */
+/* 4-state status — mirrors MonitorPage */
+type StatusKey = "online" | "working" | "idle" | "offline";
+const STATUS_META: Record<StatusKey, { label: string; color: string; ring: string; dot: string; pulse: boolean }> = {
+  working: { label: "Working",  color: "#a78bfa", ring: "rgba(139,92,246,0.55)",  dot: "#7c3aed", pulse: true  },
+  online:  { label: "Online",   color: "#34d399", ring: "rgba(52,211,153,0.45)",  dot: "#10b981", pulse: false },
+  idle:    { label: "Idle",     color: "#fbbf24", ring: "rgba(251,191,36,0.4)",   dot: "#f59e0b", pulse: false },
+  offline: { label: "Offline",  color: "#6b7280", ring: "rgba(107,114,128,0.3)",  dot: "#4b5563", pulse: false },
+};
+function deriveStatus(presence: any): StatusKey {
+  if (!presence?.isOnline) return "offline";
+  const action = (presence.lastAction || "").toLowerCase();
+  const secsAgo = presence.lastSeenAt
+    ? Math.floor((Date.now() - new Date(presence.lastSeenAt).getTime()) / 1000)
+    : 999;
+  if (/assignment|project|quiz|lesson|work/.test(action)) return "working";
+  if (secsAgo > 120) return "idle";
+  return "online";
+}
+
+/* Section header — icon-badged, matching TeacherBoardSettings style */
+function SectionHeader({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: color + "22", color,
+      }}>
+        {icon}
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--t3)" }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/* Control button — semantically styled */
+function CtrlBtn({
+  onClick, icon, label, variant = "neutral", fullWidth = false,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  variant?: "destructive" | "positive" | "neutral" | "warning" | "accent";
+  fullWidth?: boolean;
+}) {
+  const styles: Record<string, React.CSSProperties> = {
+    destructive: { background: "rgba(239,68,68,0.1)",    color: "#f87171", border: "1px solid rgba(239,68,68,0.25)"    },
+    positive:    { background: "rgba(52,211,153,0.1)",   color: "#34d399", border: "1px solid rgba(52,211,153,0.25)"   },
+    neutral:     { background: "rgba(99,102,241,0.1)",   color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.25)"   },
+    warning:     { background: "rgba(251,191,36,0.1)",   color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)"   },
+    accent:      { background: "rgba(139,92,246,0.12)",  color: "#c4b5fd", border: "1px solid rgba(139,92,246,0.3)"    },
+  };
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 7, padding: "9px 14px", borderRadius: 10,
+        fontSize: 12, fontWeight: 600, cursor: "pointer",
+        width: fullWidth ? "100%" : undefined,
+        transition: "opacity 0.15s, transform 0.1s",
+        ...styles[variant],
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.8"; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1";   (e.currentTarget as HTMLElement).style.transform = ""; }}
+    >
+      <span style={{ flexShrink: 0 }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
 export default function StudentDrawer({ open, onClose, student, classId, presence, dk }: Props) {
   const [snapshot, setSnapshot] = useState<{ data: string; path: string; capturedAt: string } | null>(null);
   const [msg, setMsg] = useState("");
   const [pushMenu, setPushMenu] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ text: string; ok: boolean } | null>(null);
   const [kidLocked, setKidLocked] = useState(false);
-  // Per-student broadcast URL input (inline — mirrors the `msg` field below).
   const [broadcastUrl, setBroadcastUrl] = useState("");
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const showFlash = useCallback((txt: string) => {
-    setFlash(txt);
+  const showFlash = useCallback((txt: string, ok = true) => {
+    setFlash({ text: txt, ok });
     setTimeout(() => setFlash(null), 2500);
   }, []);
 
-  // Poll snapshot at 2s in the drawer (faster than the tile's 6s refresh)
-  // + send FOCUS to the student so they capture at high-res. UNFOCUS on close.
+  // Poll snapshot at 2s + tell student to go high-res while drawer is open
   useEffect(() => {
     if (!open || !student) return;
     let cancelled = false;
-
-    // Tell the student client to switch to high-res capture
+    setImgLoaded(false);
     api.focusStudent(student.id, true).catch(() => {});
-
     const fetchIt = async () => {
       try {
         const d = await api.getStudentSnapshot(student.id);
-        if (!cancelled && d?.data) setSnapshot({ data: d.data, path: d.path || "", capturedAt: d.capturedAt || "" });
+        if (!cancelled && d?.data) {
+          setSnapshot({ data: d.data, path: d.path || "", capturedAt: d.capturedAt || "" });
+          setImgLoaded(false);
+        }
       } catch {}
     };
     fetchIt();
     const iv = setInterval(fetchIt, 2000);
-
     return () => {
       cancelled = true;
       clearInterval(iv);
-      // Tell the student client to go back to thumbnail mode
       api.focusStudent(student.id, false).catch(() => {});
     };
   }, [open, student]);
 
-  // Escape closes
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -78,265 +146,436 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
 
   if (!open || !student) return null;
 
-  const handleLock = async () => {
-    try {
-      await api.lockStudent(student.id, msg);
-      api.lockStudentCmd(student.id, msg || undefined).catch(() => {});
-      setKidLocked(true);
-      showFlash("🔒 Locked");
-    } catch (e: any) { alert("Failed: " + e.message); }
-  };
-  const handleUnlock = async () => {
-    try {
-      await api.unlockStudent(student.id);
-      await api.forceUnlockStudent(student.id).catch(() => {});
-      api.unlockStudentCmd(student.id).catch(() => {});
-      setKidLocked(false);
-      showFlash("🔓 Unlocked");
-    } catch (e: any) { alert("Failed: " + e.message); }
-  };
+  const status    = deriveStatus(presence);
+  const statusMeta = STATUS_META[status];
+  const initials  = (student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+  const secsAgo   = snapshot?.capturedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 1000))
+    : null;
+
+  /* ── Handlers ── */
+  const handleLock    = async () => { try { await api.lockStudent(student.id, msg); api.lockStudentCmd(student.id, msg || undefined).catch(() => {}); setKidLocked(true); showFlash("Locked"); } catch (e: any) { showFlash(e.message, false); } };
+  const handleUnlock  = async () => { try { await api.unlockStudent(student.id); await api.forceUnlockStudent(student.id).catch(() => {}); api.unlockStudentCmd(student.id).catch(() => {}); setKidLocked(false); showFlash("Unlocked"); } catch (e: any) { showFlash(e.message, false); } };
   const handleSendMsg = async () => {
     if (!msg.trim()) return;
-    try {
-      await api.sendClassCommand(classId, "MESSAGE", msg.trim(), student.id);
-      api.sendStudentMessage(student.id, msg.trim()).catch(() => {});
-      showFlash("✉️ Sent");
-      setMsg("");
-    } catch (e: any) { alert("Failed: " + e.message); }
+    try { await api.sendClassCommand(classId, "MESSAGE", msg.trim(), student.id); api.sendStudentMessage(student.id, msg.trim()).catch(() => {}); showFlash("Message sent"); setMsg(""); }
+    catch (e: any) { showFlash(e.message, false); }
   };
-  const handlePush = async (path: string) => {
-    try { await api.sendClassCommand(classId, "NAVIGATE", path, student.id); showFlash(`➡️ Pushed to ${path}`); setPushMenu(false); }
-    catch (e: any) { alert("Failed: " + e.message); }
-  };
-  const handleKick = async () => {
-    try { await api.sendClassCommand(classId, "KICK", "/student", student.id); showFlash("🏁 Kicked"); }
-    catch (e: any) { alert("Failed: " + e.message); }
-  };
+  const handlePush  = async (path: string) => { try { await api.sendClassCommand(classId, "NAVIGATE", path, student.id); showFlash(`Pushed to ${path}`); setPushMenu(false); } catch (e: any) { showFlash(e.message, false); } };
+  const handleKick  = async () => { try { await api.sendClassCommand(classId, "KICK", "/student", student.id); showFlash("Kicked to dashboard"); } catch (e: any) { showFlash(e.message, false); } };
   const handleGrant = async () => {
-    if (!confirm(`Grant free time to ${student.name}? They can use arcade/projects immediately.`)) return;
-    try {
-      await api.grantStudentFreeTime(student.id, 15);
-      showFlash("🎁 Free time granted");
-    } catch (e: any) { alert("Failed: " + e.message); }
+    if (!confirm(`Grant free time to ${student.name}?`)) return;
+    try { await api.grantStudentFreeTime(student.id, 15); showFlash("Free time granted"); } catch (e: any) { showFlash(e.message, false); }
   };
   const handleRevoke = async () => {
-    if (!confirm(`Revoke free time for ${student.name}? They'll be pushed back to assignments.`)) return;
-    try {
-      await api.revokeStudentFreeTime(student.id);
-      showFlash("⛔ Free time revoked");
-    } catch (e: any) { alert("Failed: " + e.message); }
+    if (!confirm(`Revoke free time for ${student.name}?`)) return;
+    try { await api.revokeStudentFreeTime(student.id); showFlash("Free time revoked"); } catch (e: any) { showFlash(e.message, false); }
   };
   const handleBroadcast = async () => {
     const url = broadcastUrl.trim();
-    if (!url) { alert("Enter a YouTube URL first."); return; }
-    try {
-      await api.broadcastStudentVideo(student.id, url);
-      showFlash("📺 Broadcast sent");
-      setBroadcastUrl(""); setBroadcastOpen(false);
-    } catch (e: any) { alert("Failed: " + e.message); }
+    if (!url) return;
+    try { await api.broadcastStudentVideo(student.id, url); showFlash("Video broadcast sent"); setBroadcastUrl(""); setBroadcastOpen(false); } catch (e: any) { showFlash(e.message, false); }
   };
-  const handleEndBroadcast = async () => {
-    try {
-      await api.endStudentBroadcast(student.id);
-      showFlash("⏹ Video ended");
-    } catch (e: any) { alert("Failed: " + e.message); }
-  };
+  const handleEndBroadcast = async () => { try { await api.endStudentBroadcast(student.id); showFlash("Video ended"); } catch (e: any) { showFlash(e.message, false); } };
   const handleEndBreak = async () => {
-    if (!confirm(`End ${student.name}'s break early? They'll get a toast and go back to /student.`)) return;
-    // Fire new student_commands pipe + legacy path in parallel.
-    try {
-      await Promise.allSettled([
-        api.endStudentBreak(student.id),
-        api.endBreak(student.id),
-      ]);
-      showFlash("⏰ Break ended");
-    } catch (e: any) { alert("Failed: " + e.message); }
+    if (!confirm(`End ${student.name}'s break early?`)) return;
+    try { await Promise.allSettled([api.endStudentBreak(student.id), api.endBreak(student.id)]); showFlash("Break ended"); } catch (e: any) { showFlash(e.message, false); }
   };
 
-  const btnBase = `flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border`;
-  const btn = (color: string) => {
-    const map: Record<string, string> = {
-      red:     dk ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25"           : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200",
-      emerald: dk ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/25" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200",
-      violet:  dk ? "bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border-violet-500/25"    : "bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200",
-      blue:    dk ? "bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/25"           : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200",
-      amber:   dk ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/25"       : "bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200",
-      gold:    dk ? "bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border-yellow-500/25"   : "bg-yellow-50 hover:bg-yellow-100 text-yellow-600 border-yellow-200",
-    };
-    return `${btnBase} ${map[color] || map.blue}`;
-  };
+  const bg   = "#0c0d22";
+  const surf = "rgba(255,255,255,0.03)";
+  const bdr  = "rgba(255,255,255,0.07)";
 
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: "fixed", inset: 0, zIndex: 500,
-        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
+        background: "rgba(3,3,20,0.72)", backdropFilter: "blur(8px)",
         display: "flex", justifyContent: "flex-end" }}
     >
+      <style>{`
+        @keyframes sd-in  { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes sd-flash { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes sd-pulse { 0%,100%{ box-shadow: 0 0 0 0 var(--sd-pc); } 60%{ box-shadow: 0 0 0 6px transparent; } }
+      `}</style>
+
       <div
         ref={modalRef}
         style={{
-          width: "min(560px, 100vw)", height: "100%",
-          background: dk ? "#0f1029" : "#ffffff",
-          borderLeft: dk ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+          width: "min(520px,100vw)", height: "100%",
+          background: bg,
+          borderLeft: `1px solid ${bdr}`,
+          display: "flex", flexDirection: "column",
+          animation: "sd-in 0.22s cubic-bezier(0.22,1,0.36,1)",
           overflowY: "auto",
-          animation: "slideInR 0.25s ease-out",
         }}
       >
-        <style>{`@keyframes slideInR { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-
-        {/* ── Editorial drawer header ── */}
-        <div className="sticky top-0 z-10 px-6 py-5 border-b" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between mb-3 text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-3)" }}>
-            <span>Student Profile</span>
-            <button onClick={onClose} className="btn-ghost text-[10px]" style={{ padding: "2px 6px" }}>
-              <X size={12}/> Close
+        {/* ── Hero header ── */}
+        <div style={{
+          position: "sticky", top: 0, zIndex: 10,
+          background: bg,
+          borderBottom: `1px solid ${bdr}`,
+          padding: "20px 20px 16px",
+        }}>
+          {/* Top row: label + close */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
+              Student Monitor
+            </span>
+            <button onClick={onClose} style={{
+              display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
+              borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer",
+              background: "rgba(255,255,255,0.05)", border: `1px solid ${bdr}`,
+              color: "rgba(255,255,255,0.45)", transition: "background 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
+            >
+              <X size={11} /> Close
             </button>
           </div>
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 flex items-center justify-center text-base font-bold flex-shrink-0"
-              style={{ background: "var(--accent-light)", color: "var(--text-accent)",
-                       borderRadius: "var(--r-sm)",
-                       border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
-              {(student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+
+          {/* Avatar + name + status */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* Avatar with status ring */}
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: "50%",
+                background: `linear-gradient(135deg, #7c3aed, #4f46e5)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, fontWeight: 800, color: "white",
+                border: `2.5px solid ${statusMeta.ring}`,
+                boxShadow: status === "working"
+                  ? `0 0 0 0 ${statusMeta.ring}, 0 4px 20px rgba(124,58,237,0.3)`
+                  : `0 4px 16px rgba(0,0,0,0.3)`,
+                // @ts-ignore
+                "--sd-pc": statusMeta.ring,
+                animation: status === "working" ? "sd-pulse 2s ease-in-out infinite" : undefined,
+              }}>
+                {initials}
+              </div>
+              {/* Online dot */}
+              <div style={{
+                position: "absolute", bottom: 1, right: 1,
+                width: 12, height: 12, borderRadius: "50%",
+                background: statusMeta.dot,
+                border: `2px solid ${bg}`,
+                boxShadow: status !== "offline" ? `0 0 6px ${statusMeta.dot}` : "none",
+              }} />
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-display text-2xl leading-tight truncate" style={{ color: "var(--text-1)" }}>{student.name}</h2>
-              <div className="text-xs flex items-center gap-1.5 mt-1" style={{ color: "var(--text-2)" }}>
-                <span className={`w-1.5 h-1.5 rounded-full ${presence?.isOnline ? "animate-pulse" : ""}`} style={{ background: presence?.isOnline ? "var(--success)" : "var(--text-3)" }} />
-                <strong style={{ color: presence?.isOnline ? "var(--success)" : "var(--text-3)" }}>{presence?.isOnline ? "Live" : "Offline"}</strong>
-                <span style={{ color: "var(--text-3)" }}>·</span>
-                <span className="truncate">{presence?.lastAction || "No activity yet"}</span>
+
+            {/* Name + activity */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {student.name}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {presence?.lastAction || "No activity yet"}
               </div>
             </div>
+
+            {/* Status badge */}
+            <div style={{
+              flexShrink: 0, display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 11px", borderRadius: 20,
+              background: statusMeta.color + "18",
+              border: `1px solid ${statusMeta.color + "40"}`,
+              fontSize: 11, fontWeight: 700, color: statusMeta.color,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: statusMeta.color,
+                display: "inline-block",
+                animation: statusMeta.pulse ? "sd-pulse 2s ease-in-out infinite" : undefined,
+              }} />
+              {statusMeta.label}
+            </div>
+          </div>
+
+          {/* Time-on-task + current path chips */}
+          <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+            {secsAgo !== null && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600,
+                background: "rgba(255,255,255,0.05)", border: `1px solid ${bdr}`,
+                color: "rgba(255,255,255,0.35)",
+              }}>
+                <Clock size={9} /> {secsAgo < 60 ? `${secsAgo}s ago` : `${Math.floor(secsAgo/60)}m ago`}
+              </div>
+            )}
+            {snapshot?.path && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600,
+                background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)",
+                color: "#a78bfa",
+              }}>
+                <Monitor size={9} /> {snapshot.path}
+              </div>
+            )}
+            {kidLocked && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700,
+                background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
+                color: "#f87171",
+              }}>
+                <Lock size={9} /> LOCKED
+              </div>
+            )}
           </div>
         </div>
 
         {/* Flash toast */}
         {flash && (
-          <div style={{ position: "sticky", top: 80, zIndex: 20, margin: "8px 16px",
-            padding: "8px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            background: dk ? "rgba(16,185,129,0.15)" : "#d1fae5",
-            color: dk ? "#6ee7b7" : "#047857",
-            border: `1px solid ${dk ? "rgba(16,185,129,0.3)" : "#6ee7b7"}`,
-            animation: "scaleIn 0.2s ease-out" }}>
-            {flash}
+          <div style={{
+            position: "sticky", top: 88, zIndex: 20, margin: "8px 16px",
+            padding: "9px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            background: flash.ok ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+            color: flash.ok ? "#6ee7b7" : "#f87171",
+            border: `1px solid ${flash.ok ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+            display: "flex", alignItems: "center", gap: 7,
+            animation: "sd-flash 0.2s ease-out",
+          }}>
+            {flash.ok ? <Check size={13} /> : <X size={13} />}
+            {flash.text}
           </div>
         )}
 
-        <div className="p-5 space-y-5">
-          {/* Screen preview — large, 2s refresh */}
-          <div>
-            <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-2 ${dk ? "text-white/40" : "text-gray-500"}`}>
-              Live Preview
-              {snapshot?.capturedAt && (
-                <span className={`ml-auto normal-case tracking-normal font-normal ${dk ? "text-white/25" : "text-gray-400"}`}>
-                  <Clock size={9} className="inline mr-1" />
-                  {Math.max(0, Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 1000))}s ago
-                </span>
-              )}
-            </div>
-            <div style={{
-              aspectRatio: "16/9", borderRadius: 12, overflow: "hidden",
-              background: "#07071a",
-              border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid #e5e7eb",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {snapshot?.data ? (
-                <img src={snapshot.data} alt={`${student.name}'s screen`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div className={`text-xs ${dk ? "text-white/20" : "text-gray-400"}`}>
-                  Waiting for first screenshot from student…
-                </div>
-              )}
-            </div>
-            {snapshot?.path && (
-              <div className={`text-[10px] mt-1.5 ${dk ? "text-white/30" : "text-gray-400"}`}>
-                on <code className={dk ? "text-violet-400" : "text-violet-600"}>{snapshot.path}</code>
-              </div>
-            )}
-          </div>
+        <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 22 }}>
 
-          {/* Message box */}
-          <div>
-            <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-              Quick message
+          {/* ── Section 1: Live Preview ── */}
+          <section>
+            <SectionHeader icon={<Monitor size={13} />} label="Live Preview" color="#6366f1" />
+
+            {/* Device mockup frame */}
+            <div style={{
+              borderRadius: 14, overflow: "hidden",
+              background: "#070714",
+              border: "1.5px solid rgba(255,255,255,0.09)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset",
+              position: "relative",
+            }}>
+              {/* Browser chrome bar */}
+              <div style={{
+                height: 28, background: "rgba(255,255,255,0.04)",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+                display: "flex", alignItems: "center", gap: 5, padding: "0 10px",
+              }}>
+                {["#f87171","#fbbf24","#34d399"].map((c, i) => (
+                  <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: c, opacity: 0.7 }} />
+                ))}
+                <div style={{
+                  flex: 1, height: 14, background: "rgba(255,255,255,0.05)",
+                  borderRadius: 4, margin: "0 8px",
+                  display: "flex", alignItems: "center", paddingLeft: 8,
+                  fontSize: 9, color: "rgba(255,255,255,0.25)",
+                }}>
+                  {snapshot?.path || "scratch-classroom.vercel.app"}
+                </div>
+              </div>
+
+              {/* Screenshot area */}
+              <div style={{ aspectRatio: "16/9", position: "relative", overflow: "hidden" }}>
+                {!snapshot?.data && (
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    gap: 8, color: "rgba(255,255,255,0.2)",
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,0.08)",
+                      borderTopColor: "#7c3aed",
+                      animation: "spin 1s linear infinite",
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <span style={{ fontSize: 11 }}>Waiting for first screenshot…</span>
+                  </div>
+                )}
+                {snapshot?.data && (
+                  <img
+                    src={snapshot.data}
+                    alt={`${student.name}'s screen`}
+                    onLoad={() => setImgLoaded(true)}
+                    style={{
+                      width: "100%", height: "100%", objectFit: "cover",
+                      transition: "opacity 0.3s",
+                      opacity: imgLoaded ? 1 : 0,
+                    }}
+                  />
+                )}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <input value={msg} onChange={e => setMsg(e.target.value)}
+          </section>
+
+          {/* ── Section 2: Communication ── */}
+          <section>
+            <SectionHeader icon={<MessageSquare size={13} />} label="Communication" color="#0ea5e9" />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={msg}
+                onChange={e => setMsg(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSendMsg()}
-                placeholder="Type a short message…"
-                className="input text-sm flex-1" />
-              <button onClick={handleSendMsg} disabled={!msg.trim()} className="btn-primary px-4 gap-1.5">
+                placeholder="Send a message to this student…"
+                style={{
+                  flex: 1, padding: "9px 13px", borderRadius: 10, fontSize: 12,
+                  background: surf, border: `1px solid ${bdr}`,
+                  color: "#f1f5f9", outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSendMsg}
+                disabled={!msg.trim()}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "9px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  background: "#7c3aed", color: "white", border: "none",
+                  cursor: msg.trim() ? "pointer" : "not-allowed",
+                  opacity: msg.trim() ? 1 : 0.4,
+                  transition: "opacity 0.15s",
+                }}
+              >
                 <Send size={13} /> Send
               </button>
             </div>
-          </div>
+          </section>
 
-          {/* Actions grid */}
-          <div>
-            <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${dk ? "text-white/40" : "text-gray-500"}`}>
-              Controls
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={handleLock}   className={btn("red")}>       <Lock size={13}/>     Lock This Student</button>
-              <button onClick={handleUnlock} className={btn("emerald")}>   <LockOpen size={13}/> Unlock This Student</button>
+          {/* ── Section 3: Access Controls ── */}
+          <section>
+            <SectionHeader icon={<Shield size={13} />} label="Access" color="#6366f1" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <CtrlBtn onClick={handleLock}   icon={<Lock size={13} />}     label="Lock"             variant="destructive" />
+              <CtrlBtn onClick={handleUnlock} icon={<LockOpen size={13} />} label="Unlock"           variant="positive"    />
 
-              <div className="relative col-span-2">
-                <button onClick={() => setPushMenu(v => !v)} className={btn("blue") + " w-full"}>
-                  <Navigation size={13}/> Push to Page ▾
+              {/* Push to page */}
+              <div style={{ position: "relative", gridColumn: "1 / -1" }}>
+                <button
+                  onClick={() => setPushMenu(v => !v)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 7, padding: "9px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                    background: "rgba(99,102,241,0.1)", color: "#a5b4fc",
+                    border: "1px solid rgba(99,102,241,0.25)", cursor: "pointer",
+                    transition: "opacity 0.15s",
+                  }}
+                >
+                  <Navigation size={13} /> Push to Page
+                  {pushMenu ? <ChevronDown size={11} style={{ marginLeft: "auto" }} /> : <ChevronRight size={11} style={{ marginLeft: "auto" }} />}
                 </button>
                 {pushMenu && (
-                  <div className={`absolute top-full mt-1 left-0 right-0 rounded-xl shadow-2xl border z-50 overflow-hidden ${dk ? "bg-[#0f1029] border-white/[0.08]" : "bg-white border-gray-200"}`}>
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                    background: "#0f1029", border: `1px solid ${bdr}`,
+                    borderRadius: 12, overflow: "hidden", zIndex: 50,
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+                  }}>
                     {PUSH_PAGES.map(p => (
-                      <button key={p.path} onClick={() => handlePush(p.path)}
-                        className={`w-full text-left px-4 py-2.5 text-xs cursor-pointer transition-colors ${dk ? "hover:bg-white/[0.05] text-white/70 hover:text-white" : "hover:bg-gray-50 text-gray-700"}`}>
-                        → {p.label}
+                      <button
+                        key={p.path}
+                        onClick={() => handlePush(p.path)}
+                        style={{
+                          width: "100%", display: "flex", alignItems: "center", gap: 10,
+                          padding: "10px 14px", fontSize: 12, fontWeight: 600,
+                          background: "transparent", border: "none", cursor: "pointer",
+                          color: "rgba(255,255,255,0.7)", textAlign: "left",
+                          transition: "background 0.1s",
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      >
+                        <span style={{ fontSize: 16 }}>{p.icon}</span> {p.label}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <button onClick={handleKick} className={btn("amber") + " col-span-2"}>
-                <Navigation size={13}/> Kick to Dashboard
+              <CtrlBtn onClick={handleKick} icon={<Navigation size={13} />} label="Kick to Dashboard" variant="warning" fullWidth />
+            </div>
+          </section>
+
+          {/* ── Section 4: Rewards & Breaks ── */}
+          <section>
+            <SectionHeader icon={<Gift size={13} />} label="Rewards & Breaks" color="#f59e0b" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <CtrlBtn onClick={handleGrant}    icon={<Gift size={13} />}   label="Grant Free Time"  variant="positive"    />
+              <CtrlBtn onClick={handleRevoke}   icon={<Ban size={13} />}    label="Revoke Free Time" variant="destructive"  />
+              <CtrlBtn onClick={handleEndBreak} icon={<Coffee size={13} />} label="End Break Now"    variant="accent"      fullWidth />
+            </div>
+          </section>
+
+          {/* ── Section 5: Broadcast ── */}
+          <section>
+            <SectionHeader icon={<Youtube size={13} />} label="Broadcast" color="#dc2626" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                onClick={() => setBroadcastOpen(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  padding: "9px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                  background: "rgba(220,38,38,0.1)", color: "#fca5a5",
+                  border: "1px solid rgba(220,38,38,0.25)", cursor: "pointer",
+                  transition: "opacity 0.15s",
+                }}
+              >
+                <Youtube size={13} /> Broadcast Video to This Student
+                {broadcastOpen ? <ChevronDown size={11} style={{ marginLeft: "auto" }} /> : <ChevronRight size={11} style={{ marginLeft: "auto" }} />}
               </button>
 
-              <button onClick={handleGrant}  className={btn("gold")}>   <Gift size={13}/> Grant Free Time</button>
-              <button onClick={handleRevoke} className={btn("red")}>    <Ban  size={13}/> Revoke Free Time</button>
-
-              <button onClick={handleEndBreak} className={btn("violet") + " col-span-2"}>
-                <Coffee size={13}/> ⛔ End Break Now
-              </button>
-
-              {/* Per-student YouTube broadcast — toggle the URL input, then send. */}
-              <button onClick={() => setBroadcastOpen(v => !v)} className={btn("red") + " col-span-2"}>
-                <Youtube size={13}/> 📺 Broadcast Video to This Student
-              </button>
               {broadcastOpen && (
-                <div className="col-span-2 flex gap-2">
+                <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
                     value={broadcastUrl}
                     onChange={e => setBroadcastUrl(e.target.value)}
-                    placeholder="https://youtu.be/…"
-                    className={`flex-1 px-3 py-2 rounded-xl text-xs border ${dk ? "bg-[#0f1029] border-white/[0.08] text-white placeholder-white/30" : "bg-white border-gray-200 text-gray-800"}`}
                     onKeyDown={e => { if (e.key === "Enter") handleBroadcast(); }}
+                    placeholder="https://youtu.be/…"
+                    style={{
+                      flex: 1, padding: "9px 13px", borderRadius: 10, fontSize: 12,
+                      background: surf, border: `1px solid ${bdr}`,
+                      color: "#f1f5f9", outline: "none",
+                    }}
                   />
-                  <button onClick={handleBroadcast} className={btn("red")}>
-                    <Send size={13}/> Send
+                  <button onClick={handleBroadcast} style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "9px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    background: "rgba(220,38,38,0.2)", color: "#fca5a5",
+                    border: "1px solid rgba(220,38,38,0.35)", cursor: "pointer",
+                  }}>
+                    <Send size={13} /> Send
                   </button>
                 </div>
               )}
-              <button onClick={handleEndBroadcast} className={btn("amber") + " col-span-2"}>
-                <Square size={13}/> ⏹ End Video
-              </button>
-            </div>
-          </div>
 
-          {/* Last snapshot & activity footer */}
-          <div className={`text-[10px] pt-4 border-t ${dk ? "border-white/[0.05] text-white/25" : "border-gray-100 text-gray-400"}`}>
-            Student ID: <code>{student.id.slice(0, 8)}</code> · Class <code>{classId.slice(0, 8)}</code>
+              <CtrlBtn onClick={handleEndBroadcast} icon={<Square size={13} />} label="End Video" variant="warning" fullWidth />
+            </div>
+          </section>
+
+          {/* ── Footer: ID chips ── */}
+          <div style={{
+            display: "flex", gap: 8, flexWrap: "wrap",
+            paddingTop: 16, borderTop: `1px solid ${bdr}`,
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 20,
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${bdr}`,
+              fontSize: 10, color: "rgba(255,255,255,0.3)",
+            }}>
+              <span style={{ opacity: 0.5 }}>Student</span>
+              <code style={{ color: "#a78bfa", fontFamily: "monospace" }}>{student.id.slice(0, 8)}…</code>
+            </div>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 20,
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${bdr}`,
+              fontSize: 10, color: "rgba(255,255,255,0.3)",
+            }}>
+              <span style={{ opacity: 0.5 }}>Class</span>
+              <code style={{ color: "#a78bfa", fontFamily: "monospace" }}>{classId.slice(0, 8)}…</code>
+            </div>
           </div>
         </div>
       </div>
