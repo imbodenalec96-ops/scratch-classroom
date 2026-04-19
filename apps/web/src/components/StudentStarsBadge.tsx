@@ -28,7 +28,7 @@ export default function StudentStarsBadge() {
 
   if (user?.role !== "student" || !ok) return null;
 
-  const filled = Math.max(0, Math.min(10, stars));
+  const filled = Math.max(0, Math.min(5, stars));
 
   return (
     <div
@@ -40,10 +40,10 @@ export default function StudentStarsBadge() {
         fontSize: 12,
         backdropFilter: "blur(6px)",
       }}
-      title={`${filled}/10 stars · ${rewards} reward${rewards === 1 ? "" : "s"}`}
+      title={`${filled}/5 stars · ${rewards} reward${rewards === 1 ? "" : "s"}`}
     >
       <span style={{ fontSize: 14 }}>⭐</span>
-      <span className="font-mono">{filled}/10</span>
+      <span className="font-mono">{filled}/5</span>
       {rewards > 0 && <span className="opacity-80">· 🏆{rewards}</span>}
     </div>
   );

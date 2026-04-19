@@ -1289,470 +1289,380 @@ export default function StudentDashboard() {
 
   // ── DONE / DASHBOARD ──
   const unlocked = accessUnlocked;
-  // Editorial date line "Thursday, April 17" style
   const dateLine = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
+  // Inline style tokens for the redesigned dashboard
+  const sdBg    = dk ? "#070714" : "#f0f2f8";
+  const sdSurf  = dk ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.95)";
+  const sdBord  = dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.07)";
+  const sdT1    = dk ? "#f1f5f9" : "#0f172a";
+  const sdT2    = dk ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)";
+  const heroGrad = unlocked
+    ? (dk ? "linear-gradient(135deg,#052e16 0%,#064e3b 60%,#065f46 100%)" : "linear-gradient(135deg,#059669 0%,#10b981 60%,#34d399 100%)")
+    : (dk ? "linear-gradient(135deg,#0d0d28 0%,#1a0a3a 60%,#0a1228 100%)" : "linear-gradient(135deg,#7c3aed 0%,#6366f1 60%,#4f46e5 100%)");
+  const sdCard = { background: sdSurf, border: `1px solid ${sdBord}`, borderRadius: 16, backdropFilter: "blur(10px)" } as const;
+
   return (
-    <div className="p-6 space-y-6 animate-page-enter relative" style={{ paddingBottom: unlocked ? 100 : undefined }}>
+    <div style={{ minHeight: "100vh", background: sdBg, fontFamily: "'Inter',system-ui,sans-serif", color: sdT1 }}>
+      <style>{`
+        @keyframes sd-up { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes sd-pop { 0%{transform:scale(.88);opacity:0} 60%{transform:scale(1.04)} 100%{transform:scale(1);opacity:1} }
+        @keyframes sd-shine { 0%,100%{opacity:1} 50%{opacity:.6} }
+      `}</style>
+
       {broadcast && (
-        <div className="fixed top-0 left-0 right-0 z-40 px-6 py-3 text-center text-sm font-medium flex items-center justify-center gap-2" style={{ background: "var(--accent)", color: "white", borderBottom: "2px solid var(--accent-hover)" }}>
+        <div style={{ position:"fixed",top:0,left:0,right:0,zIndex:50,padding:"10px 24px",textAlign:"center",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#7c3aed",color:"white",borderBottom:"2px solid #6d28d9" }}>
           <Megaphone size={15} />{broadcast}
         </div>
       )}
 
-      {/* ── Editorial header: masthead + date + headline + leaderboard chip ── */}
-      <header className="border-b pb-5 animate-slide-up" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
-          <span>{dateLine}</span>
-          <span className="font-mono">BLOCKFORGE · STUDENT</span>
-        </div>
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <div className="section-label mb-2">— Today's pages —</div>
-            <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
-              {unlocked
-                ? <>Free time, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>well earned.</em></>
-                : <>Good to see you, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{user?.name?.split(" ")[0]}.</em></>
-              }
-            </h1>
-            <p className="text-sm mt-2 max-w-md" style={{ color: "var(--text-2)" }}>
-              {unlocked ? "Everything's done. Pick a page, enjoy yourself." : "Your work is set up below. Start from the top — you've got this."}
-            </p>
+      {/* ── Hero header ── */}
+      <div style={{
+        background: heroGrad, padding: "28px 24px 32px",
+        position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 20%,rgba(255,255,255,0.08) 0%,transparent 60%)",pointerEvents:"none" }} />
+        <div style={{ maxWidth: 900, margin: "0 auto", position: "relative" }}>
+          <div style={{ fontSize:10,fontWeight:600,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.6)",marginBottom:10 }}>
+            {dateLine}
           </div>
-          {myEntry && (
-            <div className="flex items-baseline gap-3 px-4 py-3" style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderLeft: "3px solid var(--accent)",
-              borderRadius: "var(--r-md)",
-            }}>
-              <Trophy size={16} style={{ color: "var(--accent)" }} />
-              <div>
-                <div className="font-display text-2xl leading-none" style={{ color: "var(--text-1)" }}>{myEntry.points}</div>
-                <div className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "var(--text-3)" }}>pts · Lvl {myEntry.level}</div>
+          <div style={{ display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:16,flexWrap:"wrap" }}>
+            <div>
+              <h1 style={{ fontSize:38,fontWeight:900,letterSpacing:"-0.03em",margin:0,lineHeight:1.05,color:"white",animation:"sd-up .45s ease both" }}>
+                {unlocked ? "Free time, well earned! 🎉" : `Hey, ${user?.name?.split(" ")[0] || "friend"}! 👋`}
+              </h1>
+              <p style={{ fontSize:14,marginTop:8,color:"rgba(255,255,255,0.72)",animation:"sd-up .45s ease .06s both" }}>
+                {unlocked ? "Everything's done — pick something fun below." : "Your work is set up below. You've got this!"}
+              </p>
+            </div>
+            {myEntry && (
+              <div style={{
+                padding:"12px 18px",borderRadius:14,
+                background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",
+                backdropFilter:"blur(8px)",textAlign:"center",animation:"sd-pop .5s ease .1s both",
+              }}>
+                <div style={{ fontSize:26,fontWeight:900,color:"white",fontVariantNumeric:"tabular-nums" }}>{myEntry.points}</div>
+                <div style={{ fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em" }}>
+                  ⭐ pts · Lvl {myEntry.level}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* ── Stats — editorial Fraunces numerals with semantic left border ── */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Classes",   value: c0, icon: Users,       accent: "var(--info)" },
-          { label: "Submitted", value: c1, icon: CheckCircle, accent: "var(--success)" },
-          { label: "Graded",    value: c2, icon: Star,        accent: "var(--accent)" },
-        ].map((s, i) => (
-          <div key={s.label} className="card flex items-baseline gap-3 animate-slide-up"
-            style={{ padding: "14px 16px", borderLeft: `3px solid ${s.accent}`, animationDelay: `${80 + i * 60}ms` }}>
-            <div style={{ color: s.accent }}><s.icon size={15}/></div>
-            <div className="flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{s.label}</div>
-              <div className="font-display text-3xl leading-none mt-1 tabular-nums" style={{ color: "var(--text-1)" }}>{s.value}</div>
-            </div>
+            )}
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* ── Today's Quizzes (Bug #32): quizzes created by teacher surface here ── */}
-      {pendingQuizzes.length > 0 && !activeQuiz && (
-        <div className="animate-slide-up" style={{ animationDelay: "160ms" }}>
-          <div className="section-label mb-3" style={{ color: "var(--accent)" }}>
-            — Today's quizzes —
-          </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {pendingQuizzes.map((q) => (
-              <button key={q.id}
-                onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
-                className="text-left p-5 card-hover transition-all"
-                style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                  borderLeft: "3px solid var(--accent)",
-                  borderRadius: "var(--r-xl)",
-                  cursor: "pointer",
-                }}>
-                <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>
-                  {q._className || "Quiz"} · {(q.questions || []).length} questions
-                </div>
-                <div className="font-display text-xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  {q.title || "Untitled quiz"}
-                </div>
-                {q.estimated_minutes ? (
-                  <div className="text-xs mt-2" style={{ color: "var(--text-2)" }}>~{q.estimated_minutes} min</div>
-                ) : null}
-              </button>
-            ))}
-          </div>
+      {/* ── Main content ── */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 20px 80px" }}>
+
+        {/* Stats row */}
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24 }}>
+          {[
+            { label:"Classes",   value:c0, grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.35)", emoji:"🏫" },
+            { label:"Submitted", value:c1, grad:"linear-gradient(135deg,#10b981,#059669)", glow:"rgba(16,185,129,0.35)", emoji:"✅" },
+            { label:"Graded",    value:c2, grad:"linear-gradient(135deg,#f59e0b,#d97706)", glow:"rgba(245,158,11,0.35)",  emoji:"🏆" },
+          ].map((s,i) => (
+            <div key={s.label} style={{ ...sdCard, padding:"16px 14px", animation:`sd-up .45s ease ${i*60}ms both` }}>
+              <div style={{ width:36,height:36,borderRadius:10,background:s.grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,marginBottom:10,boxShadow:`0 4px 12px ${s.glow}` }}>
+                {s.emoji}
+              </div>
+              <div style={{ fontSize:28,fontWeight:900,color:sdT1,fontVariantNumeric:"tabular-nums",lineHeight:1 }}>{s.value}</div>
+              <div style={{ fontSize:11,fontWeight:600,color:sdT2,textTransform:"uppercase",letterSpacing:"0.1em",marginTop:3 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
-      )}
 
-      {/* Inline quiz taker */}
-      {activeQuiz && (
-        <div className="animate-slide-up card p-6" style={{ borderLeft: "3px solid var(--accent)" }}>
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <div className="section-label mb-1">— Quiz —</div>
-              <h2 className="font-display text-2xl" style={{ color: "var(--text-1)" }}>{activeQuiz.title}</h2>
+        {/* Quizzes */}
+        {pendingQuizzes.length > 0 && !activeQuiz && (
+          <div style={{ marginBottom:24, animation:"sd-up .45s ease .16s both" }}>
+            <div style={{ fontSize:11,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:sdT2,marginBottom:12 }}>Today's Quizzes</div>
+            <div style={{ display:"grid",gap:10,gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))" }}>
+              {pendingQuizzes.map((q) => (
+                <button key={q.id}
+                  onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
+                  style={{ ...sdCard, padding:"18px 16px",textAlign:"left",cursor:"pointer",border:`1px solid rgba(245,158,11,0.4)`,
+                    background:dk?"rgba(245,158,11,0.08)":"rgba(245,158,11,0.06)",
+                    transition:"all 0.15s",
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform="translateY(-2px)"}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; }}>
+                  <div style={{ fontSize:22,marginBottom:8 }}>📝</div>
+                  <div style={{ fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4 }}>
+                    {q._className || "Quiz"} · {(q.questions||[]).length} questions
+                  </div>
+                  <div style={{ fontSize:15,fontWeight:800,color:sdT1 }}>{q.title || "Untitled quiz"}</div>
+                  {q.estimated_minutes && <div style={{ fontSize:11,color:sdT2,marginTop:4 }}>~{q.estimated_minutes} min</div>}
+                </button>
+              ))}
             </div>
-            <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} className="text-sm" style={{ color: "var(--text-3)" }}>Close</button>
           </div>
+        )}
 
-          {quizResult ? (
-            <div className="text-center py-8">
-              <div className="font-display text-5xl mb-2" style={{ color: "var(--accent)" }}>{quizResult.score}%</div>
-              <div style={{ color: "var(--text-2)" }}>Quiz submitted. Nice work.</div>
-              <button
-                onClick={() => {
-                  setPendingQuizzes((prev) => prev.filter((x) => x.id !== activeQuiz.id));
-                  setActiveQuiz(null); setQuizResult(null);
-                }}
-                className="btn-primary mt-4">Done</button>
+        {/* Inline quiz taker — keep existing */}
+        {activeQuiz && (
+          <div style={{ ...sdCard, padding:24, marginBottom:24, borderLeft:"3px solid #f59e0b", animation:"sd-up .4s ease both" }}>
+            <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,marginBottom:16 }}>
+              <div>
+                <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:sdT2,marginBottom:4 }}>Quiz</div>
+                <h2 style={{ fontSize:22,fontWeight:800,color:sdT1,margin:0 }}>{activeQuiz.title}</h2>
+              </div>
+              <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize:12,color:sdT2,background:"none",border:"none",cursor:"pointer" }}>✕ Close</button>
             </div>
-          ) : (
-            <>
-              <div className="space-y-4">
+            {quizResult ? (
+              <div style={{ textAlign:"center",padding:"32px 0" }}>
+                <div style={{ fontSize:52,marginBottom:12 }}>{(quizResult as any).score >= 70 ? "🎉" : "💪"}</div>
+                <div style={{ fontSize:28,fontWeight:900,color:sdT1 }}>{(quizResult as any).score}%</div>
+                <div style={{ fontSize:13,color:sdT2,marginTop:6 }}>{(quizResult as any).score >= 70 ? "Great job!" : "Keep practicing!"}</div>
+                <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ marginTop:16,padding:"10px 24px",borderRadius:10,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"white",fontWeight:700,fontSize:13,border:"none",cursor:"pointer" }}>Done</button>
+              </div>
+            ) : (
+              <>
                 {(activeQuiz.questions || []).map((q: any, qi: number) => (
-                  <div key={qi} className="p-4" style={{ background: "var(--bg-muted)", borderRadius: "var(--r-md)" }}>
-                    <div className="font-medium mb-3" style={{ color: "var(--text-1)" }}>{qi + 1}. {q.text}</div>
-                    <div className="space-y-2">
+                  <div key={qi} style={{ marginBottom:20 }}>
+                    <div style={{ display:"flex",gap:10,alignItems:"flex-start",marginBottom:10 }}>
+                      <span style={{ fontSize:11,fontWeight:800,minWidth:20,padding:"2px 6px",borderRadius:6,background:dk?"rgba(99,102,241,0.2)":"#eef2ff",color:"#6366f1" }}>{qi+1}</span>
+                      <div style={{ fontSize:14,fontWeight:600,color:sdT1,flex:1 }}>{q.question}</div>
+                    </div>
+                    <div style={{ display:"grid",gap:6,paddingLeft:30 }}>
                       {(q.options || []).map((opt: string, oi: number) => (
-                        <label key={oi} className="flex items-center gap-2 cursor-pointer p-2 rounded"
-                          style={{ background: quizAnswers[qi] === oi ? "var(--accent-light)" : "transparent" }}>
-                          <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
-                            onChange={() => setQuizAnswers((a) => { const n = [...a]; n[qi] = oi; return n; })} />
-                          <span style={{ color: "var(--text-1)" }}>{opt}</span>
-                        </label>
+                        <button key={oi} onClick={() => setQuizAnswers((a: number[]) => { const n=[...a]; n[qi]=oi; return n; })}
+                          style={{ padding:"10px 14px",borderRadius:10,textAlign:"left",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.12s",
+                            background: quizAnswers[qi]===oi ? "linear-gradient(135deg,rgba(99,102,241,0.25),rgba(124,58,237,0.18))" : sdSurf,
+                            border: quizAnswers[qi]===oi ? "1px solid rgba(99,102,241,0.5)" : `1px solid ${sdBord}`,
+                            color: quizAnswers[qi]===oi ? (dk?"#c4b5fd":"#4f46e5") : sdT1,
+                          }}>
+                          {opt}
+                        </button>
                       ))}
                     </div>
                   </div>
                 ))}
-              </div>
-              <button
-                disabled={quizSubmitting || quizAnswers.some((a) => a < 0)}
-                onClick={async () => {
-                  setQuizSubmitting(true);
-                  try {
-                    const r = await api.submitQuiz(activeQuiz.id, quizAnswers);
-                    setQuizResult({ score: r.score });
-                  } catch (e: any) {
-                    alert("Could not submit: " + (e?.message || "unknown error"));
-                  } finally { setQuizSubmitting(false); }
-                }}
-                className="btn-primary mt-6">
-                {quizSubmitting ? "Submitting…" : "Submit quiz"}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Free Time Unlocked — editorial tile set ── */}
-      {unlocked && (
-        <div className="animate-spring-in" style={{ animationDelay: "200ms" }}>
-          <div className="section-label mb-3" style={{ color: "var(--success)" }}>
-            — Free time earned —
-          </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-            <Link to="/arcade"
-              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
-              style={{
-                animationDelay: "240ms",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderLeft: "3px solid var(--accent)",
-                borderRadius: "var(--r-xl)",
-                textDecoration: "none",
-              }}>
-              <div className="w-12 h-12 flex items-center justify-center text-2xl"
-                style={{ background: "var(--accent-light)", borderRadius: "var(--r-md)" }}>
-                🎮
-              </div>
-              <div>
-                <div className="section-label mb-1">— Arcade —</div>
-                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  Play some<em style={{ color: "var(--accent)", fontStyle: "italic" }}> games.</em>
-                </div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>29 games · keep it fun</div>
-              </div>
-            </Link>
-            <Link to="/projects"
-              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
-              style={{
-                animationDelay: "310ms",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderLeft: "3px solid var(--accent-sage)",
-                borderRadius: "var(--r-xl)",
-                textDecoration: "none",
-              }}>
-              <div className="w-12 h-12 flex items-center justify-center text-2xl"
-                style={{ background: "color-mix(in srgb, var(--accent-sage) 14%, transparent)", borderRadius: "var(--r-md)" }}>
-                💻
-              </div>
-              <div>
-                <div className="section-label mb-1" style={{ color: "var(--accent-sage)" }}>— Projects —</div>
-                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  Build<em style={{ color: "var(--accent-sage)", fontStyle: "italic" }}> something.</em>
-                </div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>BlockForge · 2D & 3D stages</div>
-              </div>
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Class video */}
-      {classVideo && (
-        <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: "280ms" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-            <h2 className="text-sm font-semibold" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>📺 Your Teacher Shared a Video</h2>
-            {classVideo.video_title && <span className="text-xs ml-auto" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#9ca3af" }}>{classVideo.video_title}</span>}
-          </div>
-          <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 12, overflow: "hidden" }}>
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
-              title={classVideo.video_title || "Class Video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* YouTube Library — gated by unlock/break state + teacher config
-          Hidden unless: student is unlocked OR on a break, AND teacher hasn't disabled YouTube */}
-      {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
-      <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
-          📺 Video Library
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(239,68,68,0.1)" : "#fee2e2", color: dk ? "#f87171" : "#dc2626" }}>
-            {youtubeLibrary.length} {youtubeLibrary.length === 1 ? "video" : "videos"}
-          </span>
-        </h2>
-
-        {/* Playing inline */}
-        {playingLibVideo && (
-          <div className="mb-4 animate-spring-in">
-            <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
-                title={playingLibVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
-              />
-            </div>
-            <button onClick={() => setPlayingLibVideo(null)} className="mt-2 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-colors" style={{ background: dk?"rgba(255,255,255,0.05)":"#f1f5f9", color: dk?"rgba(255,255,255,0.5)":"#64748b" }}>
-              ✕ Close video
-            </button>
-          </div>
-        )}
-
-        {/* Grid of videos OR empty state */}
-        {youtubeLibrary.length > 0 ? (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
-            {youtubeLibrary.map((v: any) => (
-              <button
-                key={v.id}
-                onClick={async () => {
-                  setPlayingLibVideo({ videoId: v.video_id, title: v.title });
-                  if (user?.id) {
-                    api.pickLibraryVideo(v.id, user.id).catch(() => {});
-                  }
-                }}
-                style={{
-                  textAlign:"left", padding:0, background:"none", border:"none", cursor:"pointer",
-                  borderRadius:12, overflow:"hidden",
-                  boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
-                  transition:"transform 0.15s, box-shadow 0.15s",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-              >
-                <div style={{ position:"relative", overflow:"hidden" }}>
-                  <img src={v.thumbnail_url || `https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%", aspectRatio:"16/9", objectFit:"cover", display:"block" }} />
-                </div>
-                <div style={{ padding:"8px 10px", background: dk?"rgba(255,255,255,0.04)":"white" }}>
-                  <div style={{ fontSize:11, fontWeight:700, color: dk?"rgba(255,255,255,0.85)":"#1e293b", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
-                  {v.category && <div style={{ fontSize:9, fontWeight:600, marginTop:3, color: dk?"rgba(239,68,68,0.7)":"#dc2626", textTransform:"uppercase", letterSpacing:"0.05em" }}>{v.category}</div>}
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-6" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
-            <div className="text-3xl mb-2">📼</div>
-            <p className="text-xs">No videos in the library yet.<br/>Ask your teacher to add some, or request one below!</p>
-          </div>
-        )}
-
-        {/* Request a video — only when fully unlocked (not during a break) */}
-        {unlocked && !isOnBreak() && (
-          <div className={`mt-4 pt-4 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
-            <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => { /* toast or refresh */ }} />
-          </div>
-        )}
-      </div>
-      )}
-
-      {/* Learning Apps — teacher-granted websites (only shows if any) */}
-      {(unlocked || isOnBreak()) && (myWebsites.length > 0 || true) && (
-        <div className="card animate-slide-up" style={{ animationDelay: "310ms" }}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
-              🌐 Learning Apps
-              {myWebsites.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(99,102,241,0.15)" : "#e0e7ff", color: dk ? "#a5b4fc" : "#4338ca" }}>
-                  {myWebsites.length}
-                </span>
-              )}
-            </h2>
-            <button
-              onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
-              style={{ background: dk ? "rgba(99,102,241,0.15)" : "#eef2ff", color: dk ? "#a5b4fc" : "#4338ca" }}
-            >
-              📝 Ask for a new website
-            </button>
-          </div>
-
-          {myWebsites.length > 0 ? (
-            <LearningAppGrid>
-              {myWebsites.map((w: any) => (
-                <LearningAppTile key={w.id} app={w} dk={dk} />
-              ))}
-            </LearningAppGrid>
-          ) : (
-            <div className="text-center py-10 px-4 rounded-2xl" style={{
-              background: dk ? "rgba(255,255,255,0.02)" : "#f8fafc",
-              border: dk ? "1px dashed rgba(255,255,255,0.08)" : "1px dashed #e2e8f0",
-            }}>
-              <div className="text-5xl mb-3">🌐</div>
-              <p className="text-sm font-bold mb-1" style={{ color: dk ? "rgba(255,255,255,0.85)" : "#1e293b" }}>
-                No learning apps yet — ask your teacher!
-              </p>
-              <p className="text-xs mb-4" style={{ color: dk ? "rgba(255,255,255,0.4)" : "#64748b" }}>
-                Got a site you'd love to use? Let them know below.
-              </p>
-              <button
-                onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-                className="text-sm font-bold px-5 py-2.5 rounded-full cursor-pointer transition-all hover:scale-105"
-                style={{
-                  background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                  color: "white",
-                  boxShadow: "0 6px 16px rgba(99,102,241,0.35)",
-                }}
-              >
-                📝 Ask for a new website
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Website request modal */}
-      {showWebsiteRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowWebsiteRequest(false)}>
-          <div className="card max-w-md w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-2" style={{ color: dk ? "white" : "#1e293b" }}>Request a website</h3>
-            <p className="text-sm mb-4" style={{ color: dk ? "rgba(255,255,255,0.5)" : "#64748b" }}>
-              Tell your teacher the name of the site you'd like to use. They'll review it and unlock it for you.
-            </p>
-            {websiteRequestSent ? (
-              <div className="text-center py-4">
-                <div className="text-4xl mb-2">✅</div>
-                <p className="text-sm font-semibold text-emerald-500">Request sent! Your teacher will review it.</p>
-                <button onClick={() => setShowWebsiteRequest(false)} className="btn-primary mt-4">Close</button>
-              </div>
-            ) : (
-              <>
-                <input
-                  autoFocus
-                  value={websiteRequestTitle}
-                  onChange={e => setWebsiteRequestTitle(e.target.value)}
-                  placeholder="e.g. Typing Club, Prodigy, Cool Math…"
-                  className="input w-full mb-4"
-                  maxLength={200}
-                  onKeyDown={async e => {
-                    if (e.key === "Enter" && websiteRequestTitle.trim()) {
-                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
-                    }
+                <button
+                  disabled={quizAnswers.some((a: number) => a === -1)}
+                  onClick={async () => {
+                    try {
+                      const r = await api.submitQuiz(activeQuiz.id, quizAnswers);
+                      setQuizResult(r);
+                    } catch { setQuizResult({ score: 0 }); }
                   }}
-                />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowWebsiteRequest(false)} className="px-4 py-2 rounded-lg font-semibold" style={{ background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9", color: dk ? "rgba(255,255,255,0.7)" : "#64748b" }}>Cancel</button>
-                  <button
-                    disabled={!websiteRequestTitle.trim()}
-                    onClick={async () => {
-                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
-                    }}
-                    className="btn-primary disabled:opacity-40"
-                  >
-                    Send request
-                  </button>
-                </div>
+                  style={{ padding:"11px 28px",borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"white",fontWeight:700,fontSize:13,border:"none",cursor:"pointer",opacity:quizAnswers.some((a: number) => a===-1)?0.4:1 }}>
+                  Submit Quiz
+                </button>
               </>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Join a class */}
-      <div className="card animate-slide-up" style={{ animationDelay: "320ms" }}>
-        <h2 className="text-sm font-semibold mb-3" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>Join a Class</h2>
-        <div className="flex gap-2">
-          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
-            placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
-            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} style={{ minHeight: 48 }} />
-          <button ref={joinBtnRef} onClick={handleJoinClass}
-            className={`btn-primary px-4 transition-all duration-200 ${joinSuccess ? "bg-emerald-500 hover:bg-emerald-500" : ""}`}
-            style={{ minHeight: 48 }}>
-            {joinSuccess ? "✓" : "Join"}
-          </button>
-        </div>
-      </div>
-
-      {/* Recent grades */}
-      <div className="card animate-slide-up" style={{ animationDelay: "400ms" }}>
-        <h2 className="text-base font-semibold mb-4" style={{ color: dk ? "white" : "#1e293b" }}>Recent Grades</h2>
-        <div className="space-y-2">
-          {submissions.slice(0, 5).map((s: any, i: number) => (
-            <div key={s.id} className="list-row animate-slide-in-right" style={{ animationDelay: `${500 + i * 50}ms` }}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: dk ? "rgba(139,92,246,0.1)" : "#f5f3ff" }}>
-                  <CheckCircle size={14} className="text-violet-400" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium" style={{ color: dk ? "white" : "#1e293b" }}>{s.assignment_title || "Assignment"}</div>
-                  <div className="text-xs flex items-center gap-1" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
-                    <Clock size={10} />{new Date(s.submitted_at).toLocaleDateString()}
+        {/* Free time tiles */}
+        {unlocked && (
+          <div style={{ marginBottom:24, animation:"sd-up .45s ease .2s both" }}>
+            <div style={{ fontSize:11,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:sdT2,marginBottom:12 }}>Free Time Earned 🎉</div>
+            <div style={{ display:"grid",gap:12,gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))" }}>
+              {[
+                { to:"/arcade",    emoji:"🎮", label:"Arcade",        sub:"29 games · play anything",     grad:"linear-gradient(135deg,#f43f5e,#e11d48)", glow:"rgba(244,63,94,0.3)" },
+                { to:"/projects",  emoji:"💻", label:"Projects",      sub:"BlockForge · build anything",  grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,0.3)" },
+              ].map((tile, i) => (
+                <Link key={tile.to} to={tile.to} style={{ textDecoration:"none", display:"flex",flexDirection:"column",gap:12,padding:"20px 18px",borderRadius:18,
+                  background:sdSurf, border:`1px solid ${sdBord}`,
+                  transition:"all 0.15s", animation:`sd-up .45s ease ${200+i*60}ms both`,
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform="translateY(-4px)"; (e.currentTarget as HTMLElement).style.boxShadow=`0 12px 32px ${tile.glow}`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; (e.currentTarget as HTMLElement).style.boxShadow=""; }}
+                >
+                  <div style={{ width:52,height:52,borderRadius:14,background:tile.grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,boxShadow:`0 6px 16px ${tile.glow}` }}>
+                    {tile.emoji}
                   </div>
-                </div>
-              </div>
-              <div>
-                {s.grade !== null ? (
-                  <span className="text-sm font-bold" style={{ color: s.grade >= 70 ? "#10b981" : "#ef4444" }}>{s.grade}%</span>
-                ) : (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8", background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9" }}>Pending</span>
-                )}
+                  <div>
+                    <div style={{ fontSize:18,fontWeight:800,color:sdT1 }}>{tile.label}</div>
+                    <div style={{ fontSize:12,color:sdT2,marginTop:3 }}>{tile.sub}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Class video */}
+        {classVideo && (
+          <div style={{ ...sdCard, padding:16, marginBottom:24, animation:"sd-up .45s ease .28s both" }}>
+            <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:12 }}>
+              <div style={{ width:8,height:8,borderRadius:"50%",background:"#ef4444",animation:"sd-shine 1.5s infinite" }} />
+              <span style={{ fontSize:13,fontWeight:700,color:sdT1 }}>📺 Teacher shared a video</span>
+              {classVideo.video_title && <span style={{ fontSize:11,color:sdT2,marginLeft:"auto" }}>{classVideo.video_title}</span>}
+            </div>
+            <div style={{ position:"relative",paddingTop:"56.25%",borderRadius:12,overflow:"hidden" }}>
+              <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
+                title={classVideo.video_title||"Class Video"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }} />
+            </div>
+          </div>
+        )}
+
+        {/* YouTube library */}
+        {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
+          <div style={{ ...sdCard, padding:20, marginBottom:24, animation:"sd-up .45s ease .3s both" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <span style={{ fontSize:15,fontWeight:800,color:sdT1 }}>📺 Video Library</span>
+                <span style={{ fontSize:10,padding:"2px 8px",borderRadius:20,background:dk?"rgba(239,68,68,0.12)":"#fee2e2",color:dk?"#f87171":"#dc2626",fontWeight:700 }}>
+                  {youtubeLibrary.length} videos
+                </span>
               </div>
             </div>
-          ))}
-          {submissions.length === 0 && (
-            <p className="text-center text-sm py-8" style={{ color: dk ? "rgba(255,255,255,0.25)" : "#9ca3af" }}>No submissions yet</p>
-          )}
+            {playingLibVideo && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ position:"relative",paddingTop:"56.25%",borderRadius:12,overflow:"hidden" }}>
+                  <iframe src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                    title={playingLibVideo.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }} />
+                </div>
+                <button onClick={() => setPlayingLibVideo(null)} style={{ marginTop:8,fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,background:sdSurf,border:`1px solid ${sdBord}`,color:sdT2,cursor:"pointer" }}>
+                  ✕ Close video
+                </button>
+              </div>
+            )}
+            {youtubeLibrary.length > 0 ? (
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10 }}>
+                {youtubeLibrary.map((v: any) => (
+                  <button key={v.id} onClick={async () => { setPlayingLibVideo({ videoId:v.video_id, title:v.title }); if (user?.id) api.pickLibraryVideo(v.id, user.id).catch(()=>{}); }}
+                    style={{ background:"none",border:"none",cursor:"pointer",borderRadius:12,overflow:"hidden",textAlign:"left",
+                      boxShadow:dk?"0 2px 8px rgba(0,0,0,0.3)":"0 2px 8px rgba(0,0,0,0.08)", transition:"transform 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform="translateY(-2px)"}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; }}>
+                    <img src={v.thumbnail_url||`https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%",aspectRatio:"16/9",objectFit:"cover",display:"block" }} />
+                    <div style={{ padding:"7px 9px",background:dk?"rgba(255,255,255,0.05)":"white" }}>
+                      <div style={{ fontSize:11,fontWeight:700,color:sdT1,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign:"center",padding:"32px 0",color:sdT2 }}>
+                <div style={{ fontSize:36,marginBottom:8 }}>📼</div>
+                <div style={{ fontSize:12 }}>No videos yet — ask your teacher!</div>
+              </div>
+            )}
+            {unlocked && !isOnBreak() && (
+              <div style={{ marginTop:16,paddingTop:16,borderTop:`1px solid ${sdBord}` }}>
+                <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => {}} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Learning Apps */}
+        {(unlocked || isOnBreak()) && (myWebsites.length > 0 || true) && (
+          <div style={{ ...sdCard, padding:20, marginBottom:24, animation:"sd-up .45s ease .31s both" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <span style={{ fontSize:15,fontWeight:800,color:sdT1 }}>🌐 Learning Apps</span>
+                {myWebsites.length > 0 && (
+                  <span style={{ fontSize:10,padding:"2px 8px",borderRadius:20,background:dk?"rgba(99,102,241,0.15)":"#eef2ff",color:dk?"#a5b4fc":"#4338ca",fontWeight:700 }}>
+                    {myWebsites.length}
+                  </span>
+                )}
+              </div>
+              <button onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
+                style={{ fontSize:11,fontWeight:700,padding:"6px 12px",borderRadius:20,background:dk?"rgba(99,102,241,0.15)":"#eef2ff",color:dk?"#a5b4fc":"#4338ca",border:"none",cursor:"pointer" }}>
+                📝 Ask for a site
+              </button>
+            </div>
+            {myWebsites.length > 0 ? (
+              <LearningAppGrid>{myWebsites.map((w: any) => <LearningAppTile key={w.id} app={w} dk={dk} />)}</LearningAppGrid>
+            ) : (
+              <div style={{ textAlign:"center",padding:"28px 0" }}>
+                <div style={{ fontSize:36,marginBottom:8 }}>🖥️</div>
+                <div style={{ fontSize:13,color:sdT2,marginBottom:16 }}>No apps unlocked yet</div>
+                <button onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
+                  style={{ padding:"10px 22px",borderRadius:12,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"white",fontWeight:700,fontSize:13,border:"none",cursor:"pointer",boxShadow:"0 6px 16px rgba(99,102,241,0.35)" }}>
+                  📝 Ask for a new website
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Website request modal */}
+        {showWebsiteRequest && (
+          <div style={{ position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,0.6)" }}
+            onClick={() => setShowWebsiteRequest(false)}>
+            <div style={{ ...sdCard, maxWidth:400,width:"100%",padding:24 }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ fontSize:17,fontWeight:800,color:sdT1,marginBottom:8 }}>Request a website</h3>
+              <p style={{ fontSize:13,color:sdT2,marginBottom:16 }}>Your teacher will review it and unlock it for you.</p>
+              {websiteRequestSent ? (
+                <div style={{ textAlign:"center",padding:"24px 0" }}>
+                  <div style={{ fontSize:40,marginBottom:8 }}>✅</div>
+                  <div style={{ fontSize:13,fontWeight:700,color:"#10b981" }}>Sent! Your teacher will review it.</div>
+                  <button onClick={() => setShowWebsiteRequest(false)} style={{ marginTop:16,padding:"10px 24px",borderRadius:10,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"white",fontWeight:700,border:"none",cursor:"pointer" }}>Close</button>
+                </div>
+              ) : (
+                <>
+                  <input autoFocus value={websiteRequestTitle} onChange={e => setWebsiteRequestTitle(e.target.value)}
+                    placeholder="e.g. Typing Club, Prodigy, Cool Math…" maxLength={200}
+                    className="input w-full mb-4"
+                    onKeyDown={async e => { if (e.key==="Enter"&&websiteRequestTitle.trim()) { try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {} } }} />
+                  <div style={{ display:"flex",gap:8,justifyContent:"flex-end" }}>
+                    <button onClick={() => setShowWebsiteRequest(false)} style={{ padding:"9px 16px",borderRadius:10,background:sdSurf,border:`1px solid ${sdBord}`,color:sdT2,fontWeight:600,fontSize:13,cursor:"pointer" }}>Cancel</button>
+                    <button disabled={!websiteRequestTitle.trim()} onClick={async () => { try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {} }}
+                      style={{ padding:"9px 20px",borderRadius:10,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"white",fontWeight:700,fontSize:13,border:"none",cursor:"pointer",opacity:websiteRequestTitle.trim()?1:0.4 }}>
+                      Send request
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Join a class */}
+        <div style={{ ...sdCard, padding:20, marginBottom:24, animation:"sd-up .45s ease .32s both" }}>
+          <div style={{ fontSize:14,fontWeight:800,color:sdT1,marginBottom:12 }}>Join a Class</div>
+          <div style={{ display:"flex",gap:8 }}>
+            <input value={joinCode} onChange={e => setJoinCode(e.target.value)}
+              placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
+              onKeyDown={e => e.key==="Enter"&&handleJoinClass()} style={{ minHeight:46 }} />
+            <button ref={joinBtnRef} onClick={handleJoinClass}
+              style={{ padding:"0 20px",minHeight:46,borderRadius:12,background:joinSuccess?"linear-gradient(135deg,#10b981,#059669)":"linear-gradient(135deg,#7c3aed,#4f46e5)",color:"white",fontWeight:700,fontSize:13,border:"none",cursor:"pointer" }}>
+              {joinSuccess ? "✓" : "Join"}
+            </button>
+          </div>
         </div>
+
+        {/* Recent grades */}
+        <div style={{ ...sdCard, padding:20, animation:"sd-up .45s ease .4s both" }}>
+          <div style={{ fontSize:14,fontWeight:800,color:sdT1,marginBottom:14 }}>Recent Grades</div>
+          <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+            {submissions.slice(0,5).map((s: any, i: number) => (
+              <div key={s.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:12,background:dk?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.02)",animation:`sd-up .4s ease ${500+i*50}ms both` }}>
+                <div style={{ width:34,height:34,borderRadius:10,background:dk?"rgba(139,92,246,0.15)":"#f5f3ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  <CheckCircle size={14} style={{ color:"#8b5cf6" }} />
+                </div>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ fontSize:13,fontWeight:600,color:sdT1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{s.assignment_title||"Assignment"}</div>
+                  <div style={{ fontSize:11,color:sdT2,marginTop:1 }}>
+                    <Clock size={9} style={{ display:"inline",marginRight:3 }} />{new Date(s.submitted_at).toLocaleDateString()}
+                  </div>
+                </div>
+                {s.grade !== null ? (
+                  <span style={{ fontSize:14,fontWeight:800,color:s.grade>=70?"#10b981":"#ef4444" }}>{s.grade}%</span>
+                ) : (
+                  <span style={{ fontSize:10,padding:"2px 8px",borderRadius:20,background:sdSurf,color:sdT2,fontWeight:600 }}>Pending</span>
+                )}
+              </div>
+            ))}
+            {submissions.length===0 && (
+              <div style={{ textAlign:"center",padding:"32px 0",color:sdT2 }}>
+                <div style={{ fontSize:36,marginBottom:8 }}>📋</div>
+                <div style={{ fontSize:13 }}>No submissions yet</div>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
-      {/* Celebrating mascot on done dashboard */}
-      {!dk && (
-        <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
-          <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
-        </div>
-      )}
+      {!dk && <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true"><Mascot state={mascotCelebrating ? "cheer" : "idle"} /></div>}
     </div>
   );
 }
