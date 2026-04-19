@@ -27,6 +27,7 @@ import LessonAnalytics from "./components/LessonAnalytics.tsx";
 import ClassGrades from "./components/ClassGrades.tsx";
 import TeacherGradebook, { GradebookStudentPicker } from "./components/TeacherGradebook.tsx";
 import TeacherWebsites from "./components/TeacherWebsites.tsx";
+import StudentWebsites from "./components/StudentWebsites.tsx";
 import TeacherSchedule from "./components/TeacherSchedule.tsx";
 import WebsiteViewer from "./components/WebsiteViewer.tsx";
 import {
@@ -155,6 +156,7 @@ export default function App() {
             <Route path="class-grades" element={<ClassGrades />} />
             <Route path="teacher/gradebook" element={<GradebookStudentPicker />} />
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
+            <Route path="websites" element={<StudentWebsites />} />
             <Route path="teacher/websites" element={<TeacherWebsites />} />
             <Route path="teacher/schedule" element={<TeacherSchedule />} />
             <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
