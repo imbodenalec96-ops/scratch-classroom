@@ -218,7 +218,7 @@ export default function TeacherSchedule() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-extrabold flex items-center gap-2 text-t1">
-            <Clock size={22} className="text-cyan-400" />
+            <Clock size={22} className="text-violet-400" style={{ filter: "drop-shadow(0 0 6px rgba(139,92,246,0.5))" }} />
             Schedule Editor
           </h1>
           <p className="text-sm text-t3 mt-1">Edit daily blocks, breaks, and subjects. Students' auto-nav and dashboards read from here.</p>
@@ -268,7 +268,7 @@ export default function TeacherSchedule() {
               return (
                 <Fragment key={i}>
                 <div
-                  className={`grid grid-cols-[36px_100px_100px_minmax(140px,1fr)_160px_80px_140px_180px_40px] gap-2 px-3 py-2 items-center border-t ${dk ? "border-white/[0.06]" : "border-gray-100"} ${isLive ? (dk ? "bg-cyan-500/10" : "bg-cyan-50") : ""}`}
+                  className={`grid grid-cols-[36px_100px_100px_minmax(140px,1fr)_160px_80px_140px_180px_40px] gap-2 px-3 py-2 items-center border-t ${dk ? "border-white/[0.06]" : "border-gray-100"} ${isLive ? (dk ? "bg-violet-500/10" : "bg-violet-50") : ""}`}
                 >
                   <div className="text-xs text-t3 font-mono">{i + 1}</div>
                   <input
@@ -332,7 +332,7 @@ export default function TeacherSchedule() {
                           }}
                           className={`text-[10px] font-medium w-8 h-6 rounded border transition-all ${
                             on
-                              ? (dk ? "bg-cyan-600/70 border-cyan-500/60 text-white" : "bg-cyan-500 border-cyan-500 text-white")
+                              ? (dk ? "bg-violet-600/70 border-violet-500/60 text-white" : "bg-violet-500 border-violet-500 text-white")
                               : (dk ? "bg-white/5 border-white/10 text-white/40 hover:bg-white/10" : "bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200")
                           }`}
                           title={d}
@@ -406,7 +406,7 @@ export default function TeacherSchedule() {
               <div className={`text-[10px] font-semibold uppercase tracking-wide ${dk ? "text-white/40" : "text-gray-500"}`}>Now ({now})</div>
               {liveBlock ? (
                 <>
-                  <div className={`px-2 py-1 rounded-md text-xs font-semibold ${dk ? "bg-cyan-500/20 text-cyan-300" : "bg-cyan-100 text-cyan-700"}`}>
+                  <div className={`px-2 py-1 rounded-md text-xs font-semibold ${dk ? "bg-violet-500/20 text-violet-300" : "bg-violet-100 text-violet-700"}`}>
                     {liveBlock.label}
                   </div>
                   <div className="text-xs text-t3">
