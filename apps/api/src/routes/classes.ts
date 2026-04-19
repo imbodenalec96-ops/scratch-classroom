@@ -19,6 +19,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
 
 // List classes for current user
 router.get("/", async (req: AuthRequest, res: Response) => {
+  await seedStarStudents();
   const u = req.user!;
   let rows;
   if (u.role === "admin") {
@@ -1097,9 +1098,66 @@ router.get("/:classId/video", async (req: AuthRequest, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// STAR class + student seed — idempotent, runs once at startup.
+// Creates the "Star" class and its 5 real students if they don't exist.
+// Also ensures specials_grade column exists on users table.
+// ─────────────────────────────────────────────────────────────────────────────
+const STAR_CLASS_ID   = "b0000000-0000-0000-0000-000000000002";
+const STAR_TEACHER_ID = "a0000000-0000-0000-0000-000000000002"; // Jane Teacher seed account
+const STAR_STUDENTS_SEED = [
+  { id: "s0000000-0000-0000-0000-000000000001", name: "Ryan",   email: "ryan.star@star.local",   specials_grade: 5 },
+  { id: "s0000000-0000-0000-0000-000000000002", name: "Jaida",  email: "jaida.star@star.local",  specials_grade: 5 },
+  { id: "s0000000-0000-0000-0000-000000000003", name: "Rayden", email: "rayden.star@star.local", specials_grade: 4 },
+  { id: "s0000000-0000-0000-0000-000000000004", name: "Zoey",   email: "zoey.star@star.local",   specials_grade: 3 },
+  { id: "s0000000-0000-0000-0000-000000000005", name: "Aiden",  email: "aiden.star@star.local",  specials_grade: 3 },
+  { id: "s0000000-0000-0000-0000-000000000006", name: "Kaleb",  email: "kaleb.star@star.local",  specials_grade: 5 },
+  { id: "s0000000-0000-0000-0000-000000000007", name: "Anna",   email: "anna.star@star.local",   specials_grade: 3 },
+  { id: "s0000000-0000-0000-0000-000000000008", name: "Ameer",  email: "ameer.star@star.local",  specials_grade: null },
+] as const;
+
+let starStudentSeedRan = false;
+async function seedStarStudents() {
+  if (starStudentSeedRan) return;
+  try {
+    // specials_grade column — safe to re-run (fails silently if already exists)
+    try { await db.exec("ALTER TABLE users ADD COLUMN specials_grade INTEGER"); } catch {}
+
+    // Get teacher for the class (fall back to any admin if seed teacher missing)
+    const teacher: any = await db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").get(STAR_TEACHER_ID)
+      ?? await db.prepare("SELECT id FROM users WHERE role IN ('teacher','admin') LIMIT 1").get();
+    const teacherId = teacher?.id ?? null;
+
+    await db.prepare(
+      `INSERT INTO classes (id, name, teacher_id, code) VALUES (?, 'Star', ?, 'STAR01') ON CONFLICT DO NOTHING`
+    ).run(STAR_CLASS_ID, teacherId);
+
+    const bcrypt = await import("bcrypt");
+    const hash = await bcrypt.default.hash("star1234", 10);
+
+    for (const s of STAR_STUDENTS_SEED) {
+      await db.prepare(
+        `INSERT INTO users (id, email, password_hash, name, role, specials_grade) VALUES (?, ?, ?, ?, 'student', ?) ON CONFLICT DO NOTHING`
+      ).run(s.id, s.email, hash, s.name, s.specials_grade ?? null);
+      // Backfill specials_grade if it wasn't set on a prior seed run
+      if (s.specials_grade != null) {
+        await db.prepare(
+          `UPDATE users SET specials_grade = ? WHERE id = ? AND specials_grade IS NULL`
+        ).run(s.specials_grade, s.id);
+      }
+      await db.prepare(
+        `INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING`
+      ).run(s.id, STAR_CLASS_ID);
+    }
+    starStudentSeedRan = true;
+    console.log("[star-seed] Star class + students seeded");
+  } catch (e) {
+    console.error("[star-seed] error:", e);
+  }
+}
+seedStarStudents();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Class daily schedule — Feature: block-based day table.
-// Drives future auto-nav + dashboard header, but this commit is TABLE + SEED +
-// READ only. No UI, no dispatcher.
 // ─────────────────────────────────────────────────────────────────────────────
 let scheduleTableReady = false;
 async function ensureClassScheduleTable() {
@@ -1131,8 +1189,7 @@ type SeedBlock = [string, string, string, string | null, 0 | 1, string | null];
 const STAR_SCHEDULE_SEED: SeedBlock[] = [
   ["09:10", "09:20", "Daily News",          "daily_news",     0, null],
   ["09:20", "09:30", "Break",               null,             1, "regular"],
-  ["09:30", "09:40", "SEL",                 "sel",            0, null],
-  ["09:40", "09:50", "Break",               null,             1, "regular"],
+  ["09:30", "09:50", "SEL",                 "sel",            0, null],
   ["09:50", "10:10", "Math",                "math",           0, null],
   ["10:10", "10:20", "Break",               null,             1, "regular"],
   ["10:20", "10:50", "Recess",              "recess",         1, "recess"],

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ExternalLink, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { api } from "../lib/api.ts";
 
 // Embedded viewer for a single teacher-granted website.
@@ -15,6 +15,21 @@ export default function WebsiteViewer() {
   const [err, setErr] = useState<string>("");
   const [loaded, setLoaded] = useState(false);
   const [maybeBlocked, setMaybeBlocked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      await document.exitFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   useEffect(() => {
     if (!websiteId) return;
@@ -63,6 +78,14 @@ export default function WebsiteViewer() {
           <div className="text-sm font-semibold text-t1 truncate">{site.title}</div>
           <div className="text-xs text-t3 truncate">{site.url}</div>
         </div>
+        <button
+          onClick={toggleFullscreen}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5 text-t2 text-sm font-medium"
+          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          {isFullscreen ? "Exit" : "Fullscreen"}
+        </button>
         <a
           href={site.url}
           target="_blank"

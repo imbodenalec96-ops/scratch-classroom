@@ -53,7 +53,14 @@ export default function TeacherWebsites() {
     } catch (e: any) { setErr(e?.message || "Failed to load"); }
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    reload();
+    // Poll for new student requests every 20s so Alec sees them without refreshing
+    const iv = setInterval(() => {
+      api.getPendingWebsiteRequests().then(p => { if (p) setPending(p as any[]); }).catch(() => {});
+    }, 20_000);
+    return () => clearInterval(iv);
+  }, []);
 
   // Load students (for grants tab) — only when tab is opened
   useEffect(() => {

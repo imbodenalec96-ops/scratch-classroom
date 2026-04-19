@@ -6,19 +6,19 @@ import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 
-// Idempotent schema bootstrap — students columns + new board tables.
+// Idempotent schema bootstrap for board-specific tables.
 let schemaReady = false;
 async function ensureBoardSchema() {
   if (schemaReady) return;
-  const alters = [
-    "ALTER TABLE students ADD COLUMN behavior_stars INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE students ADD COLUMN reward_count INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE students ADD COLUMN level INTEGER NOT NULL DEFAULT 1",
-  ];
-  for (const sql of alters) {
-    try { await db.exec(sql); } catch { /* already exists */ }
-  }
   try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS board_user_data (
+        user_id TEXT PRIMARY KEY,
+        behavior_stars INTEGER NOT NULL DEFAULT 0,
+        reward_count INTEGER NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 1
+      )
+    `);
     await db.exec(`
       CREATE TABLE IF NOT EXISTS resource_schedules (
         id TEXT PRIMARY KEY,
@@ -58,14 +58,16 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
   const classId = req.params.classId;
   try {
     const students = await db.prepare(
-      `SELECT s.id, s.name, s.avatar_emoji,
-              COALESCE(s.behavior_stars, 0) AS behavior_stars,
-              COALESCE(s.reward_count, 0)    AS reward_count,
-              COALESCE(s.level, 1)           AS level
-       FROM students s
-       WHERE s.active = 1
-       ORDER BY s.name ASC`
-    ).all();
+      `SELECT u.id, u.name, u.avatar_url, u.specials_grade,
+              COALESCE(bd.behavior_stars, 0) AS behavior_stars,
+              COALESCE(bd.reward_count, 0)    AS reward_count,
+              COALESCE(bd.level, 1)           AS level
+       FROM users u
+       JOIN class_members cm ON u.id = cm.user_id
+       LEFT JOIN board_user_data bd ON bd.user_id = u.id
+       WHERE cm.class_id = ? AND u.role = 'student'
+       ORDER BY u.name ASC`
+    ).all(classId);
 
     const schedules = await db.prepare(
       `SELECT * FROM resource_schedules ORDER BY student_id, position, start_time`
@@ -92,22 +94,26 @@ router.post("/students/:id/stars", requireRole("teacher", "admin"), async (req: 
   const delta = Math.trunc(Number(req.body?.delta ?? 0));
   if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: "delta required" });
   try {
-    const row: any = await db.prepare(
-      `SELECT COALESCE(behavior_stars,0) AS stars, COALESCE(reward_count,0) AS rewards
-       FROM students WHERE id = ?`
-    ).get(id);
-    if (!row) return res.status(404).json({ error: "student not found" });
+    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`).get(id);
+    if (!user) return res.status(404).json({ error: "student not found" });
 
-    let stars = Math.max(0, row.stars + delta);
-    let rewards = row.rewards;
+    await db.prepare(
+      `INSERT INTO board_user_data (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING`
+    ).run(id);
+    const row: any = await db.prepare(
+      `SELECT behavior_stars, reward_count FROM board_user_data WHERE user_id = ?`
+    ).get(id);
+
+    let stars = Math.max(0, (row?.behavior_stars || 0) + delta);
+    let rewards = row?.reward_count || 0;
     let rewardFired = false;
-    if (stars >= 10) {
+    if (stars >= 5) {
       rewardFired = true;
       rewards = rewards + 1;
       stars = 0;
     }
     await db.prepare(
-      `UPDATE students SET behavior_stars = ?, reward_count = ? WHERE id = ?`
+      `UPDATE board_user_data SET behavior_stars = ?, reward_count = ? WHERE user_id = ?`
     ).run(stars, rewards, id);
 
     res.json({ id, behavior_stars: stars, reward_count: rewards, rewardFired });
@@ -121,8 +127,14 @@ router.post("/students/:id/level", requireRole("teacher", "admin"), async (req: 
   const id = req.params.id;
   const level = Math.max(1, Math.min(5, Math.trunc(Number(req.body?.level ?? 1))));
   try {
-    const r = await db.prepare(`UPDATE students SET level = ? WHERE id = ?`).run(level, id);
-    if (!r.changes) return res.status(404).json({ error: "student not found" });
+    const user: any = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`).get(id);
+    if (!user) return res.status(404).json({ error: "student not found" });
+
+    await db.prepare(
+      `INSERT INTO board_user_data (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING`
+    ).run(id);
+    await db.prepare(`UPDATE board_user_data SET level = ? WHERE user_id = ?`).run(level, id);
+
     res.json({ id, level });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "level update failed" });
@@ -209,9 +221,9 @@ router.get("/me/stars", async (req: AuthRequest, res: Response) => {
   if (!userId) return res.status(401).json({ error: "auth required" });
   try {
     const row: any = await db.prepare(
-      `SELECT COALESCE(behavior_stars,0) AS stars,
-              COALESCE(reward_count,0) AS rewards
-       FROM students WHERE id = ?`
+      `SELECT COALESCE(behavior_stars, 0) AS stars,
+              COALESCE(reward_count, 0)   AS rewards
+       FROM board_user_data WHERE user_id = ?`
     ).get(userId);
     res.json({ stars: row?.stars ?? 0, rewards: row?.rewards ?? 0 });
   } catch (e: any) {

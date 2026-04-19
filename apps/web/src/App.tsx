@@ -31,7 +31,7 @@ import TeacherSchedule from "./components/TeacherSchedule.tsx";
 import WebsiteViewer from "./components/WebsiteViewer.tsx";
 import {
   VideoLearningPage, TedTalkPage, DismissalPage, CashoutPage,
-  AssignmentTodayPage,
+  AssignmentTodayPage, SELPage,
 } from "./components/BlockPlaceholder.tsx";
 import DailyNewsViewer from "./components/DailyNewsViewer.tsx";
 import { useClassConfig } from "./lib/useClassConfig.ts";
@@ -162,6 +162,7 @@ export default function App() {
             <Route path="ted-talk" element={<TedTalkPage />} />
             <Route path="dismissal" element={<DismissalPage />} />
             <Route path="cashout" element={<CashoutPage />} />
+            <Route path="assignment/today/sel" element={<SELPage />} />
             <Route path="assignment/today/:subject" element={<AssignmentTodayPage />} />
           </Route>
 
