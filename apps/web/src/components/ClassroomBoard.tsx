@@ -315,12 +315,16 @@ export default function ClassroomBoard() {
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>⭐ Behavior Stars</div>
             <div style={{ fontSize: 11, opacity: 0.35 }}>5 = McDonald's</div>
           </div>
+          {(() => {
+            const n = board.students.length || 1;
+            const cols = n <= 4 ? 2 : n <= 9 ? 3 : n <= 16 ? 4 : 5;
+            const rows = Math.ceil(n / cols);
+            return (
           <div style={{
-            overflowY: "auto", flex: 1,
+            flex: 1, minHeight: 0,
             display: "grid",
-            gridTemplateColumns: `repeat(auto-fill, minmax(130px, 1fr))`,
-            gridAutoRows: "minmax(min-content, 1fr)",
-            alignContent: "stretch",
+            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+            gridTemplateRows: `repeat(${rows}, 1fr)`,
             gap: 6,
           }}>
             {board.students.map((s, idx) => {
@@ -353,9 +357,9 @@ export default function ClassroomBoard() {
                   <div style={{ flex: 1, padding: "10px 6px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
                     {/* Avatar */}
                     <div style={{
-                      width: 58, height: 58, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 72, height: 72, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 20, fontWeight: 900, color: "white",
+                      fontSize: 26, fontWeight: 900, color: "white",
                       background: isFull
                         ? "linear-gradient(135deg, #f59e0b, #d97706)"
                         : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
@@ -369,7 +373,7 @@ export default function ClassroomBoard() {
                     </div>
 
                     {/* Name */}
-                    <div style={{ fontSize: 15, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
+                    <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
                       {s.name}
                     </div>
 
@@ -440,6 +444,8 @@ export default function ClassroomBoard() {
               </div>
             )}
           </div>
+            );
+          })()}
         </section>
 
         {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}

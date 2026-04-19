@@ -714,7 +714,10 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         </div>
 
         {/* Game area */}
-        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "manipulation" }}>
+        <div
+          className={`flex-1 ${(game.type === "unity" && game.embedUrl) ? "overflow-hidden flex flex-col" : "overflow-auto"}`}
+          style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: game.type === "unity" ? "none" : "manipulation" }}
+        >
           {game.comingSoon ? (
             /* Coming-soon slot — Unity placeholder */
             <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>

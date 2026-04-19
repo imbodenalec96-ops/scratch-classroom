@@ -24,7 +24,7 @@ export default function UnityGame({ src, title = "Unity Game" }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   return (
-    <div className="relative w-full flex flex-col items-center" style={{ background: "#07071a", minHeight: 480 }}>
+    <div className="relative w-full h-full flex flex-col" style={{ background: "#07071a", minHeight: 480 }}>
       {/* Loading overlay */}
       {!loaded && !error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10" style={{ background: "#07071a" }}>
@@ -63,10 +63,10 @@ export default function UnityGame({ src, title = "Unity Game" }: Props) {
         ref={iframeRef}
         src={src}
         title={title}
-        className="w-full"
-        style={{ height: "70vh", border: "none", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease" }}
-        allow="autoplay; fullscreen; microphone"
-        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"
+        className="w-full flex-1"
+        style={{ height: "100%", minHeight: 480, border: "none", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", display: "block" }}
+        allow="autoplay; fullscreen; microphone; pointer-lock"
+        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-modals"
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
       />

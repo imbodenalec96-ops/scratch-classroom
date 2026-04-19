@@ -81,13 +81,13 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
       WHERE sw.student_id = ?
       ORDER BY sw.granted_at DESC`
   ).all(userId) as any[];
-  // Class-library sites: all approved_websites in classes this student is enrolled in
+  // Class-library sites: websites in classes this student is enrolled in, plus global (class_id IS NULL) entries
   const classLibrary = await db.prepare(
     `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
             w.added_at AS granted_at
        FROM approved_websites w
-       JOIN class_members cm ON cm.class_id = w.class_id
-      WHERE cm.user_id = ?
+       LEFT JOIN class_members cm ON cm.class_id = w.class_id AND cm.user_id = ?
+      WHERE (cm.user_id IS NOT NULL OR w.class_id IS NULL)
       ORDER BY w.added_at DESC`
   ).all(userId) as any[];
   // Merge: deduplicate by id, granted entries take priority
