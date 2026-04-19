@@ -81,13 +81,13 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
       WHERE sw.student_id = ?
       ORDER BY sw.granted_at DESC`
   ).all(userId) as any[];
-  // Class-library sites: websites in classes this student is enrolled in, plus global (class_id IS NULL) entries
+  // Class-library sites: websites in classes the student is enrolled in, plus global (class_id IS NULL) entries
   const classLibrary = await db.prepare(
     `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
             w.added_at AS granted_at
        FROM approved_websites w
-       LEFT JOIN class_members cm ON cm.class_id = w.class_id AND cm.user_id = ?
-      WHERE (cm.user_id IS NOT NULL OR w.class_id IS NULL)
+      WHERE w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
+         OR w.class_id IS NULL
       ORDER BY w.added_at DESC`
   ).all(userId) as any[];
   // Merge: deduplicate by id, granted entries take priority
@@ -113,15 +113,16 @@ router.get("/mine/:id", async (req: AuthRequest, res: Response) => {
       WHERE sw.student_id = ? AND w.id = ?
       LIMIT 1`
   ).get(userId, req.params.id);
-  // Fall back to class library access
+  // Fall back to class library access (includes global class_id IS NULL sites)
   if (!row) {
     row = await db.prepare(
       `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
          FROM approved_websites w
-         JOIN class_members cm ON cm.class_id = w.class_id
-        WHERE cm.user_id = ? AND w.id = ?
+        WHERE w.id = ?
+          AND (w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
+               OR w.class_id IS NULL)
         LIMIT 1`
-    ).get(userId, req.params.id);
+    ).get(req.params.id, userId);
   }
   if (!row) return res.status(404).json({ error: "Website not found" });
   res.json(row);
