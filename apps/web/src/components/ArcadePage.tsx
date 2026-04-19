@@ -4,7 +4,7 @@ import { useAuth } from "../lib/auth.tsx";
 import { usePresencePing } from "../lib/presence.ts";
 import { isOnBreak, BREAK_ALLOWED_GAME_IDS, breakSecondsRemaining } from "../lib/breakSystem.ts";
 import { useClassConfig, isGameAllowed } from "../lib/useClassConfig.ts";
-import { X, Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
+import { Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
 import PongGame from "./games/PongGame.tsx";
 import MemoryGame from "./games/MemoryGame.tsx";
@@ -599,179 +599,118 @@ function GameCard({ game, index, onPlay }: { game: Game; index: number; onPlay: 
   );
 }
 
-/* ── Embedded player modal ───────────────────────────────────── */
-function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: () => void; showBrowseLink?: boolean }) {
-  const backdropRef = useRef<HTMLDivElement>(null);
+/* ── Fullscreen game player ───────────────────────────────────── */
+function PlayerModal({ game, onClose }: { game: Game; onClose: () => void; showBrowseLink?: boolean }) {
   const [closing, setClosing] = useState(false);
 
   const close = useCallback(() => {
+    // Exit browser fullscreen if active
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
     setClosing(true);
-    setTimeout(onClose, 180);
+    setTimeout(onClose, 150);
   }, [onClose]);
 
-  // Close on Escape; also prevent scroll keys from bubbling to the page while modal is open
+  // Request native fullscreen on mount (works on desktop & newer iPads)
   useEffect(() => {
-    const SCROLL_KEYS = new Set([
-      "ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ",
-      "w","W","s","S","a","A","d","D",
-      "PageUp","PageDown","Home","End",
-    ]);
-    const isTypingTarget = (el: EventTarget | null) => {
-      const n = el as HTMLElement | null;
-      if (!n || !n.tagName) return false;
-      const t = n.tagName;
-      return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || (n as any).isContentEditable === true;
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    return () => {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
+  }, []);
+
+  // Escape key closes
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { close(); return; }
-      // Don't swallow keys when the user is typing inside a game input
-      // (e.g. WordSearch guess field, NumberQuiz answer).
-      if (isTypingTarget(e.target)) return;
-      if (SCROLL_KEYS.has(e.key)) e.preventDefault();
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  // Lock background page scroll while a game is open — prevents the dashboard
-  // from scrolling behind the modal on mobile / trackpad. Restores prior value
-  // on unmount so we don't leak this style if something else set it.
+  // Lock body scroll
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    const prevOverscroll = (document.body.style as any).overscrollBehavior;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    (document.body.style as any).overscrollBehavior = "contain";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      (document.body.style as any).overscrollBehavior = prevOverscroll;
-    };
+    return () => { document.body.style.overflow = prev; };
   }, []);
+
+  const isUnity = game.type === "unity" && game.embedUrl && !game.comingSoon;
 
   return (
     <div
-      ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-arcade-modal-bg"
+      className="fixed inset-0 z-[9999] flex flex-col"
       style={{
-        background: "rgba(0,0,0,0.88)",
-        backdropFilter: "blur(14px)",
+        background: "#07071a",
         opacity: closing ? 0 : 1,
-        transition: closing ? "opacity 0.18s ease" : undefined,
-        // Stop two-finger pan / rubber-band scrolling the page behind the modal
-        overscrollBehavior: "contain",
-        touchAction: "none",
+        transition: "opacity 0.15s ease",
       }}
-      onClick={e => { if (e.target === backdropRef.current) close(); }}
     >
+      {/* ── Slim header: Back button + game name ── */}
       <div
-        className="relative w-full flex flex-col rounded-2xl overflow-hidden animate-arcade-modal"
+        className="flex items-center gap-3 flex-shrink-0 px-3"
         style={{
-          maxWidth: 700,
-          maxHeight: "92vh",
-          /* On touch / coarse-pointer devices (iPad, phones) expand to near full-screen */
-          width: "min(700px, 100vw - 12px)",
-          height: "min(92vh, calc(100vh - 12px))",
-          background: "#08081f",
-          border: `1px solid ${game.accentColor}44`,
-          boxShadow: `0 40px 80px ${game.accentColor}33, 0 0 0 1px rgba(255,255,255,0.04)`,
-          opacity: closing ? 0 : 1,
-          transform: closing ? "scale(0.92) translateY(12px)" : undefined,
-          transition: closing ? "opacity 0.18s ease, transform 0.18s ease" : undefined,
+          height: 48,
+          background: "rgba(0,0,0,0.55)",
+          borderBottom: `1px solid ${game.accentColor}28`,
         }}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-          style={{ background: "rgba(0,0,0,0.5)", borderBottom: `1px solid ${game.accentColor}22` }}
+        <button
+          onClick={close}
+          className="flex items-center gap-2 text-sm font-bold text-white/80 hover:text-white px-3 py-2 rounded-xl hover:bg-white/10 transition-all"
+          style={{ touchAction: "manipulation", minWidth: 44, minHeight: 44 }}
         >
-          <div className="flex items-center gap-3">
-            <span
-              className="text-2xl animate-arcade-float"
-              style={{ filter: `drop-shadow(0 0 8px ${game.accentColor}99)` }}
-            >{game.emoji}</span>
-            <div>
-              <div className="text-sm font-bold text-white leading-tight">{game.title}</div>
-              <div className="text-[11px] font-medium" style={{ color: game.accentColor }}>{game.category}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {showBrowseLink && (
-              <button
-                onClick={close}
-                className="text-[11px] font-semibold text-white/60 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
-                title="Open the game picker"
-              >
-                Play something else →
-              </button>
-            )}
-            <button
-              onClick={close}
-              className="rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-150"
-              style={{ minWidth: 44, minHeight: 44 }}
-            >
-              <X size={15} />
+          ← Back to Games
+        </button>
+        <span
+          className="text-xl"
+          style={{ filter: `drop-shadow(0 0 6px ${game.accentColor}88)` }}
+        >{game.emoji}</span>
+        <div>
+          <div className="text-sm font-bold text-white leading-tight">{game.title}</div>
+          <div className="text-[10px] font-medium" style={{ color: game.accentColor }}>{game.category}</div>
+        </div>
+      </div>
+
+      {/* ── Game area fills remaining height ── */}
+      <div
+        className="flex-1 flex flex-col"
+        style={{
+          overflow: isUnity ? "hidden" : "auto",
+          overscrollBehavior: "contain",
+          touchAction: isUnity ? "none" : "manipulation",
+          minHeight: 0,
+        }}
+      >
+        {game.comingSoon ? (
+          <div className="flex flex-col items-center justify-center gap-5 p-10 text-center h-full">
+            <div className="text-5xl">🎮</div>
+            <div className="text-white font-extrabold text-xl">Coming Soon</div>
+            <div className="text-white/40 text-sm max-w-xs">This game is being built. Check back later!</div>
+            <button onClick={close} className="px-6 py-2 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-500 transition-colors">
+              ← Back to Games
             </button>
           </div>
-        </div>
-
-        {/* Game area */}
-        <div
-          className={`flex-1 ${(game.type === "unity" && game.embedUrl) ? "overflow-hidden flex flex-col" : "overflow-auto"}`}
-          style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: game.type === "unity" ? "none" : "manipulation" }}
-        >
-          {game.comingSoon ? (
-            /* Coming-soon slot — Unity placeholder */
-            <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
-              <div className="text-5xl animate-arcade-float">🎮</div>
-              <div className="text-white font-extrabold text-xl">Unity WebGL — Coming Soon</div>
-              <div className="text-white/45 text-sm max-w-sm leading-relaxed">
-                Export any Unity project as <strong className="text-white/70">WebGL</strong>, drop the build output into
-                <code className="mx-1 px-1.5 py-0.5 rounded text-cyan-400" style={{ background: "rgba(34,211,238,0.1)", fontSize: "0.75rem" }}>
-                  /public/unity-games/&lt;name&gt;/
-                </code>
-                and register it in <code className="text-violet-400" style={{ fontSize: "0.75rem" }}>ArcadePage.tsx</code>.
-              </div>
-              <div className="rounded-xl p-4 text-left text-xs font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#a78bfa", maxWidth: 380, width: "100%" }}>
-                <div className="text-white/30 mb-1">{`// ArcadePage.tsx → GAMES array`}</div>
-                <div>{`{`}</div>
-                <div className="pl-4 text-cyan-400">id: <span className="text-green-400">"my-unity-game"</span>,</div>
-                <div className="pl-4 text-cyan-400">type: <span className="text-green-400">"unity"</span>,</div>
-                <div className="pl-4 text-cyan-400">embedUrl: <span className="text-green-400">"/unity-games/my-game/index.html"</span>,</div>
-                <div className="pl-4 text-cyan-400">title: <span className="text-green-400">"My Unity Game"</span>,</div>
-                <div>{`}`}</div>
-              </div>
-              <div className="text-white/25 text-xs">See <code className="text-cyan-400">/public/unity-games/README.md</code> for full instructions</div>
+        ) : isUnity ? (
+          <UnityGame src={game.embedUrl!} title={game.title} />
+        ) : game.component ? (
+          <React.Suspense fallback={
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
             </div>
-          ) : game.type === "unity" && game.embedUrl ? (
-            <UnityGame src={game.embedUrl} title={game.title} />
-          ) : game.component ? (
-            <React.Suspense fallback={
-              <div className="h-80 flex items-center justify-center">
-                <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
-              </div>
-            }>
-              <game.component />
-            </React.Suspense>
-          ) : (
-            <iframe
-              src={game.embedUrl}
-              className="w-full"
-              style={{ height: "70vh", border: "none" }}
-              title={game.title}
-              allow="autoplay; microphone; fullscreen"
-            />
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between px-4 py-2 flex-shrink-0"
-          style={{ background: "rgba(0,0,0,0.4)", borderTop: `1px solid ${game.accentColor}18` }}
-        >
-          <StarRating stars={game.stars} />
-          <span className="text-[10px] text-white/25">
-            {game.plays} plays &bull; {typeof window !== "undefined" && "ontouchstart" in window ? "Tap × to close" : "Press Esc to close"}
-          </span>
-        </div>
+          }>
+            <game.component />
+          </React.Suspense>
+        ) : (
+          <iframe
+            src={game.embedUrl}
+            className="w-full flex-1"
+            style={{ height: "100%", border: "none", display: "block" }}
+            title={game.title}
+            allow="autoplay; microphone; fullscreen; pointer-lock"
+          />
+        )}
       </div>
     </div>
   );

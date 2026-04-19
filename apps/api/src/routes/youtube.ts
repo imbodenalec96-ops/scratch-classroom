@@ -46,10 +46,9 @@ router.get("/library", async (req: AuthRequest, res: Response) => {
     const rows = req.user?.role === 'teacher' || req.user?.role === 'admin'
       ? await db.prepare("SELECT * FROM youtube_library ORDER BY added_at DESC").all()
       : await db.prepare(
-          `SELECT DISTINCT yl.* FROM youtube_library yl
-           LEFT JOIN class_members cm ON cm.class_id = yl.class_id AND cm.user_id = ?
-           WHERE (cm.user_id IS NOT NULL OR yl.class_id IS NULL)
-           ORDER BY yl.added_at DESC`
+          `SELECT * FROM youtube_library
+           WHERE class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
+           ORDER BY added_at DESC`
         ).all(userId);
     res.json(rows);
   } catch (e) { res.json([]); }
