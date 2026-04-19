@@ -43,6 +43,7 @@ async function ensureGradeCols() {
       // is_group=1 means the target students work together; UI shows shared notes.
       "ALTER TABLE assignments ADD COLUMN is_group INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE assignments ADD COLUMN group_name TEXT",
+      "ALTER TABLE assignments ADD COLUMN video_url TEXT",
     ]) {
       try { await db.exec(col); } catch { /* column already exists */ }
     }
@@ -167,7 +168,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
     targetStudentIds,
     teacherNotes, questionCount, estimatedMinutes, focusKeywords,
     learningObjective, hintsAllowed, questionType,
-    isGroup, groupName,
+    isGroup, groupName, videoUrl,
   } = req.body;
   const id = crypto.randomUUID();
   await ensureGradeCols();
@@ -188,8 +189,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
         target_grade_min, target_grade_max, target_subject,
         teacher_notes, question_count, estimated_minutes,
         focus_keywords, learning_objective, hints_allowed, question_type,
-        target_student_ids, is_group, group_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        target_student_ids, is_group, group_name, video_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []),
       starterProjectId, content ?? null, scheduledDate ?? null,
@@ -204,6 +205,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
       tStudents,
       isGroup ? 1 : 0,
       groupName || null,
+      videoUrl || null,
     );
   } catch (e: any) {
     console.error('assignment insert error:', e?.message);
@@ -981,6 +983,7 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
     teacherNotes, questionCount, estimatedMinutes,
     focusKeywords, learningObjective, hintsAllowed, questionType,
     targetSubject, targetGradeMin, targetGradeMax, targetStudentIds,
+    videoUrl,
   } = req.body;
   const encodedTargetStudents =
     targetStudentIds === undefined
@@ -1007,7 +1010,8 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
        target_grade_max = COALESCE(?, target_grade_max),
        target_student_ids = CASE WHEN ? = '__KEEP__' THEN target_student_ids
                                  WHEN ? = '' THEN NULL
-                                 ELSE ? END
+                                 ELSE ? END,
+       video_url = CASE WHEN ? = '__KEEP__' THEN video_url WHEN ? = '' THEN NULL ELSE ? END
      WHERE id = ?`
   ).run(
     title, description, dueDate,
@@ -1026,6 +1030,9 @@ router.put("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res
     encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
     encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
     encodedTargetStudents === null ? "__KEEP__" : encodedTargetStudents,
+    videoUrl === undefined ? "__KEEP__" : (videoUrl || ""),
+    videoUrl === undefined ? "__KEEP__" : (videoUrl || ""),
+    videoUrl === undefined ? "__KEEP__" : (videoUrl || ""),
     req.params.id,
   );
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(req.params.id) as any;

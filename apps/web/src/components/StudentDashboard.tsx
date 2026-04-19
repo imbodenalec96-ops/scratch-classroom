@@ -476,6 +476,19 @@ function ProgressDots({ total, current, answers }: { total: number; current: num
   );
 }
 
+function youtubeEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      const id = u.hostname.includes("youtu.be")
+        ? u.pathname.slice(1).split("?")[0]
+        : u.searchParams.get("v") ?? u.pathname.split("/").pop();
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
+    }
+  } catch {}
+  return null;
+}
+
 /* ── Interactive Assignment Worker ── */
 function WorkScreen({
   assignment, parsed, dk, onComplete, onBreak, questionsAnswered, setQuestionsAnswered,
@@ -635,6 +648,24 @@ function WorkScreen({
             {assignment.title}<em style={{ color: starfall.accent, fontStyle: "italic" }}>.</em>
           </h1>
         </div>
+
+        {/* ── Video embed (if teacher attached a YouTube link) ── */}
+        {assignment.video_url && youtubeEmbedUrl(assignment.video_url) && (
+          <div className="animate-slide-up" style={{ animationDelay: "40ms" }}>
+            <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
+              <iframe
+                src={youtubeEmbedUrl(assignment.video_url)!}
+                style={{ width: "100%", height: "100%", border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="Assignment video"
+              />
+            </div>
+            <p style={{ fontSize: 11, textAlign: "center", marginTop: 8, opacity: 0.45 }}>
+              📺 Watch the video, then answer the questions below
+            </p>
+          </div>
+        )}
 
         {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
@@ -1508,12 +1539,12 @@ export default function StudentDashboard() {
             { label: "Assignments", icon: "📝", to: "/assignments" },
             { label: "Lessons",     icon: "📖", to: "/lessons" },
             { label: "Websites",    icon: "🌐", to: "/websites" },
+            { label: "Videos",      icon: "📺", to: "/student/videos" },
             { label: "Leaderboard", icon: "🏆", to: "/leaderboard" },
             { label: "Achievements",icon: "🎖️", to: "/achievements" },
             ...(unlocked ? [
               { label: "Arcade",    icon: "🎮", to: "/arcade" },
               { label: "Projects",  icon: "💻", to: "/projects" },
-              { label: "Videos",    icon: "📺", to: "/student/videos" },
             ] : []),
           ].map(item => (
             <Link key={item.to} to={item.to} style={{ textDecoration: "none", flexShrink: 0 }}>

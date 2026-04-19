@@ -2295,6 +2295,7 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
 }) {
   const [title, setTitle] = useState(assignment.title || "");
   const [description, setDescription] = useState(assignment.description || "");
+  const [videoUrl, setVideoUrl] = useState(assignment.video_url || "");
   const [teacherNotes, setTeacherNotes] = useState(assignment.teacher_notes || "");
   const [questionCount, setQuestionCount] = useState<number>(assignment.question_count || 3);
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(assignment.estimated_minutes || 5);
@@ -2380,6 +2381,7 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
     try {
       await api.updateAssignment(assignment.id, {
         title, description,
+        videoUrl: videoUrl.trim() || "",
         teacherNotes, questionCount, estimatedMinutes,
         focusKeywords, learningObjective, questionType,
         hintsAllowed,
@@ -2426,6 +2428,10 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Description / instructions (student sees this)</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="input text-sm w-full resize-none" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>📺 Video URL (optional — YouTube link plays above the assignment)</label>
+            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." className="input text-sm w-full" />
           </div>
 
           {/* Customization grid */}
