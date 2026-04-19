@@ -28,15 +28,20 @@
 
   <!-- PWA standalone: intercept target=_blank so links never escape to Safari -->
   <script>
-    if (window.navigator.standalone) {
-      document.addEventListener('click', function(e) {
-        var a = e.target.closest('a[target="_blank"]');
-        if (a && a.href && a.href.startsWith('http')) {
-          e.preventDefault();
-          window.location.href = a.href;
-        }
-      }, true);
-    }
+    try {
+      if (window.navigator.standalone) {
+        document.addEventListener('click', function(e) {
+          try {
+            var t = e.target;
+            var a = t && t.closest ? t.closest('a[target="_blank"]') : null;
+            if (a && a.href && a.href.startsWith('http')) {
+              e.preventDefault();
+              window.location.href = a.href;
+            }
+          } catch(err) {}
+        }, true);
+      }
+    } catch(err) {}
   </script>
 </head>
 <body>
