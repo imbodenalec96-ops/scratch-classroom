@@ -390,39 +390,64 @@ export default function ClassroomBoard() {
         {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}
         <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Specials Today */}
-          <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>✨ Specials Today</div>
-              <div style={{ fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 8, background: "rgba(245,158,11,.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,.38)" }}>Day {dayLetter}</div>
+          {/* Specials Today — hero cards */}
+          <section style={{
+            display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
+            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
+            background: "linear-gradient(160deg, rgba(15,10,35,0.95), rgba(8,4,20,0.98))",
+            padding: "10px 10px 8px",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+          }}>
+            {/* Header row */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7, flexShrink: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)" }}>NOW IN SESSION</div>
+              <div style={{
+                fontSize: 13, fontWeight: 900, padding: "2px 10px", borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(245,158,11,0.35), rgba(251,191,36,0.2))",
+                color: "#fde68a", border: "1px solid rgba(245,158,11,0.6)",
+                boxShadow: "0 0 10px rgba(245,158,11,0.25)",
+              }}>DAY {dayLetter}</div>
             </div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-              {GRADES.map(grade => {
+            {/* Grade hero cards */}
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+              {GRADES.map((grade, gi) => {
                 const students = board.students.filter(s => s.specials_grade === grade);
                 if (students.length === 0) return null;
                 const act = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
                 const gc = GRADE_COLORS[grade];
+                const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 12, padding: "7px 10px",
-                    background: `linear-gradient(135deg, ${gc.from}, ${gc.to})`,
+                    flex: 1, borderRadius: 10, overflow: "hidden",
+                    display: "flex", alignItems: "stretch",
                     border: `1px solid ${gc.border}`,
-                    display: "flex", alignItems: "center", gap: 10, overflow: "hidden",
-                    animation: `popIn .45s ease ${(grade - 3) * 0.08}s both`,
+                    boxShadow: `0 0 12px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                    animation: `popIn .4s ease ${gi * 0.07}s both`,
                   }}>
-                    <div style={{ flexShrink: 0, textAlign: "center", minWidth: 38 }}>
-                      <div style={{ fontSize: 18, lineHeight: 1 }}>{actEmoji(act || "")}</div>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: gc.text }}>{grade}th</div>
+                    {/* Left accent */}
+                    <div style={{
+                      width: 34, flexShrink: 0, display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: 2,
+                      background: `linear-gradient(180deg, ${gc.from.replace("0.22", "0.55")}, ${gc.to.replace("0.12", "0.3")})`,
+                      borderRight: `1px solid ${gc.border}`,
+                    }}>
+                      <div style={{ fontSize: 20, lineHeight: 1 }}>{emoji}</div>
+                      <div style={{ fontSize: 9, fontWeight: 900, color: gc.text, letterSpacing: "0.05em" }}>{grade}TH</div>
                     </div>
-                    <div style={{ flex: 1, overflow: "hidden" }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {act || <span style={{ opacity: 0.35, fontStyle: "italic" }}>not set</span>}
+                    {/* Right content */}
+                    <div style={{
+                      flex: 1, padding: "5px 8px", display: "flex", flexDirection: "column", justifyContent: "center",
+                      background: `linear-gradient(135deg, ${gc.from.replace("0.22", "0.15")}, rgba(0,0,0,0))`,
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
+                        {act || <span style={{ opacity: 0.3, fontStyle: "italic", fontWeight: 500 }}>not set</span>}
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
                         {students.map(s => (
                           <span key={s.id} style={{
-                            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
-                            background: "rgba(255,255,255,.13)", color: "rgba(255,255,255,.9)",
+                            fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20,
+                            background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.8)",
+                            border: "1px solid rgba(255,255,255,0.08)",
                           }}>{s.name}</span>
                         ))}
                       </div>
@@ -431,11 +456,14 @@ export default function ClassroomBoard() {
                 );
               })}
               {board.students.filter(s => !s.specials_grade).length > 0 && (
-                <div style={{ borderRadius: 12, padding: "6px 10px", background: g(0.04), border: `1px solid ${g(0.1)}`, display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 10, opacity: 0.4, flexShrink: 0 }}>TBD</div>
+                <div style={{
+                  borderRadius: 10, padding: "5px 8px", display: "flex", alignItems: "center", gap: 8,
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>TBD</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                     {board.students.filter(s => !s.specials_grade).map(s => (
-                      <span key={s.id} style={{ fontSize: 11, padding: "1px 7px", borderRadius: 20, background: g(0.08), opacity: 0.6 }}>{s.name}</span>
+                      <span key={s.id} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }}>{s.name}</span>
                     ))}
                   </div>
                 </div>
@@ -443,34 +471,49 @@ export default function ClassroomBoard() {
             </div>
           </section>
 
-          {/* Specials Rotation */}
-          <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em", marginBottom: 8, flexShrink: 0 }}>🗓 Specials Rotation</div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 4 }}>
+          {/* Specials Rotation — week-at-a-glance */}
+          <section style={{
+            display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
+            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
+            background: "linear-gradient(160deg, rgba(15,10,35,0.95), rgba(8,4,20,0.98))",
+            padding: "10px 10px 8px",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)", marginBottom: 7, flexShrink: 0 }}>WEEK SCHEDULE</div>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
               {/* Day header */}
-              <div style={{ display: "grid", gridTemplateColumns: "40px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "32px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
                 <div />
-                {DAY_LETTERS.map(d => (
-                  <div key={d} style={{
-                    textAlign: "center", fontSize: 11, fontWeight: 800,
-                    padding: "3px 4px", borderRadius: 8,
-                    background: d === dayLetter ? "rgba(245,158,11,.25)" : g(0.06),
-                    color: d === dayLetter ? "#fbbf24" : g(0.45),
-                    border: d === dayLetter ? "1px solid rgba(245,158,11,.4)" : `1px solid ${g(0.06)}`,
-                  }}>
-                    {d}{d === dayLetter ? "●" : ""}
-                  </div>
-                ))}
+                {DAY_LETTERS.map(d => {
+                  const isToday = d === dayLetter;
+                  return (
+                    <div key={d} style={{
+                      textAlign: "center", fontSize: 11, fontWeight: 900,
+                      padding: "4px 2px", borderRadius: 8,
+                      background: isToday ? "linear-gradient(135deg, rgba(245,158,11,0.4), rgba(251,191,36,0.25))" : "rgba(255,255,255,0.04)",
+                      color: isToday ? "#fde68a" : "rgba(255,255,255,0.25)",
+                      border: isToday ? "1px solid rgba(245,158,11,0.6)" : "1px solid rgba(255,255,255,0.05)",
+                      boxShadow: isToday ? "0 0 12px rgba(245,158,11,0.3)" : "none",
+                      letterSpacing: isToday ? "0.05em" : 0,
+                    }}>
+                      {d}{isToday ? " ★" : ""}
+                    </div>
+                  );
+                })}
               </div>
               {/* Grade rows */}
               {GRADES.map(grade => {
                 const gc = GRADE_COLORS[grade];
                 return (
-                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "40px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "32px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                    {/* Grade label */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, fontWeight: 800, borderRadius: 8,
-                      color: gc.text, background: gc.from, border: `1px solid ${gc.border}`,
+                      fontSize: 10, fontWeight: 900, borderRadius: 8,
+                      color: gc.text,
+                      background: `linear-gradient(135deg, ${gc.from.replace("0.22","0.45")}, ${gc.to.replace("0.12","0.2")})`,
+                      border: `1px solid ${gc.border}`,
+                      boxShadow: `0 0 6px ${gc.glow}`,
                     }}>{grade}th</div>
                     {DAY_LETTERS.map(day => {
                       const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
@@ -478,16 +521,20 @@ export default function ClassroomBoard() {
                       return (
                         <div key={day} style={{
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 10, fontWeight: 600, textAlign: "center", borderRadius: 8, padding: "2px 3px",
-                          background: isToday ? gc.from : g(0.04),
-                          border: isToday ? `1px solid ${gc.border}` : `1px solid ${g(0.07)}`,
-                          color: isToday ? gc.text : g(0.65),
+                          fontSize: 9, fontWeight: 700, textAlign: "center", borderRadius: 8, padding: "1px 2px",
+                          background: isToday
+                            ? `linear-gradient(135deg, ${gc.from.replace("0.22","0.45")}, ${gc.to.replace("0.12","0.25")})`
+                            : "rgba(255,255,255,0.03)",
+                          border: isToday ? `1px solid ${gc.border}` : "1px solid rgba(255,255,255,0.05)",
+                          color: isToday ? gc.text : "rgba(255,255,255,0.35)",
                           overflow: "hidden",
                           boxShadow: isToday && c ? `0 0 8px ${gc.glow}` : "none",
                         }}>
                           {c?.activity
-                            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", padding: "0 2px" }}>{actEmoji(c.activity)} {c.activity}</span>
-                            : <span style={{ opacity: 0.2 }}>—</span>}
+                            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", padding: "0 1px" }}>
+                                {actEmoji(c.activity)}{isToday ? ` ${c.activity}` : ""}
+                              </span>
+                            : <span style={{ opacity: 0.15 }}>—</span>}
                         </div>
                       );
                     })}
