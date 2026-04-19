@@ -1,26 +1,51 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
 
-/**
- * ClassroomBoard — student-facing TV/projector view. READ-ONLY.
- * All editing happens in /teacher/board-settings. The board polls every 15s
- * and shows whatever the teacher has configured.
- *
- * Usage: /board?class=<classId-or-slug>
- */
-
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
-const MUSIC_PRESETS: { id: string; label: string; videoId: string }[] = [
-  { id: "forest",    label: "🌲 Forest",    videoId: "xNN7iTA57jM" },
-  { id: "ocean",     label: "🌊 Ocean",     videoId: "MIr3RsUWrdo" },
-  { id: "rain",      label: "🌧 Rain",      videoId: "mPZkdNFkNps" },
-  { id: "piano",     label: "🎹 Piano",     videoId: "4xDzrJKXOOY" },
-  { id: "campfire",  label: "🔥 Campfire",  videoId: "UgHKb_7884o" },
+const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string }[] = [
+  { id: "forest",   label: "Forest",   videoId: "xNN7iTA57jM", emoji: "🌲" },
+  { id: "ocean",    label: "Ocean",    videoId: "MIr3RsUWrdo", emoji: "🌊" },
+  { id: "rain",     label: "Rain",     videoId: "mPZkdNFkNps", emoji: "🌧" },
+  { id: "piano",    label: "Piano",    videoId: "4xDzrJKXOOY", emoji: "🎹" },
+  { id: "campfire", label: "Campfire", videoId: "UgHKb_7884o", emoji: "🔥" },
 ];
+
+const SUBJECT_COLORS: Record<string, string> = {
+  math:          "rgba(239,68,68,0.25)",
+  sel:           "rgba(245,158,11,0.25)",
+  coding_art_gym:"rgba(139,92,246,0.25)",
+  video_learning:"rgba(59,130,246,0.25)",
+  writing:       "rgba(16,185,129,0.25)",
+  daily_news:    "rgba(99,102,241,0.25)",
+  review:        "rgba(236,72,153,0.2)",
+  cashout:       "rgba(245,158,11,0.2)",
+  lunch:         "rgba(34,197,94,0.2)",
+  recess:        "rgba(34,197,94,0.25)",
+  calm_down:     "rgba(139,92,246,0.2)",
+  ted_talk:      "rgba(59,130,246,0.2)",
+  extra_review:  "rgba(236,72,153,0.2)",
+};
+
+const ACTIVITY_EMOJI: Record<string, string> = {
+  PE: "🏃", Gym: "🏃", Music: "🎵", Art: "🎨", Library: "📚",
+  Tech: "💻", Dance: "💃", Science: "🔬", Drama: "🎭", Spanish: "🗣",
+};
+function activityEmoji(name: string) {
+  for (const [k, v] of Object.entries(ACTIVITY_EMOJI)) {
+    if (name?.toLowerCase().includes(k.toLowerCase())) return v;
+  }
+  return "✨";
+}
+
+const GRADE_COLORS: Record<number, { bg: string; border: string; text: string }> = {
+  3: { bg: "rgba(20,184,166,0.2)",  border: "rgba(20,184,166,0.5)",  text: "#5eead4" },
+  4: { bg: "rgba(251,146,60,0.2)",  border: "rgba(251,146,60,0.5)",  text: "#fdba74" },
+  5: { bg: "rgba(167,139,250,0.2)", border: "rgba(167,139,250,0.5)", text: "#c4b5fd" },
+};
 
 export default function ClassroomBoard() {
   const [params] = useSearchParams();
@@ -34,6 +59,8 @@ export default function ClassroomBoard() {
   const [now, setNow] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(true);
+  const musicRef = useRef<HTMLIFrameElement>(null);
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -42,6 +69,14 @@ export default function ClassroomBoard() {
       await document.exitFullscreen?.().catch(() => {});
     }
   }, []);
+
+  const toggleMusic = useCallback(() => {
+    const func = musicPlaying ? "pauseVideo" : "playVideo";
+    musicRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func, args: "" }), "*"
+    );
+    setMusicPlaying(p => !p);
+  }, [musicPlaying]);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -114,162 +149,193 @@ export default function ClassroomBoard() {
   if (!cls)  return <div className="min-h-screen flex items-center justify-center bg-black text-white/60 text-2xl">Loading classroom board…</div>;
 
   const bgUrl = board.settings?.background_image_url;
-  const bg = bgUrl || "linear-gradient(135deg, #1a0a35 0%, #3a1f5e 35%, #7a3e1f 65%, #2a1008 100%)";
+  const bg = bgUrl || "linear-gradient(135deg, #0f0821 0%, #1e1035 30%, #2d1b4e 60%, #12082a 100%)";
   const musicId = board.settings?.music_playlist_id || "";
-  const musicVideoId = MUSIC_PRESETS.find(p => p.id === musicId)?.videoId;
+  const musicPreset = MUSIC_PRESETS.find(p => p.id === musicId);
+
+  const glass = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(10px)" } as const;
+  const sectionLabel = "text-[11px] uppercase tracking-[0.28em] font-semibold opacity-50 mb-1";
 
   return (
     <div className="min-h-screen relative" style={{
-      background: bgUrl ? `url(${bgUrl}) center/cover no-repeat` : bg,
+      background: bgUrl ? `url(${bgUrl}) center/cover no-repeat fixed` : bg,
       color: "white",
-      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     }}>
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(5,5,20,0.55)" }} />
+      {/* Dark overlay */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: bgUrl ? "rgba(5,3,18,0.65)" : "rgba(5,3,18,0.35)" }} />
 
-      <div className="relative p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-end justify-between gap-4 flex-wrap border-b pb-5" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+      <div className="relative p-6 space-y-5 pb-28">
+        {/* ── Header ── */}
+        <div className="flex items-end justify-between gap-4 flex-wrap pb-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
           <div>
-            <div className="text-xs uppercase tracking-[0.25em] opacity-60 mb-2">BlockForge · Classroom</div>
-            <h1 style={{ fontSize: 56, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}>{cls.name}</h1>
-            <div className="mt-2 text-base opacity-80">
-              {dateStr} · <span className="font-mono font-bold">Day {dayLetter}</span>
+            <div className="text-[11px] uppercase tracking-[0.3em] opacity-50 mb-1">BlockForge · Classroom</div>
+            <h1 style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}>{cls.name}</h1>
+            <div className="mt-2 text-base opacity-75">
+              {dateStr} &nbsp;·&nbsp;
+              <span className="font-mono font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(245,158,11,0.2)", color: "#fbbf24" }}>
+                Day {dayLetter}
+              </span>
             </div>
           </div>
           <div className="text-right flex flex-col items-end gap-2">
-            <div style={{ fontSize: 56, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
+            <div style={{ fontSize: 52, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
             <button
               onClick={toggleFullscreen}
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer", letterSpacing: "0.05em" }}
+              style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 8, padding: "5px 12px", fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer" }}
             >
               {isFullscreen ? "✕ Exit" : "⛶ Fullscreen"}
             </button>
           </div>
         </div>
 
-        {/* Hidden autoplay music */}
-        {musicVideoId && (
-          <iframe
-            title="ambient-music"
-            width="1" height="1"
-            style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01 }}
-            src={`https://www.youtube-nocookie.com/embed/${musicVideoId}?autoplay=1&loop=1&playlist=${musicVideoId}`}
-            allow="autoplay"
-          />
-        )}
-
-        {/* Current block */}
-        <section className="rounded-3xl p-7" style={{
+        {/* ── Current Block ── */}
+        <section className="rounded-3xl p-6" style={{
           background: currentBlock
-            ? "linear-gradient(135deg, rgba(139,92,246,0.28), rgba(99,102,241,0.16))"
-            : "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(139,92,246,0.35)",
-          backdropFilter: "blur(8px)",
+            ? (SUBJECT_COLORS[currentBlock.subject || ""] || "rgba(139,92,246,0.2)")
+            : "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(139,92,246,0.4)",
+          backdropFilter: "blur(10px)",
         }}>
-          <div className="text-xs uppercase tracking-[0.25em] opacity-60 mb-3">Right now</div>
+          <div className={sectionLabel}>Right Now</div>
           {currentBlock ? (
             <div className="flex items-baseline gap-6 flex-wrap">
-              <div style={{ fontSize: 72, fontWeight: 900, letterSpacing: "-0.03em" }}>
+              <div style={{ fontSize: 68, fontWeight: 900, letterSpacing: "-0.03em" }}>
                 {currentBlock.label || currentBlock.subject}
               </div>
-              <div className="opacity-80 text-2xl font-mono">{currentBlock.start_time}–{currentBlock.end_time}</div>
+              <div className="opacity-70 text-2xl font-mono">{currentBlock.start_time}–{currentBlock.end_time}</div>
               {countdown && (
-                <div className="px-4 py-2 rounded-full text-xl font-bold font-mono" style={{ background: "rgba(0,0,0,0.3)" }}>
+                <div className="px-5 py-2 rounded-2xl text-2xl font-bold font-mono" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.12)" }}>
                   ⏱ {countdown}
                 </div>
               )}
               {currentBlock.is_break && (
-                <div className="px-4 py-2 rounded-full text-base font-bold" style={{ background: "rgba(34,197,94,0.25)", color: "#86efac" }}>☕ Break</div>
+                <div className="px-4 py-2 rounded-full text-base font-bold" style={{ background: "rgba(34,197,94,0.25)", color: "#86efac", border: "1px solid rgba(34,197,94,0.35)" }}>☕ Break</div>
               )}
             </div>
           ) : (
-            <div style={{ fontSize: 40, fontWeight: 800, opacity: 0.6 }}>No active block</div>
+            <div style={{ fontSize: 40, fontWeight: 800, opacity: 0.5 }}>No active block</div>
           )}
           {nextBlock && (
-            <div className="mt-4 text-sm opacity-70">
-              Up next: <span className="font-bold">{nextBlock.block.label || nextBlock.block.subject}</span> at {nextBlock.block.start_time}
+            <div className="mt-3 text-sm opacity-65">
+              Up next: <span className="font-semibold">{nextBlock.block.label || nextBlock.block.subject}</span>
+              <span className="font-mono ml-2 opacity-80">{nextBlock.block.start_time}</span>
             </div>
           )}
         </section>
 
-        {/* Specialist slot */}
-        <section className="rounded-2xl p-5 flex items-center gap-5 flex-wrap" style={{
-          background: "linear-gradient(135deg, rgba(245,158,11,0.16), rgba(251,191,36,0.08))",
-          border: "1px solid rgba(245,158,11,0.3)",
-          backdropFilter: "blur(6px)",
-        }}>
-          <div className="text-3xl">🕚</div>
-          <div className="flex-1 min-w-[200px]">
-            <div className="text-xs uppercase tracking-[0.25em] opacity-60">11:00 AM · Specialist in Room</div>
-            <div className="mt-1" style={{ fontSize: 28, fontWeight: 800 }}>
-              {board.settings?.specialist_name || <span className="opacity-40 italic">— not set —</span>}
+        {/* ── Specialist ── */}
+        {board.settings?.specialist_name && (
+          <section className="rounded-2xl px-6 py-4 flex items-center gap-4" style={{
+            background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,191,36,0.07))",
+            border: "1px solid rgba(245,158,11,0.28)",
+            backdropFilter: "blur(8px)",
+          }}>
+            <div className="text-3xl">🕚</div>
+            <div>
+              <div className={sectionLabel}>11:00 AM · Specialist in Room</div>
+              <div style={{ fontSize: 26, fontWeight: 800 }}>{board.settings.specialist_name}</div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* Stars + Levels */}
+        {/* ── Behavior Stars + Independence Levels ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
-            <div className="mb-3">
-              <div className="text-xs uppercase tracking-[0.25em] opacity-60">Behavior Stars</div>
-              <div className="text-sm opacity-60 mt-1">5 stars → McDonald's · resets automatically</div>
+
+          {/* Behavior Stars */}
+          <section className="rounded-2xl p-5" style={glass}>
+            <div className="flex items-baseline gap-3 mb-4">
+              <div className={sectionLabel}>⭐ Behavior Stars</div>
+              <div className="text-[11px] opacity-40">5 = McDonald's · resets</div>
             </div>
-            <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-3">
               {board.students.map(s => {
                 const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
+                const isFull = stars >= 5;
+                const isHigh = stars >= 3;
                 return (
-                  <div key={s.id} className="rounded-xl p-2.5 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3))" }}>
+                  <div key={s.id} className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center" style={{
+                    background: isFull
+                      ? "linear-gradient(135deg, rgba(245,158,11,0.4), rgba(234,179,8,0.22))"
+                      : isHigh
+                      ? "linear-gradient(135deg, rgba(139,92,246,0.28), rgba(99,102,241,0.16))"
+                      : "rgba(255,255,255,0.05)",
+                    border: isFull
+                      ? "1px solid rgba(245,158,11,0.65)"
+                      : isHigh
+                      ? "1px solid rgba(139,92,246,0.45)"
+                      : "1px solid rgba(255,255,255,0.1)",
+                    boxShadow: isFull ? "0 0 24px rgba(245,158,11,0.3)" : "none",
+                  }}>
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0 overflow-hidden" style={{
+                      background: isFull
+                        ? "linear-gradient(135deg, rgba(245,158,11,0.55), rgba(234,179,8,0.38))"
+                        : "linear-gradient(135deg, rgba(139,92,246,0.55), rgba(99,102,241,0.42))",
+                      border: "2.5px solid rgba(255,255,255,0.2)",
+                    }}>
                       {s.avatar_url
                         ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <span>{(s.name || "?")[0]}</span>}
+                        : <span style={{ fontSize: 22 }}>{(s.name || "?")[0].toUpperCase()}</span>}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate">{s.name}</div>
-                      <div className="flex items-center gap-0.5 mt-0.5">
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <span key={i} style={{ fontSize: 14, opacity: i < stars ? 1 : 0.2, filter: i < stars ? "none" : "grayscale(1)" }}>⭐</span>
-                        ))}
-                      </div>
+                    <div className="font-bold text-sm leading-tight">{s.name}</div>
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span key={i} style={{
+                          fontSize: 20,
+                          opacity: i < stars ? 1 : 0.13,
+                          filter: i < stars ? "drop-shadow(0 0 6px rgba(251,191,36,1))" : "grayscale(1) brightness(0.35)",
+                        }}>⭐</span>
+                      ))}
+                    </div>
+                    <div className="w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)", height: 5 }}>
+                      <div className="h-full rounded-full transition-all duration-700" style={{
+                        width: `${(stars / 5) * 100}%`,
+                        background: isFull ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)" : isHigh ? "#a78bfa" : "#818cf8",
+                      }} />
                     </div>
                     {s.reward_count > 0 && (
-                      <div className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: "rgba(245,158,11,0.25)", color: "#fcd34d" }}>
-                        🏆 {s.reward_count}
+                      <div className="text-[11px] px-2.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(245,158,11,0.3)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.45)" }}>
+                        🏆 {s.reward_count}× earned
                       </div>
                     )}
                   </div>
                 );
               })}
               {board.students.length === 0 && (
-                <div className="text-sm opacity-50 py-8 text-center">No students yet.</div>
+                <div className="col-span-2 text-sm opacity-40 py-8 text-center">No students in this class yet.</div>
               )}
             </div>
           </section>
 
-          <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
-            <div className="mb-3">
-              <div className="text-xs uppercase tracking-[0.25em] opacity-60">Independence Levels</div>
-              <div className="text-sm opacity-60 mt-1">1 = most support · 5 = full independence</div>
-            </div>
-            <div className="space-y-2">
-              {[1,2,3,4,5].map(level => {
+          {/* Independence Levels */}
+          <section className="rounded-2xl p-5" style={glass}>
+            <div className={sectionLabel + " mb-4"}>🎯 Independence Levels</div>
+            <div className="space-y-2.5">
+              {[5, 4, 3, 2, 1].map(level => {
                 const atLevel = board.students.filter(s => (s.level || 1) === level);
+                const colors = [
+                  "", // placeholder for index 0
+                  { bg: "rgba(239,68,68,0.18)", border: "rgba(239,68,68,0.35)", text: "#fca5a5", label: "L1 · Max Support" },
+                  { bg: "rgba(251,146,60,0.18)", border: "rgba(251,146,60,0.35)", text: "#fdba74", label: "L2 · Some Support" },
+                  { bg: "rgba(245,158,11,0.2)",  border: "rgba(245,158,11,0.38)", text: "#fcd34d", label: "L3 · Growing" },
+                  { bg: "rgba(34,197,94,0.18)",  border: "rgba(34,197,94,0.35)",  text: "#86efac", label: "L4 · Independent" },
+                  { bg: "rgba(16,185,129,0.22)", border: "rgba(16,185,129,0.45)", text: "#6ee7b7", label: "L5 · Full Mastery" },
+                ];
+                const c = colors[level] || colors[3];
                 return (
-                  <div key={level} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="flex items-center gap-3">
-                      <div className="font-bold text-lg w-10 flex-shrink-0" style={{ color: level >= 4 ? "#86efac" : level >= 2 ? "#fde68a" : "#fca5a5" }}>L{level}</div>
-                      <div className="flex-1 flex flex-wrap gap-1.5 min-h-[38px]">
-                        {atLevel.map(s => (
-                          <div key={s.id} className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(139,92,246,0.22)" }}>
-                            {s.avatar_url
-                              ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                              : <span className="opacity-70">{(s.name || "?")[0]}</span>}
-                            <span className="truncate max-w-[90px]">{s.name}</span>
-                          </div>
-                        ))}
-                        {atLevel.length === 0 && <span className="opacity-30 text-xs self-center">— empty —</span>}
-                      </div>
+                  <div key={level} className="rounded-xl p-3 flex items-center gap-3" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
+                    <div className="text-xs font-bold w-28 flex-shrink-0" style={{ color: c.text }}>{c.label}</div>
+                    <div className="flex-1 flex flex-wrap gap-1.5 min-h-[28px]">
+                      {atLevel.map(s => (
+                        <div key={s.id} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)" }}>
+                          {s.avatar_url
+                            ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                            : <span style={{ fontSize: 10, opacity: 0.7 }}>{(s.name || "?")[0]}</span>}
+                          {s.name}
+                        </div>
+                      ))}
+                      {atLevel.length === 0 && <span className="text-xs opacity-25 self-center italic">empty</span>}
                     </div>
                   </div>
                 );
@@ -278,89 +344,44 @@ export default function ClassroomBoard() {
           </section>
         </div>
 
-        {/* Schedules + Specials */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <section className="lg:col-span-2 rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
-            <div className="mb-3">
-              <div className="text-xs uppercase tracking-[0.25em] opacity-60">STAR Student Schedules</div>
-              <div className="text-sm opacity-60 mt-1">Resource pullouts · activity · time · classroom</div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* ── STAR Student Schedules ── */}
+        {board.students.some(s => board.schedules.some((r: any) => r.student_id === s.id)) && (
+          <section className="rounded-2xl p-5" style={glass}>
+            <div className={sectionLabel + " mb-4"}>📅 STAR Student Resource Schedules</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {board.students.map(s => {
                 const rows = board.schedules.filter((r: any) => r.student_id === s.id);
+                if (rows.length === 0) return null;
                 return (
-                  <div key={s.id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="font-bold text-sm mb-2">{s.name}</div>
-                    {rows.length === 0 ? (
-                      <div className="text-xs opacity-40 italic py-2">No resource pullouts.</div>
-                    ) : (
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="opacity-50 uppercase tracking-wider">
-                            <th className="text-left font-medium pb-1">Activity</th>
-                            <th className="text-left font-medium pb-1">Time</th>
-                            <th className="text-left font-medium pb-1">Room</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((r: any) => (
-                            <tr key={r.id} className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                              <td className="py-1 pr-2 font-semibold">{r.activity}</td>
-                              <td className="py-1 pr-2 font-mono">{r.start_time}–{r.end_time}</td>
-                              <td className="py-1 opacity-80">{r.classroom}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
+                  <div key={s.id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <div className="font-bold text-sm mb-2.5 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0" style={{ background: "rgba(139,92,246,0.45)" }}>
+                        {s.avatar_url
+                          ? <img src={s.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                          : (s.name || "?")[0]}
+                      </div>
+                      {s.name}
+                    </div>
+                    <div className="space-y-1.5">
+                      {rows.map((r: any) => (
+                        <div key={r.id} className="rounded-lg px-2.5 py-1.5 flex items-center gap-2" style={{ background: "rgba(99,102,241,0.18)", border: "1px solid rgba(99,102,241,0.25)" }}>
+                          <div className="text-xs font-semibold flex-1 truncate">{r.activity}</div>
+                          <div className="text-[10px] font-mono opacity-70 flex-shrink-0">{r.start_time}–{r.end_time}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </section>
+        )}
 
-          <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
-            <div className="mb-3">
-              <div className="text-xs uppercase tracking-[0.25em] opacity-60">Specials Rotation</div>
-              <div className="text-sm opacity-60 mt-1">Grades 3–5 · Days A–F</div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="opacity-60 uppercase tracking-wider">
-                    <th className="text-left font-medium pb-2 pr-2">Grade</th>
-                    {DAY_LETTERS.map(d => (
-                      <th key={d} className={`text-center font-medium pb-2 px-1 ${d === dayLetter ? "text-amber-300" : ""}`}>
-                        {d}{d === dayLetter ? " ●" : ""}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {GRADES.map(grade => (
-                    <tr key={grade} className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                      <td className="py-2 pr-2 font-bold opacity-80">{grade}</td>
-                      {DAY_LETTERS.map(day => {
-                        const c = board.specials.find((r: any) => r.grade === grade && String(r.day_letter).toUpperCase() === day);
-                        return (
-                          <td key={day} className={`text-center py-2 px-1 ${day === dayLetter ? "font-bold" : "opacity-75"}`}>
-                            {c?.activity || <span className="opacity-30">—</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        {/* Specials Today — groups STAR students by their specials_grade + today's activity */}
-        <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
-          <div className="flex items-baseline gap-3 mb-4">
-            <div className="text-xs uppercase tracking-[0.25em] opacity-60">Specials Today</div>
-            <div className="px-2 py-0.5 rounded font-bold text-sm" style={{ background: "rgba(245,158,11,0.25)", color: "#fcd34d" }}>
+        {/* ── Specials Today ── */}
+        <section className="rounded-2xl p-5" style={glass}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={sectionLabel}>✨ Specials Today</div>
+            <div className="text-xs px-2.5 py-1 rounded-lg font-bold" style={{ background: "rgba(245,158,11,0.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.35)" }}>
               Day {dayLetter}
             </div>
           </div>
@@ -369,20 +390,26 @@ export default function ClassroomBoard() {
               const studentsInGrade = board.students.filter((s: any) => s.specials_grade === grade);
               if (studentsInGrade.length === 0) return null;
               const activity = board.specials.find((r: any) => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
+              const gc = GRADE_COLORS[grade];
               return (
-                <div key={grade} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <div className="text-xs font-bold opacity-80">{grade}th Grade</div>
-                    {activity
-                      ? <div className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(139,92,246,0.3)", color: "rgba(255,255,255,0.9)" }}>{activity}</div>
-                      : <div className="text-xs opacity-40 italic">— specials not set</div>}
+                <div key={grade} className="rounded-2xl p-4" style={{ background: gc.bg, border: `1px solid ${gc.border}` }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="text-xs font-bold" style={{ color: gc.text }}>{grade}th Grade</div>
+                    {activity ? (
+                      <div className="flex items-center gap-1.5 text-sm font-bold px-3 py-1 rounded-xl" style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
+                        <span>{activityEmoji(activity)}</span>
+                        <span>{activity}</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs opacity-35 italic">not set</div>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {studentsInGrade.map((s: any) => (
-                      <div key={s.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.1)" }}>
+                      <div key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.95)" }}>
                         {s.avatar_url
-                          ? <img src={s.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
-                          : <span style={{ opacity: 0.7 }}>{(s.name || "?")[0]}</span>}
+                          ? <img src={s.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          : <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}>{(s.name || "?")[0]}</span>}
                         {s.name}
                       </div>
                     ))}
@@ -390,12 +417,13 @@ export default function ClassroomBoard() {
                 </div>
               );
             })}
+            {/* Students with no grade set */}
             {board.students.filter((s: any) => !s.specials_grade).length > 0 && (
-              <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="text-xs font-bold opacity-50 mb-2">Grade not set</div>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div className="text-xs font-bold opacity-40 mb-3">Grade TBD</div>
+                <div className="flex flex-wrap gap-2">
                   {board.students.filter((s: any) => !s.specials_grade).map((s: any) => (
-                    <div key={s.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.06)", opacity: 0.7 }}>
+                    <div key={s.id} className="px-3 py-1.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,0.08)", opacity: 0.65 }}>
                       {s.name}
                     </div>
                   ))}
@@ -405,10 +433,104 @@ export default function ClassroomBoard() {
           </div>
         </section>
 
-        <div className="pt-4 text-center text-xs opacity-40 uppercase tracking-[0.2em]">
+        {/* ── Specials Rotation ── */}
+        <section className="rounded-2xl p-5" style={glass}>
+          <div className={sectionLabel + " mb-4"}>🗓 Specials Rotation — All Days</div>
+          <div className="overflow-x-auto">
+            <table className="w-full" style={{ borderCollapse: "separate", borderSpacing: "0 6px" }}>
+              <thead>
+                <tr>
+                  <th className="text-left pb-2 pr-3 text-xs opacity-50 font-semibold uppercase tracking-wider w-20">Grade</th>
+                  {DAY_LETTERS.map(d => (
+                    <th key={d} className="pb-2 px-2 text-xs font-bold uppercase tracking-wide text-center" style={{
+                      color: d === dayLetter ? "#fbbf24" : "rgba(255,255,255,0.45)",
+                      fontSize: d === dayLetter ? 13 : 11,
+                    }}>
+                      {d}{d === dayLetter ? " ●" : ""}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {GRADES.map(grade => {
+                  const gc = GRADE_COLORS[grade];
+                  return (
+                    <tr key={grade}>
+                      <td className="pr-3 py-1">
+                        <div className="text-sm font-bold px-2 py-1 rounded-lg inline-block" style={{ color: gc.text, background: gc.bg, border: `1px solid ${gc.border}` }}>
+                          {grade}th
+                        </div>
+                      </td>
+                      {DAY_LETTERS.map(day => {
+                        const c = board.specials.find((r: any) => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
+                        const isToday = day === dayLetter;
+                        return (
+                          <td key={day} className="px-1 py-1">
+                            <div className="text-xs font-semibold text-center px-2 py-2 rounded-xl truncate" style={{
+                              background: isToday
+                                ? (c ? gc.bg : "rgba(255,255,255,0.04)")
+                                : "rgba(255,255,255,0.04)",
+                              border: isToday ? `1px solid ${gc.border}` : "1px solid rgba(255,255,255,0.07)",
+                              color: isToday ? gc.text : "rgba(255,255,255,0.65)",
+                              minWidth: 72,
+                            }}>
+                              {c?.activity
+                                ? <>{activityEmoji(c.activity)} {c.activity}</>
+                                : <span style={{ opacity: 0.25 }}>—</span>}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div className="pt-2 text-center text-[11px] opacity-30 uppercase tracking-[0.25em]">
           BlockForge · auto-refreshes every 15 seconds
         </div>
       </div>
+
+      {/* ── Floating Music Player ── */}
+      {musicPreset && (
+        <>
+          <iframe
+            ref={musicRef}
+            title="ambient-music"
+            width="1" height="1"
+            style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
+            src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=1&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1`}
+            allow="autoplay"
+          />
+          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl z-50" style={{
+            background: "rgba(15,8,33,0.85)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            backdropFilter: "blur(16px)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          }}>
+            <span style={{ fontSize: 20 }}>{musicPreset.emoji}</span>
+            <span className="text-sm font-semibold opacity-80">{musicPreset.label}</span>
+            <button
+              onClick={toggleMusic}
+              title={musicPlaying ? "Pause music" : "Play music"}
+              className="flex items-center justify-center rounded-xl font-bold transition-all hover:scale-105"
+              style={{
+                width: 36, height: 36,
+                background: musicPlaying ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "white",
+                cursor: "pointer",
+                fontSize: 16,
+              }}
+            >
+              {musicPlaying ? "⏸" : "▶"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
