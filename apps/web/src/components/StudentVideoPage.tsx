@@ -2,30 +2,30 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { isAccessAllowed } from "../lib/workUnlock.ts";
+import { isOnBreak } from "../lib/breakSystem.ts";
 
 export default function StudentVideoPage() {
   const navigate = useNavigate();
   const [videos, setVideos] = useState<any[]>([]);
   const [playing, setPlaying] = useState<{ videoId: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const unlocked = isAccessAllowed();
+  const [unlocked, setUnlocked] = useState(() => isAccessAllowed() || isOnBreak());
+
+  // Re-check access every second so freetime grant appears without refresh
+  useEffect(() => {
+    const check = () => setUnlocked(isAccessAllowed() || isOnBreak());
+    check();
+    const iv = setInterval(check, 1000);
+    window.addEventListener("breakstate-change", check);
+    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", check); };
+  }, []);
 
   useEffect(() => {
     if (!unlocked) { setLoading(false); return; }
     (async () => {
       try {
-        const classes = await api.getClasses().catch(() => [] as any[]);
-        const results = await Promise.all(
-          classes.map((c: any) => api.getYouTubeLibrary(c.id).catch(() => [] as any[]))
-        );
-        const seen = new Set<string>();
-        const merged: any[] = [];
-        for (const arr of results) {
-          for (const v of arr) {
-            if (!seen.has(v.id)) { seen.add(v.id); merged.push(v); }
-          }
-        }
-        setVideos(merged);
+        const vids = await api.getAllYouTubeLibrary().catch(() => [] as any[]);
+        setVideos(vids);
       } finally { setLoading(false); }
     })();
   }, [unlocked]);

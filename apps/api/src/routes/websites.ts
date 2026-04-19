@@ -71,15 +71,32 @@ router.post("/request", async (req: AuthRequest, res: Response) => {
 // ── Student: my granted websites ───────────────────────────────────
 router.get("/mine", async (req: AuthRequest, res: Response) => {
   await ensureTables();
-  const rows = await db.prepare(
+  const userId = req.user!.id;
+  // Individually granted sites
+  const granted = await db.prepare(
     `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
             sw.granted_at
        FROM student_approved_websites sw
        JOIN approved_websites w ON w.id = sw.approved_website_id
       WHERE sw.student_id = ?
       ORDER BY sw.granted_at DESC`
-  ).all(req.user!.id);
-  res.json(rows);
+  ).all(userId) as any[];
+  // Class-library sites: all approved_websites in classes this student is enrolled in
+  const classLibrary = await db.prepare(
+    `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
+            w.added_at AS granted_at
+       FROM approved_websites w
+       JOIN class_members cm ON cm.class_id = w.class_id
+      WHERE cm.user_id = ?
+      ORDER BY w.added_at DESC`
+  ).all(userId) as any[];
+  // Merge: deduplicate by id, granted entries take priority
+  const seen = new Set<string>();
+  const merged: any[] = [];
+  for (const w of [...granted, ...classLibrary]) {
+    if (!seen.has(w.id)) { seen.add(w.id); merged.push(w); }
+  }
+  res.json(merged);
 });
 
 // ── Student: resolve one website by id (for the embedded viewer) ───
@@ -87,14 +104,26 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
 // Prevents a student from typing /app/<someoneElsesId> and getting a URL.
 router.get("/mine/:id", async (req: AuthRequest, res: Response) => {
   await ensureTables();
-  const row = await db.prepare(
+  const userId = req.user!.id;
+  // Check individually granted first
+  let row: any = await db.prepare(
     `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
        FROM student_approved_websites sw
        JOIN approved_websites w ON w.id = sw.approved_website_id
       WHERE sw.student_id = ? AND w.id = ?
       LIMIT 1`
-  ).get(req.user!.id, req.params.id);
-  if (!row) return res.status(404).json({ error: "Website not granted" });
+  ).get(userId, req.params.id);
+  // Fall back to class library access
+  if (!row) {
+    row = await db.prepare(
+      `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
+         FROM approved_websites w
+         JOIN class_members cm ON cm.class_id = w.class_id
+        WHERE cm.user_id = ? AND w.id = ?
+        LIMIT 1`
+    ).get(userId, req.params.id);
+  }
+  if (!row) return res.status(404).json({ error: "Website not found" });
   res.json(row);
 });
 

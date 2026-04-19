@@ -32,6 +32,8 @@ import Minesweeper from "./games/Minesweeper.tsx";
 import WordSearch from "./games/WordSearch.tsx";
 import Sudoku from "./games/Sudoku.tsx";
 import Sandbox from "./games/Sandbox.tsx";
+import HangmanGame from "./games/HangmanGame.tsx";
+import TypingRace from "./games/TypingRace.tsx";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Game {
@@ -433,6 +435,30 @@ const GAMES: Game[] = [
     embedUrl: "/unity-games/blockforge-stage/index.html",
     hint: "WASD / arrow keys · mouse to look around",
   },
+  {
+    id: "hangman",
+    title: "Hangman",
+    description: "Guess the hidden word one letter at a time before the man is hanged! 50+ words across animals, food, sports and more.",
+    category: "Education",
+    stars: 4,
+    plays: "NEW",
+    accentColor: "#f59e0b",
+    emoji: "🪢",
+    component: HangmanGame,
+    hint: "Tap letters to guess · 6 wrong = game over",
+  },
+  {
+    id: "typingrace",
+    title: "Typing Race",
+    description: "Type words as fast as you can in 60 seconds! How many words per minute can you type?",
+    category: "Education",
+    stars: 5,
+    plays: "NEW",
+    accentColor: "#06b6d4",
+    emoji: "⌨️",
+    component: TypingRace,
+    hint: "Type the word · auto-advances · 60 second timer",
+  },
 ];
 
 const CATEGORIES = ["All", "Classic", "Action", "Puzzle", "Education", "Creative", "Sandbox", "Sports", "Unity"];
@@ -640,10 +666,10 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         className="relative w-full flex flex-col rounded-2xl overflow-hidden animate-arcade-modal"
         style={{
           maxWidth: 700,
-          maxHeight: "90vh",
+          maxHeight: "92vh",
           /* On touch / coarse-pointer devices (iPad, phones) expand to near full-screen */
-          width: "min(700px, 100vw - 16px)",
-          height: "min(90vh, 100dvh - 16px)",
+          width: "min(700px, 100vw - 12px)",
+          height: "min(92vh, calc(100vh - 12px))",
           background: "#08081f",
           border: `1px solid ${game.accentColor}44`,
           boxShadow: `0 40px 80px ${game.accentColor}33, 0 0 0 1px rgba(255,255,255,0.04)`,
@@ -688,7 +714,7 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         </div>
 
         {/* Game area */}
-        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "none" }}>
+        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "manipulation" }}>
           {game.comingSoon ? (
             /* Coming-soon slot — Unity placeholder */
             <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
