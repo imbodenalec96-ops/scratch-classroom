@@ -1248,6 +1248,7 @@ export default function StudentDashboard() {
   usePresencePing(phaseActivity);
 
   useSocket("class:lock", (data) => setLockedScreen(data.locked));
+  useSocket("class:reload", () => window.location.reload());
   useSocket("class:broadcast", (data) => {
     setBroadcast(`${data.from}: ${data.message}`);
     setTimeout(() => setBroadcast(null), 10000);

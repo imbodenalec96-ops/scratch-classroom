@@ -11,7 +11,7 @@ import {
   Youtube, Trophy, Navigation, MessageSquare,
   Send, GraduationCap, Tv,
   LayoutDashboard, BookOpen, Gamepad2, FileText,
-  Wifi, WifiOff, Radio,
+  Wifi, WifiOff, Radio, RotateCcw,
 } from "lucide-react";
 
 function useCountUp(target: number, duration = 700) {
@@ -410,6 +410,11 @@ export default function TeacherDashboard() {
                         display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
                         background: surface, border:`1px solid ${border}`, color:text2,
                       }}><LockOpen size={12}/> Unlock</button>
+
+                      <button onClick={() => { getSocket().emit("class:reload", { classId: selectedClass.id }); }} style={{
+                        display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
+                        background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.35)",color:"#a5b4fc",
+                      }}><RotateCcw size={12}/> Reload All</button>
 
                       {/* Push to page — dropdown with page icons */}
                       <div style={{ position:"relative" }}>
