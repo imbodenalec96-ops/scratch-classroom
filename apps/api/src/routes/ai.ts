@@ -392,4 +392,242 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation �
   }
 });
 
+/* ─────────────────────────────────────────────────────────────────
+ * Video → Assignment
+ * POST /api/ai/generate-assignment-from-video
+ * Body: { videoUrl, title?, subject?, grade?, questionCount? }
+ * Returns the same shape as /generate-assignment, plus { videoUrl, videoId }
+ * so the builder can populate the form and save video_url on the assignment.
+ * ───────────────────────────────────────────────────────────────── */
+
+function extractYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  const patterns = [
+    /youtube\.com\/watch\?v=([A-Za-z0-9_-]{11})/,
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+  ];
+  for (const re of patterns) {
+    const m = trimmed.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// Fetch { title, author } via YouTube's public oEmbed endpoint (no API key).
+async function fetchVideoOEmbed(videoId: string): Promise<{ title: string; author: string } | null> {
+  try {
+    const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = (await r.json()) as any;
+    return { title: data?.title || "", author: data?.author_name || "" };
+  } catch {
+    return null;
+  }
+}
+
+// Fetch an English transcript via YouTube's public timedtext API.
+// Returns plain text (concatenated caption lines) or empty string if unavailable.
+async function fetchVideoTranscript(videoId: string): Promise<string> {
+  const tryOne = async (lang: string, kind?: string) => {
+    const q = new URLSearchParams({ v: videoId, lang });
+    if (kind) q.set("kind", kind);
+    const url = `https://www.youtube.com/api/timedtext?${q.toString()}`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return "";
+      const xml = await r.text();
+      if (!xml || !xml.includes("<text")) return "";
+      // Strip XML tags, decode basic HTML entities, collapse whitespace.
+      const lines = Array.from(xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)).map((m) => m[1]);
+      const decoded = lines
+        .join(" ")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return decoded;
+    } catch {
+      return "";
+    }
+  };
+  // Try manual English, then auto-captions, then en-US.
+  return (
+    (await tryOne("en")) ||
+    (await tryOne("en", "asr")) ||
+    (await tryOne("en-US")) ||
+    ""
+  );
+}
+
+router.post("/generate-assignment-from-video", async (req: AuthRequest, res: Response) => {
+  if (req.user!.role === "student") return res.status(403).json({ error: "Forbidden" });
+
+  const { videoUrl, title, subject, grade, questionCount } = req.body || {};
+  if (!videoUrl || typeof videoUrl !== "string") {
+    return res.status(400).json({ error: "videoUrl is required" });
+  }
+
+  const videoId = extractYouTubeId(videoUrl);
+  if (!videoId) {
+    return res.status(400).json({ error: "Could not extract a YouTube video ID from that URL. Paste a standard youtube.com/watch or youtu.be link." });
+  }
+
+  // Normalize to a canonical watch URL — this is what we persist on the assignment.
+  const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  // Gather the best context we can about the video (no API key required).
+  const [oembed, transcript] = await Promise.all([
+    fetchVideoOEmbed(videoId),
+    fetchVideoTranscript(videoId),
+  ]);
+  const videoTitle = oembed?.title || "";
+  const videoAuthor = oembed?.author || "";
+  const hasTranscript = transcript.length > 40;
+
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  const nQuestions = Math.min(Math.max(Number(questionCount) || 6, 3), 15);
+
+  // Dev fallback — no API key. Still returns a usable shape.
+  if (!ANTHROPIC_KEY) {
+    return res.json({
+      title: title || videoTitle || "Video Assignment",
+      subject: subject || "General",
+      grade: grade || "3rd Grade",
+      instructions: `Watch the video "${videoTitle || canonicalUrl}" and answer the questions below.`,
+      totalPoints: nQuestions * 10,
+      videoUrl: canonicalUrl,
+      videoId,
+      videoTitle,
+      transcriptUsed: hasTranscript,
+      sections: [
+        {
+          title: "Part 1: Comprehension (10 pts each)",
+          questions: Array.from({ length: nQuestions }, (_, i) => ({
+            type: i % 2 === 0 ? "multiple_choice" : "short_answer",
+            text: `Sample comprehension question ${i + 1} about the video.`,
+            ...(i % 2 === 0
+              ? { options: ["A. Option one", "B. Option two", "C. Option three", "D. Option four"], correctIndex: 0 }
+              : { lines: 3 }),
+            points: 10,
+          })),
+        },
+      ],
+    });
+  }
+
+  try {
+    // Trim transcript for token budget — Claude is smart about this, but keep the
+    // prompt lean. ~12k chars ≈ ~3k tokens which is comfortably inside Opus limits.
+    const transcriptSnippet = hasTranscript ? transcript.slice(0, 12000) : "";
+    const contextBlock = hasTranscript
+      ? `VIDEO TITLE: ${videoTitle || "(unknown)"}
+VIDEO CHANNEL: ${videoAuthor || "(unknown)"}
+VIDEO URL: ${canonicalUrl}
+
+TRANSCRIPT (auto-fetched from YouTube captions):
+"""
+${transcriptSnippet}
+"""`
+      : `VIDEO TITLE: ${videoTitle || "(unknown)"}
+VIDEO CHANNEL: ${videoAuthor || "(unknown)"}
+VIDEO URL: ${canonicalUrl}
+
+(Captions/transcript were not available for this video. Base questions on the title and channel alone — keep them general enough that a student who watches the video can answer them. Do NOT invent specific quotes or numbers that you cannot verify.)`;
+
+    const gradeLabel = grade || "3rd Grade";
+    const subjectLabel = subject || "General";
+    const assignmentTitle = title?.trim() || (videoTitle ? `Video: ${videoTitle}` : "Video Assignment");
+
+    const prompt = `You are an experienced elementary school teacher. A student will watch a YouTube video in class and then answer comprehension questions on a printable worksheet.
+
+${contextBlock}
+
+Assignment metadata:
+- Grade Level: ${gradeLabel}
+- Subject: ${subjectLabel}
+- Worksheet Title: ${assignmentTitle}
+
+Create a thorough comprehension worksheet with 1-2 sections and exactly ${nQuestions} total questions appropriate for ${gradeLabel}.
+Mix question types: multiple_choice, short_answer, and fill_blank.
+Questions MUST be about the content of this specific video — not generic subject questions.
+Include a mix of literal recall ("According to the video, what…") and higher-order thinking ("Why do you think…", "How does this connect to…").
+
+CRITICAL RULES FOR multiple_choice QUESTIONS:
+1. Every multiple_choice question MUST include a "correctIndex" field.
+2. "correctIndex" is the 0-based index of the correct answer in the "options" array.
+3. Options must be prefixed: "A. ...", "B. ...", "C. ...", "D. ..."
+4. There must be exactly ONE correct answer per question.
+
+Return ONLY valid JSON, no markdown, no code fences, no explanation — just this object:
+{
+  "title": "string",
+  "subject": "string",
+  "grade": "string",
+  "instructions": "Watch the video, then answer the questions below. (1-2 sentences, student-facing.)",
+  "totalPoints": number,
+  "sections": [
+    {
+      "title": "Part 1: Section Name (X pts each)",
+      "questions": [
+        { "type": "multiple_choice", "text": "…?", "options": ["A. …","B. …","C. …","D. …"], "correctIndex": 0, "points": 5 },
+        { "type": "short_answer", "text": "…?", "points": 10, "lines": 3 },
+        { "type": "fill_blank", "text": "The ___ is …", "points": 5 }
+      ]
+    }
+  ]
+}`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-5",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Anthropic error ${response.status}: ${body.slice(0, 200)}`);
+    }
+    const data = await response.json();
+    const text = (data as any).content?.[0]?.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in model response");
+    const assignment = JSON.parse(jsonMatch[0]);
+
+    // Attach the pieces the UI needs to save the assignment correctly.
+    return res.json({
+      ...assignment,
+      videoUrl: canonicalUrl,
+      videoId,
+      videoTitle,
+      transcriptUsed: hasTranscript,
+    });
+  } catch (err) {
+    console.error("generate-assignment-from-video failed:", err);
+    return res.status(500).json({
+      error: "Video assignment generation failed",
+      details: String(err),
+      videoUrl: canonicalUrl,
+      videoId,
+    });
+  }
+});
+
 export default router;

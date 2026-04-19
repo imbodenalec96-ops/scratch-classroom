@@ -69,6 +69,9 @@ export const api = {
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),
+  generateAssignmentFromVideo: (data: {
+    videoUrl: string; title?: string; subject?: string; grade?: string; questionCount?: number;
+  }) => request<any>("/ai/generate-assignment-from-video", { method: "POST", body: JSON.stringify(data) }),
   getAssignment: (id: string) => request<any>(`/assignments/${id}`),
   updateAssignment: (id: string, data: any) => request<any>(`/assignments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   getTodayAssignment: (classId: string) => request<any[]>(`/assignments/class/${classId}/today`),
@@ -191,6 +194,10 @@ export const api = {
   // Users
   getUsers: () => request<any[]>("/users"),
   updateRole: (userId: string, role: string) => request<any>(`/users/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+  updateUser: (userId: string, updates: { name?: string; email?: string; role?: string }) =>
+    request<any>(`/users/${userId}`, { method: "PUT", body: JSON.stringify(updates) }),
+  resetUserPassword: (userId: string, password: string) =>
+    request<any>(`/users/${userId}/reset-password`, { method: "POST", body: JSON.stringify({ password }) }),
   deleteUser: (userId: string) => request<any>(`/users/${userId}`, { method: "DELETE" }),
 
   // AI

@@ -124,11 +124,7 @@ export default function QuizBuilder() {
         >
           <div className="flex items-center gap-2">
             <Sparkles size={15} className="text-violet-400 flex-shrink-0" />
-            <h3 className="text-sm font-bold text-t1">Generate with AI</h3>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ml-auto"
-              style={{ background: "rgba(99,102,241,0.12)", color: "#a5b4fc" }}>
-              Claude
-            </span>
+            <h3 className="text-sm font-bold text-t1">Generate Quiz</h3>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -240,7 +236,7 @@ export default function QuizBuilder() {
               <Zap size={28} className="text-indigo-500 opacity-40" />
             </div>
             <p className="text-t3 text-sm font-medium">No quizzes yet</p>
-            <p className="text-t3 text-xs mt-1 opacity-60">Generate one with AI above or create manually.</p>
+            <p className="text-t3 text-xs mt-1 opacity-60">Generate one above or create manually.</p>
           </div>
         )}
       </div>

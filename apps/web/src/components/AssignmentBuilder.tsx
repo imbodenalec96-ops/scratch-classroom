@@ -477,6 +477,13 @@ export default function AssignmentBuilder() {
   const [generated, setGenerated] = useState<GeneratedAssignment | null>(null);
   const [genError, setGenError] = useState("");
 
+  // Video → assignment state
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoGenError, setVideoGenError] = useState("");
+  const [videoGenNote, setVideoGenNote] = useState(""); // e.g. "no captions available"
+  const [videoQuestionCount, setVideoQuestionCount] = useState<number>(6);
+
   // PDF → assignment import state
   const [pdfParsing, setPdfParsing] = useState(false);
   const [pdfErr, setPdfErr] = useState<string | null>(null);
@@ -625,6 +632,54 @@ export default function AssignmentBuilder() {
     setGenerating(false);
   };
 
+  // Quick YouTube URL sniff — matches the shapes the backend recognizes.
+  const isYouTubeUrl = (raw: string): boolean => {
+    if (!raw) return false;
+    const t = raw.trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(t)) return true;
+    return /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[A-Za-z0-9_-]{11}/.test(t);
+  };
+
+  const handleGenerateFromVideo = async () => {
+    setVideoGenError("");
+    setVideoGenNote("");
+    if (!videoUrl.trim()) { setVideoGenError("Paste a YouTube URL first."); return; }
+    if (!isYouTubeUrl(videoUrl)) {
+      setVideoGenError("That doesn't look like a YouTube URL. Use youtube.com/watch?v=… or youtu.be/…");
+      return;
+    }
+    setVideoGenerating(true);
+    setGenerated(null);
+    setGenError("");
+    try {
+      const result = await api.generateAssignmentFromVideo({
+        videoUrl: videoUrl.trim(),
+        title: title.trim() || undefined,
+        subject,
+        grade,
+        questionCount: videoQuestionCount,
+      });
+      // Populate the main form so Save & Assign works unchanged.
+      if (result?.title && !title.trim()) setTitle(result.title);
+      if (result?.videoUrl) setVideoUrl(result.videoUrl);
+      if (result?.transcriptUsed === false) {
+        setVideoGenNote("Captions weren't available — questions are based on the video title and channel only. Review before assigning.");
+      }
+      setGenerated({
+        title: result?.title || title || "Video Assignment",
+        subject: result?.subject || subject,
+        grade: result?.grade || grade,
+        instructions: result?.instructions || "Watch the video, then answer the questions below.",
+        totalPoints: result?.totalPoints || 0,
+        sections: Array.isArray(result?.sections) ? result.sections : [],
+      });
+    } catch (e: any) {
+      setVideoGenError(e?.message || "Could not generate from this video. Try another URL.");
+    } finally {
+      setVideoGenerating(false);
+    }
+  };
+
   // Map the API's lowercase subject/grade to the form's capitalized dropdown
   // values. Silent pass-through if the API already returned a display label.
   const normalizeSubject = (s?: string): string | null => {
@@ -724,7 +779,7 @@ export default function AssignmentBuilder() {
       ? generated.sections.flatMap((s) => s.questions.map((q) => ({ label: q.text.slice(0, 60), maxPoints: q.points })))
       : [{ label: "Correctness", maxPoints: 50 }, { label: "Creativity", maxPoints: 50 }];
     const desc = generated
-      ? `[AI-Generated] ${generated.instructions}\n\nSections: ${generated.sections.map((s) => s.title).join(", ")}`
+      ? `[Generated] ${generated.instructions}\n\nSections: ${generated.sections.map((s) => s.title).join(", ")}`
       : instructions;
     const content = generated ? JSON.stringify(generated) : null;
     const targeting: any = {};
@@ -756,17 +811,20 @@ export default function AssignmentBuilder() {
       groupPayload.isGroup = true;
       groupPayload.groupName = groupName.trim() || "Group";
     }
+    // Video → assignment: persist the URL so WorkScreen embeds the player for students.
+    const videoPayload: any = videoUrl.trim() ? { videoUrl: videoUrl.trim() } : {};
     if (pdfSourceAssignmentId) {
       // Update the existing assignment that was created during PDF upload
       // (avoids a duplicate entry — the source already has attached_pdf_path + class_id)
-      await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
+      await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
     } else {
-      await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
+      await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
     }
     setShowForm(false);
     setGenerated(null);
     setPdfSourceAssignmentId(null);
     setTitle(""); setInstructions(""); setDueDate("");
+    setVideoUrl(""); setVideoGenError(""); setVideoGenNote("");
     setCustomQuestionCount(""); setCustomEstimatedMinutes(""); setCustomQuestionType("");
     setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
     setShowAdvanced(false);
@@ -923,7 +981,7 @@ export default function AssignmentBuilder() {
       loadAssignments(classId);
     } catch (e: any) {
       if (e?.message?.includes("AI_NOT_CONFIGURED") || e?.message?.includes("ANTHROPIC_API_KEY")) {
-        alert("⚠️ AI is not configured.\n\nAdd ANTHROPIC_API_KEY in your Vercel environment variables to enable weekly generation.");
+        alert("⚠️ Generation is not configured.\n\nAdd ANTHROPIC_API_KEY in your Vercel environment variables to enable weekly generation.");
       } else {
         alert("Failed: " + (e?.message || e));
       }
@@ -975,7 +1033,7 @@ export default function AssignmentBuilder() {
               <em style={{ color: "var(--accent)", fontStyle: "italic" }}> Builder</em>
             </h1>
             <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
-              AI-generated, per student, per grade. One click makes the whole week.
+              Generated per student, per grade. One click makes the whole week.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -1133,7 +1191,7 @@ export default function AssignmentBuilder() {
             )}
             {!fullWeekGenerating && (
               <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                ~{Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × students, 10 AI calls in parallel
+                ~{Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × students, 10 calls in parallel
               </span>
             )}
           </div>
@@ -1316,7 +1374,7 @@ export default function AssignmentBuilder() {
               <input
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Notes for AI generation…"
+                placeholder="Notes for generation…"
                 className="input w-full text-sm"
               />
             </div>
@@ -1570,15 +1628,15 @@ export default function AssignmentBuilder() {
             {pdfErr && <div style={{ color: '#f87171', fontSize: 11, marginTop: 6 }}>{pdfErr}</div>}
           </div>
 
-          {/* AI Generate button */}
+          {/* Generate button */}
           <div className={`rounded-xl p-4 border ${dk ? "bg-violet-500/[0.06] border-violet-500/20" : "bg-violet-50 border-violet-200"}`}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className={`text-sm font-semibold ${dk ? "text-violet-300" : "text-violet-800"}`}>
-                  AI Worksheet Generator
+                  Worksheet Generator
                 </div>
                 <div className={`text-xs mt-0.5 ${dk ? "text-violet-400/70" : "text-violet-600"}`}>
-                  Claude AI creates a full paper-style worksheet with questions based on your title, subject & grade
+                  Generate a full paper-style worksheet with questions based on your title, subject & grade
                 </div>
               </div>
               <button
@@ -1594,10 +1652,59 @@ export default function AssignmentBuilder() {
             {genError && <p className="text-red-400 text-xs mt-2">{genError}</p>}
           </div>
 
+          {/* Video → Assignment generator */}
+          <div className={`rounded-xl p-4 border ${dk ? "bg-rose-500/[0.06] border-rose-500/20" : "bg-rose-50 border-rose-200"}`}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div className={`text-sm font-semibold flex items-center gap-1.5 ${dk ? "text-rose-300" : "text-rose-800"}`}>
+                  ▶︎ Video Assignment Generator
+                </div>
+                <div className={`text-xs mt-0.5 ${dk ? "text-rose-400/70" : "text-rose-600"}`}>
+                  Paste a YouTube URL — Claude pulls the transcript and writes comprehension questions for {grade || "this grade"}.
+                </div>
+              </div>
+              <button
+                onClick={handleGenerateFromVideo}
+                disabled={videoGenerating || !videoUrl.trim()}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white transition-all flex-shrink-0"
+                style={{ background: videoGenerating ? "rgba(244,63,94,0.5)" : "linear-gradient(135deg,#f43f5e,#e11d48)", opacity: !videoUrl.trim() ? 0.5 : 1 }}
+              >
+                {videoGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {videoGenerating ? "Generating…" : "Generate from Video"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={videoUrl}
+                onChange={(e) => { setVideoUrl(e.target.value); setVideoGenError(""); }}
+                placeholder="https://www.youtube.com/watch?v=…  or  https://youtu.be/…"
+                className="input text-sm flex-1"
+                disabled={videoGenerating}
+              />
+              <label className={`text-[10px] font-semibold uppercase tracking-wider ${dk ? "text-rose-300/70" : "text-rose-700"}`}>
+                Qs
+              </label>
+              <input
+                type="number"
+                min={3}
+                max={15}
+                value={videoQuestionCount}
+                onChange={(e) => setVideoQuestionCount(Math.max(3, Math.min(15, Number(e.target.value) || 6)))}
+                className="input text-sm"
+                style={{ width: 64 }}
+                disabled={videoGenerating}
+              />
+            </div>
+            {videoGenError && <p className="text-red-400 text-xs mt-2">{videoGenError}</p>}
+            {videoGenNote && <p className="text-amber-400 text-xs mt-2">⚠️ {videoGenNote}</p>}
+          </div>
+
           {generated && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <Check size={13} className="text-emerald-400 flex-shrink-0" />
-              <span className="text-xs font-semibold text-emerald-300">Worksheet generated — preview in the panel on the right</span>
+              <span className="text-xs font-semibold text-emerald-300">
+                {videoUrl.trim() ? "Video assignment generated — preview in the panel on the right" : "Worksheet generated — preview in the panel on the right"}
+              </span>
             </div>
           )}
 
@@ -1614,7 +1721,7 @@ export default function AssignmentBuilder() {
             >
               📅 Assign for Week (Mon–Fri)
             </button>
-            <button onClick={() => { setShowForm(false); setGenerated(null); setGenError(""); }} className="btn-ghost">Cancel</button>
+            <button onClick={() => { setShowForm(false); setGenerated(null); setGenError(""); setVideoUrl(""); setVideoGenError(""); setVideoGenNote(""); }} className="btn-ghost">Cancel</button>
           </div>
         </div>
       )}
@@ -1808,7 +1915,7 @@ export default function AssignmentBuilder() {
                     )}
                     {parsed && (
                       <span className="stamp" style={{ background: "var(--accent-light)", color: "var(--text-accent)", borderLeftColor: "var(--accent)" }}>
-                        AI Worksheet
+                        Worksheet
                       </span>
                     )}
                     {a.scheduled_date && (
@@ -2449,7 +2556,7 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
               <div>
                 <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Question type</label>
                 <select value={questionType} onChange={e => setQuestionType(e.target.value)} className="input text-sm w-full">
-                  <option value="mixed">Mixed (AI picks)</option>
+                  <option value="mixed">Mixed (auto-select)</option>
                   <option value="multiple_choice">Multiple choice</option>
                   <option value="short_answer">Short answer</option>
                   <option value="fill_blank">Fill in blank</option>
@@ -2481,13 +2588,13 @@ function EditAssignmentModal({ assignment, dk, onClose, onSaved }: {
 
             <div className="mt-3">
               <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>
-                🔒 Private teacher notes (AI reads, student never sees)
+                🔒 Private teacher notes (used by the generator, student never sees)
               </label>
               <textarea value={teacherNotes} onChange={e => setTeacherNotes(e.target.value)}
                 rows={2} placeholder="e.g. This student struggles with word problems — use visual hints + shorter sentences."
                 className="input text-sm w-full resize-none" />
               <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-                When you hit 📉 Easier / 📈 Harder / ✨ Regenerate, the AI uses these notes to tailor the rewrite.
+                When you hit 📉 Easier / 📈 Harder / ✨ Regenerate, these notes tailor the rewrite.
               </p>
             </div>
           </div>
