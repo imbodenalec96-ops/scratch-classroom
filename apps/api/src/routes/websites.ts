@@ -231,14 +231,19 @@ router.post("/deny", requireRole("teacher", "admin"), async (req: AuthRequest, r
 
 // ── Teacher/admin: library (list approved websites) ─────────────────
 router.get("/library", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  const classId = req.query.classId ? String(req.query.classId) : null;
-  const rows = classId
-    ? await db.prepare(
-        `SELECT * FROM approved_websites WHERE class_id = ? OR class_id IS NULL ORDER BY added_at DESC`
-      ).all(classId)
-    : await db.prepare(`SELECT * FROM approved_websites ORDER BY added_at DESC`).all();
-  res.json(rows);
+  try {
+    await ensureTables();
+    const classId = req.query.classId ? String(req.query.classId) : null;
+    const rows = classId
+      ? await db.prepare(
+          `SELECT * FROM approved_websites WHERE class_id = ? OR class_id IS NULL ORDER BY added_at DESC`
+        ).all(classId)
+      : await db.prepare(`SELECT * FROM approved_websites ORDER BY added_at DESC`).all();
+    res.json(rows);
+  } catch (e: any) {
+    console.error("[websites/library GET]", e);
+    res.status(500).json({ error: e?.message || "Failed to load library" });
+  }
 });
 
 // ── Teacher/admin: delete a library entry ──────────────────────────
