@@ -68,7 +68,10 @@ async function ensureTables() {
         granted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
+    // Postgres: ADD COLUMN IF NOT EXISTS; SQLite silently fails the outer catch
+    try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN IF NOT EXISTS icon_emoji TEXT`); } catch {
+      try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
+    }
   } catch (e) {
     console.error("[websites] migration error:", e);
   }
@@ -81,8 +84,10 @@ async function seedDefaultsIfEmpty() {
   if (seeded) return;
   seeded = true;
   try {
+    await ensureTables(); // ensure tables exist before seeding
     const row = await db.prepare(`SELECT COUNT(*) as n FROM approved_websites WHERE added_by = 'system'`).get() as any;
-    if ((row?.n ?? 0) > 0) return; // already seeded
+    const count = parseInt(String(row?.n ?? "0"), 10);
+    if (count > 0) return; // already seeded
     for (const site of DEFAULT_WEBSITES) {
       const id = crypto.randomUUID();
       await db.prepare(
@@ -95,6 +100,10 @@ async function seedDefaultsIfEmpty() {
     console.error("[websites] seed error:", e);
   }
 }
+
+// Eager cold-start seed — runs when module loads so the library is
+// populated before the first request arrives.
+ensureTables().then(seedDefaultsIfEmpty).catch(e => console.error("[websites] startup seed error:", e));
 
 // ── Student: submit a new website request ──────────────────────────
 // Student ONLY provides a title — no URL. Teacher vets and adds the URL.
