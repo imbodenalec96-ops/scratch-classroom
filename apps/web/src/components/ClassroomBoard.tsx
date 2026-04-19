@@ -112,8 +112,12 @@ export default function ClassroomBoard() {
       <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(5,5,20,0.55)" }} />
 
       <div className="relative p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-end justify-between gap-4 flex-wrap border-b pb-5" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+
+        {/* ① Header — springs in first */}
+        <div
+          className="animate-spring-in flex items-end justify-between gap-4 flex-wrap border-b pb-5"
+          style={{ borderColor: "rgba(255,255,255,0.12)", animationDelay: "0ms" }}
+        >
           <div>
             <div className="text-xs uppercase tracking-[0.25em] opacity-60 mb-2">BlockForge · Classroom</div>
             <h1 style={{ fontSize: 56, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}>{cls.name}</h1>
@@ -137,23 +141,28 @@ export default function ClassroomBoard() {
           />
         )}
 
-        {/* Current block */}
-        <section className="rounded-3xl p-7" style={{
-          background: currentBlock
-            ? "linear-gradient(135deg, rgba(139,92,246,0.28), rgba(99,102,241,0.16))"
-            : "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(139,92,246,0.35)",
-          backdropFilter: "blur(8px)",
-        }}>
+        {/* ② Current block — section staggers in; inner content re-mounts on block change */}
+        <section
+          className="animate-spring-in rounded-3xl p-7"
+          style={{
+            background: currentBlock
+              ? "linear-gradient(135deg, rgba(139,92,246,0.28), rgba(99,102,241,0.16))"
+              : "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(139,92,246,0.35)",
+            backdropFilter: "blur(8px)",
+            animationDelay: "80ms",
+          }}
+        >
           <div className="text-xs uppercase tracking-[0.25em] opacity-60 mb-3">Right now</div>
           {currentBlock ? (
-            <div className="flex items-baseline gap-6 flex-wrap">
+            <div key={currentBlock.start_time} className="animate-spring-in flex items-baseline gap-6 flex-wrap">
               <div style={{ fontSize: 72, fontWeight: 900, letterSpacing: "-0.03em" }}>
                 {currentBlock.label || currentBlock.subject}
               </div>
               <div className="opacity-80 text-2xl font-mono">{currentBlock.start_time}–{currentBlock.end_time}</div>
+              {/* ③ Countdown — gold glow pulse to signal live timer */}
               {countdown && (
-                <div className="px-4 py-2 rounded-full text-xl font-bold font-mono" style={{ background: "rgba(0,0,0,0.3)" }}>
+                <div className="snap-glow px-4 py-2 rounded-full text-xl font-bold font-mono" style={{ background: "rgba(0,0,0,0.3)" }}>
                   ⏱ {countdown}
                 </div>
               )}
@@ -171,12 +180,16 @@ export default function ClassroomBoard() {
           )}
         </section>
 
-        {/* Specialist slot */}
-        <section className="rounded-2xl p-5 flex items-center gap-5 flex-wrap" style={{
-          background: "linear-gradient(135deg, rgba(245,158,11,0.16), rgba(251,191,36,0.08))",
-          border: "1px solid rgba(245,158,11,0.3)",
-          backdropFilter: "blur(6px)",
-        }}>
+        {/* Specialist slot — staggers in */}
+        <section
+          className="animate-spring-in rounded-2xl p-5 flex items-center gap-5 flex-wrap"
+          style={{
+            background: "linear-gradient(135deg, rgba(245,158,11,0.16), rgba(251,191,36,0.08))",
+            border: "1px solid rgba(245,158,11,0.3)",
+            backdropFilter: "blur(6px)",
+            animationDelay: "160ms",
+          }}
+        >
           <div className="text-3xl">🕚</div>
           <div className="flex-1 min-w-[200px]">
             <div className="text-xs uppercase tracking-[0.25em] opacity-60">11:00 AM · Specialist in Room</div>
@@ -186,31 +199,54 @@ export default function ClassroomBoard() {
           </div>
         </section>
 
-        {/* Stars + Levels */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* ④ Stars + Levels grid — staggers in as a unit */}
+        <div className="animate-spring-in grid grid-cols-1 lg:grid-cols-2 gap-5" style={{ animationDelay: "240ms" }}>
           <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
             <div className="mb-3">
               <div className="text-xs uppercase tracking-[0.25em] opacity-60">Behavior Stars</div>
               <div className="text-sm opacity-60 mt-1">10 stars → McDonald's · resets automatically</div>
             </div>
             <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-              {board.students.map(s => {
+              {board.students.map((s, index) => {
                 const stars = Math.max(0, Math.min(10, s.behavior_stars || 0));
                 return (
-                  <div key={s.id} className="rounded-xl p-2.5 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div
+                    key={s.id}
+                    className="animate-spring-in rounded-xl p-2.5 flex items-center gap-3"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      animationDelay: `${index * 35}ms`,
+                    }}
+                  >
                     <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3))" }}>
                       {s.avatar_emoji || "🙂"}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-sm truncate">{s.name}</div>
                       <div className="flex items-center gap-0.5 mt-0.5">
+                        {/* ⑤ Filled stars pop in with cascade delay */}
                         {Array.from({ length: 10 }, (_, i) => (
-                          <span key={i} style={{ fontSize: 14, opacity: i < stars ? 1 : 0.2, filter: i < stars ? "none" : "grayscale(1)" }}>⭐</span>
+                          <span
+                            key={i}
+                            className={i < stars ? "animate-pop-in" : ""}
+                            style={{
+                              fontSize: 14,
+                              opacity: i < stars ? 1 : 0.2,
+                              filter: i < stars ? "none" : "grayscale(1)",
+                              ...(i < stars ? { animationDelay: `${i * 40}ms` } : {}),
+                            }}
+                          >⭐</span>
                         ))}
                       </div>
                     </div>
+                    {/* ⑥ Reward badge jellies in; re-mounts on count change */}
                     {s.reward_count > 0 && (
-                      <div className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: "rgba(245,158,11,0.25)", color: "#fcd34d" }}>
+                      <div
+                        key={s.reward_count}
+                        className="animate-jelly text-xs px-2 py-1 rounded-full font-bold"
+                        style={{ background: "rgba(245,158,11,0.25)", color: "#fcd34d" }}
+                      >
                         🏆 {s.reward_count}
                       </div>
                     )}
@@ -237,7 +273,7 @@ export default function ClassroomBoard() {
                       <div className="font-bold text-lg w-10 flex-shrink-0" style={{ color: level >= 4 ? "#86efac" : level >= 2 ? "#fde68a" : "#fca5a5" }}>L{level}</div>
                       <div className="flex-1 flex flex-wrap gap-1.5 min-h-[38px]">
                         {atLevel.map(s => (
-                          <div key={s.id} className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(139,92,246,0.22)" }}>
+                          <div key={s.id} className="animate-spring-in flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(139,92,246,0.22)" }}>
                             <span>{s.avatar_emoji || "🙂"}</span>
                             <span className="truncate max-w-[90px]">{s.name}</span>
                           </div>
@@ -252,8 +288,8 @@ export default function ClassroomBoard() {
           </section>
         </div>
 
-        {/* Schedules + Specials */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Schedules + Specials — staggers in last */}
+        <div className="animate-spring-in grid grid-cols-1 lg:grid-cols-3 gap-5" style={{ animationDelay: "320ms" }}>
           <section className="lg:col-span-2 rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
             <div className="mb-3">
               <div className="text-xs uppercase tracking-[0.25em] opacity-60">STAR Student Schedules</div>
@@ -303,8 +339,9 @@ export default function ClassroomBoard() {
                 <thead>
                   <tr className="opacity-60 uppercase tracking-wider">
                     <th className="text-left font-medium pb-2 pr-2">Grade</th>
+                    {/* ⑦ Today's column header glows amber */}
                     {DAY_LETTERS.map(d => (
-                      <th key={d} className={`text-center font-medium pb-2 px-1 ${d === dayLetter ? "text-amber-300" : ""}`}>
+                      <th key={d} className={`text-center font-medium pb-2 px-1 ${d === dayLetter ? "text-amber-300 board-day-glow" : ""}`}>
                         {d}{d === dayLetter ? " ●" : ""}
                       </th>
                     ))}
@@ -314,10 +351,14 @@ export default function ClassroomBoard() {
                   {GRADES.map(grade => (
                     <tr key={grade} className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
                       <td className="py-2 pr-2 font-bold opacity-80">{grade}</td>
+                      {/* ⑦ Today's column cells glow amber */}
                       {DAY_LETTERS.map(day => {
                         const c = board.specials.find((r: any) => r.grade === grade && String(r.day_letter).toUpperCase() === day);
                         return (
-                          <td key={day} className={`text-center py-2 px-1 ${day === dayLetter ? "font-bold" : "opacity-75"}`}>
+                          <td
+                            key={day}
+                            className={`text-center py-2 px-1 ${day === dayLetter ? "font-bold board-day-glow" : "opacity-75"}`}
+                          >
                             {c?.activity || <span className="opacity-30">—</span>}
                           </td>
                         );
@@ -330,7 +371,11 @@ export default function ClassroomBoard() {
           </section>
         </div>
 
-        <section data-slot="board-modules" className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)" }}>
+        <section
+          data-slot="board-modules"
+          className="animate-spring-in rounded-2xl p-5"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)", animationDelay: "400ms" }}
+        >
           <div className="text-xs uppercase tracking-[0.25em] opacity-50">Modules</div>
           <div className="text-sm opacity-40 mt-2">Reserved space for future classroom widgets.</div>
         </section>

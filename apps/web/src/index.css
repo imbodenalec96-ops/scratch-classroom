@@ -522,6 +522,12 @@
 }
 .snap-glow { animation: snap-glow 0.8s ease-in-out infinite; }
 
+@keyframes board-day-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(251,191,36,0.5); }
+  50%       { text-shadow: 0 0 18px rgba(251,191,36,0.95), 0 0 4px rgba(251,191,36,0.5); }
+}
+.board-day-glow { animation: board-day-glow 1.8s ease-in-out infinite; }
+
 /* ═══════════════════════════════════════════════════════════
    UTILITIES
    ═══════════════════════════════════════════════════════════ */
