@@ -124,6 +124,17 @@ export default function ClassroomBoard() {
   }, []);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 15_000); return () => clearInterval(iv); }, []);
 
+  // Prevent any scroll bleed from the parent page
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = "";
+    };
+  }, []);
+
   useEffect(() => {
     let done = false;
     api.getClasses().then((cs: any[]) => {
@@ -281,8 +292,8 @@ export default function ClassroomBoard() {
           <div style={{
             flex: 1, overflow: "hidden", minHeight: 0,
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gridTemplateRows: "repeat(2, 1fr)",
+            gridTemplateColumns: `repeat(${Math.min(4, Math.max(2, board.students.length))}, 1fr)`,
+            gridAutoRows: "1fr",
             gap: 6,
           }}>
             {board.students.map((s, idx) => {

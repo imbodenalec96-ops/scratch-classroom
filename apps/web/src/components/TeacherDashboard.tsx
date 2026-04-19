@@ -153,7 +153,7 @@ export default function TeacherDashboard() {
   } as const;
 
   return (
-    <div style={{ padding: "28px 32px", color: text1, fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8", color: text1, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
       {/* Message modal */}
@@ -172,50 +172,59 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* ── Header ── */}
-      <header style={{ marginBottom: 28, animation: "td-fadeUp .5s ease both" }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: text2, marginBottom: 8 }}>
+      {/* ── Hero header ── */}
+      <div style={{
+        background: dk
+          ? "linear-gradient(135deg, #0d0d28 0%, #1a0a3a 60%, #0a1228 100%)"
+          : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 60%, #2563eb 100%)",
+        padding: "28px 32px 28px", marginBottom: 28,
+        position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 50%, rgba(255,255,255,0.06) 0%, transparent 60%)",pointerEvents:"none" }} />
+
+      <header style={{ maxWidth: 1280, margin: "0 auto", position: "relative", animation: "td-fadeUp .5s ease both" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 8 }}>
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </div>
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
           <div>
             <h1 style={{
               fontSize: 42, fontWeight: 900, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.05,
-              background: dk
-                ? "linear-gradient(90deg, #f1f5f9 0%, #a78bfa 50%, #818cf8 100%)"
-                : "linear-gradient(90deg, #0f172a 0%, #7c3aed 60%, #4f46e5 100%)",
+              color: "white",
               backgroundSize: "200% auto",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               animation: "td-shimmer 6s linear infinite",
             }}>
               {greeting}, {user?.name?.split(" ")[0]}.
             </h1>
-            <p style={{ fontSize: 13, marginTop: 6, color: text2 }}>
+            <p style={{ fontSize: 13, marginTop: 6, color: "rgba(255,255,255,0.65)" }}>
               Manage your classroom, monitor students, keep the day on track.
             </p>
           </div>
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             {classes[0]?.id && (
               <a href={`/board?class=${encodeURIComponent(classes[0].id)}`} target="_blank" rel="noopener noreferrer"
-                style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,textDecoration:"none",
-                  background:"linear-gradient(135deg, rgba(124,58,237,0.18), rgba(79,70,229,0.12))",
-                  border:"1px solid rgba(124,58,237,0.35)", color:"#a78bfa",
-                  boxShadow:"0 2px 12px rgba(124,58,237,0.2)",
+                style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,textDecoration:"none",
+                  background:"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.35)", color:"white",
+                  backdropFilter:"blur(8px)",
                 }}>
                 <Tv size={13}/> Open Board
               </a>
             )}
-            <Link to="/teacher/board-settings" style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:600,textDecoration:"none",
-              background: surface, border:`1px solid ${border}`, color:text2 }}>
+            <Link to="/teacher/board-settings" style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,textDecoration:"none",
+              background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.25)", color:"rgba(255,255,255,0.85)" }}>
               <Tv size={13}/> Board Settings
             </Link>
-            <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
-              background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", color:"#f87171" }}>
+            <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
+              background:"rgba(239,68,68,0.25)", border:"1px solid rgba(239,68,68,0.5)", color:"#fecaca" }}>
               <LockOpen size={13}/> Force Unlock All
             </button>
           </div>
         </div>
       </header>
+      </div>
+
+      <div style={{ padding: "0 32px 32px", maxWidth: 1280, margin: "0 auto" }}>
 
       {/* ── Tools grid ── */}
       <div style={{
@@ -456,6 +465,7 @@ export default function TeacherDashboard() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

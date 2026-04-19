@@ -182,6 +182,7 @@ export const api = {
 
   // Leaderboard
   getLeaderboard: () => request<any[]>("/leaderboard"),
+  getAssignmentLeaderboard: () => request<any[]>("/leaderboard/assignments"),
   addPoints: (userId: string, points: number) => request<any>("/leaderboard/points", { method: "POST", body: JSON.stringify({ userId, points }) }),
 
   // Users

@@ -15,6 +15,28 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
+// Assignment completion leaderboard
+router.get("/assignments", async (_req: AuthRequest, res: Response) => {
+  try {
+    const rows = await db.prepare(`
+      SELECT
+        u.id AS user_id,
+        u.name,
+        COALESCE(SUM(CASE WHEN wa.completed=1 THEN 1 ELSE 0 END), 0) AS completed,
+        COUNT(wa.id) AS total_assigned
+      FROM users u
+      LEFT JOIN worksheet_assignments wa ON wa.student_id = u.id
+      WHERE u.role = 'student'
+      GROUP BY u.id, u.name
+      ORDER BY completed DESC, total_assigned DESC
+      LIMIT 50
+    `).all() as any[];
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to get assignment leaderboard" });
+  }
+});
+
 // Add points (internal / teacher)
 router.post("/points", async (req: AuthRequest, res: Response) => {
   const { userId, points } = req.body;
