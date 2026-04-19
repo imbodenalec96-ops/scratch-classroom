@@ -173,29 +173,45 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
 // Returns the website row only if this student has been granted access.
 // Prevents a student from typing /app/<someoneElsesId> and getting a URL.
 router.get("/mine/:id", async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  const userId = req.user!.id;
-  // Check individually granted first
-  let row: any = await db.prepare(
-    `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
-       FROM student_approved_websites sw
-       JOIN approved_websites w ON w.id = sw.approved_website_id
-      WHERE sw.student_id = ? AND w.id = ?
-      LIMIT 1`
-  ).get(userId, req.params.id);
-  // Fall back to class library access (includes global class_id IS NULL sites)
-  if (!row) {
-    row = await db.prepare(
+  try {
+    await ensureTables();
+    const userId = req.user!.id;
+    const id = req.params.id;
+    // Check individually granted first
+    let row: any = await db.prepare(
       `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
-         FROM approved_websites w
-        WHERE w.id = ?
-          AND (w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
-               OR w.class_id IS NULL)
+         FROM student_approved_websites sw
+         JOIN approved_websites w ON w.id = sw.approved_website_id
+        WHERE sw.student_id = ? AND w.id = ?
         LIMIT 1`
-    ).get(req.params.id, userId);
+    ).get(userId, id);
+    // Fall back to class library + global (class_id IS NULL) sites
+    if (!row) {
+      try {
+        row = await db.prepare(
+          `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
+             FROM approved_websites w
+            WHERE w.id = ?
+              AND (w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
+                   OR w.class_id IS NULL)
+            LIMIT 1`
+        ).get(id, userId);
+      } catch {
+        // class_members join failed — fall back to global-only check
+        row = await db.prepare(
+          `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji
+             FROM approved_websites w
+            WHERE w.id = ? AND w.class_id IS NULL
+            LIMIT 1`
+        ).get(id);
+      }
+    }
+    if (!row) return res.status(404).json({ error: "Website not found or not unlocked for you" });
+    res.json(row);
+  } catch (e: any) {
+    console.error("[websites/mine/:id]", e);
+    res.status(500).json({ error: e?.message || "Failed to load website" });
   }
-  if (!row) return res.status(404).json({ error: "Website not found" });
-  res.json(row);
 });
 
 // ── Teacher/admin: list all pending requests across the teacher's classes ──

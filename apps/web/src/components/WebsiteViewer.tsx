@@ -35,7 +35,12 @@ export default function WebsiteViewer() {
     if (!websiteId) return;
     api.getMyWebsite(websiteId)
       .then(setSite)
-      .catch(() => setErr("This website isn't available. Ask your teacher to unlock it."));
+      .catch((e: any) => {
+        const status = e?.status ?? e?.response?.status;
+        setErr(status === 404
+          ? "This website isn't unlocked for you yet. Ask your teacher to grant you access."
+          : "Something went wrong loading this site. Try refreshing or go back.");
+      });
   }, [websiteId]);
 
   // If the iframe doesn't fire `load` within ~6s, surface the fallback.
