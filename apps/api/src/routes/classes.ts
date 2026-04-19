@@ -1149,7 +1149,7 @@ async function seedStarStudents() {
     for (const s of STAR_STUDENTS_SEED) {
       if (s.specials_grade != null) {
         await db.prepare(
-          `UPDATE users SET specials_grade = ? WHERE LOWER(name) = LOWER(?) AND specials_grade IS NULL AND role = 'student'`
+          `UPDATE users SET specials_grade = ? WHERE LOWER(name) = LOWER(?) AND role = 'student'`
         ).run(s.specials_grade, s.name);
         // Also force-update the canonical seed students by ID so grade corrections propagate
         await db.prepare(

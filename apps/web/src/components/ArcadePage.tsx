@@ -641,6 +641,9 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         style={{
           maxWidth: 700,
           maxHeight: "90vh",
+          /* On touch / coarse-pointer devices (iPad, phones) expand to near full-screen */
+          width: "min(700px, 100vw - 16px)",
+          height: "min(90vh, 100dvh - 16px)",
           background: "#08081f",
           border: `1px solid ${game.accentColor}44`,
           boxShadow: `0 40px 80px ${game.accentColor}33, 0 0 0 1px rgba(255,255,255,0.04)`,
@@ -685,7 +688,7 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
         </div>
 
         {/* Game area */}
-        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "manipulation" }}>
+        <div className="flex-1 overflow-auto" style={{ minHeight: 380, overscrollBehavior: "contain", touchAction: "none" }}>
           {game.comingSoon ? (
             /* Coming-soon slot — Unity placeholder */
             <div className="flex flex-col items-center justify-center gap-5 p-10 text-center" style={{ minHeight: 420 }}>
@@ -736,7 +739,9 @@ function PlayerModal({ game, onClose, showBrowseLink }: { game: Game; onClose: (
           style={{ background: "rgba(0,0,0,0.4)", borderTop: `1px solid ${game.accentColor}18` }}
         >
           <StarRating stars={game.stars} />
-          <span className="text-[10px] text-white/25">{game.plays} plays • Press Esc to close</span>
+          <span className="text-[10px] text-white/25">
+            {game.plays} plays &bull; {typeof window !== "undefined" && "ontouchstart" in window ? "Tap × to close" : "Press Esc to close"}
+          </span>
         </div>
       </div>
     </div>

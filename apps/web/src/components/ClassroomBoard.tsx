@@ -318,7 +318,7 @@ export default function ClassroomBoard() {
           <div style={{
             flex: 1, overflow: "hidden", minHeight: 0,
             display: "grid",
-            gridTemplateColumns: `repeat(${Math.min(4, Math.max(2, board.students.length))}, 1fr)`,
+            gridTemplateColumns: `repeat(${Math.min(5, Math.max(3, board.students.length))}, 1fr)`,
             gridAutoRows: "1fr",
             gap: 6,
           }}>
@@ -331,7 +331,7 @@ export default function ClassroomBoard() {
               const initial = (s.name || "?")[0].toUpperCase();
               return (
                 <div key={s.id} style={{
-                  borderRadius: 16, display: "flex", flexDirection: "column",
+                  borderRadius: 10, display: "flex", flexDirection: "column",
                   alignItems: "stretch", textAlign: "center",
                   background: isFull
                     ? "linear-gradient(160deg, rgba(245,158,11,.28), rgba(234,179,8,.14))"
@@ -349,17 +349,17 @@ export default function ClassroomBoard() {
                   }} />
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "6px 4px 5px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ flex: 1, padding: "4px 3px 3px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                     {/* Avatar */}
                     <div style={{
-                      width: 50, height: 50, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 36, height: 36, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 20, fontWeight: 900, color: "white",
+                      fontSize: 14, fontWeight: 900, color: "white",
                       background: isFull
                         ? "linear-gradient(135deg, #f59e0b, #d97706)"
                         : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
-                      border: `3px solid ${isFull ? "rgba(245,158,11,.7)" : lc.color + "55"}`,
-                      boxShadow: isFull ? `0 0 16px rgba(245,158,11,.5)` : `0 0 10px ${lc.glow}`,
+                      border: `2px solid ${isFull ? "rgba(245,158,11,.7)" : lc.color + "55"}`,
+                      boxShadow: isFull ? `0 0 12px rgba(245,158,11,.5)` : `0 0 7px ${lc.glow}`,
                       animation: isFull ? "popIn .4s ease both, pulseRing 2s ease-in-out 0.5s infinite" : undefined,
                     }}>
                       {s.avatar_url
@@ -368,18 +368,18 @@ export default function ClassroomBoard() {
                     </div>
 
                     {/* Name */}
-                    <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 3px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
                       {s.name}
                     </div>
 
-                    {/* Stars — big and prominent */}
+                    {/* Stars */}
                     <div style={{ display: "flex", gap: 1, justifyContent: "center" }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 20,
+                          fontSize: 13,
                           lineHeight: 1,
                           opacity: i < stars ? 1 : 0.13,
-                          filter: i < stars ? (isFull ? "drop-shadow(0 0 5px rgba(251,191,36,0.9))" : "none") : "grayscale(1) brightness(.25)",
+                          filter: i < stars ? (isFull ? "drop-shadow(0 0 4px rgba(251,191,36,0.9))" : "none") : "grayscale(1) brightness(.25)",
                           animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.15}s infinite` : undefined,
                         }}>⭐</span>
                       ))}
@@ -410,37 +410,19 @@ export default function ClassroomBoard() {
                       ) : null;
                     })()}
 
-                    {/* Segmented star progress dots */}
-                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <div key={i} style={{
-                          width: i < stars ? 10 : 6,
-                          height: i < stars ? 10 : 6,
-                          borderRadius: '50%',
-                          transition: 'all 0.4s ease',
-                          background: i < stars
-                            ? (isFull ? 'radial-gradient(circle, #fef08a, #f59e0b)' : `radial-gradient(circle, ${lc.color}, ${lc.color}88)`)
-                            : 'rgba(255,255,255,0.1)',
-                          boxShadow: i < stars ? (isFull ? '0 0 6px rgba(245,158,11,0.8)' : `0 0 5px ${lc.glow}`) : 'none',
-                          animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.2}s infinite` : undefined,
-                        }} />
-                      ))}
-                    </div>
-
                     {/* Level label + reward */}
-                    <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
                       <div style={{
-                        fontSize: 9, padding: "2px 7px", borderRadius: 20,
+                        fontSize: 8, padding: "1px 5px", borderRadius: 20,
                         background: lc.bg, color: lc.color, fontWeight: 800,
                         border: `1px solid ${lc.color}44`,
-                        boxShadow: `0 0 6px ${lc.glow}`,
-                        letterSpacing: "0.04em",
+                        letterSpacing: "0.03em",
                       }}>
                         {lc.icon} {lc.short}
                       </div>
                       {s.reward_count > 0 && (
                         <div style={{
-                          fontSize: 9, padding: "2px 7px", borderRadius: 20,
+                          fontSize: 8, padding: "1px 5px", borderRadius: 20,
                           background: "rgba(245,158,11,.3)", color: "#fcd34d", fontWeight: 800,
                           border: "1px solid rgba(245,158,11,.45)",
                           animation: "rewardBounce 1.5s ease-in-out infinite",

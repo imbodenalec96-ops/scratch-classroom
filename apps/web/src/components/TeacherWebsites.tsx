@@ -115,6 +115,7 @@ export default function TeacherWebsites() {
       });
       setApproveFor(null);
       await reload();
+      setTab("library");
     } catch (e: any) { setErr(e?.message || "Failed to approve"); }
     finally { setSaving(false); }
   };

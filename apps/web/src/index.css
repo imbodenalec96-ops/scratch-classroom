@@ -794,3 +794,47 @@ tr {
 .font-student {
   font-family: 'Baloo 2', ui-sans-serif, sans-serif;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   iPAD / TOUCH OPTIMIZATION
+   ═══════════════════════════════════════════════════════════ */
+
+/* Prevent accidental zoom on double-tap for interactive elements */
+button, a, select, input, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Remove tap highlight on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure minimum 44px touch targets on mobile */
+@media (pointer: coarse) {
+  button, [role="button"], select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Increase font sizes slightly for readability */
+  .text-xs { font-size: 0.8rem; }
+
+  /* More generous padding on cards for touch */
+  .card { padding: 14px 16px; }
+
+  /* Hide hover-only states since touch doesn't hover */
+  .hover-only { display: none; }
+}
+
+/* Safe area insets for notched iPads */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .pb-safe { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
+/* Game canvas — prevent iOS overscroll/bounce */
+canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

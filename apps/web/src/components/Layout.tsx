@@ -256,8 +256,9 @@ export default function Layout() {
                 to={item.path}
                 style={{
                   display: "flex", alignItems: "center", gap: 9,
-                  padding: "8px 10px", borderRadius: 10, textDecoration: "none",
+                  padding: "10px 10px", borderRadius: 10, textDecoration: "none",
                   fontSize: 13, fontWeight: active ? 700 : 500,
+                  minHeight: 44, touchAction: "manipulation",
                   transition: "all 0.15s ease",
                   animationDelay: `${i * 35}ms`,
                   ...(active
@@ -300,7 +301,8 @@ export default function Layout() {
             onClick={toggleTheme}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "7px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              padding: "10px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              minHeight: 44, touchAction: "manipulation",
               cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.1)"}`,
               background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
               color: dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)",
@@ -344,7 +346,8 @@ export default function Layout() {
             onClick={logout}
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              padding: "7px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              padding: "10px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              minHeight: 44, touchAction: "manipulation",
               cursor: "pointer", border: "1px solid transparent",
               background: "transparent",
               color: dk ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.35)",

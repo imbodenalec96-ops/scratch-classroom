@@ -1565,4 +1565,104 @@ router.post("/upload-pdf", requireRole("teacher", "admin"), pdfUpload.single("fi
   });
 });
 
+// ── PDF → structured-assignment JSON via Claude ───────────────────────────────
+// Takes a fileId (which is the assignment_id returned by /upload-pdf since
+// `saveAttachedPdf` stores rows keyed by assignment_id), pulls the base64 PDF
+// out of assignment_files, and asks Claude to extract it into the editor's
+// expected shape: { title, subject, grade, instructions, sections[] }.
+router.post("/parse-pdf", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  const { fileId } = req.body || {};
+  if (!fileId || typeof fileId !== "string") {
+    return res.status(400).json({ error: "fileId is required" });
+  }
+
+  // Load the most recent PDF attached to this assignment. We look up by
+  // assignment_id first (matches /upload-pdf's return shape) and fall back to
+  // the assignment_files primary key so either id works.
+  let row: any = null;
+  try {
+    row = await db.prepare(
+      `SELECT * FROM assignment_files WHERE assignment_id = ? ORDER BY created_at DESC LIMIT 1`
+    ).get(fileId);
+    if (!row) {
+      row = await db.prepare(`SELECT * FROM assignment_files WHERE id = ?`).get(fileId);
+    }
+  } catch (e: any) {
+    return res.status(500).json({ error: "DB lookup failed: " + (e?.message || "unknown") });
+  }
+  if (!row || !row.data_base64) {
+    return res.status(404).json({ error: "PDF not found for that fileId" });
+  }
+
+  const client = getAnthropic();
+  if (!client) {
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+  }
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-opus-4-7",
+      max_tokens: 4096,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: row.data_base64 },
+          },
+          {
+            type: "text",
+            text: `Extract this worksheet into a JSON assignment. Return ONLY valid JSON in this exact shape:
+{
+  "title": "string",
+  "subject": "math|reading|writing|science|social_studies|spelling",
+  "grade": "Kindergarten|1st Grade|2nd Grade|3rd Grade|4th Grade|5th Grade",
+  "instructions": "string (the overall directions)",
+  "sections": [
+    {
+      "title": "Section name",
+      "questions": [
+        {
+          "type": "multiple_choice|short_answer|fill_blank",
+          "text": "Question text",
+          "options": ["A", "B", "C", "D"],
+          "correctIndex": 0,
+          "points": 1
+        }
+      ]
+    }
+  ]
+}
+Only include "options" and "correctIndex" for multiple_choice questions.`,
+          },
+        ],
+      }],
+    });
+
+    // Claude returns content as an array of blocks; grab the first text block.
+    const textBlock = (response.content || []).find((b: any) => b.type === "text");
+    const raw = (textBlock as any)?.text?.trim() || "";
+    if (!raw) return res.status(500).json({ error: "Claude returned no text" });
+
+    // Tolerate ```json fences even though we asked for plain JSON.
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e: any) {
+      return res.status(500).json({ error: "Claude response was not valid JSON: " + (e?.message || "parse error") });
+    }
+
+    return res.json(parsed);
+  } catch (e: any) {
+    console.error("[parse-pdf]", e?.message || e);
+    return res.status(500).json({ error: e?.message || "Claude request failed" });
+  }
+});
+
 export default router;
