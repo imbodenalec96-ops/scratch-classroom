@@ -337,6 +337,7 @@ export const api = {
 
   // YouTube library (curated class videos)
   getYouTubeLibrary: (classId: string) => request<any[]>(`/youtube/library/${classId}`),
+  getAllYouTubeLibrary: () => request<any[]>(`/youtube/library`),
   addToYouTubeLibrary: (data: any) => request<any>('/youtube/library', { method: 'POST', body: JSON.stringify(data) }),
   removeFromYouTubeLibrary: (id: string) => request<any>(`/youtube/library/${id}`, { method: 'DELETE' }),
   pickLibraryVideo: (libraryId: string, studentId: string | number) => request<any>(`/youtube/library/${libraryId}/pick`, { method: 'POST', body: JSON.stringify({ student_id: studentId }) }),

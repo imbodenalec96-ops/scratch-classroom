@@ -939,8 +939,15 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
   const { theme, toggleTheme } = useTheme();
   const dk = theme === "dark";
 
+  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 900);
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
-    <div className={`h-screen flex flex-col ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`}>
+    <div className={`flex flex-col ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`} style={{ height: "100dvh" }}>
       {/* Lock screen overlay */}
       {lockedScreen && (
         <div className={`fixed inset-0 z-50 backdrop-blur-xl flex items-center justify-center ${dk ? "bg-[#07071a]/98" : "bg-white/95"}`}>
@@ -954,7 +961,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         </div>
       )}
       {/* Toolbar */}
-      <div className={`flex items-center gap-3 px-4 py-2 border-b ${dk ? "bg-[#0a0b20] border-white/[0.05]" : "bg-white border-gray-200"}`}>
+      <div className={`flex items-center gap-2 px-3 py-2 border-b flex-shrink-0 overflow-x-auto ${dk ? "bg-[#0a0b20] border-white/[0.05]" : "bg-white border-gray-200"}`} style={{ minHeight: 44, WebkitOverflowScrolling: "touch" }}>
         <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
@@ -965,7 +972,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         <div className={`w-px h-5 ${dk ? "bg-white/[0.08]" : "bg-gray-200"}`} />
 
         <input value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
-          className={`bg-transparent border-none font-medium text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/50 rounded px-2 py-1 w-48 ${dk ? "text-white" : "text-gray-900"}`} />
+          className={`bg-transparent border-none font-medium text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/50 rounded px-2 py-1 w-28 sm:w-48 flex-shrink-0 ${dk ? "text-white" : "text-gray-900"}`} />
 
         {/* Mode toggle */}
         <div className={`flex rounded-lg overflow-hidden border ${dk ? "border-white/[0.08]" : "border-gray-200"}`}>
@@ -1002,28 +1009,32 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         </button>
 
         <button onClick={() => setShowTimeline(!showTimeline)}
-          className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
-          {showTimeline ? "Hide Timeline" : "Timeline"}
+          className={`flex-shrink-0 px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
+          <span className="hidden sm:inline">{showTimeline ? "Hide Timeline" : "Timeline"}</span>
+          <span className="sm:hidden">⏱</span>
         </button>
         <button onClick={() => setShowAssets(!showAssets)}
-          className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
-          {showAssets ? "Hide Assets" : "Assets"}
+          className={`flex-shrink-0 px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
+          <span className="hidden sm:inline">{showAssets ? "Hide Assets" : "Assets"}</span>
+          <span className="sm:hidden">🖼</span>
         </button>
         <button onClick={() => setShowAICreator(true)}
-          className="px-2.5 py-1 text-xs rounded-lg bg-gradient-to-r from-[#FF6B9D]/20 to-violet-500/20 text-[#FF6B9D] hover:from-[#FF6B9D]/30 hover:to-violet-500/30 border border-[#FF6B9D]/20 transition-colors font-medium">
-          ✧ AI Creator
+          className="flex-shrink-0 px-2.5 py-1 text-xs rounded-lg bg-gradient-to-r from-[#FF6B9D]/20 to-violet-500/20 text-[#FF6B9D] hover:from-[#FF6B9D]/30 hover:to-violet-500/30 border border-[#FF6B9D]/20 transition-colors font-medium">
+          <span className="hidden sm:inline">✧ AI Creator</span>
+          <span className="sm:hidden">✧</span>
         </button>
         <button onClick={() => setShowGameSystems(true)}
-          className="px-2.5 py-1 text-xs rounded-lg bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/20 transition-colors font-medium">
-          Game Systems
+          className="flex-shrink-0 px-2.5 py-1 text-xs rounded-lg bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/20 transition-colors font-medium">
+          <span className="hidden sm:inline">Game Systems</span>
+          <span className="sm:hidden">🎮</span>
         </button>
         <button onClick={() => setShowLessons(true)}
-          className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
-          📖 Lessons
+          className={`flex-shrink-0 px-2.5 py-1 text-xs rounded-lg border transition-colors ${dk ? "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] border-white/[0.06]" : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"}`}>
+          📖<span className="hidden sm:inline"> Lessons</span>
         </button>
 
         {/* Run/Stop — ping ring when running, glow invite when stopped */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           {running && (
             <span className="absolute inset-0 rounded-lg pointer-events-none animate-ping-slow bg-red-400/20" />
           )}
@@ -1043,7 +1054,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
-          className={`px-3 py-1.5 text-xs rounded-lg text-white transition-all duration-200 disabled:opacity-40 active:scale-95 ${
+          className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-lg text-white transition-all duration-200 disabled:opacity-40 active:scale-95 ${
             savedFlash ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/25 shadow-md" : "bg-violet-600 hover:bg-violet-500"
           }`}
         >
@@ -1063,10 +1074,10 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
       </div>
 
       {/* Main content */}
-      <div className={`flex-1 min-h-0 flex overflow-hidden ${shaking ? "screen-shake" : ""}`}>
+      <div className={`flex-1 min-h-0 flex overflow-hidden ${isNarrow ? "flex-col" : "flex-row"} ${shaking ? "screen-shake" : ""}`}>
         {/* Editor area */}
-        <div className="flex-1 min-h-0 flex flex-col min-w-0">
-          <div className="flex-1 min-h-0 p-2 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col min-w-0" style={isNarrow ? { minHeight: "45vh", maxHeight: "55vh" } : {}}>
+          <div className="flex-1 min-h-0 p-2 overflow-hidden" style={{ touchAction: "pan-y" }}>
             {viewMode === "blocks" ? (
               <BlockEditor
                 blocks={selectedSprite?.blocks || []}
@@ -1085,7 +1096,10 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
         </div>
 
         {/* Right panel: Stage + sprites */}
-        <div className="w-[500px] flex flex-col border-l border-white/[0.06] p-2 gap-2 overflow-y-auto bg-white/[0.01]">
+        <div
+          className={`flex flex-col p-2 gap-2 overflow-y-auto bg-white/[0.01] ${isNarrow ? "border-t border-white/[0.06] w-full" : "border-l border-white/[0.06]"}`}
+          style={isNarrow ? { maxHeight: "45vh", touchAction: "pan-y" } : { width: 420, flexShrink: 0, touchAction: "pan-y" }}
+        >
           {mode === "2d" ? (
             <Stage2D sprites={sprites} stage={stage} running={running} selectedSpriteId={selectedSpriteId} onRunningChange={setRunning} onSpriteMove={handleSpriteMove} />
           ) : mode === "3d" ? (

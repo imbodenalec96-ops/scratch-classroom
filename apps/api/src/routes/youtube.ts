@@ -36,6 +36,25 @@ function extractVideoId(url: string): string {
   return m ? m[1] : '';
 }
 
+// GET /library — all videos the current user's classes have (no classId required)
+router.get("/library", async (req: AuthRequest, res: Response) => {
+  await ensureLibraryTable();
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.json([]);
+    // For teachers/admin: all videos. For students: videos from their enrolled classes.
+    const rows = req.user?.role === 'teacher' || req.user?.role === 'admin'
+      ? await db.prepare("SELECT * FROM youtube_library ORDER BY added_at DESC").all()
+      : await db.prepare(
+          `SELECT DISTINCT yl.* FROM youtube_library yl
+           JOIN class_members cm ON cm.class_id = yl.class_id
+           WHERE cm.user_id = ?
+           ORDER BY yl.added_at DESC`
+        ).all(userId);
+    res.json(rows);
+  } catch (e) { res.json([]); }
+});
+
 // GET /library/:classId — student browses curated library
 router.get("/library/:classId", async (req: AuthRequest, res: Response) => {
   await ensureLibraryTable();

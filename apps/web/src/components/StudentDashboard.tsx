@@ -7,6 +7,7 @@ import { useSocket } from "../lib/ws.ts";
 import { isWorkUnlocked, isAccessAllowed, setWorkUnlocked } from "../lib/workUnlock.ts";
 import { isOnBreak, chooseBreak } from "../lib/breakSystem.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
+import { useBlockInfo } from "../lib/useCurrentBlock.ts";
 import { usePresencePing } from "../lib/presence.ts";
 import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
 import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
@@ -963,6 +964,7 @@ export default function StudentDashboard() {
     api.getMyWebsites().then(setMyWebsites).catch(() => {});
   }, []);
   const classConfig = useClassConfig();
+  const blockInfo = useBlockInfo(classes[0]?.id ?? null);
 
   // Reload YouTube library from ALL classes (merged) so we never miss videos
   useEffect(() => {
@@ -1349,6 +1351,53 @@ export default function StudentDashboard() {
 
       <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
 
+      {/* ── Current Block Banner ── */}
+      {(blockInfo.state === "current" && !(blockInfo as any).block.is_break) && (
+        <div style={{
+          borderRadius: 12, padding: "10px 14px",
+          background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
+          display: "flex", alignItems: "center", gap: 10,
+          animation: "dbSlide .4s ease both",
+        }}>
+          <div style={{ fontSize: 18 }}>
+            {(blockInfo as any).block.subject === "math" ? "🔢" :
+             (blockInfo as any).block.subject === "reading" ? "📖" :
+             (blockInfo as any).block.subject === "writing" ? "✏️" :
+             (blockInfo as any).block.subject === "spelling" ? "🔤" :
+             (blockInfo as any).block.subject === "sel" ? "💛" :
+             (blockInfo as any).block.subject === "daily_news" ? "📰" :
+             (blockInfo as any).block.subject === "science" ? "🔬" :
+             (blockInfo as any).block.subject === "social_studies" ? "🌎" :
+             "📚"}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>
+              Now: {(blockInfo as any).block.label}
+            </div>
+            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>
+              {(blockInfo as any).block.start_time} – {(blockInfo as any).block.end_time}
+            </div>
+          </div>
+          <div style={{ fontSize: 10, padding: "3px 9px", borderRadius: 20, background: "rgba(139,92,246,0.3)", color: "#c4b5fd", fontWeight: 700 }}>
+            IN SESSION
+          </div>
+        </div>
+      )}
+      {(blockInfo.state === "upcoming") && (
+        <div style={{
+          borderRadius: 12, padding: "10px 14px",
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", alignItems: "center", gap: 10,
+          animation: "dbSlide .4s ease both",
+        }}>
+          <div style={{ fontSize: 16 }}>⏱</div>
+          <div style={{ flex: 1, fontSize: 11, opacity: 0.5 }}>
+            Next: {(blockInfo as any).block.label} at {(blockInfo as any).block.start_time}
+            {(blockInfo as any).daysAway > 0 ? ` (in ${(blockInfo as any).daysAway}d)` : ""}
+          </div>
+        </div>
+      )}
+
       {/* ── Stats ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {[
@@ -1366,6 +1415,64 @@ export default function StudentDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Class Leaderboard ── */}
+      {leaderboard.length > 0 && (
+        <div style={{
+          borderRadius: 16, padding: "14px",
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+          animation: "dbSlide .5s ease .15s both",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 10 }}>
+            🏆 Class Leaderboard
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {leaderboard.slice(0, 5).map((entry: any, i: number) => {
+              const isMe = entry.user_id === user?.id;
+              const medals = ["🥇", "🥈", "🥉"];
+              return (
+                <div key={entry.user_id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 10px", borderRadius: 10,
+                  background: isMe ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.03)",
+                  border: isMe ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.05)",
+                  transition: "background .2s",
+                }}>
+                  <div style={{ width: 22, textAlign: "center", fontSize: i < 3 ? 16 : 12, fontWeight: 800, opacity: i < 3 ? 1 : 0.4 }}>
+                    {i < 3 ? medals[i] : `${i + 1}`}
+                  </div>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)" }}>
+                    {entry.name}{isMe ? " (you)" : ""}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {Array.from({ length: 5 }, (_, si) => (
+                      <span key={si} style={{ fontSize: 10, opacity: si < entry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {myEntry && leaderboard.findIndex((e: any) => e.user_id === user?.id) >= 5 && (
+            <div style={{
+              marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)",
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "8px 10px", borderRadius: 10,
+              background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
+            }}>
+              <div style={{ width: 22, textAlign: "center", fontSize: 12, fontWeight: 800, opacity: 0.6 }}>
+                {leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1}
+              </div>
+              <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#c4b5fd" }}>{myEntry.name} (you)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {Array.from({ length: 5 }, (_, si) => (
+                  <span key={si} style={{ fontSize: 10, opacity: si < myEntry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Today's Quizzes ── */}
       {pendingQuizzes.length > 0 && !activeQuiz && (
@@ -1487,7 +1594,7 @@ export default function StudentDashboard() {
               >
                 <div style={{ fontSize: 36, marginBottom: 8 }}>🎮</div>
                 <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Arcade</div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>29 games · keep it fun</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>31 games · keep it fun</div>
               </div>
             </Link>
             <Link to="/projects" style={{ textDecoration: "none" }}>
