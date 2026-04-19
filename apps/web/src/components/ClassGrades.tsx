@@ -1,14 +1,14 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
-import { GraduationCap, ChevronLeft, Save, Users } from "lucide-react";
+import { GraduationCap, ChevronLeft, Save, Users, CheckCircle2, ChevronDown } from "lucide-react";
 
 /**
  * ClassGrades — per-student grade-level editor.
- * Teacher picks a class → sees every student with Reading / Math / Writing
- * grade dropdowns. Edits are optimistic; "Save all" flushes to server.
- * Also exposes a bulk "Set everyone to grade N" row.
+ * Spreadsheet/gradebook layout. Rows = students, cols = Reading/Math/Writing.
+ * Inline editing: click a grade cell to open an input.
+ * Color-coded by grade level. Sticky header. Infinite Campus-inspired layout.
  */
 export default function ClassGrades() {
   const { theme } = useTheme();
@@ -20,22 +20,20 @@ export default function ClassGrades() {
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
-
-  const showFlash = useCallback((t: string) => { setFlash(t); setTimeout(() => setFlash(null), 2500); }, []);
-
+  const [editCell, setEditCell] = useState<{ id: string; subject: string } | null>(null);
   const [studentsByClass, setStudentsByClass] = useState<Record<string, number>>({});
+
+  const showFlash = useCallback((t: string) => { setFlash(t); setTimeout(() => setFlash(null), 2800); }, []);
 
   useEffect(() => {
     api.getClasses().then(async c => {
       setClasses(c);
-      // Populate student counts per class so the selector shows '(8)' badges
       const counts: Record<string, number> = {};
       await Promise.all(c.map(async (cls: any) => {
         try { const list = await api.getStudents(cls.id); counts[cls.id] = list.length; }
         catch { counts[cls.id] = 0; }
       }));
       setStudentsByClass(counts);
-      // Default to the first class with actual students, not just the first class alphabetically
       if (c.length > 0 && !selectedClassId) {
         const firstWithStudents = c.find((cls: any) => counts[cls.id] > 0);
         setSelectedClassId((firstWithStudents || c[0]).id);
@@ -45,7 +43,7 @@ export default function ClassGrades() {
 
   useEffect(() => {
     if (!selectedClassId) return;
-    api.getClassGrades(selectedClassId).then(r => { setRows(r); setDirty({}); }).catch(() => setRows([]));
+    api.getClassGrades(selectedClassId).then(r => { setRows(r); setDirty({}); setEditCell(null); }).catch(() => setRows([]));
   }, [selectedClassId]);
 
   const editGrade = (userId: string, subject: string, val: number) => {
@@ -67,14 +65,13 @@ export default function ClassGrades() {
     }
     setDirty({});
     setSaving(false);
-    showFlash(`✓ Saved ${toSave.length} students`);
+    setEditCell(null);
+    showFlash(`Saved ${toSave.length} student${toSave.length !== 1 ? "s" : ""}`);
   };
 
-  // Bulk: "apply grade N to everyone in column" — per-subject
   const bulkApply = (subject: string, grade: number) => {
     if (!confirm(`Set every student's ${subject} grade to ${gradeLabel(grade)}?`)) return;
     setRows(prev => prev.map(r => ({ ...r, [`${subject}_grade`]: grade })));
-    // Mark everyone dirty so Save All picks them up
     const d: Record<string, boolean> = {};
     for (const r of rows) d[r.id] = true;
     setDirty(d);
@@ -83,8 +80,17 @@ export default function ClassGrades() {
   const selectedClass = classes.find(c => c.id === selectedClassId);
   const dirtyCount = Object.values(dirty).filter(Boolean).length;
 
+  // Color coding for grade levels
+  const gradeColor = (g: number): { bg: string; text: string; border: string } => {
+    if (g === 0)  return dk ? { bg: "rgba(251,191,36,0.12)",  text: "#fbbf24", border: "rgba(251,191,36,0.25)"  } : { bg: "#fffbeb", text: "#b45309", border: "#fde68a" };
+    if (g <= 2)   return dk ? { bg: "rgba(251,191,36,0.10)",  text: "#fcd34d", border: "rgba(251,191,36,0.2)"   } : { bg: "#fefce8", text: "#a16207", border: "#fef08a" };
+    if (g <= 5)   return dk ? { bg: "rgba(52,211,153,0.12)",  text: "#34d399", border: "rgba(52,211,153,0.25)"  } : { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" };
+    if (g <= 8)   return dk ? { bg: "rgba(56,189,248,0.12)",  text: "#38bdf8", border: "rgba(56,189,248,0.25)"  } : { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" };
+    return           dk ? { bg: "rgba(167,139,250,0.12)", text: "#a78bfa", border: "rgba(167,139,250,0.25)" } : { bg: "#f5f3ff", text: "#7c3aed", border: "#ddd6fe" };
+  };
+
   return (
-    <div className="p-7 space-y-6 animate-page-enter max-w-5xl mx-auto">
+    <div className="p-7 space-y-5 animate-page-enter max-w-5xl mx-auto">
       {/* ── Masthead header ── */}
       <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
@@ -103,20 +109,23 @@ export default function ClassGrades() {
             </p>
           </div>
           <Link to="/teacher" className="btn-ghost text-xs">
-            <ChevronLeft size={13}/> Back to dashboard
+            <ChevronLeft size={13} /> Back to dashboard
           </Link>
         </div>
       </header>
 
       {/* Flash toast */}
       {flash && (
-        <div className="px-4 py-2 text-sm font-medium" style={{
-          background: "color-mix(in srgb, var(--success) 12%, transparent)",
+        <div className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium animate-slide-up" style={{
+          background: "color-mix(in srgb, var(--success) 10%, transparent)",
           color: "var(--success)",
-          border: "1px solid color-mix(in srgb, var(--success) 30%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
           borderLeft: "3px solid var(--success)",
           borderRadius: "var(--r-md)",
-        }}>{flash}</div>
+        }}>
+          <CheckCircle2 size={15} />
+          {flash}
+        </div>
       )}
 
       {/* Class picker */}
@@ -125,14 +134,16 @@ export default function ClassGrades() {
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Class</span>
           {classes.map(c => {
             const n = studentsByClass[c.id] ?? 0;
+            const active = selectedClassId === c.id;
             return (
               <button key={c.id} onClick={() => setSelectedClassId(c.id)}
-                className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5"
                 style={{
                   borderRadius: "var(--r-md)",
-                  background: selectedClassId === c.id ? "var(--accent-light)" : "transparent",
-                  color: selectedClassId === c.id ? "var(--text-accent)" : "var(--text-2)",
-                  borderColor: selectedClassId === c.id ? "var(--accent)" : "var(--border-md)",
+                  background: active ? "var(--accent-light)" : "transparent",
+                  color: active ? "var(--text-accent)" : "var(--text-2)",
+                  borderColor: active ? "var(--accent)" : "var(--border-md)",
+                  transform: active ? "none" : undefined,
                 }}>
                 {c.name}
                 <span style={{
@@ -146,18 +157,38 @@ export default function ClassGrades() {
         </div>
       )}
 
-      {/* Grid */}
-      <div className="card p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-          <h3 className="font-display text-xl" style={{ color: "var(--text-1)" }}>
-            {selectedClass?.name || "Roster"}
-            <span className="ml-3 text-xs font-sans font-normal" style={{ color: "var(--text-3)" }}>
+      {/* ── Gradebook table ── */}
+      <div className="rounded-xl overflow-hidden" style={{
+        border: "1px solid var(--border)",
+        background: dk ? "var(--bg-surface)" : "white",
+        boxShadow: dk ? "none" : "0 1px 8px rgba(0,0,0,0.06)",
+      }}>
+        {/* Table toolbar */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{
+          borderColor: "var(--border)",
+          background: dk ? "var(--bg-raised)" : "#f8fafc",
+        }}>
+          <div className="flex items-center gap-3">
+            <GraduationCap size={15} style={{ color: "var(--text-accent)" }} />
+            <h3 className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>
+              {selectedClass?.name || "Roster"}
+            </h3>
+            <span className="text-xs" style={{ color: "var(--text-3)" }}>
               {rows.length} {rows.length === 1 ? "student" : "students"}
             </span>
-          </h3>
+            {dirtyCount > 0 && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full animate-fade-in" style={{
+                background: "rgba(251,191,36,0.15)", color: "#fbbf24",
+                border: "1px solid rgba(251,191,36,0.3)",
+              }}>
+                {dirtyCount} unsaved
+              </span>
+            )}
+          </div>
           <button onClick={saveAll} disabled={dirtyCount === 0 || saving}
             className="btn-primary gap-1.5 text-xs">
-            <Save size={13}/> {saving ? "Saving…" : dirtyCount > 0 ? `Save (${dirtyCount})` : "All saved"}
+            <Save size={12} />
+            {saving ? "Saving…" : dirtyCount > 0 ? `Save ${dirtyCount} change${dirtyCount !== 1 ? "s" : ""}` : "All saved"}
           </button>
         </div>
 
@@ -169,67 +200,122 @@ export default function ClassGrades() {
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--bg-muted)" }}>
-                  <th style={thStyle}>Student</th>
-                  <th style={thStyle}>
-                    <div className="flex items-center justify-between">
-                      <span>📖 Reading</span>
-                      <QuickSet subject="reading" onPick={(g) => bulkApply("reading", g)} dk={dk} />
-                    </div>
+              {/* Sticky header */}
+              <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
+                <tr style={{
+                  background: dk ? "var(--bg-raised)" : "#f1f5f9",
+                  borderBottom: `2px solid ${dk ? "var(--border-md)" : "#e2e8f0"}`,
+                }}>
+                  <th style={{ ...thBase, width: "34%" }}>
+                    Student
                   </th>
-                  <th style={thStyle}>
-                    <div className="flex items-center justify-between">
-                      <span>🔢 Math</span>
-                      <QuickSet subject="math" onPick={(g) => bulkApply("math", g)} dk={dk} />
-                    </div>
-                  </th>
-                  <th style={thStyle}>
-                    <div className="flex items-center justify-between">
-                      <span>✏️ Writing</span>
-                      <QuickSet subject="writing" onPick={(g) => bulkApply("writing", g)} dk={dk} />
-                    </div>
-                  </th>
+                  {(["reading", "math", "writing"] as const).map(subject => (
+                    <th key={subject} style={{ ...thBase, width: "22%" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span>{subjectLabel(subject)}</span>
+                        <QuickSet subject={subject} onPick={(g) => bulkApply(subject, g)} dk={dk} />
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={r.id} style={{ borderTop: "1px solid var(--border)" }}>
-                    <td style={{ padding: "10px 16px" }}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 flex items-center justify-center text-xs font-bold"
-                          style={{ background: "var(--accent-light)", color: "var(--text-accent)", borderRadius: "var(--r-sm)" }}>
-                          {(r.name || "?").slice(0, 1).toUpperCase()}
+                {rows.map((r, idx) => {
+                  const isAlternate = idx % 2 === 1;
+                  return (
+                    <tr key={r.id} style={{
+                      borderBottom: `1px solid ${dk ? "var(--border)" : "#e9ecef"}`,
+                      background: isAlternate
+                        ? (dk ? "rgba(255,255,255,0.015)" : "#f8fafc")
+                        : "transparent",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = dk ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.04)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isAlternate ? (dk ? "rgba(255,255,255,0.015)" : "#f8fafc") : "transparent"}>
+                      {/* Student name cell */}
+                      <td style={{ padding: "10px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{
+                            width: 32, height: 32, flexShrink: 0,
+                            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                            borderRadius: "var(--r-md)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "white", fontSize: 12, fontWeight: 700,
+                          }}>
+                            {(r.name || "?").slice(0, 1).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{r.name}</div>
+                            <div style={{ fontSize: 10, color: "var(--text-3)" }}>{r.email}</div>
+                          </div>
+                          {dirty[r.id] && (
+                            <span style={{
+                              marginLeft: 4, padding: "1px 7px", fontSize: 9,
+                              fontWeight: 700, letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              background: "rgba(251,191,36,0.15)",
+                              color: "#fbbf24",
+                              border: "1px solid rgba(251,191,36,0.3)",
+                              borderRadius: "var(--r-sm)",
+                            }}>•</span>
+                          )}
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{r.name}</div>
-                          <div className="text-[10px]" style={{ color: "var(--text-3)" }}>{r.email}</div>
-                        </div>
-                        {dirty[r.id] && (
-                          <span className="stamp" style={{ marginLeft: 6 }}>Unsaved</span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: "10px 16px" }}>
-                      <GradeSelect value={r.reading_grade} onChange={g => editGrade(r.id, "reading", g)} />
-                    </td>
-                    <td style={{ padding: "10px 16px" }}>
-                      <GradeSelect value={r.math_grade} onChange={g => editGrade(r.id, "math", g)} />
-                    </td>
-                    <td style={{ padding: "10px 16px" }}>
-                      <GradeSelect value={r.writing_grade} onChange={g => editGrade(r.id, "writing", g)} />
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      {/* Grade cells */}
+                      {(["reading", "math", "writing"] as const).map(subject => {
+                        const val: number = r[`${subject}_grade`] ?? 0;
+                        const colors = gradeColor(val);
+                        const isEditing = editCell?.id === r.id && editCell?.subject === subject;
+                        return (
+                          <td key={subject} style={{ padding: "8px 16px" }}>
+                            {isEditing ? (
+                              <GradeSelectInline
+                                value={val}
+                                onChange={g => { editGrade(r.id, subject, g); setEditCell(null); }}
+                                onBlur={() => setEditCell(null)}
+                              />
+                            ) : (
+                              <button
+                                data-no-hover
+                                onClick={() => setEditCell({ id: r.id, subject })}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  padding: "4px 10px",
+                                  borderRadius: "var(--r-md)",
+                                  background: colors.bg,
+                                  color: colors.text,
+                                  border: `1px solid ${colors.border}`,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  transition: "all 0.15s",
+                                  minWidth: 90,
+                                  justifyContent: "space-between",
+                                }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.8"; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.transform = ""; }}
+                              >
+                                <span>{gradeLabel(val)}</span>
+                                <ChevronDown size={10} style={{ opacity: 0.6 }} />
+                              </button>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Footer hint */}
-      <div className="text-[11px]" style={{ color: "var(--text-3)" }}>
-        <GraduationCap size={11} className="inline mr-1" />
+      {/* Footer */}
+      <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+        <GraduationCap size={11} className="inline mr-1.5" />
         Grades drive the AI task generator. Two students in different grades will get different
         prompts on the same day, even in the same class.
       </div>
@@ -239,15 +325,20 @@ export default function ClassGrades() {
 
 /* ── helpers ───────────────────────────────────────────── */
 
-const thStyle: React.CSSProperties = {
+const thBase: React.CSSProperties = {
   textAlign: "left",
-  padding: "12px 16px",
+  padding: "11px 16px",
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: "0.06em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   color: "var(--text-3)",
+  whiteSpace: "nowrap",
 };
+
+function subjectLabel(s: string): string {
+  return s === "reading" ? "📖 Reading" : s === "math" ? "🔢 Math" : "✏️ Writing";
+}
 
 function gradeLabel(g: number): string {
   if (g === 0) return "K";
@@ -255,9 +346,24 @@ function gradeLabel(g: number): string {
   return `${sufx(g)}`;
 }
 
-function GradeSelect({ value, onChange }: { value: number; onChange: (g: number) => void }) {
+/** Inline select that auto-focuses and closes on change or blur */
+function GradeSelectInline({
+  value,
+  onChange,
+  onBlur,
+}: { value: number; onChange: (g: number) => void; onBlur: () => void }) {
+  const ref = useRef<HTMLSelectElement>(null);
+  useEffect(() => { ref.current?.focus(); }, []);
   return (
-    <select value={value} onChange={e => onChange(Number(e.target.value))} className="input text-sm py-1.5" style={{ width: 120 }}>
+    <select
+      ref={ref}
+      value={value}
+      autoFocus
+      onChange={e => onChange(Number(e.target.value))}
+      onBlur={onBlur}
+      className="input text-sm py-1"
+      style={{ width: 130, borderColor: "var(--accent)", boxShadow: "0 0 0 2px rgba(99,102,241,0.2)" }}
+    >
       <option value={0}>Kindergarten</option>
       {Array.from({ length: 12 }).map((_, i) => (
         <option key={i + 1} value={i + 1}>{gradeLabel(i + 1)} grade</option>
@@ -270,10 +376,13 @@ function QuickSet({ subject, onPick, dk }: { subject: string; onPick: (g: number
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }} onMouseLeave={() => setOpen(false)}>
-      <button onClick={() => setOpen(v => !v)}
-        className="text-[10px] font-semibold normal-case tracking-normal px-2 py-0.5 cursor-pointer"
-        style={{ color: "var(--text-3)", borderRadius: "var(--r-sm)" }}
-        title={`Set every student's ${subject} grade`}>
+      <button
+        data-no-hover
+        onClick={() => setOpen(v => !v)}
+        className="text-[10px] font-semibold normal-case tracking-normal px-2 py-0.5 cursor-pointer rounded transition-colors"
+        style={{ color: "var(--text-3)" }}
+        title={`Set every student's ${subject} grade`}
+      >
         Set all ▾
       </button>
       {open && (
@@ -282,12 +391,14 @@ function QuickSet({ subject, onPick, dk }: { subject: string; onPick: (g: number
           background: "var(--bg-surface)",
           border: "1px solid var(--border-md)",
           borderRadius: "var(--r-md)",
-          boxShadow: "0 6px 16px rgba(0,0,0,0.12)",
-          padding: 4, zIndex: 20, minWidth: 140,
+          boxShadow: dk ? "0 8px 24px rgba(0,0,0,0.5)" : "0 6px 16px rgba(0,0,0,0.12)",
+          padding: 4, zIndex: 30, minWidth: 140,
         }}>
-          <button onClick={() => { onPick(0); setOpen(false); }} style={menuItem}>K</button>
+          <button data-no-hover onClick={() => { onPick(0); setOpen(false); }} style={menuItem}>K — Kindergarten</button>
           {Array.from({ length: 12 }).map((_, i) => (
-            <button key={i + 1} onClick={() => { onPick(i + 1); setOpen(false); }} style={menuItem}>{gradeLabel(i + 1)} grade</button>
+            <button data-no-hover key={i + 1} onClick={() => { onPick(i + 1); setOpen(false); }} style={menuItem}>
+              {gradeLabel(i + 1)} grade
+            </button>
           ))}
         </div>
       )}
@@ -297,7 +408,7 @@ function QuickSet({ subject, onPick, dk }: { subject: string; onPick: (g: number
 
 const menuItem: React.CSSProperties = {
   display: "block", width: "100%", textAlign: "left",
-  padding: "5px 10px", fontSize: 11, fontWeight: 600,
+  padding: "6px 10px", fontSize: 11, fontWeight: 600,
   color: "var(--text-2)", background: "transparent",
   border: "none", cursor: "pointer", borderRadius: "var(--r-sm)",
 };

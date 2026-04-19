@@ -8,13 +8,12 @@ const router = Router();
 router.get("/", async (_req: AuthRequest, res: Response) => {
   const rows = await db.prepare(
     `SELECT l.*, u.name,
-            MAX(COALESCE(cm.behavior_stars, 0)) AS behavior_stars
-       FROM leaderboard l
-       JOIN users u ON l.user_id = u.id
-       LEFT JOIN class_members cm ON cm.user_id = l.user_id
-       GROUP BY l.user_id, u.name, l.points, l.level, l.badges
-       ORDER BY behavior_stars DESC, l.points DESC
-       LIMIT 50`
+            COALESCE(bd.behavior_stars, 0) AS behavior_stars,
+            COALESCE(bd.reward_count, 0)   AS reward_count
+     FROM leaderboard l
+     JOIN users u ON l.user_id = u.id
+     LEFT JOIN board_user_data bd ON bd.user_id = l.user_id
+     ORDER BY COALESCE(bd.behavior_stars, 0) DESC, l.points DESC LIMIT 50`
   ).all() as any[];
   rows.forEach((r) => { r.badges = JSON.parse(r.badges || "[]"); });
   res.json(rows);

@@ -62,20 +62,31 @@ export default function TeacherWebsites() {
     return () => clearInterval(iv);
   }, []);
 
-  // Load students (for grants tab) — only when tab is opened
+  // Load students (for grants tab) — use kiosk endpoint for reliability
   useEffect(() => {
-    if (tab !== "grants" || classes.length === 0) return;
+    if (tab !== "grants") return;
     (async () => {
-      const map: Record<string, any[]> = {};
-      for (const c of classes) {
-        try { map[c.id] = await api.getStudents(c.id); } catch { map[c.id] = []; }
-      }
-      setStudentsByClass(map);
-      // Auto-pick first student
-      const first = Object.values(map).flat()[0];
-      if (first && !selectedStudentId) setSelectedStudentId(first.id);
+      try {
+        // Try direct student list first (faster and doesn't depend on class membership)
+        const allStudents = await api.getStudentsKiosk().catch(() => []);
+        if (allStudents.length > 0) {
+          // Group into a synthetic "all" key so allStudents memo works
+          const map: Record<string, any[]> = { all: allStudents };
+          setStudentsByClass(map);
+          if (!selectedStudentId) setSelectedStudentId(allStudents[0]?.id || null);
+          return;
+        }
+        // Fallback: per-class loading
+        const map: Record<string, any[]> = {};
+        for (const c of classes) {
+          try { map[c.id] = await api.getStudents(c.id); } catch { map[c.id] = []; }
+        }
+        setStudentsByClass(map);
+        const first = Object.values(map).flat()[0];
+        if (first && !selectedStudentId) setSelectedStudentId(first.id);
+      } catch {}
     })();
-  }, [tab, classes]);
+  }, [tab]);
 
   // Load grants when a student is selected
   useEffect(() => {

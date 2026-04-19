@@ -548,6 +548,46 @@
 .card-hover:hover { transform: translateY(-2px); }
 
 /* ═══════════════════════════════════════════════════════════
+   SITE-WIDE HOVER / INTERACTION EFFECTS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Smooth transitions on all interactive elements (does not override specific rules) */
+button, a, input, select, textarea {
+  transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Interactive element lift — cards, buttons, anchor-buttons */
+.card:hover,
+.btn:hover,
+button:not([disabled]):not([data-no-hover]):hover,
+a[role="button"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(99,102,241,0.18);
+}
+
+/* Preserve existing more-specific overrides for clay/btn-primary etc. */
+.clay-btn:hover:not(:disabled),
+.clay-option:hover,
+.card-hover:hover,
+.btn-primary:hover,
+.arcade-card-press:hover {
+  transform: inherit;
+  box-shadow: inherit;
+}
+
+/* Focus glow */
+*:focus-visible {
+  outline: 2px solid rgba(99,102,241,0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Table row hover transition */
+tr {
+  transition: background 0.15s;
+}
+
+/* ═══════════════════════════════════════════════════════════
    STUDENT EXPERIENCE — Claymorphism + Spring animations
    ═══════════════════════════════════════════════════════════ */
 
@@ -577,6 +617,21 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 .animate-slide-in-right { animation: slide-in-right 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.4,0,0.2,1) both; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* Supplemental animation utility aliases */
+.animate-fade-in-fresh { animation: fade-in 0.35s ease both; }
 
 @keyframes mascot-bop {
   0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }

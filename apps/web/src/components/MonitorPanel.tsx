@@ -3,7 +3,10 @@ import { getSocket } from "../lib/ws.ts";
 import { api } from "../lib/api.ts";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.tsx";
-import { Monitor, Users, Box, Wifi, WifiOff, Lock, LockOpen, Send, LayoutGrid, List, ChevronLeft } from "lucide-react";
+import {
+  Monitor, Users, Box, Wifi, WifiOff, Lock, LockOpen, Send,
+  LayoutGrid, List, ChevronLeft, RefreshCw, MessageSquare, ExternalLink,
+} from "lucide-react";
 
 interface StudentActivity {
   blockCount: number;
@@ -129,6 +132,14 @@ export default function MonitorPanel() {
     getSocket().emit("class:lock", { classId, locked, studentId });
   }, [classId]);
 
+  const lockAll = useCallback(() => {
+    for (const s of students) lockStudent(s.id, true);
+  }, [students, lockStudent]);
+
+  const unlockAll = useCallback(() => {
+    for (const s of students) lockStudent(s.id, false);
+  }, [students, lockStudent]);
+
   const timeSince = (ts: number) => {
     const secs = Math.floor((Date.now() - ts) / 1000);
     if (secs < 60) return "just now";
@@ -140,142 +151,328 @@ export default function MonitorPanel() {
   const avgBlocks = students.length ? Math.round(Object.values(activity).reduce((s, a) => s + a.blockCount, 0) / Math.max(students.length, 1)) : 0;
 
   const summaryStats = [
-    { label: "Online", value: onlineCount, icon: <Wifi size={16} />, color: "text-emerald-400", bg: dk ? "bg-emerald-500/10" : "bg-emerald-50", border: "border-emerald-500/20" },
-    { label: "Offline", value: students.length - onlineCount, icon: <WifiOff size={16} />, color: "text-red-400", bg: dk ? "bg-red-500/10" : "bg-red-50", border: "border-red-500/20" },
-    { label: "Avg Blocks", value: avgBlocks, icon: <Box size={16} />, color: "text-blue-400", bg: dk ? "bg-blue-500/10" : "bg-blue-50", border: "border-blue-500/20" },
-    { label: "Total Students", value: students.length, icon: <Users size={16} />, color: "text-violet-400", bg: dk ? "bg-violet-500/10" : "bg-violet-50", border: "border-violet-500/20" },
+    {
+      label: "Online",
+      value: onlineCount,
+      icon: <Wifi size={18} />,
+      color: "text-emerald-400",
+      gradient: "from-emerald-500/20 to-emerald-600/10",
+      glow: "rgba(52,211,153,0.2)",
+      border: "rgba(52,211,153,0.25)",
+    },
+    {
+      label: "Offline",
+      value: students.length - onlineCount,
+      icon: <WifiOff size={18} />,
+      color: "text-red-400",
+      gradient: "from-red-500/20 to-red-600/10",
+      glow: "rgba(244,63,94,0.2)",
+      border: "rgba(244,63,94,0.25)",
+    },
+    {
+      label: "Avg Blocks",
+      value: avgBlocks,
+      icon: <Box size={18} />,
+      color: "text-blue-400",
+      gradient: "from-blue-500/20 to-blue-600/10",
+      glow: "rgba(56,189,248,0.2)",
+      border: "rgba(56,189,248,0.25)",
+    },
+    {
+      label: "Total Students",
+      value: students.length,
+      icon: <Users size={18} />,
+      color: "text-violet-400",
+      gradient: "from-violet-500/20 to-violet-600/10",
+      glow: "rgba(167,139,250,0.2)",
+      border: "rgba(167,139,250,0.25)",
+    },
   ];
 
   return (
     <div className="p-8 space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-t1">Student Monitor</h1>
-          <p className="text-t3 text-sm mt-1">{onlineCount} of {students.length} students online</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-t3 cursor-pointer">
-            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded" />
-            Auto-refresh
-          </label>
-          <div className="flex rounded-lg p-0.5" style={{ background: "var(--bg-hover)" }}>
-            <button onClick={() => setViewMode("grid")}
-              className={`px-3 py-1.5 text-xs rounded-md transition flex items-center gap-1.5 cursor-pointer ${viewMode === "grid" ? "bg-violet-600 text-white" : "text-t3"}`}>
-              <LayoutGrid size={13} /> Grid
-            </button>
-            <button onClick={() => setViewMode("list")}
-              className={`px-3 py-1.5 text-xs rounded-md transition flex items-center gap-1.5 cursor-pointer ${viewMode === "list" ? "bg-violet-600 text-white" : "text-t3"}`}>
-              <List size={13} /> List
-            </button>
+
+      {/* ── Hero Header ── */}
+      <div className="rounded-2xl p-6 relative overflow-hidden" style={{
+        background: dk
+          ? "linear-gradient(135deg, #0f1029 0%, #171935 60%, #1a1040 100%)"
+          : "linear-gradient(135deg, #eef0fa 0%, #e0e7ff 100%)",
+        border: "1px solid rgba(99,102,241,0.18)",
+        boxShadow: dk ? "0 0 40px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.04)" : "0 2px 16px rgba(99,102,241,0.10)",
+      }}>
+        {/* Background glow orb */}
+        <div style={{
+          position: "absolute", right: -60, top: -60,
+          width: 240, height: 240,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }} />
+
+        <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              boxShadow: "0 4px 20px rgba(99,102,241,0.4)",
+            }}>
+              <Monitor size={22} className="text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 mb-0.5">
+                <h1 className="text-2xl font-bold" style={{
+                  background: "linear-gradient(135deg, #a78bfa, #6366f1)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}>
+                  Student Monitor
+                </h1>
+                {/* Live pulse indicator */}
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{
+                  background: autoRefresh ? "rgba(52,211,153,0.15)" : "rgba(148,163,184,0.1)",
+                  border: `1px solid ${autoRefresh ? "rgba(52,211,153,0.3)" : "rgba(148,163,184,0.15)"}`,
+                  color: autoRefresh ? "#34d399" : "var(--text-3)",
+                }}>
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoRefresh ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                  {autoRefresh ? "LIVE" : "PAUSED"}
+                </div>
+              </div>
+              <p style={{ color: "var(--text-3)", fontSize: 13 }}>
+                {onlineCount} of {students.length} students online
+              </p>
+            </div>
           </div>
-          <select value={classId} onChange={(e) => { setClassId(e.target.value); loadStudents(e.target.value); }}
-            className="input w-44 py-2">
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <Link to="/teacher" className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300">
-            <ChevronLeft size={14} /> Dashboard
-          </Link>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2.5">
+            {/* Lock All / Unlock All */}
+            {students.length > 0 && (
+              <>
+                <button
+                  onClick={lockAll}
+                  data-no-hover
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer transition-colors"
+                  style={{
+                    background: "rgba(244,63,94,0.15)",
+                    border: "1px solid rgba(244,63,94,0.3)",
+                    color: "#f43f5e",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(244,63,94,0.25)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(244,63,94,0.15)"; }}
+                >
+                  <Lock size={13} /> Lock All
+                </button>
+                <button
+                  onClick={unlockAll}
+                  data-no-hover
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer transition-colors"
+                  style={{
+                    background: "rgba(52,211,153,0.15)",
+                    border: "1px solid rgba(52,211,153,0.3)",
+                    color: "#34d399",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.25)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.15)"; }}
+                >
+                  <LockOpen size={13} /> Unlock All
+                </button>
+              </>
+            )}
+
+            {/* Auto-refresh toggle */}
+            <button
+              data-no-hover
+              onClick={() => setAutoRefresh(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg cursor-pointer transition-colors"
+              style={{
+                background: autoRefresh ? "rgba(99,102,241,0.15)" : "var(--bg-hover)",
+                border: "1px solid " + (autoRefresh ? "rgba(99,102,241,0.3)" : "var(--border)"),
+                color: autoRefresh ? "var(--text-accent)" : "var(--text-3)",
+              }}
+            >
+              <RefreshCw size={12} className={autoRefresh ? "animate-spin" : ""} style={{ animationDuration: "3s" }} />
+              Auto
+            </button>
+
+            {/* View mode switcher */}
+            <div className="flex rounded-lg p-0.5" style={{ background: "var(--bg-hover)" }}>
+              <button data-no-hover onClick={() => setViewMode("grid")}
+                className={`px-3 py-1.5 text-xs rounded-md transition flex items-center gap-1.5 cursor-pointer ${viewMode === "grid" ? "bg-violet-600 text-white" : "text-t3"}`}>
+                <LayoutGrid size={13} /> Grid
+              </button>
+              <button data-no-hover onClick={() => setViewMode("list")}
+                className={`px-3 py-1.5 text-xs rounded-md transition flex items-center gap-1.5 cursor-pointer ${viewMode === "list" ? "bg-violet-600 text-white" : "text-t3"}`}>
+                <List size={13} /> List
+              </button>
+            </div>
+
+            <select value={classId} onChange={(e) => { setClassId(e.target.value); loadStudents(e.target.value); }}
+              className="input w-44 py-2">
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            <Link to="/teacher" className="flex items-center gap-1 text-xs" style={{ color: "var(--text-accent)" }}>
+              <ChevronLeft size={14} /> Dashboard
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Summary Stats */}
+      {/* ── Summary Stats ── */}
       <div className="grid grid-cols-4 gap-3">
         {summaryStats.map((stat) => (
-          <div key={stat.label} className={`rounded-xl px-4 py-3 border flex items-center gap-3 ${stat.bg} ${stat.border}`}>
-            <div className={stat.color}>{stat.icon}</div>
-            <div>
-              <div className="text-xs text-t3">{stat.label}</div>
-              <div className="text-2xl font-bold text-t1 leading-tight">{stat.value}</div>
+          <div key={stat.label} className="rounded-xl p-4 relative overflow-hidden" style={{
+            background: dk
+              ? `linear-gradient(135deg, var(--bg-surface), var(--bg-raised))`
+              : "white",
+            border: `1px solid ${stat.border}`,
+            boxShadow: `0 2px 16px ${stat.glow}, inset 0 1px 0 rgba(255,255,255,0.04)`,
+          }}>
+            <div style={{
+              position: "absolute", top: -20, right: -20,
+              width: 80, height: 80, borderRadius: "50%",
+              background: `radial-gradient(circle, ${stat.glow} 0%, transparent 70%)`,
+              pointerEvents: "none",
+            }} />
+            <div className="relative z-10">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stat.color}`} style={{
+                background: `${stat.glow.replace("0.2", "0.15")}`,
+                border: `1px solid ${stat.border}`,
+              }}>
+                {stat.icon}
+              </div>
+              <div className="text-3xl font-black leading-none mb-1" style={{ color: "var(--text-1)" }}>
+                {stat.value}
+              </div>
+              <div className="text-xs font-medium" style={{ color: "var(--text-3)" }}>{stat.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Grid View */}
+      {/* ── Grid View ── */}
       {viewMode === "grid" ? (
         <div className="grid grid-cols-3 gap-4">
           {students.map((s) => {
             const act = activity[s.id];
             const isOnline = act?.isOnline ?? false;
+            const isSelected = selectedStudent === s.id;
             return (
               <div
                 key={s.id}
-                className={`rounded-xl border transition-all cursor-pointer ${
-                  selectedStudent === s.id
-                    ? "border-violet-500/50 ring-1 ring-violet-500/20"
-                    : ""
-                }`}
+                className="group rounded-xl border transition-all cursor-pointer overflow-hidden"
                 style={{
                   background: "var(--bg-surface)",
-                  borderColor: selectedStudent === s.id ? undefined : "var(--border)",
+                  borderColor: isSelected ? "rgba(99,102,241,0.5)" : "var(--border)",
+                  boxShadow: isSelected
+                    ? "0 0 0 1px rgba(99,102,241,0.2), 0 4px 20px rgba(99,102,241,0.12)"
+                    : "none",
+                  transform: isSelected ? "translateY(-2px)" : undefined,
                 }}
-                onClick={() => setSelectedStudent(selectedStudent === s.id ? null : s.id)}
+                onClick={() => setSelectedStudent(isSelected ? null : s.id)}
               >
-                {/* Screen preview */}
-                <div className={`h-36 rounded-t-xl flex items-center justify-center overflow-hidden relative ${dk ? "bg-[#07071a]" : "bg-gray-100"}`}>
+                {/* Screen preview — taller, with overlay toolbar */}
+                <div className="h-44 relative overflow-hidden" style={{
+                  background: dk ? "#07071a" : "#f1f5f9",
+                }}>
                   {screenshots[s.id] ? (
                     <img src={screenshots[s.id]} alt={`${s.name}'s screen`} className="w-full h-full object-cover" />
                   ) : projectPreviews[s.id] ? (
                     <img src={projectPreviews[s.id]} alt={`${s.name}'s project`} className="w-full h-full object-contain p-3 opacity-90" />
                   ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Monitor size={28} className="text-t3 opacity-40" />
-                      <span className="text-t3 text-xs opacity-50">No screen data</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                      <Monitor size={32} style={{ color: "var(--text-3)", opacity: 0.35 }} />
+                      <span style={{ color: "var(--text-3)", fontSize: 11, opacity: 0.5 }}>No screen data</span>
                     </div>
                   )}
-                  <div className={`absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${
-                    isOnline ? "bg-emerald-500/20 text-emerald-400" : dk ? "bg-white/10 text-white/30" : "bg-gray-200 text-gray-400"
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : dk ? "bg-white/20" : "bg-gray-300"}`} />
+
+                  {/* Online badge */}
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold backdrop-blur-sm" style={{
+                    background: isOnline ? "rgba(52,211,153,0.2)" : "rgba(0,0,0,0.4)",
+                    border: `1px solid ${isOnline ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.08)"}`,
+                    color: isOnline ? "#34d399" : "rgba(255,255,255,0.4)",
+                  }}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
                     {isOnline ? "Online" : "Offline"}
+                  </div>
+
+                  {/* Hover icon toolbar — appears on card hover */}
+                  <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      data-no-hover
+                      onClick={e => { e.stopPropagation(); lockStudent(s.id, true); }}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer backdrop-blur-sm transition-colors"
+                      style={{ background: "rgba(244,63,94,0.2)", border: "1px solid rgba(244,63,94,0.3)", color: "#f43f5e" }}
+                      title="Lock"
+                    >
+                      <Lock size={12} />
+                    </button>
+                    <button
+                      data-no-hover
+                      onClick={e => { e.stopPropagation(); lockStudent(s.id, false); }}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer backdrop-blur-sm transition-colors"
+                      style={{ background: "rgba(52,211,153,0.2)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399" }}
+                      title="Unlock"
+                    >
+                      <LockOpen size={12} />
+                    </button>
+                    <button
+                      data-no-hover
+                      onClick={e => { e.stopPropagation(); setSelectedStudent(isSelected ? null : s.id); }}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer backdrop-blur-sm transition-colors"
+                      style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)", color: "#a78bfa" }}
+                      title="Message"
+                    >
+                      <MessageSquare size={12} />
+                    </button>
+                    {projectIds[s.id] && (
+                      <Link
+                        to={`/project/${projectIds[s.id]}`}
+                        onClick={e => e.stopPropagation()}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer backdrop-blur-sm transition-colors"
+                        style={{ background: "rgba(56,189,248,0.2)", border: "1px solid rgba(56,189,248,0.3)", color: "#38bdf8" }}
+                        title="Open project"
+                      >
+                        <ExternalLink size={12} />
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Student name overlay at bottom — blurred bg */}
+                  <div className="absolute bottom-0 left-0 right-0 px-3 py-2 backdrop-blur-md" style={{
+                    background: "linear-gradient(to top, rgba(7,7,26,0.85) 0%, rgba(7,7,26,0.4) 70%, transparent 100%)",
+                  }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
+                        {s.name.charAt(0)}
+                      </div>
+                      <span className="text-xs font-semibold text-white truncate">{s.name}</span>
+                      <span className="text-[10px] ml-auto flex-shrink-0" style={{ color: "rgba(255,255,255,0.45)" }}>
+                        {act ? timeSince(act.lastActive) : "—"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Student info */}
-                <div className="p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {s.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm text-t1 font-medium truncate">{s.name}</div>
-                      <div className="text-[10px] text-t3">{act ? timeSince(act.lastActive) : "—"}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-[11px] text-t3">
-                    <span className="flex items-center gap-1"><Box size={11} /> {act?.blockCount ?? 0}</span>
+                {/* Student info row */}
+                <div className="px-3 py-2.5">
+                  <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--text-3)" }}>
+                    <span className="flex items-center gap-1">
+                      <Box size={11} /> {act?.blockCount ?? 0} blocks
+                    </span>
                     <span className="truncate">{act?.projectName ?? "—"}</span>
                   </div>
-                  {projectIds[s.id] && (
-                    <div className="mt-2">
-                      <Link to={`/project/${projectIds[s.id]}`} onClick={(e) => e.stopPropagation()}
-                        className="text-[11px] text-violet-400 hover:text-violet-300 underline underline-offset-2">
-                        Open latest project
-                      </Link>
-                    </div>
-                  )}
-                  {selectedStudent === s.id && (
-                    <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
+
+                  {/* Expanded message panel when selected */}
+                  {isSelected && (
+                    <div className="mt-2.5 pt-2.5 border-t space-y-2 animate-scale-in" style={{ borderColor: "var(--border)" }}>
                       <div className="flex gap-2">
                         <input value={message} onChange={(e) => setMessage(e.target.value)}
                           placeholder="Send message..." className="input flex-1 py-1.5 text-xs"
                           onKeyDown={(e) => e.key === "Enter" && sendMessage(s.id)}
                           onClick={(e) => e.stopPropagation()} />
-                        <button onClick={(e) => { e.stopPropagation(); sendMessage(s.id); }}
+                        <button data-no-hover onClick={(e) => { e.stopPropagation(); sendMessage(s.id); }}
                           className="btn-primary px-2.5 py-1.5 text-xs gap-1">
                           <Send size={12} />
-                        </button>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={(e) => { e.stopPropagation(); lockStudent(s.id, true); }}
-                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 text-xs rounded-lg cursor-pointer transition-colors">
-                          <Lock size={11} /> Lock
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); lockStudent(s.id, false); }}
-                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-xs rounded-lg cursor-pointer transition-colors">
-                          <LockOpen size={11} /> Unlock
                         </button>
                       </div>
                     </div>
@@ -285,18 +482,18 @@ export default function MonitorPanel() {
             );
           })}
           {students.length === 0 && (
-            <div className="col-span-3 text-center py-12">
-              <Users size={36} className="mx-auto mb-3 text-t3 opacity-40" />
-              <p className="text-t3 text-sm">No students in this class yet</p>
+            <div className="col-span-3 text-center py-16">
+              <Users size={40} className="mx-auto mb-3" style={{ color: "var(--text-3)", opacity: 0.35 }} />
+              <p className="text-sm" style={{ color: "var(--text-3)" }}>No students in this class yet</p>
             </div>
           )}
         </div>
       ) : (
-        /* List View */
+        /* ── List View ── */
         <div className="card overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+              <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--bg-muted)" }}>
                 {["Student", "Status", "Project", "Blocks", "Last Active", "Actions"].map((h) => (
                   <th key={h} className="text-left table-header px-4 py-3">{h}</th>
                 ))}
@@ -307,7 +504,7 @@ export default function MonitorPanel() {
                 const act = activity[s.id];
                 const isOnline = act?.isOnline ?? false;
                 return (
-                  <tr key={s.id} className="border-b transition-colors" style={{ borderColor: "var(--border)" }}
+                  <tr key={s.id} className="border-b" style={{ borderColor: "var(--border)" }}
                     onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"}
                     onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = ""}>
                     <td className="px-4 py-3">
@@ -316,39 +513,48 @@ export default function MonitorPanel() {
                           {s.name.charAt(0)}
                         </div>
                         <div>
-                          <div className="text-t1 font-medium">{s.name}</div>
-                          <div className="text-t3 text-xs">{s.email}</div>
+                          <div style={{ color: "var(--text-1)", fontWeight: 500 }}>{s.name}</div>
+                          <div style={{ color: "var(--text-3)", fontSize: 11 }}>{s.email}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${
-                        isOnline ? "bg-emerald-500/15 text-emerald-400" : dk ? "bg-white/5 text-white/30" : "bg-gray-100 text-gray-400"
-                      }`}>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs" style={{
+                        background: isOnline ? "rgba(52,211,153,0.12)" : dk ? "rgba(255,255,255,0.05)" : "#f1f5f9",
+                        color: isOnline ? "#34d399" : dk ? "rgba(255,255,255,0.25)" : "#94a3b8",
+                        border: `1px solid ${isOnline ? "rgba(52,211,153,0.25)" : "transparent"}`,
+                      }}>
                         <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : dk ? "bg-white/20" : "bg-gray-300"}`} />
                         {isOnline ? "Online" : "Offline"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-t2">{act?.projectName ?? "—"}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--text-2)" }}>{act?.projectName ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <span className="text-t2 font-mono">{act?.blockCount ?? 0}</span>
+                      <span className="font-mono" style={{ color: "var(--text-2)" }}>{act?.blockCount ?? 0}</span>
                     </td>
-                    <td className="px-4 py-3 text-t3 text-xs">{act ? timeSince(act.lastActive) : "—"}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-3)" }}>{act ? timeSince(act.lastActive) : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5 items-center">
                         {projectIds[s.id] && (
                           <Link to={`/project/${projectIds[s.id]}`}
-                            className="px-2 py-1 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 text-xs rounded cursor-pointer">
-                            Project
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer transition-colors"
+                            style={{ background: "rgba(99,102,241,0.1)", color: "#a78bfa" }}>
+                            <ExternalLink size={10} /> Project
                           </Link>
                         )}
-                        <button onClick={() => lockStudent(s.id, true)}
-                          className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded cursor-pointer">
-                          Lock
+                        <button data-no-hover onClick={() => lockStudent(s.id, true)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer transition-colors"
+                          style={{ background: "rgba(244,63,94,0.1)", color: "#f43f5e" }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(244,63,94,0.2)"}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(244,63,94,0.1)"}>
+                          <Lock size={10} /> Lock
                         </button>
-                        <button onClick={() => lockStudent(s.id, false)}
-                          className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs rounded cursor-pointer">
-                          Unlock
+                        <button data-no-hover onClick={() => lockStudent(s.id, false)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer transition-colors"
+                          style={{ background: "rgba(52,211,153,0.1)", color: "#34d399" }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.2)"}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"}>
+                          <LockOpen size={10} /> Unlock
                         </button>
                       </div>
                     </td>
@@ -358,7 +564,7 @@ export default function MonitorPanel() {
             </tbody>
           </table>
           {students.length === 0 && (
-            <div className="text-center py-8 text-t3 text-sm">No students in this class</div>
+            <div className="text-center py-8 text-sm" style={{ color: "var(--text-3)" }}>No students in this class</div>
           )}
         </div>
       )}
