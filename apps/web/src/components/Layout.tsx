@@ -204,105 +204,152 @@ export default function Layout() {
   }
 
   return (
-    <div className={`min-h-screen flex ${dk ? "bg-[#07071a]" : "bg-[#f2f3f8]"}`}>
-      {/* Sidebar */}
-      <aside className={`w-[220px] flex flex-col flex-shrink-0 border-r ${
-        dk ? "bg-[#0a0b20] border-white/[0.05]" : "bg-white border-gray-200/80"
-      }`}>
+    <div style={{ minHeight: "100vh", display: "flex", background: dk ? "#070714" : "#f0f1f8" }}>
+      {/* ── Sidebar ── */}
+      <aside style={{
+        width: 210, flexShrink: 0, display: "flex", flexDirection: "column",
+        background: dk
+          ? "linear-gradient(180deg, #0d0d24 0%, #0a0b1e 100%)"
+          : "linear-gradient(180deg, #ffffff 0%, #f8f8ff 100%)",
+        borderRight: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}`,
+        position: "relative",
+      }}>
+        {/* Subtle glow behind logo */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 120,
+          background: "radial-gradient(ellipse at 50% -10%, rgba(124,58,237,0.18) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }} />
+
         {/* Logo */}
-        <div className={`px-5 py-5 border-b ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-600/30 group-hover:shadow-violet-500/50 transition-all duration-300">
-              <Layers size={15} className="text-white" />
+        <div style={{ padding: "20px 16px 16px", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)"}`, position: "relative" }}>
+          <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+            <div style={{
+              width: 34, height: 34,
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 4px 16px rgba(124,58,237,0.45)",
+              flexShrink: 0,
+            }}>
+              <Layers size={15} color="white" />
             </div>
-            <span className="text-[17px] font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-400">
+            <span style={{
+              fontSize: 17, fontWeight: 900, letterSpacing: "-0.02em",
+              background: "linear-gradient(90deg, #a78bfa, #818cf8)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>
               BlockForge
             </span>
           </Link>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
           {navItems.map((item, i) => {
             const active =
               location.pathname === item.path ||
               (item.path !== "/" && location.pathname.startsWith(item.path));
-            const isArcade = item.path === "/arcade";
-            if (isArcade) {
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className="animate-slide-in flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 mt-1"
-                  style={{
-                    animationDelay: `${i * 40}ms`,
-                    background: active ? "rgba(139,92,246,0.25)" : "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(99,102,241,0.1))",
-                    border: `1px solid rgba(139,92,246,${active ? "0.5" : "0.3"})`,
-                    color: active ? "#a78bfa" : "#c4b5fd",
-                    boxShadow: "0 2px 8px rgba(139,92,246,0.2)",
-                  }}
-                >
-                  <item.icon size={15} className="flex-shrink-0" />
-                  🎮 Arcade
-                  <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.3)", color: "#c4b5fd" }}>NEW</span>
-                </Link>
-              );
-            }
+            const isArcade = item.path === "/arcade" || String(item.label).includes("Arcade");
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`${active ? "nav-link-active" : "nav-link-inactive"} animate-slide-in`}
-                style={{ animationDelay: `${i * 40}ms` }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 9,
+                  padding: "8px 10px", borderRadius: 10, textDecoration: "none",
+                  fontSize: 13, fontWeight: active ? 700 : 500,
+                  transition: "all 0.15s ease",
+                  animationDelay: `${i * 35}ms`,
+                  ...(active
+                    ? {
+                        background: isArcade
+                          ? "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.18))"
+                          : dk
+                          ? "linear-gradient(135deg, rgba(124,58,237,0.25), rgba(79,70,229,0.15))"
+                          : "linear-gradient(135deg, rgba(124,58,237,0.12), rgba(79,70,229,0.08))",
+                        color: "#a78bfa",
+                        border: `1px solid rgba(124,58,237,${dk ? "0.35" : "0.2"})`,
+                        boxShadow: "0 2px 12px rgba(124,58,237,0.18)",
+                      }
+                    : {
+                        background: "transparent",
+                        color: dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.5)",
+                        border: "1px solid transparent",
+                      }),
+                }}
               >
-                <span className={`nav-dot ${active ? "nav-dot-active" : "nav-dot-inactive"}`} />
-                <item.icon size={16} className="flex-shrink-0" />
-                {item.label}
+                <item.icon size={15} style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.label}
+                </span>
+                {isArcade && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 6,
+                    background: "rgba(139,92,246,0.3)", color: "#c4b5fd",
+                  }}>NEW</span>
+                )}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className={`px-3 pb-4 pt-3 border-t space-y-2 ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
+        <div style={{ padding: "10px 8px 12px", borderTop: `1px solid ${dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)"}`, display: "flex", flexDirection: "column", gap: 6 }}>
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer ${
-              dk
-                ? "bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white/80 border border-white/[0.05]"
-                : "bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-800 border border-gray-200"
-            }`}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "7px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.1)"}`,
+              background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+              color: dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)",
+              transition: "all 0.15s ease",
+            }}
           >
-            {dk ? <Sun size={14} /> : <Moon size={14} />}
-            {dk ? "Light Mode" : "Dark Mode"}
+            {dk ? <Sun size={13} /> : <Moon size={13} />}
+            {dk ? "Light mode" : "Dark mode"}
           </button>
 
-          {/* User */}
-          <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-xl ${
-            dk ? "bg-white/[0.03]" : "bg-gray-50"
-          }`}>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-md shadow-violet-600/20 flex-shrink-0">
+          {/* User card */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 9,
+            padding: "8px 10px", borderRadius: 10,
+            background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+            border: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)"}`,
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "white", fontSize: 12, fontWeight: 800,
+              boxShadow: "0 2px 8px rgba(124,58,237,0.35)",
+            }}>
               {user.name.charAt(0).toUpperCase()}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className={`text-sm font-semibold truncate leading-tight ${dk ? "text-white" : "text-gray-900"}`}>
-                {user.name}
-              </div>
-              <div className={`text-[11px] capitalize leading-tight ${dk ? "text-white/30" : "text-gray-400"}`}>
-                {user.role}
-              </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                color: dk ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.85)",
+              }}>{user.name}</div>
+              <div style={{
+                fontSize: 10, textTransform: "capitalize",
+                color: dk ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.35)",
+              }}>{user.role}</div>
             </div>
           </div>
 
           {/* Sign out */}
           <button
             onClick={logout}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer ${
-              dk
-                ? "text-white/35 hover:text-red-400 hover:bg-red-500/[0.08]"
-                : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-            }`}
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "7px 10px", borderRadius: 10, fontSize: 12, fontWeight: 500,
+              cursor: "pointer", border: "1px solid transparent",
+              background: "transparent",
+              color: dk ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.35)",
+              transition: "all 0.15s ease",
+            }}
           >
             <LogOut size={13} />
             Sign Out
@@ -311,9 +358,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto animate-page-enter min-w-0">
-        {/* Schedule-block header — display-only. Renders nothing when no class,
-            no schedule, or the wall clock is outside every block. */}
+      <main style={{ flex: 1, overflow: "auto", minWidth: 0 }} className="animate-page-enter">
         <CurrentBlockStrip />
         <Outlet />
       </main>

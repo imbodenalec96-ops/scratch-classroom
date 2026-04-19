@@ -7,11 +7,11 @@ const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
 const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string }[] = [
-  { id: "forest",   label: "Forest",   videoId: "xNN7iTA57jM", emoji: "🌲" },
-  { id: "ocean",    label: "Ocean",    videoId: "MIr3RsUWrdo", emoji: "🌊" },
-  { id: "rain",     label: "Rain",     videoId: "mPZkdNFkNps", emoji: "🌧" },
-  { id: "piano",    label: "Piano",    videoId: "4xDzrJKXOOY", emoji: "🎹" },
-  { id: "campfire", label: "Campfire", videoId: "UgHKb_7884o", emoji: "🔥" },
+  { id: "forest",   label: "Forest Spa",     videoId: "xNN7iTA57jM", emoji: "🌿" },
+  { id: "ocean",    label: "Ocean Waves",    videoId: "MIr3RsUWrdo", emoji: "🌊" },
+  { id: "rain",     label: "Gentle Rain",    videoId: "mPZkdNFkNps", emoji: "🌧" },
+  { id: "piano",    label: "Spa Piano",      videoId: "4xDzrJKXOOY", emoji: "🎹" },
+  { id: "tibetan",  label: "Healing Bowls",  videoId: "UgHKb_7884o", emoji: "🔔" },
 ];
 
 const GRADE_COLORS: Record<number, { from: string; to: string; border: string; text: string; glow: string }> = {
@@ -179,12 +179,12 @@ export default function ClassroomBoard() {
 
   return (
     <div style={{
-      height: "100dvh", overflow: "hidden", display: "grid",
+      position: "fixed", inset: 0, zIndex: 999,
+      overflow: "hidden", display: "grid",
       gridTemplateRows: "54px 72px 1fr 50px",
       gap: 5, padding: "8px 10px 8px 10px",
       background: bgUrl ? `url(${bgUrl}) center/cover no-repeat fixed` : bg,
       color: "white", fontFamily: "'Inter', system-ui, sans-serif",
-      position: "relative",
     }}>
       <style>{ANIM}</style>
 
