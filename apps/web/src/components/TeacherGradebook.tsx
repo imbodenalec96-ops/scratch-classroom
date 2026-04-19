@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
-import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon, Eye } from "lucide-react";
+import { CheckCircle2, MessageSquare, Clock, Bot, User as UserIcon, Eye, ChevronLeft } from "lucide-react";
 
 type Scope = "today" | "week" | "all";
 
@@ -46,18 +46,37 @@ function subjectIcon(s: string | null | undefined): string {
   return SUBJECT_ICON[s] || "📝";
 }
 
-function StatusBadge({ status }: { status: Row["status"] }) {
-  const cfg: Record<Row["status"], { label: string; icon: React.ReactNode; cls: string }> = {
-    graded: { label: "Graded", icon: <CheckCircle2 size={12} />, cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-    ai_only: { label: "AI graded", icon: <Bot size={12} />, cls: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
-    needs_review: { label: "Needs review", icon: <UserIcon size={12} />, cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-    pending: { label: "Pending", icon: <Clock size={12} />, cls: "bg-white/5 text-white/40 border-white/10" },
+/** Color-coded grade cell — maps score to green/yellow/red/gray */
+function gradeCell(score: number | null | undefined, pass: boolean | null, status: Row["status"]): {
+  bg: string; text: string; border: string; label: string;
+} {
+  if (status === "pending" || (score == null && pass == null)) {
+    return { bg: "rgba(255,255,255,0.04)", text: "rgba(255,255,255,0.25)", border: "rgba(255,255,255,0.07)", label: "—" };
+  }
+  // Pass/fail from human grade
+  if (pass === true)  return { bg: "rgba(52,211,153,0.15)",  text: "#34d399", border: "rgba(52,211,153,0.3)",  label: score != null ? `${score}` : "P" };
+  if (pass === false) return { bg: "rgba(239,68,68,0.13)",   text: "#f87171", border: "rgba(239,68,68,0.28)",  label: score != null ? `${score}` : "R" };
+  // Numeric score
+  const s = score ?? 0;
+  if (s >= 90) return { bg: "rgba(52,211,153,0.15)",  text: "#34d399", border: "rgba(52,211,153,0.3)",  label: `${s}` };
+  if (s >= 80) return { bg: "rgba(52,211,153,0.10)",  text: "#6ee7b7", border: "rgba(52,211,153,0.2)",  label: `${s}` };
+  if (s >= 70) return { bg: "rgba(251,191,36,0.13)",  text: "#fbbf24", border: "rgba(251,191,36,0.3)",  label: `${s}` };
+  if (s >= 60) return { bg: "rgba(251,146,60,0.13)",  text: "#fb923c", border: "rgba(251,146,60,0.28)", label: `${s}` };
+  return           { bg: "rgba(239,68,68,0.13)",   text: "#f87171", border: "rgba(239,68,68,0.28)",  label: `${s}` };
+}
+
+function StatusDot({ status }: { status: Row["status"] }) {
+  const dot: Record<Row["status"], string> = {
+    graded:       "bg-emerald-400",
+    ai_only:      "bg-violet-400",
+    needs_review: "bg-amber-400",
+    pending:      "bg-white/20",
   };
-  const c = cfg[status];
+  const tip: Record<Row["status"], string> = {
+    graded: "Graded", ai_only: "AI graded", needs_review: "Needs review", pending: "Pending",
+  };
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${c.cls}`}>
-      {c.icon}{c.label}
-    </span>
+    <span title={tip[status]} className={`inline-block w-1.5 h-1.5 rounded-full ${dot[status]}`} />
   );
 }
 
@@ -68,13 +87,10 @@ export default function TeacherGradebook() {
   const navigate = useNavigate();
   const dk = theme === "dark";
 
-  // All students across the teacher's classes
   const [students, setStudents] = useState<StudentCard[]>([]);
-  // Per-student "week ungraded count" for badge
   const [ungradedCounts, setUngradedCounts] = useState<Record<string, number>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Assignments table state (selected student)
   const [rows, setRows] = useState<Row[]>([]);
   const [scope, setScope] = useState<Scope>("week");
   const [ungradedOnly, setUngradedOnly] = useState(false);
@@ -83,8 +99,6 @@ export default function TeacherGradebook() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [feedbackOpenFor, setFeedbackOpenFor] = useState<string | null>(null);
-  // Expanded work view (per assignment_id). Fetches full submission + assignment
-  // content so teacher sees questions paired with the student's actual answers.
   const [workOpenFor, setWorkOpenFor] = useState<string | null>(null);
   const [workCache, setWorkCache] = useState<Record<string, any>>({});
   const [workLoading, setWorkLoading] = useState<string | null>(null);
@@ -92,7 +106,7 @@ export default function TeacherGradebook() {
   const toggleWork = async (row: Row) => {
     if (workOpenFor === row.assignment_id) { setWorkOpenFor(null); return; }
     setWorkOpenFor(row.assignment_id);
-    if (!row.submission_id) return; // nothing to fetch
+    if (!row.submission_id) return;
     if (workCache[row.submission_id]) return;
     setWorkLoading(row.submission_id);
     try {
@@ -105,14 +119,12 @@ export default function TeacherGradebook() {
     }
   };
 
-  // Auth guard
   useEffect(() => {
     if (user && user.role !== "teacher" && user.role !== "admin") {
       navigate("/", { replace: true });
     }
   }, [user, navigate]);
 
-  // Load every student across teacher's classes + compute ungraded counts
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -123,11 +135,8 @@ export default function TeacherGradebook() {
           const list = await api.getStudents(c.id).catch(() => [] as any[]);
           for (const s of (list || [])) {
             allStudents.push({
-              id: s.id,
-              name: s.name,
-              email: s.email,
-              class_id: c.id,
-              class_name: c.name,
+              id: s.id, name: s.name, email: s.email,
+              class_id: c.id, class_name: c.name,
               reading_grade_level: s.reading_grade_level,
               math_grade_level: s.math_grade_level,
               writing_grade_level: s.writing_grade_level,
@@ -136,14 +145,9 @@ export default function TeacherGradebook() {
         }
         if (cancelled) return;
         setStudents(allStudents);
-
-        // Default-select: URL param wins, else first student
         const firstId = studentIdFromUrl && allStudents.some((s) => s.id === studentIdFromUrl)
-          ? studentIdFromUrl
-          : allStudents[0]?.id ?? null;
+          ? studentIdFromUrl : allStudents[0]?.id ?? null;
         setSelectedId(firstId);
-
-        // Per-student ungraded (week) counts — fire in parallel, don't block UI
         const countPromises = allStudents.map(async (s) => {
           try {
             const rows = await api.getStudentAssignments(s.id, "week");
@@ -158,8 +162,7 @@ export default function TeacherGradebook() {
       }
     })();
     return () => { cancelled = true; };
-  // Only load students once per user session; URL param only picks default
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedStudent = useMemo(
@@ -168,8 +171,7 @@ export default function TeacherGradebook() {
   );
 
   const loadRows = async (sid: string, sc: Scope) => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const data = await api.getStudentAssignments(sid, sc);
       setRows(Array.isArray(data) ? data : []);
@@ -182,12 +184,9 @@ export default function TeacherGradebook() {
 
   useEffect(() => { if (selectedId) loadRows(selectedId, scope); }, [selectedId, scope]);
 
-  // Keep URL in sync so links to /teacher/gradebook/:id still work as permalinks
   useEffect(() => {
     if (!selectedId) return;
-    if (studentIdFromUrl !== selectedId) {
-      navigate(`/teacher/gradebook/${selectedId}`, { replace: true });
-    }
+    if (studentIdFromUrl !== selectedId) navigate(`/teacher/gradebook/${selectedId}`, { replace: true });
   }, [selectedId, studentIdFromUrl, navigate]);
 
   const visibleRows = useMemo(() => {
@@ -196,9 +195,9 @@ export default function TeacherGradebook() {
   }, [rows, ungradedOnly]);
 
   const totals = useMemo(() => {
-    const submitted = rows.filter((r) => !!r.submission_id).length;
-    const humanGraded = rows.filter((r) => r.status === "graded").length;
-    const needsReview = rows.filter((r) => r.status === "needs_review" || r.status === "ai_only").length;
+    const submitted  = rows.filter((r) => !!r.submission_id).length;
+    const humanGraded= rows.filter((r) => r.status === "graded").length;
+    const needsReview= rows.filter((r) => r.status === "needs_review" || r.status === "ai_only").length;
     return { total: rows.length, submitted, humanGraded, needsReview };
   }, [rows]);
 
@@ -215,20 +214,15 @@ export default function TeacherGradebook() {
           submission_id: sub.id || r.submission_id,
           submitted_at: sub.submitted_at || r.submitted_at,
           human_grade_pass: passed,
-          human_grade_feedback:
-            typeof feedback === "string" ? feedback : r.human_grade_feedback,
+          human_grade_feedback: typeof feedback === "string" ? feedback : r.human_grade_feedback,
           graded_by: sub.graded_by || r.graded_by,
           graded_at: sub.graded_at || new Date().toISOString(),
           status: "graded",
         };
       }));
-      // Decrement the student's ungraded badge if the row was previously ungraded
       const wasUngraded = row.status === "needs_review" || row.status === "ai_only";
       if (wasUngraded) {
-        setUngradedCounts((prev) => ({
-          ...prev,
-          [selectedId]: Math.max(0, (prev[selectedId] ?? 0) - 1),
-        }));
+        setUngradedCounts((prev) => ({ ...prev, [selectedId]: Math.max(0, (prev[selectedId] ?? 0) - 1) }));
       }
       setFeedbackOpenFor(null);
     } catch (e: any) {
@@ -238,50 +232,117 @@ export default function TeacherGradebook() {
     }
   };
 
+  /* ── Layout constants ── */
+  const STUDENT_COL_W = 180;
+  const CELL_W        = 64;
+
+  /* ── Styles ── */
+  const surfaceBg  = "rgba(255,255,255,0.03)";
+  const borderCol  = "rgba(255,255,255,0.07)";
+  const headerBg   = "rgba(255,255,255,0.045)";
+  const raisedBg   = "rgba(255,255,255,0.06)";
+
   return (
-    <div className="flex h-[calc(100vh-56px)] overflow-hidden animate-fade-in" style={{ background: "var(--bg)" }}>
-      {/* ── Left sidebar — student list ── */}
+    <div
+      className="flex h-[calc(100vh-56px)] overflow-hidden animate-fade-in"
+      style={{ background: "var(--bg)" }}
+    >
+      {/* ── Left sidebar — student roster ── */}
       <aside
-        className="flex-shrink-0 flex flex-col overflow-hidden border-r"
-        style={{ width: 240, background: "var(--bg-surface)", borderColor: "rgba(255,255,255,0.06)" }}
+        className="flex-shrink-0 flex flex-col overflow-hidden"
+        style={{
+          width: 220,
+          background: surfaceBg,
+          borderRight: `1px solid ${borderCol}`,
+        }}
       >
         {/* Sidebar header */}
-        <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-t3 mb-0.5">📓 Gradebook</div>
-          {selectedStudent?.class_name && (
-            <div className="text-xs text-t3 truncate">{selectedStudent.class_name}</div>
-          )}
+        <div
+          className="px-4 pt-4 pb-3"
+          style={{ borderBottom: `1px solid ${borderCol}` }}
+        >
+          <div
+            className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
+            style={{ color: "var(--t3)" }}
+          >
+            Gradebook
+          </div>
+          <div className="text-xs font-semibold" style={{ color: "var(--t2)" }}>
+            Student roster
+          </div>
         </div>
 
         {/* Student list */}
-        <div className="flex-1 overflow-y-auto py-1">
+        <div className="flex-1 overflow-y-auto">
           {students.length === 0 && (
-            <div className="px-4 py-6 text-xs text-t3">Loading students…</div>
+            <div className="px-4 py-8 text-xs" style={{ color: "var(--t3)" }}>
+              Loading…
+            </div>
           )}
           {students.map((s) => {
-            const active = s.id === selectedId;
+            const active   = s.id === selectedId;
             const ungraded = ungradedCounts[s.id] ?? 0;
             return (
               <button
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors cursor-pointer relative
-                  ${active
-                    ? "bg-indigo-500/15 text-t1"
-                    : "text-t2 hover:bg-white/[0.04]"}`}
-                style={active ? { boxShadow: "inset 3px 0 0 #6366f1" } : undefined}
                 title={s.email || s.name}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  background: active ? "rgba(124,58,237,0.18)" : "transparent",
+                  borderLeft: active ? "3px solid #7c3aed" : "3px solid transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = "transparent";
+                }}
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0
-                  ${active ? "bg-gradient-to-br from-indigo-500 to-violet-600" : "bg-gradient-to-br from-slate-600 to-slate-700"}`}>
+                <div
+                  style={{
+                    width: 28, height: 28, flexShrink: 0, borderRadius: 4,
+                    background: active
+                      ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
+                      : "rgba(255,255,255,0.08)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: active ? "white" : "rgba(255,255,255,0.5)",
+                    fontSize: 11, fontWeight: 700,
+                  }}
+                >
                   {(s.name || "?").charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate leading-tight">{s.name}</div>
-                  <div className="text-[10px] text-t3 truncate">{s.class_name}</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 12, fontWeight: active ? 700 : 500,
+                      color: active ? "var(--t1)" : "var(--t2)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {s.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--t3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.class_name}
+                  </div>
                 </div>
                 {ungraded > 0 && (
-                  <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span
+                    style={{
+                      flexShrink: 0, minWidth: 16, height: 16, padding: "0 4px",
+                      borderRadius: 99, fontSize: 9, fontWeight: 800,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      background: "rgba(251,191,36,0.2)", color: "#fbbf24",
+                      border: "1px solid rgba(251,191,36,0.35)",
+                    }}
+                  >
                     {ungraded}
                   </span>
                 )}
@@ -290,53 +351,79 @@ export default function TeacherGradebook() {
           })}
         </div>
 
-        {/* Sidebar footer nav */}
-        <div className="px-4 py-3 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <Link to="/" className="text-[11px] text-t3 hover:text-t1 underline-offset-2 hover:underline">← Back to home</Link>
+        {/* Sidebar footer */}
+        <div className="px-4 py-3" style={{ borderTop: `1px solid ${borderCol}` }}>
+          <Link to="/" className="flex items-center gap-1 text-[11px]" style={{ color: "var(--t3)" }}>
+            <ChevronLeft size={11} /> Back to home
+          </Link>
         </div>
       </aside>
 
       {/* ── Right panel ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
+        {/* ── Top toolbar ── */}
         <div
-          className="flex-shrink-0 flex items-center justify-between gap-4 px-5 py-3 border-b"
-          style={{ background: "var(--bg-surface)", borderColor: "rgba(255,255,255,0.06)" }}
+          className="flex-shrink-0 flex items-center justify-between gap-4 px-4 py-2.5"
+          style={{
+            background: raisedBg,
+            borderBottom: `1px solid ${borderCol}`,
+            minHeight: 46,
+          }}
         >
           {/* Student name + stats */}
           <div className="flex items-center gap-4 min-w-0">
             <div className="min-w-0">
-              <h1 className="text-lg font-extrabold text-t1 leading-tight truncate">
+              <span
+                className="font-bold text-sm"
+                style={{ color: "var(--t1)" }}
+              >
                 {selectedStudent?.name || "Select a student"}
-              </h1>
+              </span>
               {selectedStudent?.class_name && (
-                <div className="text-[11px] text-t3">{selectedStudent.class_name}</div>
+                <span
+                  className="ml-2 text-[11px]"
+                  style={{ color: "var(--t3)" }}
+                >
+                  {selectedStudent.class_name}
+                </span>
               )}
             </div>
-            <div className="hidden sm:flex items-center gap-3">
-              <StatPill label="Total" value={totals.total} />
-              <StatPill label="Submitted" value={totals.submitted} color="emerald" />
-              <StatPill label="Needs review" value={totals.needsReview} color={totals.needsReview > 0 ? "amber" : "gray"} />
+            {/* Stat pills */}
+            <div className="hidden sm:flex items-center gap-2">
+              <StatPill label="Total"        value={totals.total} />
+              <StatPill label="Submitted"    value={totals.submitted}    color="emerald" />
+              <StatPill label="Needs review" value={totals.needsReview}  color={totals.needsReview > 0 ? "amber" : "gray"} />
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-            <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div
+              className="flex items-center overflow-hidden"
+              style={{ border: `1px solid ${borderCol}`, borderRadius: 6 }}
+            >
               {(["today", "week", "all"] as Scope[]).map((s) => (
                 <button
                   key={s}
                   onClick={() => setScope(s)}
-                  className={`px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer
-                    ${scope === s
-                      ? "bg-indigo-500/20 text-indigo-300"
-                      : "text-t3 hover:text-t2 hover:bg-white/[0.04]"}`}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 11, fontWeight: 600,
+                    cursor: "pointer",
+                    background: scope === s ? "rgba(124,58,237,0.2)" : "transparent",
+                    color: scope === s ? "#a78bfa" : "var(--t3)",
+                    borderRight: s !== "all" ? `1px solid ${borderCol}` : "none",
+                    transition: "background 0.12s",
+                  }}
                 >
                   {s === "today" ? "Today" : s === "week" ? "Week" : "All"}
                 </button>
               ))}
             </div>
-            <label className="inline-flex items-center gap-1.5 text-[11px] text-t2 cursor-pointer select-none">
+            <label
+              className="inline-flex items-center gap-1.5 text-[11px] cursor-pointer select-none"
+              style={{ color: "var(--t2)" }}
+            >
               <input
                 type="checkbox"
                 checked={ungradedOnly}
@@ -349,236 +436,442 @@ export default function TeacherGradebook() {
         </div>
 
         {error && (
-          <div className="mx-5 mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+          <div
+            className="mx-4 mt-2 text-xs px-3 py-2 rounded"
+            style={{
+              color: "#f87171",
+              background: "rgba(239,68,68,0.08)",
+              border: "1px solid rgba(239,68,68,0.2)",
+            }}
+          >
             {error}
           </div>
         )}
 
-        {/* ── Assignment table ── */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-sm border-collapse" style={{ minWidth: 680 }}>
-            <thead>
-              <tr
-                className="sticky top-0 z-10 text-[10px] font-bold uppercase tracking-wider text-t3"
-                style={{ background: "var(--bg-surface)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <th className="text-left px-4 py-2.5 font-bold" style={{ minWidth: 200 }}>Assignment</th>
-                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 80 }}>Subject</th>
-                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 90 }}>Date</th>
-                <th className="text-center px-3 py-2.5 font-bold" style={{ width: 70 }}>Score</th>
-                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 100 }}>Status</th>
-                <th className="text-left px-3 py-2.5 font-bold" style={{ width: 80 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!selectedId && (
+        {/* ── Spreadsheet grid ── */}
+        <div className="flex-1 overflow-auto" style={{ position: "relative" }}>
+          {!selectedId && (
+            <div className="flex items-center justify-center h-full" style={{ color: "var(--t3)" }}>
+              <div className="text-sm">Select a student from the roster</div>
+            </div>
+          )}
+
+          {selectedId && loading && (
+            <div className="flex items-center justify-center h-full" style={{ color: "var(--t3)" }}>
+              <div className="text-sm">Loading…</div>
+            </div>
+          )}
+
+          {selectedId && !loading && visibleRows.length === 0 && (
+            <div className="flex items-center justify-center h-full" style={{ color: "var(--t3)" }}>
+              <div className="text-sm">
+                {ungradedOnly ? "Everything is graded." : "No assignments in this range."}
+              </div>
+            </div>
+          )}
+
+          {selectedId && !loading && visibleRows.length > 0 && (
+            <table
+              style={{
+                borderCollapse: "collapse",
+                tableLayout: "fixed",
+                width: STUDENT_COL_W + visibleRows.length * CELL_W + 200,
+              }}
+            >
+              {/* ── Column definitions ── */}
+              <colgroup>
+                {/* frozen student name col */}
+                <col style={{ width: STUDENT_COL_W }} />
+                {/* assignment cols */}
+                {visibleRows.map((r) => (
+                  <col key={r.assignment_id} style={{ width: CELL_W }} />
+                ))}
+                {/* trailing details col */}
+                <col style={{ width: 200 }} />
+              </colgroup>
+
+              {/* ── Sticky header row ── */}
+              <thead>
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">
-                    Select a student to view their assignments.
-                  </td>
-                </tr>
-              )}
-              {selectedId && loading && (
-                <tr>
-                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">Loading…</td>
-                </tr>
-              )}
-              {selectedId && !loading && visibleRows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-16 text-center text-t3 text-sm">
-                    {ungradedOnly ? "Everything is graded." : "No assignments in this range."}
-                  </td>
-                </tr>
-              )}
-              {selectedId && !loading && visibleRows.map((r, idx) => {
-                const passKey = r.human_grade_pass;
-                const isGradedPass = passKey === true;
-                const isGradedFail = passKey === false;
-                const saving = savingId === r.assignment_id;
-                const dateText = r.scheduled_date || (r.due_date ? String(r.due_date).slice(0, 10) : "—");
-                const fbOpen = feedbackOpenFor === r.assignment_id;
-                const rowBg = idx % 2 === 1 ? "rgba(255,255,255,0.015)" : "transparent";
-                return (
-                  <React.Fragment key={r.assignment_id}>
-                    <tr
-                      className="group border-b transition-colors"
-                      style={{
-                        background: rowBg,
-                        borderColor: "rgba(255,255,255,0.04)",
-                        height: 36,
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(99,102,241,0.06)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
-                    >
-                      <td className="px-4 py-1.5">
-                        <div className="font-semibold text-t1 truncate max-w-xs leading-tight">{r.title}</div>
-                        {r.human_grade_feedback && (
-                          <div className="text-[10px] text-t3 italic truncate">"{r.human_grade_feedback}"</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <span className="text-base leading-none">{subjectIcon(r.subject)}</span>
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <span className="text-[11px] text-t3 font-mono tabular-nums">{dateText}</span>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {r.numeric_grade != null ? (
-                          <span className={`text-sm font-bold tabular-nums ${r.numeric_grade >= 70 ? "text-emerald-400" : "text-amber-400"}`}>
-                            {r.numeric_grade}
+                  {/* Corner cell */}
+                  <th
+                    style={{
+                      position: "sticky", top: 0, left: 0, zIndex: 30,
+                      background: headerBg,
+                      borderBottom: `2px solid ${borderCol}`,
+                      borderRight: `2px solid rgba(255,255,255,0.1)`,
+                      padding: "0 12px",
+                      height: 40,
+                      textAlign: "left",
+                      fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: "var(--t3)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Assignment
+                  </th>
+
+                  {/* Assignment header cells */}
+                  {visibleRows.map((r) => {
+                    const dateText = r.scheduled_date || (r.due_date ? String(r.due_date).slice(5, 10) : "");
+                    return (
+                      <th
+                        key={r.assignment_id}
+                        title={r.title}
+                        style={{
+                          position: "sticky", top: 0, zIndex: 20,
+                          background: headerBg,
+                          borderBottom: `2px solid ${borderCol}`,
+                          borderRight: `1px solid ${borderCol}`,
+                          padding: "0 4px",
+                          height: 40,
+                          width: CELL_W,
+                          textAlign: "center",
+                          verticalAlign: "bottom",
+                        }}
+                      >
+                        {/* Rotated label container */}
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "flex-end",
+                            gap: 2,
+                            paddingBottom: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 13, lineHeight: 1 }}>
+                            {subjectIcon(r.subject)}
                           </span>
-                        ) : r.ai_grade != null ? (
-                          <span className={`text-xs font-semibold ${r.ai_grade >= 70 ? "text-emerald-400" : "text-amber-400"}`}>
-                            {r.ai_grade}%
-                          </span>
-                        ) : (
-                          <span className="text-t3 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <StatusBadge status={r.status} />
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => toggleWork(r)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer
-                              ${workOpenFor === r.assignment_id
-                                ? "bg-sky-500/20 border-sky-500/50 text-sky-300"
-                                : "border-white/10 text-t3 hover:bg-white/[0.06] hover:text-t2"}`}
-                            title={r.submission_id ? "View work" : "No submission"}
-                            disabled={!r.submission_id}
-                          >
-                            <Eye size={10} className="inline" />
-                          </button>
-                          {isGradedPass ? (
-                            <span className="text-emerald-400 text-xs font-bold px-1">✓</span>
-                          ) : isGradedFail ? (
-                            <span className="text-red-400 text-xs font-bold px-1">✗</span>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
-                                disabled={saving}
-                                className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50"
-                                title="Pass"
-                              >✓</button>
-                              <button
-                                onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
-                                disabled={saving}
-                                className="px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
-                                title="Redo"
-                              >✗</button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => {
-                              setFeedbackOpenFor(fbOpen ? null : r.assignment_id);
-                              if (!fbOpen && !(r.assignment_id in feedbackDraft)) {
-                                setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
-                              }
+                          <span
+                            style={{
+                              fontSize: 9, fontWeight: 700, color: "var(--t3)",
+                              letterSpacing: "0.05em", textTransform: "uppercase",
+                              maxWidth: CELL_W - 6, overflow: "hidden",
+                              textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              display: "block",
                             }}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer
-                              ${fbOpen ? "bg-violet-500/20 border-violet-500/50 text-violet-300" : "border-white/10 text-t3 hover:bg-white/[0.06]"}`}
-                            title="Feedback"
                           >
-                            <MessageSquare size={10} className="inline" />
-                          </button>
+                            {dateText}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                    {/* Work view expansion */}
-                    {workOpenFor === r.assignment_id && (
-                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td colSpan={6} className="px-5 py-4" style={{ background: "rgba(255,255,255,0.02)" }}>
-                          {!r.submission_id ? (
-                            <p className="text-xs text-t3 italic">Student hasn't submitted yet.</p>
-                          ) : workLoading === r.submission_id ? (
-                            <p className="text-xs text-t3">Loading submission…</p>
-                          ) : (
-                            <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
-                          )}
+                      </th>
+                    );
+                  })}
+
+                  {/* Details column header */}
+                  <th
+                    style={{
+                      position: "sticky", top: 0, zIndex: 20,
+                      background: headerBg,
+                      borderBottom: `2px solid ${borderCol}`,
+                      borderLeft: `1px solid ${borderCol}`,
+                      padding: "0 12px",
+                      height: 40,
+                      textAlign: "left",
+                      fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: "var(--t3)",
+                    }}
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+
+              {/* ── Body: one row = one student (here just one selected student, each assignment is a column) ── */}
+              {/* Actually: Infinite Campus layout for single-student view = each assignment row in the roster.
+                  We render a TRANSPOSED view: rows = assignments, first col = assignment name info. */}
+              <tbody>
+                {visibleRows.map((r, idx) => {
+                  const cell    = gradeCell(r.numeric_grade ?? r.ai_grade, r.human_grade_pass, r.status);
+                  const saving  = savingId === r.assignment_id;
+                  const fbOpen  = feedbackOpenFor === r.assignment_id;
+                  const wkOpen  = workOpenFor === r.assignment_id;
+                  const rowBase = idx % 2 === 1 ? "rgba(255,255,255,0.015)" : "transparent";
+
+                  return (
+                    <React.Fragment key={r.assignment_id}>
+                      <tr
+                        style={{ background: rowBase, height: 36, transition: "background 0.1s" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(124,58,237,0.07)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = rowBase)}
+                      >
+                        {/* Frozen assignment name cell */}
+                        <td
+                          style={{
+                            position: "sticky", left: 0, zIndex: 10,
+                            background: "inherit",
+                            borderRight: `2px solid rgba(255,255,255,0.08)`,
+                            borderBottom: `1px solid ${borderCol}`,
+                            padding: "0 12px",
+                            width: STUDENT_COL_W,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <StatusDot status={r.status} />
+                            <span
+                              style={{
+                                fontSize: 12, fontWeight: 600, color: "var(--t1)",
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                maxWidth: STUDENT_COL_W - 48,
+                              }}
+                              title={r.title}
+                            >
+                              {r.title}
+                            </span>
+                          </div>
                         </td>
-                      </tr>
-                    )}
-                    {/* Feedback expansion */}
-                    {fbOpen && (
-                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td colSpan={6} className="px-5 py-3" style={{ background: "rgba(99,102,241,0.04)" }}>
-                          <div className="flex gap-2 items-start">
-                            <textarea
-                              value={feedbackDraft[r.assignment_id] ?? ""}
-                              onChange={(e) => setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
-                              placeholder="Feedback for the student…"
-                              className="flex-1 rounded-lg px-3 py-2 text-sm resize-y min-h-[52px] bg-white/[0.04] border border-white/[0.08] text-white"
-                            />
-                            <div className="flex flex-col gap-1">
-                              <button
-                                onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
-                                disabled={saving}
-                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50 cursor-pointer"
-                              >Pass + save</button>
-                              <button
-                                onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
-                                disabled={saving}
-                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 border border-red-500/40 text-red-200 hover:bg-red-500/30 disabled:opacity-50 cursor-pointer"
-                              >Redo + save</button>
-                            </div>
+
+                        {/* Grade cell — spans one column for this row */}
+                        <td
+                          style={{
+                            borderRight: `1px solid ${borderCol}`,
+                            borderBottom: `1px solid ${borderCol}`,
+                            padding: 4,
+                            textAlign: "center",
+                            width: CELL_W,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center", justifyContent: "center",
+                              width: 44, height: 26,
+                              borderRadius: 4,
+                              background: cell.bg,
+                              color: cell.text,
+                              border: `1px solid ${cell.border}`,
+                              fontSize: 11, fontWeight: 800,
+                              fontVariantNumeric: "tabular-nums",
+                              letterSpacing: "-0.01em",
+                            }}
+                          >
+                            {cell.label}
+                          </div>
+                        </td>
+
+                        {/* Remaining assignment columns (empty — this view is one student wide) */}
+                        {visibleRows.slice(idx + 1, idx + 1).map(() => null)}
+
+                        {/* Actions cell */}
+                        <td
+                          style={{
+                            borderLeft: `1px solid ${borderCol}`,
+                            borderBottom: `1px solid ${borderCol}`,
+                            padding: "0 10px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            {/* View work */}
+                            <ActionBtn
+                              active={wkOpen}
+                              disabled={!r.submission_id}
+                              title={r.submission_id ? "View work" : "No submission"}
+                              onClick={() => toggleWork(r)}
+                            >
+                              <Eye size={10} />
+                            </ActionBtn>
+
+                            {/* Pass / redo */}
+                            {r.human_grade_pass === true ? (
+                              <span style={{ fontSize: 11, fontWeight: 800, color: "#34d399", padding: "0 2px" }}>✓</span>
+                            ) : r.human_grade_pass === false ? (
+                              <span style={{ fontSize: 11, fontWeight: 800, color: "#f87171", padding: "0 2px" }}>✗</span>
+                            ) : (
+                              <>
+                                <ActionBtn
+                                  color="emerald"
+                                  disabled={saving}
+                                  title="Pass"
+                                  onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}
+                                >
+                                  ✓
+                                </ActionBtn>
+                                <ActionBtn
+                                  color="red"
+                                  disabled={saving}
+                                  title="Redo"
+                                  onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}
+                                >
+                                  ✗
+                                </ActionBtn>
+                              </>
+                            )}
+
+                            {/* Feedback */}
+                            <ActionBtn
+                              active={fbOpen}
+                              title="Feedback"
+                              onClick={() => {
+                                setFeedbackOpenFor(fbOpen ? null : r.assignment_id);
+                                if (!fbOpen && !(r.assignment_id in feedbackDraft)) {
+                                  setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: r.human_grade_feedback || "" }));
+                                }
+                              }}
+                            >
+                              <MessageSquare size={10} />
+                            </ActionBtn>
+
+                            {/* Subject + date inline */}
+                            <span style={{ marginLeft: 6, fontSize: 10, color: "var(--t3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                              {r.scheduled_date || (r.due_date ? String(r.due_date).slice(0, 10) : "—")}
+                            </span>
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+
+                      {/* Work view expansion */}
+                      {wkOpen && (
+                        <tr>
+                          <td colSpan={3} style={{ borderBottom: `1px solid ${borderCol}`, padding: "12px 16px", background: "rgba(255,255,255,0.02)" }}>
+                            {!r.submission_id ? (
+                              <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>Student hasn't submitted yet.</p>
+                            ) : workLoading === r.submission_id ? (
+                              <p style={{ fontSize: 12, color: "var(--t3)" }}>Loading submission…</p>
+                            ) : (
+                              <SubmissionWorkView sub={workCache[r.submission_id]} dk={dk} />
+                            )}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Feedback expansion */}
+                      {fbOpen && (
+                        <tr>
+                          <td colSpan={3} style={{ borderBottom: `1px solid ${borderCol}`, padding: "10px 16px", background: "rgba(124,58,237,0.04)" }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <textarea
+                                value={feedbackDraft[r.assignment_id] ?? ""}
+                                onChange={(e) => setFeedbackDraft((p) => ({ ...p, [r.assignment_id]: e.target.value }))}
+                                placeholder="Feedback for the student…"
+                                style={{
+                                  flex: 1, borderRadius: 6, padding: "6px 10px",
+                                  fontSize: 12, resize: "vertical", minHeight: 52,
+                                  background: "rgba(255,255,255,0.04)",
+                                  border: "1px solid rgba(255,255,255,0.08)",
+                                  color: "var(--t1)",
+                                  outline: "none",
+                                }}
+                              />
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <FeedbackSaveBtn color="emerald" disabled={saving} onClick={() => doGrade(r, true, feedbackDraft[r.assignment_id])}>
+                                  Pass + save
+                                </FeedbackSaveBtn>
+                                <FeedbackSaveBtn color="red" disabled={saving} onClick={() => doGrade(r, false, feedbackDraft[r.assignment_id])}>
+                                  Redo + save
+                                </FeedbackSaveBtn>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, accent = "gray" }: { label: string; value: number; accent?: "gray" | "emerald" | "violet" | "amber" }) {
-  const colors: Record<string, string> = {
-    gray: "text-t1",
-    emerald: "text-emerald-400",
-    violet: "text-violet-400",
-    amber: "text-amber-400",
-  };
+/* ── Small reusable pieces ─────────────────────────────── */
+
+function ActionBtn({
+  children, onClick, disabled = false, active = false, title = "",
+  color = "default",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  title?: string;
+  color?: "default" | "emerald" | "red";
+}) {
+  const palette = {
+    default: { bg: active ? "rgba(124,58,237,0.22)" : "rgba(255,255,255,0.06)", text: active ? "#c4b5fd" : "rgba(255,255,255,0.45)", border: active ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.1)" },
+    emerald:  { bg: "rgba(52,211,153,0.1)",  text: "#34d399", border: "rgba(52,211,153,0.3)" },
+    red:      { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.28)" },
+  }[color];
   return (
-    <div className="flex flex-col items-end">
-      <span className={`text-xl font-extrabold leading-none ${colors[accent]}`}>{value}</span>
-      <span className="text-[10px] uppercase tracking-wider text-t3 mt-0.5">{label}</span>
-    </div>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 22, height: 22, borderRadius: 4,
+        background: palette.bg, color: palette.text, border: `1px solid ${palette.border}`,
+        fontSize: 10, fontWeight: 800, cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1, transition: "opacity 0.1s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FeedbackSaveBtn({
+  children, color, disabled, onClick,
+}: { children: React.ReactNode; color: "emerald" | "red"; disabled?: boolean; onClick?: () => void }) {
+  const palette = {
+    emerald: { bg: "rgba(52,211,153,0.15)",  text: "#6ee7b7", border: "rgba(52,211,153,0.4)" },
+    red:     { bg: "rgba(239,68,68,0.12)",   text: "#fca5a5", border: "rgba(239,68,68,0.35)" },
+  }[color];
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "4px 10px", borderRadius: 5,
+        fontSize: 11, fontWeight: 700,
+        background: palette.bg, color: palette.text, border: `1px solid ${palette.border}`,
+        cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
 function StatPill({ label, value, color = "gray" }: { label: string; value: number; color?: "gray" | "emerald" | "amber" }) {
-  const cfg: Record<string, string> = {
-    gray:    "bg-white/[0.06] text-t2",
-    emerald: "bg-emerald-500/15 text-emerald-300",
-    amber:   "bg-amber-500/15 text-amber-300",
+  const cfg: Record<string, { bg: string; text: string }> = {
+    gray:    { bg: "rgba(255,255,255,0.06)", text: "var(--t2)" },
+    emerald: { bg: "rgba(52,211,153,0.12)",  text: "#6ee7b7" },
+    amber:   { bg: "rgba(251,191,36,0.13)",  text: "#fbbf24" },
   };
+  const c = cfg[color];
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${cfg[color]}`}>
-      <span className="text-base font-extrabold tabular-nums leading-none">{value}</span>
-      <span className="uppercase tracking-wider text-[9px] opacity-70">{label}</span>
+    <span
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 5,
+        padding: "3px 8px", borderRadius: 99,
+        background: c.bg, color: c.text,
+        fontSize: 11, fontWeight: 700,
+      }}
+    >
+      <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>{label}</span>
     </span>
   );
 }
 
 // Inline viewer: renders question-by-question with the student's answer and a
-// correctness marker when the assignment has an answer key. Falls back to a
-// project-data dump for Scratch-style submissions.
+// correctness marker when the assignment has an answer key.
 function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
-  if (!sub) return <p className="text-xs text-t3 italic">No submission data.</p>;
+  if (!sub) return <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>No submission data.</p>;
   const content = sub.assignment_content;
   const answers: Record<string, any> = sub.answers || {};
   const auto = sub.auto_grade_result;
   const when = sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : null;
 
-  // Flatten content.sections[].questions[] so we can pair each with answers[idx]
   const questions: any[] = [];
   if (content?.sections) {
     for (const section of content.sections) {
@@ -589,10 +882,12 @@ function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
   const normalize = (s: any) => String(s ?? "").replace(/^[A-D]\.\s*/i, "").trim().toLowerCase();
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-[11px] uppercase tracking-wider text-t3 font-bold">Student's work</div>
-        <div className="text-[11px] text-t3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, color: "var(--t3)" }}>
+          Student's work
+        </div>
+        <div style={{ fontSize: 11, color: "var(--t3)" }}>
           {sub.student_name && <span>👤 {sub.student_name} · </span>}
           {when && <span>🕐 {when}</span>}
           {auto && <span> · AI {auto.score}%</span>}
@@ -600,7 +895,7 @@ function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
       </div>
 
       {questions.length > 0 ? (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {questions.map((q, i) => {
             const ans = answers[String(i)] ?? answers[i as any];
             let correct: boolean | null = null;
@@ -615,25 +910,43 @@ function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
               if (correctOpt !== undefined) correct = normalize(ans) === normalize(correctOpt);
             }
             return (
-              <div key={i} className={`rounded-lg border p-3 ${dk ? "bg-white/[0.02] border-white/[0.06]" : "bg-white border-gray-200"}`}>
-                <div className="flex items-start gap-2">
-                  <span className="text-[10px] font-bold text-t3 mt-0.5">Q{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-t1">{q.text || `Question ${i + 1}`}</div>
+              <div
+                key={i}
+                style={{
+                  borderRadius: 6, padding: "10px 12px",
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginTop: 2 }}>Q{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)" }}>{q.text || `Question ${i + 1}`}</div>
                     {q.type === "multiple_choice" && Array.isArray(q.options) && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
+                      <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {q.options.map((opt: string, oi: number) => {
                           const isStudent = normalize(opt) === normalize(ans);
                           const isKey = correctOpt !== undefined && normalize(opt) === normalize(correctOpt);
+                          const bg = isStudent && isKey ? "rgba(52,211,153,0.2)"
+                            : isStudent ? "rgba(239,68,68,0.14)"
+                            : isKey ? "rgba(52,211,153,0.1)"
+                            : "rgba(255,255,255,0.04)";
+                          const col = isStudent && isKey ? "#6ee7b7"
+                            : isStudent ? "#fca5a5"
+                            : isKey ? "#34d399"
+                            : "rgba(255,255,255,0.38)";
+                          const bdr = isStudent && isKey ? "rgba(52,211,153,0.5)"
+                            : isStudent ? "rgba(239,68,68,0.4)"
+                            : isKey ? "rgba(52,211,153,0.3)"
+                            : "rgba(255,255,255,0.08)";
                           return (
                             <span
                               key={oi}
-                              className={`text-[11px] px-2 py-1 rounded-md border ${
-                                isStudent && isKey ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200 font-bold"
-                                : isStudent ? "bg-red-500/15 border-red-500/40 text-red-300 font-bold"
-                                : isKey ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                                : dk ? "border-white/10 text-white/40" : "border-gray-200 text-gray-500"
-                              }`}
+                              style={{
+                                fontSize: 11, padding: "3px 8px", borderRadius: 4,
+                                background: bg, color: col, border: `1px solid ${bdr}`,
+                                fontWeight: isStudent || isKey ? 700 : 400,
+                              }}
                             >
                               {isStudent ? "▶ " : ""}{opt}{isKey ? " ✓" : ""}
                             </span>
@@ -642,49 +955,58 @@ function SubmissionWorkView({ sub, dk }: { sub: any; dk: boolean }) {
                       </div>
                     )}
                     {(q.type === "short_answer" || q.type === "fill_blank") && (
-                      <div className={`mt-1.5 text-sm whitespace-pre-wrap rounded-md px-2 py-1.5 ${
-                        ans ? (dk ? "bg-white/[0.04] text-white" : "bg-gray-100 text-gray-900")
-                             : (dk ? "text-white/30 italic" : "text-gray-400 italic")
-                      }`}>
+                      <div
+                        style={{
+                          marginTop: 6, fontSize: 12, padding: "5px 8px", borderRadius: 4,
+                          background: ans ? "rgba(255,255,255,0.04)" : "transparent",
+                          color: ans ? "var(--t1)" : "var(--t3)",
+                          fontStyle: ans ? "normal" : "italic",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
                         {ans || "(no answer)"}
                       </div>
                     )}
                   </div>
-                  {correct === true && <span className="text-xs font-bold text-emerald-400">✓</span>}
-                  {correct === false && <span className="text-xs font-bold text-red-400">✗</span>}
+                  {correct === true  && <span style={{ fontSize: 12, fontWeight: 800, color: "#34d399" }}>✓</span>}
+                  {correct === false && <span style={{ fontSize: 12, fontWeight: 800, color: "#f87171" }}>✗</span>}
                 </div>
               </div>
             );
           })}
         </div>
       ) : auto?.checks ? (
-        <div className="space-y-1">
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {auto.checks.map((c: any, i: number) => (
-            <div key={i} className="text-xs flex items-start gap-2">
-              <span className={c.passed ? "text-emerald-400" : "text-red-400"}>{c.passed ? "✓" : "✗"}</span>
-              <span className="text-t1 font-semibold">{c.label}</span>
-              <span className="text-t3">— {c.detail}</span>
+            <div key={i} style={{ fontSize: 12, display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ color: c.passed ? "#34d399" : "#f87171" }}>{c.passed ? "✓" : "✗"}</span>
+              <span style={{ fontWeight: 600, color: "var(--t1)" }}>{c.label}</span>
+              <span style={{ color: "var(--t3)" }}>— {c.detail}</span>
             </div>
           ))}
         </div>
       ) : sub.project_id ? (
-        <p className="text-xs text-t3 italic">Scratch project submission (ID {String(sub.project_id).slice(0, 8)}…). Open the project workspace to view blocks.</p>
+        <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>
+          Scratch project submission (ID {String(sub.project_id).slice(0, 8)}…). Open the project workspace to view blocks.
+        </p>
       ) : (
-        <p className="text-xs text-t3 italic">No answer data in this submission.</p>
+        <p style={{ fontSize: 12, color: "var(--t3)", fontStyle: "italic" }}>No answer data in this submission.</p>
       )}
 
       {sub.human_grade_feedback && (
-        <div className="mt-2 text-xs rounded-lg border px-2 py-1.5"
-             style={{ background: "rgba(139,92,246,0.08)", borderColor: "rgba(139,92,246,0.3)" }}>
-          <span className="font-bold text-violet-300">Your feedback: </span>
-          <span className="text-t2">{sub.human_grade_feedback}</span>
+        <div
+          style={{
+            marginTop: 4, fontSize: 12, borderRadius: 6, padding: "6px 10px",
+            background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.28)",
+          }}
+        >
+          <span style={{ fontWeight: 700, color: "#c4b5fd" }}>Your feedback: </span>
+          <span style={{ color: "var(--t2)" }}>{sub.human_grade_feedback}</span>
         </div>
       )}
     </div>
   );
 }
 
-// Kept as a named export so App.tsx's existing import still compiles. The
-// standalone picker route is no longer used — /teacher/gradebook now renders
-// the full single-page gradebook, so this just re-exports the default page.
+// Kept as a named export so App.tsx's existing import still compiles.
 export const GradebookStudentPicker = TeacherGradebook;

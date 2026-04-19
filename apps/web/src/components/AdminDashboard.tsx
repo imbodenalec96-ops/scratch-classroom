@@ -7,7 +7,7 @@ import {
   Users, GraduationCap, BookOpen, School, Eye,
   LockOpen, Youtube, BarChart3, Trophy,
   ClipboardList, Monitor, HelpCircle, CheckSquare,
-  Download, AlertTriangle, Tv,
+  Download, AlertTriangle, Tv, CircleDot,
 } from "lucide-react";
 
 const ANIM = `
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
 
   const handleForceUnlockAll = async () => {
     if (!confirm("Force-unlock EVERY class system-wide?")) return;
-    try { await api.forceUnlockAll(); alert("✓ All classes unlocked."); }
+    try { await api.forceUnlockAll(); alert("All classes unlocked."); }
     catch (e: any) { alert("Failed: " + e.message); }
   };
 
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
   if (unstaffedClasses.length) pendingTasks.push({ severity:"high", label:`${unstaffedClasses.length} class${unstaffedClasses.length===1?"":"es"} without a teacher`, link:"/admin-dashboard" });
   if (emptyClasses.length)     pendingTasks.push({ severity:"low",  label:`${emptyClasses.length} empty class${emptyClasses.length===1?"":"es"} (no students)`, link:"/admin-dashboard" });
   if (totalTeachers === 0)     pendingTasks.push({ severity:"high", label:"No teachers on the platform yet", link:"/admin-dashboard" });
-  if (genWarnings.length)      pendingTasks.push({ severity:"med",  label:`⚠️ ${genWarnings.length} off-grade task${genWarnings.length===1?"":"s"} flagged by CCSS`, link:"#gen-warnings" });
+  if (genWarnings.length)      pendingTasks.push({ severity:"med",  label:`${genWarnings.length} off-grade task${genWarnings.length===1?"":"s"} flagged by CCSS`, link:"#gen-warnings" });
 
   const ADMIN_TOOLS = [
     { path:"/monitor",         icon:Monitor,       label:"Live Monitor",   desc:"Every student",           grad:"linear-gradient(135deg,#ec4899,#f43f5e)", glow:"rgba(236,72,153,0.3)"  },
@@ -106,60 +106,65 @@ export default function AdminDashboard() {
     { label:"Unstaffed classes",  ok:unstaffedClasses.length===0, okText:"Every class staffed",  failText:`${unstaffedClasses.length} unstaffed` },
   ];
 
-  const surface = dk ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.9)";
-  const border  = dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const surface = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
+  const border  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
   const text1   = dk ? "#f1f5f9" : "#0f172a";
-  const text2   = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
-  const card = { background:surface, border:`1px solid ${border}`, borderRadius:16, backdropFilter:"blur(12px)" } as const;
+  const text2   = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const cardStyle = { background:surface, border:`1px solid ${border}`, borderRadius:20, backdropFilter:"blur(16px)" } as const;
 
   const STATS = [
-    { label:"Classes",    value:classes.length,  icon:School,       grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,0.35)" },
-    { label:"Teachers",   value:totalTeachers,   icon:GraduationCap,grad:"linear-gradient(135deg,#14b8a6,#0d9488)", glow:"rgba(20,184,166,0.35)" },
-    { label:"Students",   value:totalStudents,   icon:Users,        grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.35)" },
-    { label:"YT Pending", value:youtubePending,  icon:Youtube,      grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,0.35)"  },
+    { label:"Classes",    value:classes.length,  icon:School,       grad:"linear-gradient(135deg,#8b5cf6,#6d28d9)", glow:"rgba(139,92,246,0.25)" },
+    { label:"Teachers",   value:totalTeachers,   icon:GraduationCap,grad:"linear-gradient(135deg,#14b8a6,#0d9488)", glow:"rgba(20,184,166,0.25)" },
+    { label:"Students",   value:totalStudents,   icon:Users,        grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.25)" },
+    { label:"YT Pending", value:youtubePending,  icon:Youtube,      grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,0.25)"  },
   ];
 
   return (
     <div style={{ minHeight:"100vh", background:dk?"#070714":"#f0f1f8", color:text1, fontFamily:"'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
-      {/* ── Hero header ── */}
       <div style={{
-        background:dk
-          ?"linear-gradient(135deg,#0d0d28 0%,#1a0a3a 60%,#0a1228 100%)"
-          :"linear-gradient(135deg,#0ea5e9 0%,#3b82f6 40%,#4f46e5 100%)",
-        padding:"28px 32px 28px", marginBottom:28,
-        position:"relative", overflow:"hidden",
+        background: dk
+          ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
+          : "linear-gradient(160deg,#0ea5e9 0%,#3b82f6 40%,#4f46e5 100%)",
+        padding:"32px 40px 32px",
+        marginBottom:32,
+        position:"relative",
+        overflow:"hidden",
       }}>
-        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 50%,rgba(255,255,255,0.06) 0%,transparent 60%)",pointerEvents:"none" }} />
-        <header style={{ maxWidth:1280, margin:"0 auto", position:"relative", animation:"ad-fadeUp .5s ease both" }}>
-          <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.6)",marginBottom:8 }}>
-            {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · Admin
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 40%,rgba(124,58,237,0.18) 0%,transparent 65%)",pointerEvents:"none" }} />
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 20% 80%,rgba(59,130,246,0.1) 0%,transparent 60%)",pointerEvents:"none" }} />
+        <header style={{ maxWidth:1280, margin:"0 auto", position:"relative", animation:"ad-fadeUp .45s ease both" }}>
+          <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.45)",marginBottom:10 }}>
+            {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · Admin Portal
           </div>
           <div style={{ display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:16,flexWrap:"wrap" }}>
             <div>
-              <h1 style={{ fontSize:40,fontWeight:900,letterSpacing:"-0.03em",margin:0,lineHeight:1.05,color:"white" }}>
+              <h1 style={{ fontSize:38,fontWeight:900,letterSpacing:"-0.035em",margin:0,lineHeight:1.08,color:"white" }}>
                 {greeting}, {user?.name?.split(" ")[0] || "Admin"}.
               </h1>
-              <p style={{ fontSize:13,marginTop:6,color:"rgba(255,255,255,0.65)" }}>
+              <p style={{ fontSize:13,marginTop:8,color:"rgba(255,255,255,0.55)",letterSpacing:"0.01em" }}>
                 School-wide overview. Flip into any teacher's seat with one click.
               </p>
             </div>
             <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
               {classes[0]?.id && (
                 <a href={`/board?class=${encodeURIComponent(classes[0].id)}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,textDecoration:"none",
-                    background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.35)",color:"white",backdropFilter:"blur(8px)" }}>
+                  style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:700,textDecoration:"none",
+                    background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",color:"white",backdropFilter:"blur(8px)",transition:"background 0.15s" }}>
                   <Tv size={13}/> Open Board
                 </a>
               )}
-              <Link to="/teacher" style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,textDecoration:"none",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.25)",color:"rgba(255,255,255,0.85)" }}>
+              <Link to="/teacher" style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:600,textDecoration:"none",
+                background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",color:"rgba(255,255,255,0.8)" }}>
                 <Eye size={13}/> View as Teacher
               </Link>
-              <button onClick={handleExportCSV} style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.25)",color:"rgba(255,255,255,0.85)" }}>
-                <Download size={13}/> Export Students
+              <button onClick={handleExportCSV} style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",
+                background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",color:"rgba(255,255,255,0.8)" }}>
+                <Download size={13}/> Export CSV
               </button>
-              <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",background:"rgba(239,68,68,0.25)",border:"1px solid rgba(239,68,68,0.5)",color:"#fecaca" }}>
+              <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",
+                background:"rgba(239,68,68,0.2)",border:"1px solid rgba(239,68,68,0.4)",color:"#fca5a5" }}>
                 <LockOpen size={13}/> Force Unlock All
               </button>
             </div>
@@ -167,199 +172,206 @@ export default function AdminDashboard() {
         </header>
       </div>
 
-      <div style={{ padding:"0 32px 32px", maxWidth:1280, margin:"0 auto" }}>
+      <div style={{ padding:"0 40px 48px", maxWidth:1280, margin:"0 auto" }}>
 
-      {/* ── Stats ── */}
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24,animation:"ad-fadeUp .5s ease .06s both" }}>
-        {STATS.map(s => (
-          <div key={s.label} style={{ ...card, padding:"18px 20px", display:"flex",alignItems:"center",gap:14 }}>
-            <div style={{ width:44,height:44,borderRadius:12,background:s.grad,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 4px 16px ${s.glow}` }}>
-              <s.icon size={20} color="white"/>
-            </div>
-            <div>
-              <div style={{ fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.15em",color:text2 }}>{s.label}</div>
-              <div style={{ fontSize:30,fontWeight:900,lineHeight:1.1,color:text1,letterSpacing:"-0.02em" }}>{s.value}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Pending tasks ── */}
-      {pendingTasks.length > 0 && (
-        <div style={{ ...card,padding:"16px 20px",marginBottom:24,borderLeft:"3px solid #f59e0b",animation:"ad-fadeUp .5s ease .1s both" }}>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12 }}>
-            <div style={{ fontSize:13,fontWeight:800,color:text1 }}>
-              ⚠️ Needs attention
-            </div>
-            <span style={{ fontSize:11,padding:"2px 10px",borderRadius:20,background:"rgba(245,158,11,0.18)",color:"#fbbf24",fontWeight:700 }}>
-              {pendingTasks.length} item{pendingTasks.length===1?"":"s"}
-            </span>
-          </div>
-          <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-            {pendingTasks.map((t, i) => {
-              const color = t.severity==="high"?"#f87171":t.severity==="med"?"#fbbf24":"rgba(255,255,255,0.4)";
-              const inner = (
-                <div style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,
-                  background:dk?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.02)",border:`1px solid ${border}` }}>
-                  <AlertTriangle size={13} style={{ color,flexShrink:0 }}/>
-                  <div style={{ fontSize:12,color:text1,flex:1 }}>{t.label}</div>
-                  <span style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color,flexShrink:0 }}>
-                    {t.severity==="high"?"High":t.severity==="med"?"Med":"Low"}
-                  </span>
-                </div>
-              );
-              if (t.link==="#gen-warnings") {
-                return <button key={i} onClick={() => setShowWarnings(v => !v)} style={{ background:"transparent",border:"none",cursor:"pointer",textAlign:"left",display:"block",width:"100%" }}>{inner}</button>;
-              }
-              return <Link key={i} to={t.link} style={{ textDecoration:"none",display:"block" }}>{inner}</Link>;
-            })}
-          </div>
-          {showWarnings && genWarnings.length > 0 && (
-            <div style={{ marginTop:12,padding:12,borderRadius:10,background:dk?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.02)",border:`1px solid ${border}`,maxHeight:280,overflowY:"auto" }}>
-              <div style={{ fontSize:11,fontWeight:700,marginBottom:8,color:text2 }}>CCSS Validator flags</div>
-              {genWarnings.map((w: any) => {
-                let reasons: string[] = [];
-                try { reasons = JSON.parse(w.generation_warnings || "[]"); } catch {}
-                return (
-                  <div key={w.id} style={{ marginBottom:10,paddingBottom:10,borderBottom:`1px solid ${border}` }}>
-                    <div style={{ fontSize:10,color:text2 }}>{w.date} · {w.subject} · grade {w.target_grade??"?"}</div>
-                    <div style={{ fontSize:12,color:text1,marginTop:2 }}>{w.prompt}</div>
-                    <div style={{ fontSize:11,color:"#fbbf24",marginTop:2 }}>⚠️ {reasons.join("; ")}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Tools grid ── */}
-      <div style={{ marginBottom:24, animation:"ad-fadeUp .5s ease .14s both" }}>
-        <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.15em",textTransform:"uppercase",color:text2,marginBottom:12 }}>Admin Tools</div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10 }}>
-          {ADMIN_TOOLS.map((t, i) => (
-            <Link key={t.path} to={t.path} style={{
-              display:"flex",flexDirection:"column",gap:10,padding:"14px 12px",borderRadius:14,textDecoration:"none",
-              background:surface,border:`1px solid ${border}`,transition:"all 0.2s ease",
-              animation:"ad-fadeUp .45s ease both",animationDelay:`${i*40}ms`,
-            }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform="translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow=`0 8px 28px ${t.glow}`; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; (e.currentTarget as HTMLElement).style.boxShadow=""; }}>
-              <div style={{ width:36,height:36,borderRadius:10,background:t.grad,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 12px ${t.glow}` }}>
-                <t.icon size={17} color="white"/>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:28,animation:"ad-fadeUp .5s ease .05s both" }}>
+          {STATS.map(s => (
+            <div key={s.label} style={{ ...cardStyle, padding:"22px 24px", display:"flex",alignItems:"center",gap:16 }}>
+              <div style={{
+                width:50,height:50,borderRadius:14,background:s.grad,
+                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                boxShadow:`0 8px 24px ${s.glow}`,
+              }}>
+                <s.icon size={22} color="white"/>
               </div>
               <div>
-                <div style={{ fontSize:12,fontWeight:700,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{t.label}</div>
-                <div style={{ fontSize:10,color:text2,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{t.desc}</div>
+                <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.18em",color:text2,marginBottom:4 }}>{s.label}</div>
+                <div style={{ fontSize:32,fontWeight:900,lineHeight:1,color:text1,letterSpacing:"-0.03em" }}>{s.value}</div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
-      </div>
 
-      {/* ── Classes + Teachers 2-col ── */}
-      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24,animation:"ad-fadeUp .5s ease .18s both" }}>
-        {/* Classes */}
-        <div style={{ ...card,padding:"18px 20px" }}>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
-            <div>
-              <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.15em",textTransform:"uppercase",color:text2,marginBottom:3 }}>Every Class</div>
-              <div style={{ fontSize:18,fontWeight:800,color:text1 }}>Classrooms</div>
+        {pendingTasks.length > 0 && (
+          <div style={{ ...cardStyle,padding:"18px 22px",marginBottom:28,borderLeft:"3px solid rgba(245,158,11,0.7)",animation:"ad-fadeUp .5s ease .1s both" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:9 }}>
+                <AlertTriangle size={15} style={{ color:"#fbbf24" }} />
+                <span style={{ fontSize:13,fontWeight:800,color:text1 }}>Needs attention</span>
+              </div>
+              <span style={{ fontSize:11,padding:"3px 11px",borderRadius:20,background:"rgba(245,158,11,0.14)",color:"#fbbf24",fontWeight:700,letterSpacing:"0.04em" }}>
+                {pendingTasks.length} item{pendingTasks.length===1?"":"s"}
+              </span>
             </div>
-            <span style={{ fontSize:11,padding:"3px 10px",borderRadius:20,background:dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",color:text2,fontWeight:600 }}>
-              {classes.length} total
-            </span>
-          </div>
-          {classes.length === 0
-            ? <p style={{ fontSize:12,textAlign:"center",padding:"28px 0",color:text2 }}>No classes created yet.</p>
-            : (
-              <div style={{ display:"flex",flexDirection:"column",gap:4 }}>
-                {classes.map(c => {
-                  const teacher = teachers.find(t => t.id === c.teacher_id);
+            <div style={{ display:"flex",flexDirection:"column",gap:5 }}>
+              {pendingTasks.map((t, i) => {
+                const color = t.severity==="high"?"#f87171":t.severity==="med"?"#fbbf24":"rgba(255,255,255,0.35)";
+                const bg    = t.severity==="high"?"rgba(239,68,68,0.07)":t.severity==="med"?"rgba(245,158,11,0.07)":"rgba(255,255,255,0.02)";
+                const inner = (
+                  <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,
+                    background:bg,border:`1px solid ${t.severity==="high"?"rgba(239,68,68,0.15)":t.severity==="med"?"rgba(245,158,11,0.15)":border}` }}>
+                    <div style={{ width:6,height:6,borderRadius:"50%",background:color,flexShrink:0 }} />
+                    <div style={{ fontSize:12,color:text1,flex:1,letterSpacing:"0.01em" }}>{t.label}</div>
+                    <span style={{ fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.12em",color,flexShrink:0 }}>
+                      {t.severity==="high"?"High":t.severity==="med"?"Med":"Low"}
+                    </span>
+                  </div>
+                );
+                if (t.link==="#gen-warnings") {
+                  return <button key={i} onClick={() => setShowWarnings(v => !v)} style={{ background:"transparent",border:"none",cursor:"pointer",textAlign:"left",display:"block",width:"100%",padding:0 }}>{inner}</button>;
+                }
+                return <Link key={i} to={t.link} style={{ textDecoration:"none",display:"block" }}>{inner}</Link>;
+              })}
+            </div>
+            {showWarnings && genWarnings.length > 0 && (
+              <div style={{ marginTop:14,padding:14,borderRadius:14,background:dk?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",border:`1px solid ${border}`,maxHeight:280,overflowY:"auto" }}>
+                <div style={{ fontSize:10,fontWeight:700,marginBottom:10,color:text2,textTransform:"uppercase",letterSpacing:"0.15em" }}>CCSS Validator flags</div>
+                {genWarnings.map((w: any) => {
+                  let reasons: string[] = [];
+                  try { reasons = JSON.parse(w.generation_warnings || "[]"); } catch {}
                   return (
-                    <div key={c.id} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:`1px solid transparent`,
-                      transition:"all 0.15s ease" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
-                      <div style={{ width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0 }}>
-                        {c.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ flex:1,minWidth:0 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:text1 }}>
-                          {c.name}
-                          <span style={{ marginLeft:6,fontSize:10,fontFamily:"monospace",color:text2 }}>{c.code}</span>
-                        </div>
-                        <div style={{ fontSize:10,color:text2 }}>{teacher?.name||"No teacher"} · {studentsByClass[c.id]??"…"} students</div>
-                      </div>
-                      <Link to="/monitor" style={{ fontSize:10,fontWeight:600,color:"#a78bfa",textDecoration:"none",padding:"3px 8px",borderRadius:6,background:"rgba(124,58,237,0.12)" }}>Monitor →</Link>
+                    <div key={w.id} style={{ marginBottom:10,paddingBottom:10,borderBottom:`1px solid ${border}` }}>
+                      <div style={{ fontSize:10,color:text2 }}>{w.date} · {w.subject} · grade {w.target_grade??"?"}</div>
+                      <div style={{ fontSize:12,color:text1,marginTop:3 }}>{w.prompt}</div>
+                      <div style={{ fontSize:11,color:"#fbbf24",marginTop:3 }}>{reasons.join("; ")}</div>
                     </div>
                   );
                 })}
               </div>
-            )
-          }
-        </div>
-
-        {/* Teachers */}
-        <div style={{ ...card,padding:"18px 20px" }}>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
-            <div>
-              <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.15em",textTransform:"uppercase",color:text2,marginBottom:3 }}>Staff</div>
-              <div style={{ fontSize:18,fontWeight:800,color:text1 }}>People</div>
-            </div>
-            <span style={{ fontSize:11,padding:"3px 10px",borderRadius:20,background:dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",color:text2,fontWeight:600 }}>
-              {totalTeachers} teachers · {teachers.length-totalTeachers} admins
-            </span>
+            )}
           </div>
-          {teachers.length === 0
-            ? <p style={{ fontSize:12,textAlign:"center",padding:"28px 0",color:text2 }}>No teachers or admins yet.</p>
-            : (
-              <div style={{ display:"flex",flexDirection:"column",gap:4 }}>
-                {teachers.map(t => {
-                  const owns = classes.filter(c => c.teacher_id === t.id);
-                  return (
-                    <div key={t.id} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,border:`1px solid transparent`,transition:"all 0.15s ease" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
-                      <div style={{ width:30,height:30,borderRadius:8,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,
-                        background:t.role==="admin"?"linear-gradient(135deg,#ef4444,#dc2626)":"linear-gradient(135deg,#14b8a6,#0d9488)",
-                        boxShadow:t.role==="admin"?"0 2px 8px rgba(239,68,68,0.3)":"0 2px 8px rgba(20,184,166,0.3)",
-                      }}>
-                        {t.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
-                          {t.name}
-                          {t.role==="admin" && <span style={{ fontSize:9,fontWeight:800,padding:"1px 5px",borderRadius:4,background:"rgba(239,68,68,0.15)",color:"#f87171" }}>Admin</span>}
-                        </div>
-                        <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                          {t.email} · {owns.length>0?`Teaches ${owns.map((c:any)=>c.name).join(", ")}`:"No classes"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          }
-        </div>
-      </div>
+        )}
 
-      {/* ── System Health ── */}
-      <div style={{ ...card,padding:"18px 20px",animation:"ad-fadeUp .5s ease .22s both" }}>
-        <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.15em",textTransform:"uppercase",color:text2,marginBottom:12 }}>System Health</div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10 }}>
-          {healthItems.map(s => {
-            const color = s.ok ? "#34d399" : s.warn ? "#fbbf24" : "#f87171";
-            return (
-              <div key={s.label} style={{ padding:"12px 14px",borderRadius:10,borderLeft:`3px solid ${color}`,background:dk?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.02)" }}>
-                <div style={{ fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.12em",color:text2,marginBottom:4 }}>{s.label}</div>
-                <div style={{ fontSize:12,fontWeight:700,color }}>{s.ok?"✓ ":s.warn?"⚠ ":"✕ "}{s.ok ? s.okText : s.failText}</div>
-              </div>
-            );
-          })}
+        <div style={{ marginBottom:28, animation:"ad-fadeUp .5s ease .14s both" }}>
+          <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:14 }}>Admin Tools</div>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(136px,1fr))",gap:10 }}>
+            {ADMIN_TOOLS.map((t, i) => (
+              <Link key={t.path} to={t.path} style={{
+                display:"flex",flexDirection:"column",gap:12,padding:"16px 14px",borderRadius:16,textDecoration:"none",
+                background:surface,border:`1px solid ${border}`,transition:"all 0.2s ease",
+                animation:"ad-fadeUp .45s ease both",animationDelay:`${i*35}ms`,
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform="translateY(-4px)"; (e.currentTarget as HTMLElement).style.boxShadow=`0 12px 32px ${t.glow}`; (e.currentTarget as HTMLElement).style.borderColor=`rgba(255,255,255,0.12)`; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; (e.currentTarget as HTMLElement).style.boxShadow=""; (e.currentTarget as HTMLElement).style.borderColor=border; }}>
+                <div style={{ width:38,height:38,borderRadius:11,background:t.grad,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 6px 16px ${t.glow}` }}>
+                  <t.icon size={17} color="white"/>
+                </div>
+                <div>
+                  <div style={{ fontSize:12,fontWeight:700,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"0.01em" }}>{t.label}</div>
+                  <div style={{ fontSize:10,color:text2,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{t.desc}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:28,animation:"ad-fadeUp .5s ease .18s both" }}>
+          <div style={{ ...cardStyle,padding:"20px 22px" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+              <div>
+                <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>All Rooms</div>
+                <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>Classrooms</div>
+              </div>
+              <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
+                {classes.length} total
+              </span>
+            </div>
+            {classes.length === 0
+              ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No classes created yet.</p>
+              : (
+                <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                  {classes.map(c => {
+                    const teacher = teachers.find(t => t.id === c.teacher_id);
+                    return (
+                      <div key={c.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,
+                        transition:"all 0.15s ease" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
+                        <div style={{ width:32,height:32,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#6d28d9)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0,boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
+                          {c.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
+                            {c.name}
+                            <span style={{ fontSize:9,fontFamily:"monospace",color:text2,background:dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",padding:"1px 5px",borderRadius:4 }}>{c.code}</span>
+                          </div>
+                          <div style={{ fontSize:10,color:text2,marginTop:2 }}>{teacher?.name||"No teacher"} · {studentsByClass[c.id]??"…"} students</div>
+                        </div>
+                        <Link to="/monitor" style={{ fontSize:10,fontWeight:700,color:"#a78bfa",textDecoration:"none",padding:"4px 9px",borderRadius:7,background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.2)",whiteSpace:"nowrap" }}>Monitor</Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
+          </div>
+
+          <div style={{ ...cardStyle,padding:"20px 22px" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+              <div>
+                <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>Staff</div>
+                <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>People</div>
+              </div>
+              <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
+                {totalTeachers} teachers · {teachers.length-totalTeachers} admins
+              </span>
+            </div>
+            {teachers.length === 0
+              ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No teachers or admins yet.</p>
+              : (
+                <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                  {teachers.map(t => {
+                    const owns = classes.filter(c => c.teacher_id === t.id);
+                    return (
+                      <div key={t.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,transition:"all 0.15s ease" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
+                        <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,
+                          background:t.role==="admin"?"linear-gradient(135deg,#ef4444,#dc2626)":"linear-gradient(135deg,#14b8a6,#0d9488)",
+                          boxShadow:t.role==="admin"?"0 4px 12px rgba(239,68,68,0.25)":"0 4px 12px rgba(20,184,166,0.25)",
+                        }}>
+                          {t.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth:0,flex:1 }}>
+                          <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
+                            {t.name}
+                            {t.role==="admin" && <span style={{ fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:5,background:"rgba(239,68,68,0.12)",color:"#f87171",letterSpacing:"0.06em" }}>ADMIN</span>}
+                          </div>
+                          <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2 }}>
+                            {t.email} · {owns.length>0?`Teaches ${owns.map((c:any)=>c.name).join(", ")}`:"No classes"}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle,padding:"20px 22px",animation:"ad-fadeUp .5s ease .22s both" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
+            <CircleDot size={14} style={{ color:"#34d399" }} />
+            <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2 }}>System Health</div>
+          </div>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10 }}>
+            {healthItems.map(s => {
+              const color = s.ok ? "#34d399" : s.warn ? "#fbbf24" : "#f87171";
+              const bg    = s.ok ? "rgba(52,211,153,0.07)" : s.warn ? "rgba(251,191,36,0.07)" : "rgba(248,113,113,0.07)";
+              const bdr   = s.ok ? "rgba(52,211,153,0.2)" : s.warn ? "rgba(251,191,36,0.2)" : "rgba(248,113,113,0.2)";
+              return (
+                <div key={s.label} style={{ padding:"14px 16px",borderRadius:14,background:bg,border:`1px solid ${bdr}` }}>
+                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:6 }}>
+                    <div style={{ width:7,height:7,borderRadius:"50%",background:color,flexShrink:0 }} />
+                    <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",color:text2 }}>{s.label}</div>
+                  </div>
+                  <div style={{ fontSize:12,fontWeight:700,color }}>{s.ok ? s.okText : s.failText}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

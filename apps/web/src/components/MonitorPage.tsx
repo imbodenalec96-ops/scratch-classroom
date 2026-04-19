@@ -9,6 +9,7 @@ import {
   ChevronLeft, Monitor, Activity, Box, ExternalLink,
   Youtube, X, Play, Square, Eye, Send, Navigation,
   Gamepad2, BookOpen, LayoutDashboard, MessageSquare,
+  Settings2, Gift, XCircle, Clock, Zap, Radio,
 } from "lucide-react";
 import StudentDrawer from "./StudentDrawer.tsx";
 
@@ -42,23 +43,43 @@ function extractYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+type StatusKey = "online" | "working" | "idle" | "offline";
+
+/** Derive a 4-state status from presence data */
+function deriveStatus(pr: any): StatusKey {
+  if (!pr.isOnline) return "offline";
+  const a = (pr.lastAction || "").toLowerCase();
+  if (a.includes("assignment") || a.includes("project") || a.includes("quiz") || a.includes("lesson"))
+    return "working";
+  const secsAgo = pr.lastActive ? Math.floor((Date.now() - pr.lastActive) / 1000) : 9999;
+  if (secsAgo > 120) return "idle";
+  return "online";
+}
+
+const STATUS_META: Record<StatusKey, { label: string; dot: string; ring: string; text: string; bg: string }> = {
+  online:  { label: "Online",   dot: "#34d399", ring: "rgba(52,211,153,0.25)",  text: "#34d399", bg: "rgba(52,211,153,0.08)"  },
+  working: { label: "Working",  dot: "#8b5cf6", ring: "rgba(139,92,246,0.25)", text: "#a78bfa", bg: "rgba(139,92,246,0.08)" },
+  idle:    { label: "Idle",     dot: "#f59e0b", ring: "rgba(245,158,11,0.20)",  text: "#fbbf24", bg: "rgba(245,158,11,0.06)"  },
+  offline: { label: "Offline",  dot: "#475569", ring: "transparent",            text: "#64748b", bg: "transparent"            },
+};
+
 /** Maps presence activity string to an icon/label for the tile preview */
 function activityPreview(activity: string): { emoji: string; label: string; color: string } {
   const a = (activity || "").toLowerCase();
-  if (a.includes("arcade") || a.includes("game"))  return { emoji: "🎮", label: "In Arcade",       color: "#8b5cf6" };
-  if (a.includes("assignment") || a.includes("quiz")) return { emoji: "📝", label: "On Assignment", color: "#f59e0b" };
-  if (a.includes("project"))                        return { emoji: "💻", label: "In Projects",     color: "#06b6d4" };
-  if (a.includes("lesson"))                         return { emoji: "📖", label: "Reading Lessons", color: "#10b981" };
-  if (a.includes("video"))                          return { emoji: "📺", label: "Watching Video",  color: "#ef4444" };
-  if (a.includes("dashboard"))                      return { emoji: "🏠", label: "On Dashboard",   color: "#6366f1" };
-  return { emoji: "🟢", label: activity || "Online",                                                color: "#34d399" };
+  if (a.includes("arcade") || a.includes("game"))       return { emoji: "🎮", label: "In Arcade",       color: "#8b5cf6" };
+  if (a.includes("assignment") || a.includes("quiz"))   return { emoji: "📝", label: "On Assignment",   color: "#f59e0b" };
+  if (a.includes("project"))                            return { emoji: "💻", label: "In Projects",     color: "#06b6d4" };
+  if (a.includes("lesson"))                             return { emoji: "📖", label: "Reading Lessons", color: "#10b981" };
+  if (a.includes("video"))                              return { emoji: "📺", label: "Watching Video",  color: "#ef4444" };
+  if (a.includes("dashboard"))                          return { emoji: "🏠", label: "On Dashboard",   color: "#6366f1" };
+  return { emoji: "🟢", label: activity || "Online",                                                    color: "#34d399" };
 }
 
 const PUSH_PAGES = [
-  { label: "Dashboard",  path: "/student",  icon: LayoutDashboard },
-  { label: "Lessons",    path: "/lessons",  icon: BookOpen },
-  { label: "Assignments",path: "/assignments", icon: BookOpen },
-  { label: "Arcade",     path: "/arcade",   icon: Gamepad2 },
+  { label: "Dashboard",   path: "/student",     icon: LayoutDashboard },
+  { label: "Lessons",     path: "/lessons",     icon: BookOpen },
+  { label: "Assignments", path: "/assignments", icon: BookOpen },
+  { label: "Arcade",      path: "/arcade",      icon: Gamepad2 },
 ];
 
 // Catalog for the per-game whitelist UI in Free Time Settings. Kept in sync
@@ -397,6 +418,16 @@ export default function MonitorPage() {
 
   const onlineCount  = Object.values(presence).filter(p => p.isOnline).length;
   const offlineCount = students.length - onlineCount;
+  const workingCount = students.filter(s => {
+    const pr = presence[s.id];
+    return pr && deriveStatus(pr) === "working";
+  }).length;
+  const idleCount = students.filter(s => {
+    const pr = presence[s.id];
+    return pr && deriveStatus(pr) === "idle";
+  }).length;
+
+  const isLive = pollOk || wsConnected;
 
   return (
     <div className="p-6 space-y-5 animate-page-enter">
@@ -415,42 +446,109 @@ export default function MonitorPage() {
 
       {/* Zoomed snapshot modal */}
       {zoomedSnapshot && (
-        <div onClick={() => setZoomedSnapshot(null)}
-          style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,cursor:"pointer" }}>
-          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 960, width:"100%", cursor:"default" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 16px", background:"rgba(139,92,246,0.1)", borderRadius:"12px 12px 0 0", border:"1px solid rgba(139,92,246,0.25)", borderBottom:"none" }}>
-              <div style={{ width:8, height:8, borderRadius:"50%", background:"#10b981", boxShadow:"0 0 8px #10b981", animation:"pulse 2s infinite" }} />
-              <span style={{ color:"white", fontWeight:700, fontSize:13 }}>{zoomedSnapshot.name}'s screen</span>
-              <span style={{ color:"rgba(255,255,255,0.4)", fontSize:11 }}>{zoomedSnapshot.path}</span>
-              <button onClick={() => setZoomedSnapshot(null)} style={{ marginLeft:"auto", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:8, padding:"4px 12px", cursor:"pointer", fontSize:12, fontWeight:600 }}>✕ Close</button>
+        <div
+          onClick={() => setZoomedSnapshot(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20, cursor: "pointer",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 960, width: "100%", cursor: "default", borderRadius: 16, overflow: "hidden",
+              border: "1px solid rgba(139,92,246,0.3)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}
+          >
+            {/* Modal header */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 16px",
+              background: "rgba(139,92,246,0.12)", borderBottom: "1px solid rgba(139,92,246,0.2)",
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981",
+                boxShadow: "0 0 8px #10b981", display: "inline-block", animation: "pulse 2s infinite" }} />
+              <span style={{ color: "white", fontWeight: 700, fontSize: 13 }}>{zoomedSnapshot.name}'s screen</span>
+              <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, fontFamily: "monospace" }}>{zoomedSnapshot.path}</span>
+              <button
+                onClick={() => setZoomedSnapshot(null)}
+                style={{
+                  marginLeft: "auto", background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)",
+                  borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                }}
+              >
+                Close
+              </button>
             </div>
-            <img src={zoomedSnapshot.data} alt="student screen" style={{ width:"100%", display:"block", borderRadius:"0 0 12px 12px", border:"1px solid rgba(139,92,246,0.25)" }} />
+            <img
+              src={zoomedSnapshot.data}
+              alt="student screen"
+              style={{ width: "100%", display: "block" }}
+            />
           </div>
         </div>
       )}
 
       {/* Unity live view modal */}
       {watchingRoom && (
-        <div style={{ position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-          <div style={{ width:"min(960px,96vw)",borderRadius:16,overflow:"hidden",border:"1px solid rgba(34,211,238,0.3)",background:"#07071a",display:"flex",flexDirection:"column" }}>
-            <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"rgba(34,211,238,0.07)",borderBottom:"1px solid rgba(34,211,238,0.15)" }}>
-              <div style={{ width:8,height:8,borderRadius:"50%",background:"#22d3ee",boxShadow:"0 0 8px #22d3ee" }} />
-              <span style={{ color:"#22d3ee",fontWeight:700,fontSize:13 }}>👁 Watching {watchingName}'s Unity Stage — Room: {watchingRoom}</span>
-              <button onClick={() => { setWatchingRoom(null); setWatchingName(""); }} style={{ marginLeft:"auto",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.6)",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontSize:12,fontWeight:600 }}>✕ Close</button>
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            width: "min(960px,96vw)", borderRadius: 16, overflow: "hidden",
+            border: "1px solid rgba(34,211,238,0.3)", background: "#07071a",
+            display: "flex", flexDirection: "column",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 16px",
+              background: "rgba(34,211,238,0.07)", borderBottom: "1px solid rgba(34,211,238,0.15)",
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22d3ee", boxShadow: "0 0 8px #22d3ee", display: "inline-block" }} />
+              <span style={{ color: "#22d3ee", fontWeight: 700, fontSize: 13 }}>
+                Watching {watchingName}'s Unity Stage — Room: {watchingRoom}
+              </span>
+              <button
+                onClick={() => { setWatchingRoom(null); setWatchingName(""); }}
+                style={{
+                  marginLeft: "auto", background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)",
+                  borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                }}
+              >
+                Close
+              </button>
             </div>
-            <iframe src={`/unity-games/blockforge-stage/index.html?room=${encodeURIComponent(watchingRoom)}&spectator=1`} style={{ width:"100%",height:540,border:"none" }} allow="autoplay; fullscreen; pointer-lock" title="Unity Live View" />
+            <iframe
+              src={`/unity-games/blockforge-stage/index.html?room=${encodeURIComponent(watchingRoom)}&spectator=1`}
+              style={{ width: "100%", height: 540, border: "none" }}
+              allow="autoplay; fullscreen; pointer-lock"
+              title="Unity Live View"
+            />
           </div>
         </div>
       )}
 
       {/* Message modal */}
       {showMsgModal && (
-        <div style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center" }}
-          onClick={e => { if (e.target === e.currentTarget) setShowMsgModal(null); }}>
-          <div className={`rounded-2xl p-6 w-full max-w-md shadow-2xl border ${dk ? "bg-[#0f1029] border-white/[0.08]" : "bg-white border-gray-200"}`}>
-            <h3 className={`font-bold text-lg mb-4 ${dk ? "text-white" : "text-gray-900"}`}>
-              💬 Send Message{showMsgModal === "all" ? " to Everyone" : ` to ${students.find(s => s.id === showMsgModal)?.name}`}
-            </h3>
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowMsgModal(null); }}
+        >
+          <div className="card animate-scale-in" style={{ width: "100%", maxWidth: 420, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(99,102,241,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <MessageSquare size={16} style={{ color: "var(--accent)" }} />
+              </div>
+              <div>
+                <div className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>Send Message</div>
+                <div className="text-xs" style={{ color: "var(--text-3)" }}>
+                  {showMsgModal === "all" ? "To everyone in class" : `To ${students.find(s => s.id === showMsgModal)?.name}`}
+                </div>
+              </div>
+            </div>
             <textarea
               value={msgText}
               onChange={e => setMsgText(e.target.value)}
@@ -460,98 +558,124 @@ export default function MonitorPage() {
               autoFocus
               onKeyDown={e => { if (e.key === "Enter" && e.metaKey) handleSendMessage(); }}
             />
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-3">
               <button onClick={handleSendMessage} disabled={!msgText.trim()} className="btn-primary flex-1 gap-2">
-                <Send size={14} /> Send
+                <Send size={13} /> Send
               </button>
-              <button onClick={() => { setShowMsgModal(null); setMsgText(""); }} className="btn-secondary px-4">Cancel</button>
+              <button onClick={() => { setShowMsgModal(null); setMsgText(""); }} className="btn-secondary px-4">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Masthead header ── */}
-      <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
-          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
-          <span className="font-mono">BLOCKFORGE · LIVE MONITOR</span>
-        </div>
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <div className="section-label mb-2">— Classroom in session —</div>
-            <h1 className="font-display text-4xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
-              {selectedClass?.name || "No class selected"}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
-            </h1>
-            <p className="text-sm mt-2" style={{ color: "var(--text-2)" }}>
-              {loading ? "Loading…" : <>
-                <strong style={{ color: "var(--success)" }}>{onlineCount} online</strong> · {offlineCount} offline · {students.length} total students
-              </>}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full ${
-            pollOk || wsConnected
-              ? dk ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-              : dk ? "bg-red-500/10 text-red-400" : "bg-red-50 text-red-600"
-          }`}>
-            {pollOk || wsConnected ? (
-              <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <Wifi size={11}/> {wsConnected ? "Live" : "Connected"}</>
-            ) : (
-              <><span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                <WifiOff size={11}/> Disconnected</>
+      {/* ── Page header ── */}
+      <header>
+        <div className="flex items-center justify-between mb-4">
+          {/* Left: title + class selector */}
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/teacher" className="btn-ghost px-2 py-1.5 text-xs flex-shrink-0">
+              <ChevronLeft size={13} /> Back
+            </Link>
+            <div className="w-px h-4 flex-shrink-0" style={{ background: "var(--border)" }} />
+            <div className="min-w-0">
+              <div className="section-label mb-0.5">Live Monitor</div>
+              <h1 className="font-display text-xl leading-tight truncate" style={{ color: "var(--text-1)" }}>
+                {selectedClass?.name || "No class selected"}
+              </h1>
+            </div>
+            {classes.length > 1 && (
+              <select
+                value={selectedClass?.id ?? ""}
+                onChange={e => handleClassChange(e.target.value)}
+                className="input py-1.5 text-sm w-40 flex-shrink-0"
+              >
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             )}
           </div>
-          {/* Force Unlock All — panic button */}
-          <button
-            onClick={async () => {
-              if (!confirm("Force-unlock EVERY class?")) return;
-              try { await api.forceUnlockAll(); setIsClassLocked(false); alert("✓ All classes unlocked."); }
-              catch (e: any) { alert("Failed: " + (e?.message || e)); }
-            }}
-            title="Clear every active lock system-wide"
-            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-all ${
-              dk ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25"
-                 : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
-            }`}
-          >
-            <LockOpen size={11}/> Force Unlock All
-          </button>
-          {/* Period selector — label-only, doesn't auto-trigger (per user spec) */}
-          <select value={period} onChange={e => setPeriod(e.target.value)}
-            className="input py-2 text-xs w-36"
-            title="Class period — just a label to scope your current settings"
-          >
-            <option value="None">No period</option>
-            {["Period 1","Period 2","Period 3","Period 4","Period 5","Period 6","Free Time"].map(p =>
-              <option key={p} value={p}>{p}</option>
-            )}
-          </select>
-          {classes.length > 1 && (
-            <select value={selectedClass?.id ?? ""} onChange={e => handleClassChange(e.target.value)} className="input py-2 text-sm w-44">
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+
+          {/* Right: status chips + period + panic button */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Live / disconnected pill */}
+            <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full border ${
+              isLive
+                ? dk ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                : dk ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-red-50 text-red-600 border-red-200"
+            }`}>
+              {isLive
+                ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><Wifi size={11} /> Live</>
+                : <><span className="w-1.5 h-1.5 rounded-full bg-red-400" /><WifiOff size={11} /> Offline</>
+              }
+            </div>
+
+            {/* Period selector */}
+            <select
+              value={period}
+              onChange={e => setPeriod(e.target.value)}
+              className="input py-1.5 text-xs w-32"
+              title="Class period label"
+            >
+              <option value="None">No period</option>
+              {["Period 1","Period 2","Period 3","Period 4","Period 5","Period 6","Free Time"].map(p =>
+                <option key={p} value={p}>{p}</option>
+              )}
             </select>
-          )}
-          <Link to="/teacher" className="btn-ghost text-xs">
-            <ChevronLeft size={13}/> Dashboard
-          </Link>
-        </div>
+
+            {/* Class lock status badge */}
+            {isClassLocked && (
+              <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25 animate-pulse">
+                <Lock size={11} /> LOCKED
+              </span>
+            )}
+
+            {/* Force unlock all */}
+            <button
+              onClick={async () => {
+                if (!confirm("Force-unlock EVERY class?")) return;
+                try { await api.forceUnlockAll(); setIsClassLocked(false); alert("✓ All classes unlocked."); }
+                catch (e: any) { alert("Failed: " + (e?.message || e)); }
+              }}
+              title="Clear every active lock system-wide"
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                dk ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25"
+                   : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+              }`}
+            >
+              <LockOpen size={11} /> Force Unlock All
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Stats row — editorial numerals, not colored pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Status summary bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
-          { label:"Online",    value:onlineCount,     accent:"var(--success)", icon:<Wifi size={14}/> },
-          { label:"Offline",   value:offlineCount,    accent:"var(--danger)",  icon:<WifiOff size={14}/> },
-          { label:"Students",  value:students.length, accent:"var(--accent)",  icon:<Users size={14}/> },
-          { label:"Active Now",value:onlineCount,     accent:"var(--accent-sage)", icon:<Activity size={14}/> },
+          { label: "Online",   value: onlineCount,   color: STATUS_META.online.dot,   bg: STATUS_META.online.bg,   icon: <Wifi size={12} /> },
+          { label: "Working",  value: workingCount,  color: STATUS_META.working.dot,  bg: STATUS_META.working.bg,  icon: <Activity size={12} /> },
+          { label: "Idle",     value: idleCount,     color: STATUS_META.idle.dot,     bg: STATUS_META.idle.bg,     icon: <Clock size={12} /> },
+          { label: "Offline",  value: offlineCount,  color: STATUS_META.offline.dot,  bg: "rgba(71,85,105,0.06)",  icon: <WifiOff size={12} /> },
         ].map(stat => (
-          <div key={stat.label} className="card flex items-baseline gap-3" style={{ padding: "14px 16px", borderLeft: `3px solid ${stat.accent}` }}>
-            <div style={{ color: stat.accent }}>{stat.icon}</div>
-            <div className="flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{stat.label}</div>
-              <div className="font-display text-3xl leading-none mt-0.5" style={{ color: "var(--text-1)" }}>{stat.value}</div>
+          <div
+            key={stat.label}
+            className="card flex items-center gap-3"
+            style={{ padding: "12px 14px", borderLeft: `3px solid ${stat.color}` }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              background: stat.bg, display: "flex", alignItems: "center", justifyContent: "center",
+              color: stat.color,
+            }}>
+              {stat.icon}
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                {stat.label}
+              </div>
+              <div className="font-display text-2xl leading-none mt-0.5" style={{ color: "var(--text-1)" }}>
+                {stat.value}
+              </div>
             </div>
           </div>
         ))}
@@ -559,248 +683,423 @@ export default function MonitorPage() {
 
       {/* ── Classroom Controls ── */}
       {selectedClass && (
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="section-label mb-1">— Controls —</div>
-              <h3 className="font-display text-xl leading-none" style={{ color: "var(--text-1)" }}>
-                Classroom
-              </h3>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+
+          {/* Controls header */}
+          <div
+            className="flex items-center justify-between px-5 py-3"
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <div className="flex items-center gap-2">
+              <Zap size={14} style={{ color: "var(--accent)" }} />
+              <span className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>Class Controls</span>
+              {period !== "None" && (
+                <span className="chip">{period}</span>
+              )}
             </div>
             {isClassLocked && (
-              <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/25 animate-pulse">
-                <Lock size={11}/> LOCKED
+              <span className="flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">
+                <Lock size={10} /> LOCKED
               </span>
             )}
           </div>
 
-          {/* Row 1: Lock controls + Push to Page */}
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => handleLockAll(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${isClassLocked ? "bg-red-500/20 text-red-300 border-red-400/40" : dk?"bg-red-500/10 hover:bg-red-500/18 text-red-400 border-red-500/20":"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
-              <Lock size={13}/> Lock All
-            </button>
-            <button onClick={() => handleLockAll(false)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-emerald-500/10 hover:bg-emerald-500/18 text-emerald-400 border-emerald-500/20":"bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200"}`}>
-              <LockOpen size={13}/> Unlock All
-            </button>
+          <div className="p-5 space-y-4">
 
-            {/* Optional lock message */}
-            <input
-              value={lockMsg}
-              onChange={e => setLockMsg(e.target.value)}
-              placeholder="Lock message (optional)…"
-              className="input text-sm flex-1 min-w-0"
-            />
+            {/* Row 1: Lock / Unlock + Push + Message */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Lock controls group */}
+              <div className="flex items-center gap-1.5 rounded-xl p-1" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)" }}>
+                <button
+                  onClick={() => handleLockAll(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
+                    isClassLocked
+                      ? "bg-red-500/25 text-red-300 border-red-400/40"
+                      : dk ? "bg-red-500/12 hover:bg-red-500/20 text-red-400 border-red-500/20" : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                  }`}
+                >
+                  <Lock size={11} /> Lock All
+                </button>
+                <button
+                  onClick={() => handleLockAll(false)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
+                    dk ? "bg-emerald-500/10 hover:bg-emerald-500/18 text-emerald-400 border-emerald-500/20"
+                       : "bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200"
+                  }`}
+                >
+                  <LockOpen size={11} /> Unlock
+                </button>
+              </div>
 
-            {/* Push to Page */}
-            <div className="relative">
+              {/* Lock message */}
+              <input
+                value={lockMsg}
+                onChange={e => setLockMsg(e.target.value)}
+                placeholder="Lock screen message (optional)…"
+                className="input text-xs flex-1 min-w-0"
+                style={{ minWidth: 160, maxWidth: 280 }}
+              />
+
+              <div className="flex-1" />
+
+              {/* Push to page */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowPushMenu(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                    showPushMenu
+                      ? dk ? "bg-blue-500/20 text-blue-300 border-blue-500/35" : "bg-blue-100 text-blue-700 border-blue-300"
+                      : dk ? "bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20" : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+                  }`}
+                >
+                  <Navigation size={11} /> Push to Page
+                </button>
+                {showPushMenu && (
+                  <div
+                    className="absolute top-full mt-1.5 right-0 rounded-xl shadow-2xl border overflow-hidden z-50 animate-scale-in"
+                    style={{
+                      minWidth: 176,
+                      background: dk ? "var(--bg-raised)" : "white",
+                      borderColor: "var(--border-md)",
+                    }}
+                  >
+                    {PUSH_PAGES.map(p => (
+                      <button
+                        key={p.path}
+                        onClick={() => handlePushToPage(p.path)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-left cursor-pointer transition-colors"
+                        style={{ color: "var(--text-2)" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <p.icon size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Broadcast message */}
               <button
-                onClick={() => setShowPushMenu(v => !v)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}>
-                <Navigation size={13}/> Push to Page ▾
+                onClick={() => setShowMsgModal("all")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                  dk ? "bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20"
+                     : "bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"
+                }`}
+              >
+                <MessageSquare size={11} /> Message All
               </button>
-              {showPushMenu && (
-                <div className={`absolute top-full mt-1 right-0 rounded-xl shadow-2xl border overflow-hidden z-50 ${dk?"bg-[#0f1029] border-white/[0.08]":"bg-white border-gray-200"}`} style={{ minWidth: 180 }}>
-                  {PUSH_PAGES.map(p => (
-                    <button key={p.path} onClick={() => handlePushToPage(p.path)}
-                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors cursor-pointer ${dk?"hover:bg-white/[0.05] text-white/70 hover:text-white":"hover:bg-gray-50 text-gray-700"}`}>
-                      <p.icon size={14}/> {p.label}
-                    </button>
-                  ))}
+            </div>
+
+            {/* Row 2: Announce broadcast */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Radio size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-3)", pointerEvents: "none" }} />
+                <input
+                  ref={announceRef}
+                  value={announcement}
+                  onChange={e => setAnnouncement(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleAnnounce()}
+                  placeholder="Broadcast announcement to all students…"
+                  className="input text-sm w-full"
+                  style={{ paddingLeft: 30 }}
+                />
+              </div>
+              <button
+                onClick={handleAnnounce}
+                disabled={!announcement.trim()}
+                className={`btn-primary gap-1.5 px-4 flex-shrink-0 transition-all ${announceSent ? "bg-emerald-500 border-emerald-500" : ""}`}
+                style={announceSent ? { background: "#10b981" } : {}}
+              >
+                {announceSent ? "Sent!" : <><Megaphone size={13} /> Announce</>}
+              </button>
+            </div>
+
+            {/* Row 3: Free time actions */}
+            <div
+              className="flex flex-wrap gap-2 items-center pt-3"
+              style={{ borderTop: "1px solid var(--border)" }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                Free Time
+              </span>
+              <button
+                onClick={handleGrantAll}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                  dk ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/25"
+                     : "bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200"
+                }`}
+              >
+                <Gift size={11} /> Grant All
+              </button>
+              <button
+                onClick={handleRevokeAll}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                  dk ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25"
+                     : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                }`}
+              >
+                <XCircle size={11} /> Revoke All
+              </button>
+              <button
+                onClick={handleEndAllBreaks}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                  dk ? "bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border-violet-500/25"
+                     : "bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"
+                }`}
+              >
+                <Clock size={11} /> End All Breaks
+              </button>
+              <button
+                onClick={() => setShowConfigPanel(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                  showConfigPanel
+                    ? dk ? "bg-blue-500/20 text-blue-300 border-blue-500/35" : "bg-blue-100 text-blue-700 border-blue-300"
+                    : dk ? "bg-white/5 hover:bg-white/8 text-white/50 border-white/10" : "bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200"
+                }`}
+              >
+                <Settings2 size={11} /> Settings
+              </button>
+            </div>
+
+            {/* Free-time config panel */}
+            {showConfigPanel && (
+              <div
+                className="rounded-xl p-4 space-y-3 animate-slide-up"
+                style={{
+                  background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                  Free time includes:
                 </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { key: "arcadeEnabled",    label: "Arcade" },
+                    { key: "projectsEnabled",  label: "Projects" },
+                    { key: "unityEnabled",     label: "Unity 3D" },
+                    { key: "blockforgeEnabled",label: "BlockForge" },
+                    { key: "youtubeEnabled",   label: "YouTube" },
+                  ].map(f => (
+                    <label
+                      key={f.key}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-xs font-semibold transition-colors ${
+                        freeTimeConfig[f.key]
+                          ? dk ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : dk ? "bg-white/[0.03] text-white/30 border border-white/[0.06]" : "bg-white text-gray-400 border border-gray-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!freeTimeConfig[f.key]}
+                        onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, [f.key]: e.target.checked }))}
+                      />
+                      {f.label}
+                    </label>
+                  ))}
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border ${
+                    dk ? "bg-white/[0.03] text-white/40 border-white/[0.06]" : "bg-white text-gray-500 border-gray-200"
+                  }`}>
+                    <span>Daily cap (min):</span>
+                    <input
+                      type="number"
+                      value={freeTimeConfig.dailyCapMinutes || 0}
+                      min={0}
+                      max={240}
+                      onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, dailyCapMinutes: parseInt(e.target.value) || 0 }))}
+                      className="input text-xs w-14 py-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Per-game whitelist */}
+                <details className="rounded-lg overflow-hidden" style={{ background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", border: "1px solid var(--border)" }}>
+                  <summary className={`cursor-pointer font-semibold select-none text-xs px-3 py-2 ${dk ? "text-white/50" : "text-gray-500"}`}>
+                    Allowed arcade games {freeTimeConfig.allowedGameIds?.length ? `(${freeTimeConfig.allowedGameIds.length} selected)` : "(all allowed)"}
+                  </summary>
+                  <div className="px-3 pb-3 pt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
+                    {ARCADE_GAME_CATALOG.map(g => {
+                      const whitelist: string[] | undefined = freeTimeConfig.allowedGameIds;
+                      const checked = !whitelist || whitelist.length === 0 || whitelist.includes(g.id);
+                      return (
+                        <label
+                          key={g.id}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer text-[11px] font-medium transition-colors ${
+                            checked
+                              ? dk ? "bg-emerald-500/8 text-emerald-400" : "bg-emerald-50 text-emerald-700"
+                              : dk ? "bg-white/[0.02] text-white/25" : "bg-white text-gray-400"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              setFreeTimeConfig((cfg: any) => {
+                                const cur: string[] = cfg.allowedGameIds || ARCADE_GAME_CATALOG.map(x => x.id);
+                                if (e.target.checked) return { ...cfg, allowedGameIds: [...cur.filter(x => x !== g.id), g.id] };
+                                return { ...cfg, allowedGameIds: cur.filter(x => x !== g.id) };
+                              });
+                            }}
+                          />
+                          <span>{g.emoji}</span>
+                          <span className="truncate">{g.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setFreeTimeConfig((cfg: any) => ({ ...cfg, allowedGameIds: null }))}
+                    className={`mx-3 mb-2 text-[10px] font-medium px-2 py-1 rounded cursor-pointer transition-colors ${
+                      dk ? "text-white/35 hover:text-white/55" : "text-gray-400 hover:text-gray-600"
+                    }`}
+                  >
+                    Reset — allow all games
+                  </button>
+                </details>
+
+                <div className="flex items-center gap-3">
+                  <button onClick={saveConfig} className="btn-primary gap-1.5 text-xs px-4">
+                    Save & Apply
+                  </button>
+                  <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                    Applies to all students in {selectedClass?.name} on next poll
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Row 4: Video sharing */}
+            <div
+              className="flex flex-wrap gap-2 items-center pt-3"
+              style={{ borderTop: "1px solid var(--border)" }}
+            >
+              <Youtube size={13} style={{ color: "#f87171", flexShrink: 0 }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                Video
+              </span>
+
+              {activeVideo ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                    style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#ef4444", display: "inline-block", animation: "pulse 1.5s infinite" }} />
+                    Live
+                    <img src={`https://img.youtube.com/vi/${activeVideo}/default.jpg`}
+                      style={{ width: 28, height: 20, objectFit: "cover", borderRadius: 4, marginLeft: 2 }} alt="thumb" />
+                  </div>
+                  <button
+                    onClick={handleStopVideo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
+                    style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}
+                  >
+                    <Square size={11} /> Stop
+                  </button>
+                </div>
+              ) : showVideoInput ? (
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                  <input
+                    value={videoUrl}
+                    onChange={e => setVideoUrl(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleShareVideo()}
+                    placeholder="YouTube URL or video ID…"
+                    className="input text-xs flex-1"
+                    autoFocus
+                  />
+                  <input
+                    value={videoTitle}
+                    onChange={e => setVideoTitle(e.target.value)}
+                    placeholder="Title (optional)"
+                    className="input text-xs w-36"
+                  />
+                  <button
+                    onClick={handleShareVideo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer"
+                    style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}
+                  >
+                    <Play size={11} /> Share
+                  </button>
+                  <button
+                    onClick={() => { setShowVideoInput(false); setVideoUrl(""); setVideoTitle(""); }}
+                    className={`p-1.5 rounded-lg cursor-pointer transition-colors ${dk ? "text-white/30 hover:text-white/55" : "text-gray-400 hover:text-gray-600"}`}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowVideoInput(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer border"
+                  style={{ background: "rgba(239,68,68,0.07)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
+                >
+                  <Youtube size={11} /> Share YouTube Video
+                </button>
               )}
             </div>
 
-            {/* Broadcast message */}
-            <button onClick={() => setShowMsgModal("all")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all cursor-pointer ${dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
-              <MessageSquare size={13}/> Message All
-            </button>
-          </div>
-
-          {/* Bulk free-time actions + config toggle */}
-          <div className={`flex flex-wrap gap-2 items-center pt-2 border-t ${dk?"border-white/[0.05]":"border-gray-100"}`}>
-            <span className={`text-xs font-semibold ${dk?"text-white/50":"text-gray-600"}`}>Free Time:</span>
-            <button onClick={handleGrantAll}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border-yellow-500/25":"bg-yellow-50 hover:bg-yellow-100 text-yellow-600 border-yellow-200"}`}>
-              🎁 Grant All
-            </button>
-            <button onClick={handleRevokeAll}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/25":"bg-red-50 hover:bg-red-100 text-red-600 border-red-200"}`}>
-              ⛔ Revoke All
-            </button>
-            <button onClick={handleEndAllBreaks}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${dk?"bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border-violet-500/25":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
-              ⏰ End All Breaks
-            </button>
-            <button onClick={() => setShowConfigPanel(v => !v)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${showConfigPanel ? (dk?"bg-blue-500/20 text-blue-300 border-blue-500/40":"bg-blue-100 text-blue-700 border-blue-300") : (dk?"bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/25":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200")}`}>
-              ⚙️ Free Time Settings
-            </button>
-            {period !== "None" && (
-              <span className={`ml-auto text-[10px] font-semibold px-2 py-1 rounded-full ${dk?"bg-white/[0.04] text-white/45":"bg-gray-100 text-gray-600"}`}>
-                Scope: {period}
-              </span>
-            )}
-          </div>
-
-          {/* Free-time config panel */}
-          {showConfigPanel && (
-            <div className={`mt-3 p-4 rounded-xl space-y-3 animate-slide-in ${dk ? "bg-white/[0.03] border border-white/[0.06]" : "bg-gray-50 border border-gray-200"}`}>
-              <div className={`text-xs font-bold uppercase tracking-wider ${dk?"text-white/40":"text-gray-500"}`}>
-                Free Time includes:
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {[
-                  { key: "arcadeEnabled",    label: "🎮 Arcade" },
-                  { key: "projectsEnabled",  label: "💻 Projects" },
-                  { key: "unityEnabled",     label: "🎮 Unity 3D" },
-                  { key: "blockforgeEnabled",label: "🔮 BlockForge" },
-                  { key: "youtubeEnabled",   label: "📺 YouTube" },
-                ].map(f => (
-                  <label key={f.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-xs font-semibold ${freeTimeConfig[f.key] ? (dk?"bg-emerald-500/10 text-emerald-400":"bg-emerald-50 text-emerald-700") : (dk?"bg-white/[0.03] text-white/40":"bg-white text-gray-400")}`}>
-                    <input type="checkbox" checked={!!freeTimeConfig[f.key]}
-                      onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, [f.key]: e.target.checked }))} />
-                    {f.label}
-                  </label>
-                ))}
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${dk?"bg-white/[0.03] text-white/50":"bg-white text-gray-500"}`}>
-                  <span>Daily cap (min):</span>
-                  <input type="number" value={freeTimeConfig.dailyCapMinutes || 0} min={0} max={240}
-                    onChange={e => setFreeTimeConfig((cfg: any) => ({ ...cfg, dailyCapMinutes: parseInt(e.target.value) || 0 }))}
-                    className="input text-xs w-16 py-1" />
-                </div>
-              </div>
-              {/* Per-game whitelist — collapsible */}
-              <details className={`rounded-lg p-2 text-xs ${dk?"bg-white/[0.02]":"bg-white"}`}>
-                <summary className={`cursor-pointer font-semibold select-none ${dk?"text-white/60":"text-gray-600"}`}>
-                  🎮 Allowed arcade games {freeTimeConfig.allowedGameIds?.length ? `(${freeTimeConfig.allowedGameIds.length} picked)` : "(all)"}
-                </summary>
-                <div className="pt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
-                  {ARCADE_GAME_CATALOG.map(g => {
-                    const whitelist: string[] | undefined = freeTimeConfig.allowedGameIds;
-                    const checked = !whitelist || whitelist.length === 0 || whitelist.includes(g.id);
-                    return (
-                      <label key={g.id} className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer text-[11px] ${checked ? (dk?"bg-emerald-500/8 text-emerald-400":"bg-emerald-50 text-emerald-700") : (dk?"bg-white/[0.02] text-white/30":"bg-gray-50 text-gray-400")}`}>
-                        <input type="checkbox" checked={checked}
-                          onChange={e => {
-                            setFreeTimeConfig((cfg: any) => {
-                              const cur: string[] = cfg.allowedGameIds || ARCADE_GAME_CATALOG.map(x => x.id);
-                              if (e.target.checked) return { ...cfg, allowedGameIds: [...cur.filter(x => x !== g.id), g.id] };
-                              return { ...cfg, allowedGameIds: cur.filter(x => x !== g.id) };
-                            });
-                          }} />
-                        <span>{g.emoji}</span>
-                        <span className="truncate">{g.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                <button onClick={() => setFreeTimeConfig((cfg: any) => ({ ...cfg, allowedGameIds: null }))}
-                  className={`mt-2 text-[10px] font-medium px-2 py-1 rounded cursor-pointer ${dk?"text-white/40 hover:text-white/60":"text-gray-400 hover:text-gray-600"}`}>
-                  ↺ Reset — allow all games
-                </button>
-              </details>
-
-              <div className="flex items-center gap-2">
-                <button onClick={saveConfig} className="btn-primary gap-1.5 px-4 text-xs">
-                  Save & Apply
-                </button>
-                <span className={`text-[10px] ${dk?"text-white/25":"text-gray-400"}`}>
-                  Applies to all students in {selectedClass?.name} on next poll
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Row 2: Announce */}
-          <div className="flex gap-2">
-            <input
-              ref={announceRef}
-              value={announcement}
-              onChange={e => setAnnouncement(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleAnnounce()}
-              placeholder="Type announcement to broadcast (WebSocket)…"
-              className="input text-sm flex-1"
-            />
-            <button onClick={handleAnnounce} disabled={!announcement.trim()}
-              className={`btn-primary gap-2 px-4 transition-all ${announceSent?"bg-emerald-500 border-emerald-500":""}`}>
-              {announceSent ? "Sent!" : <><Megaphone size={14}/> Announce</>}
-            </button>
-          </div>
-
-          {/* Row 3: Video sharing */}
-          <div className={`flex flex-wrap gap-2 items-center pt-2 border-t ${dk?"border-white/[0.05]":"border-gray-100"}`}>
-            <Youtube size={15} className="text-red-400 flex-shrink-0" />
-            <span className={`text-xs font-semibold ${dk?"text-white/50":"text-gray-600"}`}>Share Video to Class</span>
-            {activeVideo ? (
-              <>
-                <div style={{ display:"flex",alignItems:"center",gap:8,background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"4px 12px" }}>
-                  <span style={{ width:8,height:8,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite" }} />
-                  <span style={{ color:"#f87171",fontSize:12,fontWeight:600 }}>Video Live</span>
-                  <img src={`https://img.youtube.com/vi/${activeVideo}/default.jpg`} style={{ width:32,height:24,objectFit:"cover",borderRadius:4 }} alt="thumb" />
-                </div>
-                <button onClick={handleStopVideo} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer" style={{ background:"rgba(239,68,68,0.12)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)" }}>
-                  <Square size={12}/> Stop Video
-                </button>
-              </>
-            ) : showVideoInput ? (
-              <>
-                <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && handleShareVideo()} placeholder="YouTube URL or video ID…" className="input text-sm flex-1" autoFocus />
-                <input value={videoTitle} onChange={e => setVideoTitle(e.target.value)} placeholder="Title (optional)" className="input text-sm w-40" />
-                <button onClick={handleShareVideo} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer" style={{ background:"rgba(239,68,68,0.15)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)" }}>
-                  <Play size={12}/> Share
-                </button>
-                <button onClick={() => { setShowVideoInput(false); setVideoUrl(""); setVideoTitle(""); }} className={`p-2 rounded-lg cursor-pointer ${dk?"text-white/30 hover:text-white/60":"text-gray-400 hover:text-gray-700"}`}><X size={14}/></button>
-              </>
-            ) : (
-              <button onClick={() => setShowVideoInput(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer" style={{ background:"rgba(239,68,68,0.1)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)" }}>
-                <Youtube size={13}/> Share YouTube Video
-              </button>
-            )}
           </div>
         </div>
       )}
 
-      {/* Student tile grid */}
+      {/* ── Student presence grid ── */}
       {loading ? (
-        <div className={`text-center py-16 text-sm ${dk?"text-white/20":"text-gray-400"}`}>Loading students…</div>
+        <div className="card flex flex-col items-center justify-center py-16 gap-3">
+          <div style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid var(--border)", borderTop: "2px solid var(--accent)", animation: "spin 0.8s linear infinite" }} />
+          <span className="text-sm" style={{ color: "var(--text-3)" }}>Loading students…</span>
+        </div>
       ) : students.length === 0 ? (
-        <div className={`card text-center py-16 ${dk?"text-white/20":"text-gray-400"}`}>
-          <Users size={36} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">
+        <div className="card flex flex-col items-center justify-center py-16 gap-3">
+          <Users size={36} style={{ color: "var(--text-3)", opacity: 0.3 }} />
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
             {selectedClass
-              ? <>No students yet. Share code <strong className={`font-mono ${dk?"text-violet-400":"text-violet-600"}`}>{selectedClass?.code}</strong></>
+              ? <>No students yet. Share class code <strong className="font-mono" style={{ color: "var(--accent)" }}>{selectedClass?.code}</strong></>
               : "Select a class to begin."}
-          </p>
-          <p className={`text-xs mt-2 ${dk?"text-white/20":"text-gray-400"}`}>
-            Students are quiet right now. Check back when class starts! 🎒
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {students.map((s, i) => {
-            const pr = presence[s.id] ?? { isOnline:false, lastActive:0, lastAction:"No activity yet" };
-            const snap = snapshots[s.id];
-            return (
-              <StudentTile
-                key={s.id}
-                student={s}
-                presence={pr}
-                snapshot={snap}
-                dk={dk}
-                tick={tick}
-                animDelay={i * 40}
-                onWatchUnity={(room, name) => { setWatchingRoom(room); setWatchingName(name); }}
-                onMessage={() => setShowMsgModal(s.id)}
-                onKick={() => handleKick(s.id)}
-                onZoom={snap?.data ? () => setZoomedSnapshot({ name: s.name, data: snap.data, path: snap.path }) : undefined}
-                onOpenDrawer={() => setDrawerStudent(s)}
-              />
-            );
-          })}
-        </div>
+        <>
+          {/* Section label with count summary */}
+          <div className="flex items-center justify-between">
+            <div className="section-label">— {students.length} students —</div>
+            <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-3)" }}>
+              {[
+                { key: "online" as StatusKey,  count: onlineCount },
+                { key: "working" as StatusKey, count: workingCount },
+                { key: "idle" as StatusKey,    count: idleCount },
+                { key: "offline" as StatusKey, count: offlineCount },
+              ].map(({ key, count }) => (
+                <span key={key} className="flex items-center gap-1">
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_META[key].dot, display: "inline-block" }} />
+                  {count} {STATUS_META[key].label.toLowerCase()}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {students.map((s, i) => {
+              const pr = presence[s.id] ?? { isOnline: false, lastActive: 0, lastAction: "No activity yet" };
+              const snap = snapshots[s.id];
+              return (
+                <StudentTile
+                  key={s.id}
+                  student={s}
+                  presence={pr}
+                  snapshot={snap}
+                  dk={dk}
+                  tick={tick}
+                  animDelay={i * 35}
+                  onWatchUnity={(room, name) => { setWatchingRoom(room); setWatchingName(name); }}
+                  onMessage={() => setShowMsgModal(s.id)}
+                  onKick={() => handleKick(s.id)}
+                  onZoom={snap?.data ? () => setZoomedSnapshot({ name: s.name, data: snap.data, path: snap.path }) : undefined}
+                  onOpenDrawer={() => setDrawerStudent(s)}
+                />
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -825,111 +1124,190 @@ interface TileProps {
 function StudentTile({ student, presence, snapshot, dk, tick, animDelay, onWatchUnity, onMessage, onKick, onZoom, onOpenDrawer }: TileProps) {
   const gradient = avatarGradient(student.name || "?");
   const initials = (student.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
-  const { emoji, label, color } = activityPreview(presence.lastAction || "");
+  const status = deriveStatus(presence);
+  const meta = STATUS_META[status];
+  const { emoji, label: actLabel, color: actColor } = activityPreview(presence.lastAction || "");
   const hasSnap = !!snapshot?.data;
-  const snapAgeSec = snapshot?.capturedAt ? Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 1000) : null;
+  const snapAgeSec = snapshot?.capturedAt
+    ? Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 1000)
+    : null;
 
   return (
     <div
       onClick={onOpenDrawer}
-      className={`rounded-2xl border transition-all duration-200 overflow-hidden animate-slide-in group cursor-pointer hover:-translate-y-0.5 hover:shadow-xl ${
-        presence.isOnline
-          ? dk ? "border-emerald-500/25 shadow-lg shadow-emerald-500/5" : "border-emerald-300/60 shadow-md shadow-emerald-100"
-          : dk ? "border-white/[0.06]" : "border-gray-200"
-      }`}
-      style={{ background: "var(--bg-surface)", animationDelay: `${animDelay}ms` }}
+      className="animate-slide-up group cursor-pointer"
+      style={{
+        animationDelay: `${animDelay}ms`,
+        background: "var(--bg-surface)",
+        border: `1px solid ${status !== "offline" ? meta.ring : "var(--border)"}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        transition: "border-color 0.2s, box-shadow 0.2s, transform 0.15s",
+        boxShadow: status !== "offline" ? `0 0 0 1px ${meta.ring}` : "none",
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 24px rgba(0,0,0,0.25), 0 0 0 1px ${meta.ring}`;
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = status !== "offline" ? `0 0 0 1px ${meta.ring}` : "none";
+      }}
     >
-      {/* Online accent stripe */}
-      {presence.isOnline && <div className="h-0.5 bg-gradient-to-r from-emerald-500/60 via-emerald-400 to-emerald-500/60" />}
+      {/* Top status stripe */}
+      <div style={{
+        height: 3,
+        background: status !== "offline"
+          ? `linear-gradient(90deg, transparent, ${meta.dot}, transparent)`
+          : "transparent",
+      }} />
 
-      {/* Screenshot preview pane — click to zoom (no stopPropagation so tile opens drawer) */}
+      {/* Screenshot / activity preview pane */}
       <div
         style={{
           position: "relative",
-          height: 140,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flexDirection: "column", gap: 4,
-          background: hasSnap ? "#07071a" : presence.isOnline ? `${color}12` : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-          borderBottom: dk ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(0,0,0,0.05)",
+          height: 130,
+          background: hasSnap ? "#07071a" : status !== "offline" ? `${actColor}10` : dk ? "rgba(255,255,255,0.015)" : "rgba(0,0,0,0.02)",
           overflow: "hidden",
-        }}>
+        }}
+      >
         {hasSnap ? (
           <>
-            <img src={snapshot!.data} alt={`${student.name}'s screen`}
-              style={{ width:"100%", height:"100%", objectFit:"cover", display:"block",
-                filter: presence.isOnline ? "none" : "grayscale(60%) brightness(0.5)",
-                transition: "filter 0.25s" }} />
-            {/* Activity badge overlay */}
-            <div style={{ position:"absolute", bottom: 4, left: 4, right: 4,
-              display:"flex", alignItems:"center", gap:4,
-              background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
-              padding:"2px 6px", borderRadius: 6,
-              fontSize: 9, fontWeight: 700, color:"white", letterSpacing:"0.03em" }}>
-              <span>{emoji}</span>
-              <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>
+            <img
+              src={snapshot!.data}
+              alt={`${student.name}'s screen`}
+              style={{
+                width: "100%", height: "100%", objectFit: "cover", display: "block",
+                filter: status === "offline" ? "grayscale(80%) brightness(0.4)" : "none",
+                transition: "filter 0.3s",
+              }}
+            />
+            {/* Activity overlay */}
+            <div style={{
+              position: "absolute", bottom: 0, left: 0, right: 0,
+              padding: "12px 8px 6px",
+              background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)",
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              <span style={{ fontSize: 10, flexShrink: 0 }}>{emoji}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "white", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                {actLabel}
+              </span>
               {snapAgeSec !== null && (
-                <span style={{ marginLeft:"auto", color:"rgba(255,255,255,0.6)", fontSize:9 }}>{snapAgeSec}s</span>
+                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{snapAgeSec}s</span>
               )}
             </div>
-            {!presence.isOnline && (
-              <div style={{ position:"absolute", top: 6, right: 6, background:"rgba(239,68,68,0.75)", color:"white", fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:4, letterSpacing:"0.05em" }}>AWAY</div>
+            {/* Zoom button */}
+            {onZoom && (
+              <button
+                onClick={e => { e.stopPropagation(); onZoom(); }}
+                title="View full screen"
+                style={{
+                  position: "absolute", top: 6, right: 6,
+                  width: 24, height: 24, borderRadius: 6,
+                  background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)",
+                  color: "white", display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", opacity: 0, transition: "opacity 0.15s",
+                }}
+                className="group-hover:opacity-100"
+              >
+                <ExternalLink size={10} />
+              </button>
+            )}
+            {status === "offline" && (
+              <div style={{
+                position: "absolute", top: 6, left: 6,
+                background: "rgba(71,85,105,0.8)", color: "rgba(255,255,255,0.6)",
+                fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, letterSpacing: "0.05em",
+              }}>AWAY</div>
             )}
           </>
-        ) : presence.isOnline ? (
-          <>
-            <span style={{ fontSize: 28 }}>{emoji}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
-            <span style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>Preview loading…</span>
-          </>
+        ) : status !== "offline" ? (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <span style={{ fontSize: 26 }}>{emoji}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: actColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>{actLabel}</span>
+            <span style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>Preview loading…</span>
+          </div>
         ) : (
-          <span style={{ fontSize: 24, opacity: 0.2 }}>💤</span>
+          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 22, opacity: 0.15 }}>💤</span>
+          </div>
         )}
       </div>
 
-      <div className="p-3">
-        {/* Avatar + status */}
-        <div className="flex items-start justify-between mb-2">
-          <div className="relative">
-            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
+      {/* Card body */}
+      <div style={{ padding: "10px 12px 10px" }}>
+        {/* Avatar row */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative flex-shrink-0">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-xs font-bold`}>
               {initials}
             </div>
-            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${dk?"border-[#0f1029]":"border-white"} ${presence.isOnline?"bg-emerald-400":dk?"bg-white/20":"bg-gray-300"}`} />
+            {/* Status dot */}
+            <span
+              style={{
+                position: "absolute", bottom: -1, right: -1,
+                width: 9, height: 9, borderRadius: "50%",
+                background: meta.dot,
+                border: `2px solid var(--bg-surface)`,
+                boxShadow: status !== "offline" ? `0 0 6px ${meta.dot}` : "none",
+              }}
+            />
           </div>
-          <span className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${presence.isOnline ? dk?"bg-emerald-500/10 text-emerald-400":"bg-emerald-50 text-emerald-600" : dk?"bg-white/5 text-white/25":"bg-gray-100 text-gray-400"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${presence.isOnline?"bg-emerald-400 animate-pulse":dk?"bg-white/20":"bg-gray-300"}`} />
-            {presence.isOnline ? "Live" : "Away"}
-          </span>
+
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-xs leading-tight truncate" style={{ color: "var(--text-1)" }}>
+              {student.name}
+            </div>
+            <div className="text-[10px] truncate" style={{ color: meta.text, fontWeight: 600 }}>
+              {meta.label}
+              {presence.lastActive && status !== "offline"
+                ? <span style={{ color: "var(--text-3)", fontWeight: 400 }}> · {timeAgo(presence.lastActive)}</span>
+                : null}
+            </div>
+          </div>
         </div>
 
-        {/* Name + time */}
-        <div className="mb-2 min-w-0">
-          <div className={`font-semibold text-sm leading-tight truncate ${dk?"text-white":"text-gray-900"}`}>{student.name}</div>
-          <div className={`text-[10px] mt-0.5 ${dk?"text-white/25":"text-gray-400"}`}>
-            {presence.lastActive ? timeAgo(presence.lastActive) : "No activity yet"}
-          </div>
-        </div>
-
-        {/* Action buttons — visible on hover */}
-        <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
+        {/* Action row */}
+        <div className="flex gap-1" onClick={e => e.stopPropagation()}>
           {presence.projectId ? (
-            <Link to={`/project/${presence.projectId}`} className={`flex items-center justify-center gap-1 flex-1 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${dk?"bg-violet-500/10 hover:bg-violet-500/18 text-violet-400 border-violet-500/20":"bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200"}`}>
-              <ExternalLink size={9}/> View
+            <Link
+              to={`/project/${presence.projectId}`}
+              className="flex items-center justify-center gap-1 flex-1 py-1 rounded-md text-[10px] font-semibold border transition-colors"
+              style={{
+                background: "rgba(99,102,241,0.07)", color: "var(--accent)",
+                border: "1px solid rgba(99,102,241,0.18)",
+              }}
+            >
+              <ExternalLink size={9} /> View
             </Link>
           ) : (
-            <div className={`flex-1 text-center text-[10px] py-1.5 ${dk?"text-white/15":"text-gray-300"}`}>No project</div>
+            <div className="flex-1 text-center text-[10px] py-1" style={{ color: "var(--text-3)" }}>No project</div>
           )}
-          <button onClick={e => { e.stopPropagation(); onMessage(); }} title="Send message"
-            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-blue-500/10 hover:bg-blue-500/18 text-blue-400 border-blue-500/20":"bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}>
-            <MessageSquare size={11}/>
+          <button
+            onClick={e => { e.stopPropagation(); onMessage(); }}
+            title="Send message"
+            className="flex items-center justify-center p-1.5 rounded-md border cursor-pointer transition-colors"
+            style={{ background: "rgba(99,102,241,0.07)", color: "var(--accent)", border: "1px solid rgba(99,102,241,0.15)", minWidth: 26 }}
+          >
+            <MessageSquare size={10} />
           </button>
-          <button onClick={e => { e.stopPropagation(); onKick(); }} title="Kick to dashboard"
-            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${dk?"bg-amber-500/10 hover:bg-amber-500/18 text-amber-400 border-amber-500/20":"bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200"}`}>
-            <Navigation size={11}/>
+          <button
+            onClick={e => { e.stopPropagation(); onKick(); }}
+            title="Redirect to dashboard"
+            className="flex items-center justify-center p-1.5 rounded-md border cursor-pointer transition-colors"
+            style={{ background: "rgba(245,158,11,0.07)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.18)", minWidth: 26 }}
+          >
+            <Navigation size={10} />
           </button>
           {presence.unityRoom && (
-            <button onClick={e => { e.stopPropagation(); onWatchUnity(presence.unityRoom!, student.name); }} title="Watch Unity"
-              className="p-1.5 rounded-lg border transition-all cursor-pointer" style={{ background:"rgba(34,211,238,0.1)",color:"#22d3ee",border:"1px solid rgba(34,211,238,0.25)" }}>
-              <Eye size={11}/>
+            <button
+              onClick={e => { e.stopPropagation(); onWatchUnity(presence.unityRoom!, student.name); }}
+              title="Watch Unity stage"
+              className="flex items-center justify-center p-1.5 rounded-md border cursor-pointer transition-colors"
+              style={{ background: "rgba(34,211,238,0.07)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.2)", minWidth: 26 }}
+            >
+              <Eye size={10} />
             </button>
           )}
         </div>

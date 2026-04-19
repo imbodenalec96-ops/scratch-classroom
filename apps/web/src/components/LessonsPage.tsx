@@ -3,6 +3,19 @@ import LessonsBrowser from "./LessonsBrowser.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { usePresencePing } from "../lib/presence.ts";
 import { api } from "../lib/api.ts";
+import {
+  BookOpen,
+  Sparkles,
+  ChevronLeft,
+  CheckCircle2,
+  Circle,
+  Brain,
+  Star,
+  Trophy,
+  RotateCcw,
+  ArrowRight,
+  Filter,
+} from "lucide-react";
 
 // ─── Coding lessons (original 11 JS lessons) ────────────────────────────────
 const CODING_LESSONS = [
@@ -747,23 +760,248 @@ const ALL_LESSONS: Lesson[] = [
 // ─── Subject config ───────────────────────────────────────────────────────────
 type SubjectKey = "reading" | "math" | "writing" | "sel" | "coding";
 
-const SUBJECTS: { key: SubjectKey; label: string; emoji: string; color: string; activeColor: string }[] = [
-  { key: "reading", label: "Reading",  emoji: "📖", color: "from-cyan-500/20 to-cyan-600/10",   activeColor: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" },
-  { key: "math",    label: "Math",     emoji: "➕", color: "from-blue-500/20 to-blue-600/10",   activeColor: "bg-blue-500/20 text-blue-300 border-blue-500/40" },
-  { key: "writing", label: "Writing",  emoji: "✍️", color: "from-pink-500/20 to-pink-600/10",   activeColor: "bg-pink-500/20 text-pink-300 border-pink-500/40" },
-  { key: "sel",     label: "SEL",      emoji: "🌱", color: "from-emerald-500/20 to-emerald-600/10", activeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
-  { key: "coding",  label: "Coding",   emoji: "💻", color: "from-violet-500/20 to-violet-600/10", activeColor: "bg-violet-500/20 text-violet-300 border-violet-500/40" },
+const SUBJECTS: {
+  key: SubjectKey;
+  label: string;
+  emoji: string;
+  // pill colors (active state)
+  activeBg: string;
+  activeText: string;
+  activeBorder: string;
+  // card accent strip color (css color value)
+  stripColor: string;
+  // card gradient tint
+  cardBg: string;
+  // section heading color
+  headingColor: string;
+}[] = [
+  {
+    key: "reading",
+    label: "Reading",
+    emoji: "📖",
+    activeBg: "rgba(6,182,212,0.15)",
+    activeText: "#67e8f9",
+    activeBorder: "rgba(6,182,212,0.4)",
+    stripColor: "#06b6d4",
+    cardBg: "rgba(6,182,212,0.06)",
+    headingColor: "#67e8f9",
+  },
+  {
+    key: "math",
+    label: "Math",
+    emoji: "➕",
+    activeBg: "rgba(59,130,246,0.15)",
+    activeText: "#93c5fd",
+    activeBorder: "rgba(59,130,246,0.4)",
+    stripColor: "#3b82f6",
+    cardBg: "rgba(59,130,246,0.06)",
+    headingColor: "#93c5fd",
+  },
+  {
+    key: "writing",
+    label: "Writing",
+    emoji: "✍️",
+    activeBg: "rgba(236,72,153,0.15)",
+    activeText: "#f9a8d4",
+    activeBorder: "rgba(236,72,153,0.4)",
+    stripColor: "#ec4899",
+    cardBg: "rgba(236,72,153,0.06)",
+    headingColor: "#f9a8d4",
+  },
+  {
+    key: "sel",
+    label: "SEL",
+    emoji: "🌱",
+    activeBg: "rgba(16,185,129,0.15)",
+    activeText: "#6ee7b7",
+    activeBorder: "rgba(16,185,129,0.4)",
+    stripColor: "#10b981",
+    cardBg: "rgba(16,185,129,0.06)",
+    headingColor: "#6ee7b7",
+  },
+  {
+    key: "coding",
+    label: "Coding",
+    emoji: "💻",
+    activeBg: "rgba(139,92,246,0.15)",
+    activeText: "#c4b5fd",
+    activeBorder: "rgba(139,92,246,0.4)",
+    stripColor: "#8b5cf6",
+    cardBg: "rgba(139,92,246,0.06)",
+    headingColor: "#c4b5fd",
+  },
 ];
 
 const GRADE_OPTIONS = [0, 2, 3, 4, 5];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+/** Single lesson card shown in the browser grid */
+function LessonCard({
+  lesson,
+  subject,
+  done,
+  quizScore,
+  markedRead,
+  onOpen,
+  dk,
+}: {
+  lesson: Lesson;
+  subject: (typeof SUBJECTS)[number];
+  done: boolean;
+  quizScore: string | null;
+  markedRead: boolean;
+  onOpen: () => void;
+  dk: boolean;
+}) {
+  const isRead = markedRead || done;
+  return (
+    <button
+      onClick={onOpen}
+      className="group text-left flex flex-col rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2"
+      style={{
+        background: dk ? "var(--bg-surface)" : "var(--bg-surface)",
+        borderColor: isRead
+          ? "rgba(34,197,94,0.35)"
+          : "var(--border)",
+        boxShadow: dk
+          ? "0 1px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)"
+          : "0 1px 3px rgba(0,0,0,0.07)",
+        focusRingColor: subject.stripColor,
+      } as React.CSSProperties}
+      onMouseEnter={(e) => {
+        if (!isRead)
+          (e.currentTarget as HTMLElement).style.borderColor =
+            subject.activeBorder;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = isRead
+          ? "rgba(34,197,94,0.35)"
+          : "var(--border)";
+      }}
+    >
+      {/* Color strip accent */}
+      <div
+        className="h-1 w-full flex-shrink-0"
+        style={{ background: subject.stripColor, opacity: isRead ? 1 : 0.5 }}
+      />
+
+      <div className="flex flex-col flex-1 p-4 gap-3">
+        {/* Top row: emoji + status */}
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-2xl leading-none">{lesson.emoji}</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {quizScore && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{
+                  background: "rgba(251,191,36,0.12)",
+                  color: "#fbbf24",
+                  border: "1px solid rgba(251,191,36,0.2)",
+                }}
+              >
+                <Star size={9} />
+                {quizScore}/{lesson.quiz.length}
+              </span>
+            )}
+            {isRead ? (
+              <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
+            ) : (
+              <Circle
+                size={15}
+                className="flex-shrink-0 transition-colors group-hover:text-white/40"
+                style={{ color: "var(--text-3)" }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Grade pills */}
+        <div className="flex gap-1 flex-wrap">
+          {lesson.grades.map((g) => (
+            <span
+              key={g}
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+              style={{
+                background: subject.activeBg,
+                color: subject.activeText,
+                border: `1px solid ${subject.activeBorder}`,
+              }}
+            >
+              G{g}
+            </span>
+          ))}
+        </div>
+
+        {/* Title + description */}
+        <div className="flex-1">
+          <h3
+            className="text-sm font-bold leading-snug"
+            style={{ color: "var(--text-1)" }}
+          >
+            {lesson.title}
+          </h3>
+          <p
+            className="text-xs mt-1 leading-relaxed"
+            style={{ color: "var(--text-3)" }}
+          >
+            {lesson.description}
+          </p>
+        </div>
+
+        {/* Footer CTA */}
+        <div
+          className="flex items-center gap-1 text-xs font-semibold mt-auto pt-1 transition-colors"
+          style={{ color: subject.activeText }}
+        >
+          {isRead ? "Review lesson" : "Start lesson"}
+          <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** Progress bar shown at the top of the browser when a subject is selected */
+function SubjectProgress({
+  lessons,
+  completed,
+  markedRead,
+  subject,
+}: {
+  lessons: Lesson[];
+  completed: Set<string>;
+  markedRead: Set<string>;
+  subject: (typeof SUBJECTS)[number];
+}) {
+  const total = lessons.length;
+  const done = lessons.filter(
+    (l) => completed.has(l.id) || markedRead.has(l.id)
+  ).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-md)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: subject.stripColor }}
+        />
+      </div>
+      <span className="text-[11px] font-semibold tabular-nums flex-shrink-0" style={{ color: "var(--text-3)" }}>
+        {done}/{total}
+      </span>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function LessonsPage() {
   const { theme } = useTheme();
   const dk = theme === "dark";
 
   const [subject, setSubject] = useState<SubjectKey>("reading");
-  const [gradeFilter, setGradeFilter] = useState<number>(0); // 0 = All
+  const [gradeFilter, setGradeFilter] = useState<number>(0);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [markedRead, setMarkedRead] = useState<Set<string>>(new Set());
@@ -771,10 +1009,15 @@ export default function LessonsPage() {
 
   // Track lesson opens + keep marked-read set in sync with server
   useEffect(() => {
-    api.getMyLessonViews().then(views => {
-      const ids = views.filter((v: any) => v.marked_read_at).map((v: any) => v.lesson_id);
-      setMarkedRead(new Set(ids));
-    }).catch(() => {});
+    api
+      .getMyLessonViews()
+      .then((views: any[]) => {
+        const ids = views
+          .filter((v: any) => v.marked_read_at)
+          .map((v: any) => v.lesson_id);
+        setMarkedRead(new Set(ids));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -785,10 +1028,12 @@ export default function LessonsPage() {
     if (!activeLesson) return;
     try {
       await api.markLessonRead(activeLesson.id);
-      setMarkedRead(prev => new Set([...prev, activeLesson.id]));
+      setMarkedRead((prev) => new Set([...prev, activeLesson.id]));
       setMarkFlash(true);
       setTimeout(() => setMarkFlash(false), 2000);
-    } catch (e: any) { alert("Couldn't save: " + e.message); }
+    } catch (e: any) {
+      alert("Couldn't save: " + e.message);
+    }
   };
 
   // Presence ping
@@ -796,6 +1041,7 @@ export default function LessonsPage() {
     ? `Studying: ${activeLesson.title} 📖`
     : "Browsing Lessons 📚";
   usePresencePing(lessonActivity);
+
   const [showBrowser, setShowBrowser] = useState(false);
 
   // Quiz state
@@ -808,7 +1054,9 @@ export default function LessonsPage() {
   // Load completed set from localStorage
   useEffect(() => {
     const keys = Object.keys(localStorage).filter((k) => k.startsWith("lesson-"));
-    const ids = keys.filter((k) => localStorage.getItem(k) === "done" || localStorage.getItem(k) === "true").map((k) => k.replace("lesson-", ""));
+    const ids = keys
+      .filter((k) => localStorage.getItem(k) === "done" || localStorage.getItem(k) === "true")
+      .map((k) => k.replace("lesson-", ""));
     setCompleted(new Set(ids));
   }, []);
 
@@ -823,6 +1071,7 @@ export default function LessonsPage() {
     return true;
   });
 
+  const allSubjectLessons = ALL_LESSONS.filter((l) => l.subject === subject);
   const currentSubject = SUBJECTS.find((s) => s.key === subject)!;
 
   const resetQuiz = () => {
@@ -849,38 +1098,105 @@ export default function LessonsPage() {
     }
   };
 
+  const isLessonRead = activeLesson
+    ? markedRead.has(activeLesson.id) || completed.has(activeLesson.id)
+    : false;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-7 space-y-6 animate-fade-in min-h-screen max-w-7xl mx-auto" style={{ background: "var(--bg)" }}>
-      {/* ── Editorial masthead ── */}
+    <div
+      className="min-h-screen max-w-7xl mx-auto px-5 py-7 space-y-6 animate-fade-in"
+      style={{ background: "var(--bg)" }}
+    >
+      {/* ── Page header ─────────────────────────────────────────────────── */}
       <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
-          <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
-          <span className="font-mono">BLOCKFORGE · LIBRARY</span>
+        <div
+          className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]"
+          style={{ color: "var(--text-3)" }}
+        >
+          <span>
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </span>
+          <span className="font-mono flex items-center gap-1.5">
+            <BookOpen size={10} />
+            BLOCKFORGE · LIBRARY
+          </span>
         </div>
         <div className="section-label mb-2">— Reading room —</div>
-        <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
-          Lessons. <em style={{ color: "var(--accent)", fontStyle: "italic", fontWeight: 400 }}>Worth your time.</em>
+        <h1
+          className="font-display text-4xl sm:text-5xl leading-[1.02]"
+          style={{ color: "var(--text-1)" }}
+        >
+          Lessons.{" "}
+          <em
+            style={{
+              color: "var(--accent)",
+              fontStyle: "italic",
+              fontWeight: 400,
+            }}
+          >
+            Worth your time.
+          </em>
         </h1>
         <p className="text-sm mt-2 max-w-xl" style={{ color: "var(--text-2)" }}>
           Choose a subject to explore lessons designed for grades 2–5.
         </p>
       </header>
 
-      {/* Subject tabs */}
+      {/* ── Subject tabs ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         {SUBJECTS.map((s) => {
           const active = subject === s.key;
           return (
             <button
               key={s.key}
-              onClick={() => { setSubject(s.key); setGradeFilter(0); setActiveLesson(null); resetQuiz(); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-200 cursor-pointer ${
+              onClick={() => {
+                setSubject(s.key);
+                setGradeFilter(0);
+                setActiveLesson(null);
+                resetQuiz();
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-200 cursor-pointer"
+              style={
                 active
-                  ? s.activeColor
+                  ? {
+                      background: s.activeBg,
+                      color: s.activeText,
+                      borderColor: s.activeBorder,
+                    }
                   : dk
-                  ? "bg-white/[0.04] text-white/50 border-white/[0.08] hover:bg-white/[0.08] hover:text-white/70"
-                  : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200 hover:text-gray-700"
-              }`}
+                  ? {
+                      background: "rgba(255,255,255,0.04)",
+                      color: "rgba(255,255,255,0.45)",
+                      borderColor: "rgba(255,255,255,0.08)",
+                    }
+                  : {
+                      background: "rgba(0,0,0,0.03)",
+                      color: "var(--text-3)",
+                      borderColor: "var(--border)",
+                    }
+              }
+              onMouseEnter={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    s.activeBorder;
+                  (e.currentTarget as HTMLElement).style.color = s.activeText;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.borderColor = dk
+                    ? "rgba(255,255,255,0.08)"
+                    : "var(--border)";
+                  (e.currentTarget as HTMLElement).style.color = dk
+                    ? "rgba(255,255,255,0.45)"
+                    : "var(--text-3)";
+                }
+              }}
             >
               <span>{s.emoji}</span>
               {s.label}
@@ -889,12 +1205,18 @@ export default function LessonsPage() {
         })}
       </div>
 
-      {/* ── Coding tab: show legacy grid + LessonsBrowser ── */}
+      {/* ── Coding tab ───────────────────────────────────────────────────── */}
       {subject === "coding" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-t3">Learn JavaScript step by step — see how each concept maps to Scratch blocks!</p>
-            <button onClick={() => setShowBrowser(true)} className="btn-primary text-sm">
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>
+              Learn JavaScript step by step — see how each concept maps to Scratch blocks!
+            </p>
+            <button
+              onClick={() => setShowBrowser(true)}
+              className="btn-primary text-sm flex-shrink-0"
+            >
+              <Sparkles size={14} />
               Open Interactive Lessons
             </button>
           </div>
@@ -903,21 +1225,34 @@ export default function LessonsPage() {
               <button
                 key={i}
                 onClick={() => setShowBrowser(true)}
-                className={`group text-left p-5 rounded-2xl bg-gradient-to-br ${lesson.color} border transition-all cursor-pointer`}
+                className={`group text-left p-5 rounded-2xl bg-gradient-to-br ${lesson.color} border transition-all cursor-pointer hover:-translate-y-0.5`}
                 style={{ borderColor: "var(--border)" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.3)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "var(--border)")}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLElement).style.borderColor =
+                    "rgba(139,92,246,0.3)")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.borderColor =
+                    "var(--border)")
+                }
               >
                 <span className="text-3xl">{lesson.icon}</span>
-                <h3 className="text-sm font-bold text-t1 mt-3 group-hover:text-t1 transition-colors">{lesson.title}</h3>
-                <p className="text-xs text-t3 mt-1">{lesson.desc}</p>
+                <h3
+                  className="text-sm font-bold mt-3 leading-snug"
+                  style={{ color: "var(--text-1)" }}
+                >
+                  {lesson.title}
+                </h3>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--text-3)" }}>
+                  {lesson.desc}
+                </p>
                 <span
-                  className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-2 ${
+                  className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-3 ${
                     lesson.level === "Beginner"
-                      ? "bg-emerald-500/20 text-emerald-500"
+                      ? "bg-emerald-500/15 text-emerald-400"
                       : lesson.level === "Intermediate"
-                      ? "bg-amber-500/20 text-amber-500"
-                      : "bg-red-500/20 text-red-400"
+                      ? "bg-amber-500/15 text-amber-400"
+                      : "bg-red-500/15 text-red-400"
                   }`}
                 >
                   {lesson.level}
@@ -929,233 +1264,382 @@ export default function LessonsPage() {
         </div>
       )}
 
-      {/* ── All other subject tabs ── */}
+      {/* ── Non-coding subject browser ───────────────────────────────────── */}
       {subject !== "coding" && (
         <div className="space-y-5">
-          {/* Grade filter */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-t3 uppercase tracking-wide">Grade:</span>
-            <div className="flex gap-1.5 flex-wrap">
-              {GRADE_OPTIONS.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGradeFilter(g)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                    gradeFilter === g
-                      ? "bg-[var(--accent-light)] text-[var(--text-accent)] border-[var(--accent)]"
-                      : dk
-                      ? "bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08] hover:text-white/60"
-                      : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
-                  }`}
-                >
-                  {g === 0 ? "All" : `Grade ${g}`}
-                </button>
-              ))}
+          {/* Controls row: grade filter + progress */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <Filter size={13} style={{ color: "var(--text-3)" }} />
+              <span
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--text-3)" }}
+              >
+                Grade
+              </span>
+              <div className="flex gap-1.5 flex-wrap">
+                {GRADE_OPTIONS.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGradeFilter(g)}
+                    className="px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer"
+                    style={
+                      gradeFilter === g
+                        ? {
+                            background: currentSubject.activeBg,
+                            color: currentSubject.activeText,
+                            borderColor: currentSubject.activeBorder,
+                          }
+                        : dk
+                        ? {
+                            background: "rgba(255,255,255,0.04)",
+                            color: "rgba(255,255,255,0.4)",
+                            borderColor: "rgba(255,255,255,0.08)",
+                          }
+                        : {
+                            background: "rgba(0,0,0,0.03)",
+                            color: "var(--text-3)",
+                            borderColor: "var(--border)",
+                          }
+                    }
+                  >
+                    {g === 0 ? "All" : `G${g}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Progress summary */}
+            <div className="flex items-center gap-3 min-w-[160px]">
+              <SubjectProgress
+                lessons={allSubjectLessons}
+                completed={completed}
+                markedRead={markedRead}
+                subject={currentSubject}
+              />
             </div>
           </div>
 
-          {/* Lesson cards */}
+          {/* Lesson grid */}
           {filteredLessons.length === 0 ? (
-            <div className="text-center py-16 text-t3">
+            <div
+              className="text-center py-20 rounded-2xl border"
+              style={{ borderColor: "var(--border)", background: "var(--bg-muted)" }}
+            >
               <p className="text-4xl mb-3">🔍</p>
-              <p className="text-sm">No lessons found for that grade. Try "All" to see everything.</p>
+              <p className="text-sm" style={{ color: "var(--text-3)" }}>
+                No lessons for that grade.{" "}
+                <button
+                  className="underline cursor-pointer"
+                  style={{ color: currentSubject.activeText }}
+                  onClick={() => setGradeFilter(0)}
+                >
+                  Show all grades
+                </button>
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredLessons.map((lesson) => {
-                const done = completed.has(lesson.id);
-                const savedScore = localStorage.getItem(`quiz-${lesson.id}`);
-                return (
-                  <div
-                    key={lesson.id}
-                    className={`relative group flex flex-col p-5 rounded-2xl bg-gradient-to-br ${currentSubject.color} border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg`}
-                    style={{ borderColor: done ? "rgba(34,197,94,0.4)" : "var(--border)" }}
-                    onClick={() => { setActiveLesson(lesson); resetQuiz(); }}
-                    onMouseEnter={(e) => {
-                      if (!done) (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.35)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.borderColor = done ? "rgba(34,197,94,0.4)" : "var(--border)";
-                    }}
-                  >
-                    {/* Completion badge */}
-                    {done && (
-                      <span className="absolute top-3 right-3 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xs">
-                        ✓
-                      </span>
-                    )}
-                    <span className="text-3xl mb-3">{lesson.emoji}</span>
-                    <div className="flex gap-1.5 flex-wrap mb-2">
-                      {lesson.grades.map((g) => (
-                        <span
-                          key={g}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                          style={{
-                            background: "rgba(139,92,246,0.15)",
-                            color: "#c4b5fd",
-                            border: "1px solid rgba(139,92,246,0.25)",
-                          }}
-                        >
-                          Grade {g}
-                        </span>
-                      ))}
-                    </div>
-                    <h3 className="text-sm font-bold text-t1 group-hover:text-t1 transition-colors leading-snug">
-                      {lesson.title}
-                    </h3>
-                    <p className="text-xs text-t3 mt-1 flex-1 leading-relaxed">{lesson.description}</p>
-                    {savedScore && (
-                      <div className="mt-2 text-[10px] text-amber-400 font-semibold">
-                        Quiz: {savedScore}/{lesson.quiz.length} ⭐
-                      </div>
-                    )}
-                    <button
-                      className="mt-4 w-full text-xs font-semibold py-2 rounded-xl transition-all"
-                      style={{
-                        background: "rgba(139,92,246,0.15)",
-                        color: "#c4b5fd",
-                        border: "1px solid rgba(139,92,246,0.25)",
-                      }}
-                      onClick={(e) => { e.stopPropagation(); setActiveLesson(lesson); resetQuiz(); }}
-                    >
-                      Start Lesson →
-                    </button>
-                  </div>
-                );
-              })}
+              {filteredLessons.map((lesson) => (
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
+                  subject={currentSubject}
+                  done={completed.has(lesson.id)}
+                  quizScore={localStorage.getItem(`quiz-${lesson.id}`)}
+                  markedRead={markedRead.has(lesson.id)}
+                  onOpen={() => {
+                    setActiveLesson(lesson);
+                    resetQuiz();
+                  }}
+                  dk={dk}
+                />
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* ── Lesson Full-Screen Editorial ── */}
+      {/* ── Lesson viewer (full-screen overlay) ─────────────────────────── */}
       {activeLesson && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "var(--bg)" }}>
-          {/* Subtle paper grid */}
-          <div className="fixed inset-0 pointer-events-none opacity-[0.04]"
-            style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-          <div className="relative max-w-3xl mx-auto px-6 py-8">
-            {/* Editorial header with back button */}
-            <div
-              className="sticky top-0 z-10 -mx-6 px-6 py-4 backdrop-blur-md border-b"
-              style={{ background: "color-mix(in srgb, var(--bg) 85%, transparent)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <button onClick={() => { setActiveLesson(null); resetQuiz(); }} className="btn-ghost text-xs gap-1.5" style={{ padding: "6px 10px" }}>
-                  ← Back to lessons
-                </button>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-3)" }}>
-                  <span style={{ fontSize: 16 }}>{activeLesson.emoji}</span>
-                  <span>{activeLesson.subject}</span>
-                  <span style={{ color: "var(--border-md)" }}>·</span>
-                  <span>Grade {activeLesson.grades.join("/")}</span>
-                </div>
-              </div>
-            </div>
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto"
+          style={{ background: "var(--bg)" }}
+        >
+          {/* Subtle dot grid */}
+          <div
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `radial-gradient(circle, ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"} 1px, transparent 1px)`,
+              backgroundSize: "24px 24px",
+            }}
+          />
 
-            {/* Masthead */}
-            <div className="py-6">
-              <div>
-                <div className="section-label mb-2">— Today's reading —</div>
-                <h2 className="font-display text-4xl sm:text-5xl leading-[1.05]" style={{ color: "var(--text-1)" }}>
-                  {activeLesson.title}<em style={{ color: "var(--accent)", fontStyle: "italic" }}>.</em>
-                </h2>
-                <p className="text-sm mt-3 max-w-xl" style={{ color: "var(--text-2)" }}>
-                  {activeLesson.description}
-                </p>
-                {quizMode && (
-                  <div className="stamp mt-3">🧠 Quiz Mode</div>
+          <div className="relative max-w-2xl mx-auto px-5 py-6">
+            {/* Sticky top bar */}
+            <div
+              className="sticky top-0 z-10 -mx-5 px-5 py-3 flex items-center justify-between gap-4 border-b backdrop-blur-md"
+              style={{
+                background: `color-mix(in srgb, var(--bg) 88%, transparent)`,
+                borderColor: "var(--border)",
+              }}
+            >
+              <button
+                onClick={() => {
+                  setActiveLesson(null);
+                  resetQuiz();
+                }}
+                className="btn-ghost text-xs gap-1.5"
+                style={{ padding: "5px 10px" }}
+              >
+                <ChevronLeft size={14} />
+                Back to lessons
+              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Subject badge */}
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wide border"
+                  style={{
+                    background: currentSubject.activeBg,
+                    color: currentSubject.activeText,
+                    borderColor: currentSubject.activeBorder,
+                  }}
+                >
+                  {currentSubject.label}
+                </span>
+                {/* Grade badge */}
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md border"
+                  style={{
+                    background: "var(--bg-muted)",
+                    color: "var(--text-3)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  Grade {activeLesson.grades.join("/")}
+                </span>
+                {/* Read indicator */}
+                {isLessonRead && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                    <CheckCircle2 size={12} />
+                    Read
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* Lesson body */}
-            <div className="pb-10 space-y-5 mt-4">
-              {/* Lesson sections (not in quiz mode) */}
-              {!quizMode && !quizDone && activeLesson.sections.map((section, i) => (
-                section.isActivity ? (
-                  /* Activity box */
-                  <div
-                    key={i}
-                    className="rounded-2xl p-5"
-                    style={{
-                      background: "rgba(251,191,36,0.07)",
-                      border: "1.5px solid rgba(251,191,36,0.35)",
-                    }}
+            {/* Lesson masthead */}
+            <div className="pt-7 pb-5 border-b" style={{ borderColor: "var(--border)" }}>
+              <div className="section-label mb-2">— Today's lesson —</div>
+              <h2
+                className="font-display text-3xl sm:text-4xl leading-[1.05]"
+                style={{ color: "var(--text-1)" }}
+              >
+                {activeLesson.emoji} {activeLesson.title}
+              </h2>
+              <p
+                className="text-sm mt-2 max-w-lg leading-relaxed"
+                style={{ color: "var(--text-2)" }}
+              >
+                {activeLesson.description}
+              </p>
+
+              {/* Section count pills */}
+              {!quizMode && !quizDone && (
+                <div className="flex items-center gap-2 mt-4">
+                  <span
+                    className="text-[11px]"
+                    style={{ color: "var(--text-3)" }}
                   >
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-lg">📝</span>
-                      <h3 className="text-sm font-bold" style={{ color: "#fbbf24" }}>
-                        {section.heading}
-                      </h3>
-                    </div>
-                    <p
-                      className="text-sm leading-relaxed whitespace-pre-line"
-                      style={{ color: dk ? "rgba(255,255,255,0.75)" : "#374151" }}
-                    >
-                      {section.body}
-                    </p>
-                  </div>
-                ) : (
-                  /* Regular section */
-                  <div key={i} className="space-y-2">
-                    <h3
-                      className="text-sm font-bold uppercase tracking-wide"
-                      style={{ color: dk ? "#a78bfa" : "#7c3aed" }}
-                    >
-                      {section.heading}
-                    </h3>
+                    {activeLesson.sections.length} sections
+                  </span>
+                  <span style={{ color: "var(--border-md)" }}>·</span>
+                  <span
+                    className="text-[11px]"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    {activeLesson.quiz.length} quiz questions
+                  </span>
+                  {activeLesson.sections.some((s) => s.isActivity) && (
+                    <>
+                      <span style={{ color: "var(--border-md)" }}>·</span>
+                      <span className="text-[11px] text-amber-400">
+                        includes activity
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {quizMode && !quizDone && (
+                <div
+                  className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-semibold px-2.5 py-1 rounded-lg border"
+                  style={{
+                    background: "rgba(139,92,246,0.12)",
+                    color: "#c4b5fd",
+                    borderColor: "rgba(139,92,246,0.3)",
+                  }}
+                >
+                  <Brain size={12} />
+                  Quiz Mode
+                </div>
+              )}
+            </div>
+
+            {/* Lesson body */}
+            <div className="py-7 space-y-5">
+              {/* Lesson sections */}
+              {!quizMode &&
+                !quizDone &&
+                activeLesson.sections.map((section, i) =>
+                  section.isActivity ? (
+                    /* Activity callout */
                     <div
-                      className="rounded-xl p-4"
+                      key={i}
+                      className="rounded-2xl p-5"
                       style={{
-                        background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.025)",
-                        border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.07)",
+                        background: "rgba(251,191,36,0.07)",
+                        border: "1.5px solid rgba(251,191,36,0.3)",
                       }}
                     >
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-base">📝</span>
+                        <h3
+                          className="text-sm font-bold"
+                          style={{ color: "#fbbf24" }}
+                        >
+                          {section.heading}
+                        </h3>
+                      </div>
                       <p
                         className="text-sm leading-relaxed whitespace-pre-line"
-                        style={{ color: dk ? "rgba(255,255,255,0.78)" : "#1f2937" }}
+                        style={{
+                          color: dk ? "rgba(255,255,255,0.75)" : "#374151",
+                        }}
                       >
                         {section.body}
                       </p>
                     </div>
-                  </div>
-                )
-              ))}
+                  ) : (
+                    /* Regular section */
+                    <div key={i} className="space-y-2">
+                      {/* Section number + heading */}
+                      <div className="flex items-baseline gap-2.5">
+                        <span
+                          className="text-[11px] font-bold tabular-nums flex-shrink-0"
+                          style={{ color: "var(--text-3)" }}
+                        >
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <h3
+                          className="text-xs font-bold uppercase tracking-wide"
+                          style={{ color: currentSubject.headingColor }}
+                        >
+                          {section.heading}
+                        </h3>
+                      </div>
+                      <div
+                        className="rounded-xl p-4 ml-6"
+                        style={{
+                          background: dk
+                            ? "var(--bg-surface)"
+                            : "var(--bg-surface)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        <p
+                          className="text-sm leading-relaxed whitespace-pre-line"
+                          style={{
+                            color: dk
+                              ? "rgba(226,232,240,0.78)"
+                              : "var(--text-1)",
+                          }}
+                        >
+                          {section.body}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
 
-              {/* Quiz mode — active question */}
+              {/* Quiz — active question */}
               {quizMode && !quizDone && activeLesson.quiz.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-violet-400 uppercase tracking-widest">Quiz Time! 🧠</span>
-                    <span className={`text-xs ${dk ? "text-white/30" : "text-gray-400"}`}>
-                      {quizQ + 1} / {activeLesson.quiz.length}
-                    </span>
-                  </div>
-
-                  {/* Progress */}
-                  <div className={`h-1.5 rounded-full ${dk ? "bg-white/10" : "bg-gray-200"}`}>
+                <div className="space-y-5">
+                  {/* Progress header */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-xs font-bold uppercase tracking-widest"
+                        style={{ color: "#c4b5fd" }}
+                      >
+                        Question {quizQ + 1}
+                      </span>
+                      <span
+                        className="text-xs tabular-nums"
+                        style={{ color: "var(--text-3)" }}
+                      >
+                        {quizQ + 1} / {activeLesson.quiz.length}
+                      </span>
+                    </div>
                     <div
-                      className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all"
-                      style={{ width: `${((quizQ + 1) / activeLesson.quiz.length) * 100}%` }}
-                    />
+                      className="h-1 rounded-full overflow-hidden"
+                      style={{ background: "var(--border-md)" }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${((quizQ + 1) / activeLesson.quiz.length) * 100}%`,
+                          background:
+                            "linear-gradient(90deg, #8b5cf6, #6366f1)",
+                        }}
+                      />
+                    </div>
                   </div>
 
-                  <p className={`text-base font-semibold leading-relaxed ${dk ? "text-white" : "text-gray-900"}`}>
+                  {/* Question */}
+                  <p
+                    className="text-base font-semibold leading-relaxed"
+                    style={{ color: "var(--text-1)" }}
+                  >
                     {activeLesson.quiz[quizQ].q}
                   </p>
 
+                  {/* Answer options */}
                   <div className="space-y-2">
                     {activeLesson.quiz[quizQ].options.map((opt, oi) => (
                       <button
                         key={oi}
                         onClick={() => handleQuizAnswer(oi)}
-                        className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer
-                          ${dk ? "border-white/10 text-white/70 hover:border-violet-500/50 hover:bg-violet-500/10"
-                                 : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50"}`}
+                        className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer"
+                        style={{
+                          background: "var(--bg-surface)",
+                          borderColor: "var(--border)",
+                          color: "var(--text-2)",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "rgba(139,92,246,0.5)";
+                          (e.currentTarget as HTMLElement).style.background =
+                            "rgba(139,92,246,0.08)";
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--text-1)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.borderColor =
+                            "var(--border)";
+                          (e.currentTarget as HTMLElement).style.background =
+                            "var(--bg-surface)";
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--text-2)";
+                        }}
                       >
                         <span
-                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full border mr-2.5 text-xs flex-shrink-0 ${dk ? "border-white/20" : "border-gray-300"}`}
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold flex-shrink-0"
+                          style={{
+                            background: "var(--bg-raised)",
+                            color: "var(--text-3)",
+                            border: "1px solid var(--border-md)",
+                          }}
                         >
                           {String.fromCharCode(65 + oi)}
                         </span>
@@ -1168,95 +1652,195 @@ export default function LessonsPage() {
 
               {/* Quiz done — results */}
               {quizDone && activeLesson && (
-                <div className="text-center space-y-4 py-4">
+                <div className="text-center space-y-5 py-6">
                   <div className="text-5xl">
                     {quizScore >= 4 ? "🏆" : quizScore >= 3 ? "⭐" : "💪"}
                   </div>
-                  <h3 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>
-                    You got {quizScore}/{activeLesson.quiz.length}!
-                  </h3>
-                  <div className="flex justify-center gap-1">
-                    {Array.from({ length: activeLesson.quiz.length }).map((_, i) => (
-                      <span key={i} className="text-xl">{i < quizScore ? "⭐" : "○"}</span>
-                    ))}
+                  <div>
+                    <h3
+                      className="text-2xl font-extrabold"
+                      style={{ color: "var(--text-1)" }}
+                    >
+                      {quizScore}/{activeLesson.quiz.length}
+                    </h3>
+                    <p
+                      className="text-sm mt-1"
+                      style={{ color: "var(--text-3)" }}
+                    >
+                      {quizScore >= 4
+                        ? "Amazing work! Lesson complete!"
+                        : quizScore >= 3
+                        ? "Good job! Keep practicing!"
+                        : "Nice try! Review the lesson and try again."}
+                    </p>
                   </div>
-                  <p className={`text-sm ${dk ? "text-white/50" : "text-gray-500"}`}>
-                    {quizScore >= 4 ? "Amazing work! Lesson complete! 🎉" : quizScore >= 3 ? "Good job! Keep practicing! 👍" : "Nice try! Review the lesson and try again!"}
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (quizScore >= 3) {
-                        // Mark lesson complete
-                        localStorage.setItem(`lesson-${activeLesson.id}`, "done");
-                        localStorage.setItem(`quiz-${activeLesson.id}`, String(quizScore));
-                        setCompleted((prev) => new Set([...prev, activeLesson.id]));
-                        setActiveLesson(null);
-                        resetQuiz();
-                      } else {
-                        // Try again — go back to lesson
-                        resetQuiz();
-                      }
-                    }}
-                    className="btn-primary"
+
+                  {/* Star row */}
+                  <div className="flex justify-center gap-1.5">
+                    {Array.from({ length: activeLesson.quiz.length }).map(
+                      (_, i) => (
+                        <Star
+                          key={i}
+                          size={20}
+                          className={
+                            i < quizScore
+                              ? "text-amber-400 fill-amber-400"
+                              : "text-white/10"
+                          }
+                        />
+                      )
+                    )}
+                  </div>
+
+                  {/* Score bar */}
+                  <div
+                    className="h-2 rounded-full overflow-hidden mx-8"
+                    style={{ background: "var(--border-md)" }}
                   >
-                    {quizScore >= 3 ? "Complete Lesson ✓" : "Try Again"}
-                  </button>
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${(quizScore / activeLesson.quiz.length) * 100}%`,
+                        background:
+                          quizScore >= 4
+                            ? "linear-gradient(90deg, #f59e0b, #fbbf24)"
+                            : quizScore >= 3
+                            ? "linear-gradient(90deg, #6366f1, #8b5cf6)"
+                            : "linear-gradient(90deg, #ec4899, #f43f5e)",
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 justify-center pt-1">
+                    {quizScore < 3 && (
+                      <button
+                        onClick={resetQuiz}
+                        className="btn-ghost gap-1.5"
+                      >
+                        <RotateCcw size={14} />
+                        Review lesson
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (quizScore >= 3) {
+                          localStorage.setItem(
+                            `lesson-${activeLesson.id}`,
+                            "done"
+                          );
+                          localStorage.setItem(
+                            `quiz-${activeLesson.id}`,
+                            String(quizScore)
+                          );
+                          setCompleted(
+                            (prev) => new Set([...prev, activeLesson.id])
+                          );
+                          setActiveLesson(null);
+                          resetQuiz();
+                        } else {
+                          resetQuiz();
+                        }
+                      }}
+                      className="btn-primary gap-1.5"
+                    >
+                      {quizScore >= 3 ? (
+                        <>
+                          <Trophy size={14} />
+                          Complete Lesson
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw size={14} />
+                          Try Quiz Again
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Action buttons (lesson mode, not quiz, not done) */}
+              {/* Bottom action bar (reading mode) */}
               {!quizMode && !quizDone && (
-                <div className="flex gap-3 pt-2 flex-wrap">
+                <div
+                  className="flex gap-3 pt-4 flex-wrap border-t"
+                  style={{ borderColor: "var(--border)" }}
+                >
                   <button
-                    onClick={() => { setActiveLesson(null); resetQuiz(); }}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all"
-                    style={{
-                      background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)",
-                      color: dk ? "rgba(255,255,255,0.5)" : "#6b7280",
-                      border: dk ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.1)",
+                    onClick={() => {
+                      setActiveLesson(null);
+                      resetQuiz();
                     }}
+                    className="btn-ghost gap-1"
                   >
-                    ← Back
+                    <ChevronLeft size={14} />
+                    Back
                   </button>
+
                   <button
-                    onClick={() => { markComplete(activeLesson.id); handleMarkAsRead(); }}
-                    className="flex-1 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all"
+                    onClick={() => {
+                      markComplete(activeLesson.id);
+                      handleMarkAsRead();
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all border"
                     style={
-                      markedRead.has(activeLesson.id) || markFlash
+                      isLessonRead || markFlash
                         ? {
-                            background: "rgba(34,197,94,0.15)",
+                            background: "rgba(34,197,94,0.12)",
                             color: "#4ade80",
-                            border: "1px solid rgba(34,197,94,0.35)",
+                            borderColor: "rgba(34,197,94,0.3)",
                           }
                         : {
-                            background: "rgba(139,92,246,0.2)",
-                            color: "#c4b5fd",
-                            border: "1px solid rgba(139,92,246,0.4)",
+                            background: "var(--bg-surface)",
+                            color: "var(--text-2)",
+                            borderColor: "var(--border-md)",
                           }
                     }
                   >
-                    {markFlash ? "✓ Saved!" : markedRead.has(activeLesson.id) ? "✓ Marked as read" : "📖 Mark as Read"}
+                    {markFlash ? (
+                      <>
+                        <CheckCircle2 size={14} />
+                        Saved!
+                      </>
+                    ) : isLessonRead ? (
+                      <>
+                        <CheckCircle2 size={14} />
+                        Marked as read
+                      </>
+                    ) : (
+                      <>
+                        <BookOpen size={14} />
+                        Mark as read
+                      </>
+                    )}
                   </button>
-                  {/* Take the Quiz button */}
+
                   {activeLesson.quiz.length > 0 && (
                     <button
                       onClick={() => setQuizMode(true)}
-                      className="px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all"
-                      style={{ background: "linear-gradient(135deg, #D97757, #C4653A)", color: "white", border: "none" }}
+                      className="btn-primary gap-1.5"
                     >
-                      🧠 Take the Quiz!
+                      <Brain size={14} />
+                      Take the Quiz
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Back to lesson button during quiz */}
+              {/* Back to lesson link during quiz */}
               {quizMode && !quizDone && (
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
-                    onClick={() => resetQuiz()}
-                    className="text-xs cursor-pointer"
-                    style={{ color: dk ? "rgba(255,255,255,0.3)" : "#9ca3af" }}
+                    onClick={resetQuiz}
+                    className="text-xs cursor-pointer transition-colors"
+                    style={{ color: "var(--text-3)" }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLElement).style.color =
+                        "var(--text-2)")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLElement).style.color =
+                        "var(--text-3)")
+                    }
                   >
                     ← Back to lesson
                   </button>

@@ -15,7 +15,7 @@ export default function ProjectsList() {
   const [projects, setProjects] = useState<any[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<"2d" | "3d">("2d");
+  const [mode, setMode] = useState<"2d" | "3d" | "unity">("2d");
 
   useEffect(() => {
     api.getProjects().then(setProjects).catch(() => {});
@@ -74,17 +74,21 @@ export default function ProjectsList() {
                 Mode
               </label>
               <div className={`flex rounded-xl overflow-hidden border ${dk ? "border-white/[0.08]" : "border-gray-200"}`}>
-                {(["2d", "3d"] as const).map((m) => (
+                {([
+                  { id: "2d",    label: "2D",    icon: "🎨" },
+                  { id: "3d",    label: "3D",    icon: "🧊" },
+                  { id: "unity", label: "Unity", icon: "🎮" },
+                ] as const).map(({ id: m, label, icon }) => (
                   <button
                     key={m}
                     onClick={() => setMode(m)}
-                    className={`px-5 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                    className={`px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                       mode === m
                         ? "bg-violet-600 text-white"
                         : dk ? "bg-white/[0.03] text-white/35 hover:text-white/60" : "bg-gray-50 text-gray-400 hover:text-gray-700"
                     }`}
                   >
-                    {m.toUpperCase()}
+                    <span>{icon}</span> {label}
                   </button>
                 ))}
               </div>

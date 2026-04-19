@@ -226,6 +226,28 @@ export default function Layout() {
     );
   }
 
+  // Students get full-width layout — no sidebar, no hamburger
+  if (isStudent) {
+    return (
+      <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8" }}>
+        <main style={{ minHeight: "100vh" }} className="animate-page-enter">
+          <CurrentBlockStrip />
+          <Outlet />
+        </main>
+        <VideoOverlay />
+        <ScreenLockOverlay
+          isLocked={classCommands.isLocked || newLock.locked}
+          message={newLock.locked && newLock.message ? newLock.message : classCommands.lockMessage}
+          lockedBy={classCommands.lockedBy}
+          pendingMessage={newMessage || classCommands.pendingMessage}
+          onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
+        />
+        <BreakChoiceModal />
+        <StudentStarsBadge />
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: dk ? "#070714" : "#f0f1f8" }}>
 
