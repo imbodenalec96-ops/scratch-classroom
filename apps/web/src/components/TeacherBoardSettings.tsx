@@ -166,22 +166,24 @@ export default function TeacherBoardSettings() {
         <section className="card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Star size={16}/> <h2 className="font-semibold text-base">Behavior Stars</h2>
-            <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>10 = McDonald's · auto-reset</span>
+            <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>5 = McDonald's · auto-reset</span>
           </div>
           <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
             {board.students.map(s => {
-              const stars = Math.max(0, Math.min(10, s.behavior_stars || 0));
+              const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
               return (
                 <div key={s.id} className="rounded-xl p-2.5 flex items-center gap-3"
                   style={{ background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: "1px solid var(--border)" }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden"
                     style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.2))" }}>
-                    {s.avatar_emoji || "🙂"}
+                    {s.avatar_url
+                      ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
+                      : <span>{(s.name || "?")[0]}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-sm truncate">{s.name}</div>
                     <div className="flex items-center gap-0.5 mt-0.5">
-                      {Array.from({ length: 10 }, (_, i) => (
+                      {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{ fontSize: 13, opacity: i < stars ? 1 : 0.25, filter: i < stars ? "none" : "grayscale(1)" }}>⭐</span>
                       ))}
                     </div>
@@ -227,7 +229,9 @@ export default function TeacherBoardSettings() {
                       {atLevel.map(s => (
                         <div key={s.id} className="group flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold"
                           style={{ background: "rgba(139,92,246,0.15)", color: "var(--text-1)" }}>
-                          <span>{s.avatar_emoji || "🙂"}</span>
+                          {s.avatar_url
+                            ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                            : <span className="opacity-60">{(s.name || "?")[0]}</span>}
                           <span className="truncate max-w-[110px]">{s.name}</span>
                           <button onClick={() => setLevel(s, level - 1)} disabled={level <= 1}
                             className="opacity-60 hover:opacity-100 disabled:opacity-20" title="Level down"><ArrowDown size={12}/></button>
@@ -325,7 +329,7 @@ function ScheduleEditor({ student, initial, onSaved }: { student: any; initial: 
   return (
     <div className="rounded-xl p-3" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between mb-2">
-        <div className="font-bold text-sm">{student.avatar_emoji} {student.name}</div>
+        <div className="font-bold text-sm">{student.name}</div>
         <div className="flex gap-1">
           <button onClick={add} className="text-xs px-2 py-1 rounded-md hover:opacity-80" style={{ background: "var(--surface-2)" }} title="Add row"><Plus size={12}/></button>
           <button onClick={save} className="text-xs px-2 py-1 rounded-md font-bold" style={{ background: "rgba(139,92,246,0.2)", color: "var(--accent)" }}>Save</button>

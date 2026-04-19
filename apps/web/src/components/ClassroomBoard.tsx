@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
@@ -33,6 +33,21 @@ export default function ClassroomBoard() {
   );
   const [now, setNow] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      await document.exitFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 15_000);
@@ -121,8 +136,15 @@ export default function ClassroomBoard() {
               {dateStr} · <span className="font-mono font-bold">Day {dayLetter}</span>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex flex-col items-end gap-2">
             <div style={{ fontSize: 56, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer", letterSpacing: "0.05em" }}
+            >
+              {isFullscreen ? "✕ Exit" : "⛶ Fullscreen"}
+            </button>
           </div>
         </div>
 
@@ -191,20 +213,22 @@ export default function ClassroomBoard() {
           <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
             <div className="mb-3">
               <div className="text-xs uppercase tracking-[0.25em] opacity-60">Behavior Stars</div>
-              <div className="text-sm opacity-60 mt-1">10 stars → McDonald's · resets automatically</div>
+              <div className="text-sm opacity-60 mt-1">5 stars → McDonald's · resets automatically</div>
             </div>
             <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
               {board.students.map(s => {
-                const stars = Math.max(0, Math.min(10, s.behavior_stars || 0));
+                const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
                 return (
                   <div key={s.id} className="rounded-xl p-2.5 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3))" }}>
-                      {s.avatar_emoji || "🙂"}
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3))" }}>
+                      {s.avatar_url
+                        ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
+                        : <span>{(s.name || "?")[0]}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-sm truncate">{s.name}</div>
                       <div className="flex items-center gap-0.5 mt-0.5">
-                        {Array.from({ length: 10 }, (_, i) => (
+                        {Array.from({ length: 5 }, (_, i) => (
                           <span key={i} style={{ fontSize: 14, opacity: i < stars ? 1 : 0.2, filter: i < stars ? "none" : "grayscale(1)" }}>⭐</span>
                         ))}
                       </div>
@@ -238,7 +262,9 @@ export default function ClassroomBoard() {
                       <div className="flex-1 flex flex-wrap gap-1.5 min-h-[38px]">
                         {atLevel.map(s => (
                           <div key={s.id} className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(139,92,246,0.22)" }}>
-                            <span>{s.avatar_emoji || "🙂"}</span>
+                            {s.avatar_url
+                              ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                              : <span className="opacity-70">{(s.name || "?")[0]}</span>}
                             <span className="truncate max-w-[90px]">{s.name}</span>
                           </div>
                         ))}
@@ -264,7 +290,7 @@ export default function ClassroomBoard() {
                 const rows = board.schedules.filter((r: any) => r.student_id === s.id);
                 return (
                   <div key={s.id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="font-bold text-sm mb-2">{s.avatar_emoji} {s.name}</div>
+                    <div className="font-bold text-sm mb-2">{s.name}</div>
                     {rows.length === 0 ? (
                       <div className="text-xs opacity-40 italic py-2">No resource pullouts.</div>
                     ) : (
@@ -330,9 +356,53 @@ export default function ClassroomBoard() {
           </section>
         </div>
 
-        <section data-slot="board-modules" className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)" }}>
-          <div className="text-xs uppercase tracking-[0.25em] opacity-50">Modules</div>
-          <div className="text-sm opacity-40 mt-2">Reserved space for future classroom widgets.</div>
+        {/* Specials Today — groups STAR students by their specials_grade + today's activity */}
+        <section className="rounded-2xl p-5" style={{ background: "rgba(10,10,25,0.55)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
+          <div className="flex items-baseline gap-3 mb-4">
+            <div className="text-xs uppercase tracking-[0.25em] opacity-60">Specials Today</div>
+            <div className="px-2 py-0.5 rounded font-bold text-sm" style={{ background: "rgba(245,158,11,0.25)", color: "#fcd34d" }}>
+              Day {dayLetter}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {GRADES.map(grade => {
+              const studentsInGrade = board.students.filter((s: any) => s.specials_grade === grade);
+              if (studentsInGrade.length === 0) return null;
+              const activity = board.specials.find((r: any) => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
+              return (
+                <div key={grade} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <div className="text-xs font-bold opacity-80">{grade}th Grade</div>
+                    {activity
+                      ? <div className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(139,92,246,0.3)", color: "rgba(255,255,255,0.9)" }}>{activity}</div>
+                      : <div className="text-xs opacity-40 italic">— specials not set</div>}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {studentsInGrade.map((s: any) => (
+                      <div key={s.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.1)" }}>
+                        {s.avatar_url
+                          ? <img src={s.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                          : <span style={{ opacity: 0.7 }}>{(s.name || "?")[0]}</span>}
+                        {s.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {board.students.filter((s: any) => !s.specials_grade).length > 0 && (
+              <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="text-xs font-bold opacity-50 mb-2">Grade not set</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {board.students.filter((s: any) => !s.specials_grade).map((s: any) => (
+                    <div key={s.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.06)", opacity: 0.7 }}>
+                      {s.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         <div className="pt-4 text-center text-xs opacity-40 uppercase tracking-[0.2em]">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle } from "lucide-react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
@@ -44,6 +44,23 @@ const BREAK_TYPES = [
 ];
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+function parseSelContent(raw: string | null | undefined): { videoUrl: string; assignmentUrl: string } {
+  if (!raw) return { videoUrl: "", assignmentUrl: "" };
+  try {
+    const p = JSON.parse(raw);
+    return { videoUrl: p.videoUrl || "", assignmentUrl: p.assignmentUrl || "" };
+  } catch { return { videoUrl: "", assignmentUrl: "" }; }
+}
+
+function buildSelContent(videoUrl: string, assignmentUrl: string): string | null {
+  const v = videoUrl.trim(); const a = assignmentUrl.trim();
+  if (!v && !a) return null;
+  const obj: Record<string, string> = {};
+  if (v) obj.videoUrl = v;
+  if (a) obj.assignmentUrl = a;
+  return JSON.stringify(obj);
+}
 
 function normalizeDays(d: string | string[] | undefined): string[] {
   if (Array.isArray(d)) return d;
@@ -156,6 +173,7 @@ export default function TeacherSchedule() {
         is_break: b.is_break ? 1 : 0,
         break_type: b.is_break ? b.break_type || "regular" : null,
         active_days: normalizeDays(b.active_days),
+        content_source: b.content_source ?? null,
       }));
       const rows = await api.updateSchedule(classId, payload);
       setBlocks((rows || []).map((r: any) => ({
@@ -246,9 +264,10 @@ export default function TeacherSchedule() {
             {blocks.map((b, i) => {
               const days = normalizeDays(b.active_days);
               const isLive = liveBlock === b;
+              const selContent = b.subject === "sel" ? parseSelContent(b.content_source) : null;
               return (
+                <Fragment key={i}>
                 <div
-                  key={i}
                   className={`grid grid-cols-[36px_100px_100px_minmax(140px,1fr)_160px_80px_140px_180px_40px] gap-2 px-3 py-2 items-center border-t ${dk ? "border-white/[0.06]" : "border-gray-100"} ${isLive ? (dk ? "bg-cyan-500/10" : "bg-cyan-50") : ""}`}
                 >
                   <div className="text-xs text-t3 font-mono">{i + 1}</div>
@@ -331,6 +350,28 @@ export default function TeacherSchedule() {
                     <Trash2 size={14} />
                   </button>
                 </div>
+                {selContent && (
+                  <div className={`px-3 pb-2 pt-1 border-t ${dk ? "border-amber-500/15" : "border-amber-200/60"} ${dk ? "bg-amber-500/5" : "bg-amber-50/60"}`}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-semibold text-amber-400 shrink-0">💛 SEL Content</span>
+                      <input
+                        type="url"
+                        placeholder="Video URL (YouTube, etc.)"
+                        value={selContent.videoUrl}
+                        onChange={(e) => updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) })}
+                        className="input text-xs py-1 flex-1 min-w-[180px]"
+                      />
+                      <input
+                        type="url"
+                        placeholder="Assignment URL (Google Form, etc.)"
+                        value={selContent.assignmentUrl}
+                        onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
+                        className="input text-xs py-1 flex-1 min-w-[180px]"
+                      />
+                    </div>
+                  </div>
+                )}
+                </Fragment>
               );
             })}
           </div>
