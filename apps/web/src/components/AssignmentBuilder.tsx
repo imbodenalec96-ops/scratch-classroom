@@ -1628,6 +1628,12 @@ export default function AssignmentBuilder() {
                   style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)", color: "var(--accent)", background: "var(--accent-light)" }}>
                   {adjusting[a.id] === "regen" ? "Regenerating…" : "✨ Regenerate fresh"}
                 </button>
+                <button onClick={() => window.open(`/print/assignment/${a.id}`, "_blank", "noopener")}
+                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                  title="Open printable PDF view"
+                  style={{ borderRadius: "var(--r-sm)", border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
+                  🖨 Print
+                </button>
                 <button
                   onClick={async () => {
                     const count = await api.getAssignmentSubmissionCount(a.id).catch(() => ({ count: 0 }));

@@ -69,6 +69,13 @@ export default function TeacherBoardSettings() {
       setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, level: lv } : x) }));
     } catch {}
   };
+  const togglePaperOnly = async (s: any) => {
+    const next = !s.paper_only;
+    setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, paper_only: next ? 1 : 0 } : x) }));
+    try { await api.setStudentPaperOnly(s.id, next); } catch {
+      setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, paper_only: s.paper_only } : x) }));
+    }
+  };
   const saveSetting = async (key: string, value: string) => {
     setBoard(b => ({ ...b, settings: { ...b.settings, [key]: value } }));
     try { await api.saveBoardSetting(key, value); } catch {}
@@ -237,6 +244,30 @@ export default function TeacherBoardSettings() {
           </div>
         </section>
       </div>
+
+      {/* Paper-only students (printable worksheets instead of digital) */}
+      <section className="card p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="font-semibold text-base">Paper-only Students</h2>
+          <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>Check to hide digital assignments — use 🖨 Print on each assignment instead.</span>
+        </div>
+        <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>Students flagged here won't see assignments in their dashboard. Print from the Assignments page.</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {board.students.map(s => (
+            <label key={s.id}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+              style={{
+                border: "1px solid var(--border)",
+                background: s.paper_only ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "var(--surface-1)",
+              }}>
+              <input type="checkbox" checked={!!s.paper_only} onChange={() => togglePaperOnly(s)} />
+              <span className="truncate text-sm font-semibold">{s.avatar_emoji || "🙂"} {s.name}</span>
+              {!!s.paper_only && <span className="ml-auto text-[10px] font-bold" style={{ color: "var(--accent)" }}>🖨 PAPER</span>}
+            </label>
+          ))}
+          {board.students.length === 0 && <span className="text-xs opacity-60">No students in this class.</span>}
+        </div>
+      </section>
 
       {/* Resource Schedules */}
       <section className="card p-5">

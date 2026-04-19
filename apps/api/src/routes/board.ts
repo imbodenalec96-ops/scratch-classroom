@@ -57,11 +57,17 @@ router.use(async (_req, _res, next) => { await ensureBoardSchema(); next(); });
 router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try {
+    // Ensure paper_only column exists so SELECT doesn't fail on older DBs.
+    try {
+      const { ensurePaperOnlyColumn } = await import("./students.js");
+      await ensurePaperOnlyColumn();
+    } catch {}
     const students = await db.prepare(
       `SELECT s.id, s.name, s.avatar_emoji,
               COALESCE(s.behavior_stars, 0) AS behavior_stars,
               COALESCE(s.reward_count, 0)    AS reward_count,
-              COALESCE(s.level, 1)           AS level
+              COALESCE(s.level, 1)           AS level,
+              COALESCE(s.paper_only, 0)      AS paper_only
        FROM students s
        WHERE s.active = 1
        ORDER BY s.name ASC`

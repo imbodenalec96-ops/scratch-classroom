@@ -377,4 +377,11 @@ export const api = {
   saveBoardSetting: (key: string, value: string) =>
     request<any>(`/board/settings`, { method: "PUT", body: JSON.stringify({ key, value }) }),
   getMyStars: () => request<{ stars: number; rewards: number }>(`/board/me/stars`),
+
+  // ── Paper-only students (printable worksheets flow) ──
+  setStudentPaperOnly: (studentId: string, paperOnly: boolean) =>
+    request<any>(`/students/${studentId}/paper-only`, {
+      method: "PUT",
+      body: JSON.stringify({ paper_only: paperOnly }),
+    }),
 };

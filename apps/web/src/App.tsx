@@ -41,6 +41,7 @@ import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
 import ClassroomBoard from "./components/ClassroomBoard.tsx";
 import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
+import PrintAssignment from "./components/PrintAssignment.tsx";
 
 function AppLoader() {
   return (
@@ -185,6 +186,9 @@ export default function App() {
 
           {/* Classroom board — TV/projector kiosk view */}
           <Route path="/board" element={<ProtectedRoute><ClassroomBoard /></ProtectedRoute>} />
+
+          {/* Printable assignment — auto-triggers print dialog */}
+          <Route path="/print/assignment/:id" element={<PrintAssignment />} />
 
           {/* Teacher admin portal — password-protected, no auth guard */}
           <Route path="/admin" element={<TeacherAdmin />} />

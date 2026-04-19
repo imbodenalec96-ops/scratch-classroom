@@ -14,6 +14,15 @@ async function ensureVideoColumns() {
   }
 }
 
+// Ensure paper_only column exists (idempotent). Students flagged paper_only
+// never see digital assignments — teacher hands them a printed copy.
+let paperOnlyColumnReady = false;
+export async function ensurePaperOnlyColumn() {
+  if (paperOnlyColumnReady) return;
+  try { await db.exec(`ALTER TABLE students ADD COLUMN paper_only INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+  paperOnlyColumnReady = true;
+}
+
 // Ensure freetime_revoked_until column exists (idempotent).
 let freetimeColumnReady = false;
 async function ensureFreetimeColumn() {
@@ -259,6 +268,21 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: "Failed to delete student" });
+  }
+});
+
+// PUT /:id/paper-only — toggle paper-only flag (teacher/admin only).
+// Paper-only students never see digital assignments; teacher prints them instead.
+router.put("/:id/paper-only", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    await ensurePaperOnlyColumn();
+    const paperOnly = req.body?.paper_only ? 1 : 0;
+    const r = await db.prepare("UPDATE students SET paper_only=? WHERE id=?").run(paperOnly, req.params.id);
+    if (!r.changes) return res.status(404).json({ error: "Student not found" });
+    const row = await db.prepare("SELECT * FROM students WHERE id=?").get(req.params.id);
+    res.json(row);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to set paper-only" });
   }
 });
 
