@@ -100,7 +100,8 @@ export default function ClassroomBoard() {
   const [now, setNow] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [musicPlaying, setMusicPlaying] = useState(true);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicLoaded, setMusicLoaded] = useState(false);
   const musicRef = useRef<HTMLIFrameElement>(null);
 
   const toggleFullscreen = useCallback(async () => {
@@ -112,10 +113,20 @@ export default function ClassroomBoard() {
   }, []);
 
   const toggleMusic = useCallback(() => {
-    const fn = musicPlaying ? "pauseVideo" : "playVideo";
-    musicRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: fn, args: "" }), "*");
-    setMusicPlaying(p => !p);
-  }, [musicPlaying]);
+    if (!musicRef.current) return;
+    const preset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
+    if (!preset) return;
+    if (!musicLoaded) {
+      // First tap: assign src synchronously inside gesture so iOS allows autoplay
+      musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
+      setMusicLoaded(true);
+      setMusicPlaying(true);
+    } else {
+      const fn = musicPlaying ? "pauseVideo" : "playVideo";
+      musicRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: fn, args: "" }), "*");
+      setMusicPlaying(p => !p);
+    }
+  }, [musicPlaying, musicLoaded, board.settings]);
 
   useEffect(() => {
     const h = () => setIsFullscreen(!!document.fullscreenElement);
@@ -512,14 +523,14 @@ export default function ClassroomBoard() {
         </div>
       </section>
 
-      {/* Music iframe */}
+      {/* Music iframe — src is blank until first tap (iOS autoplay policy) */}
       {musicPreset && (
         <iframe
           ref={musicRef}
           title="ambient-music"
           width="1" height="1"
           style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
-          src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=1&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1`}
+          src="about:blank"
           allow="autoplay"
         />
       )}
