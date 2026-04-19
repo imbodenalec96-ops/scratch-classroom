@@ -20,12 +20,12 @@ const GRADE_COLORS: Record<number, { from: string; to: string; border: string; t
   5: { from: "rgba(167,139,250,0.22)", to: "rgba(139,92,246,0.12)", border: "rgba(167,139,250,0.55)", text: "#c4b5fd", glow: "rgba(167,139,250,0.4)" },
 };
 
-const BEHAVIOR_LEVELS: Record<number, { label: string; color: string; bg: string }> = {
-  1: { label: "Needs Redirection", color: "#fca5a5", bg: "rgba(239,68,68,0.25)" },
-  2: { label: "Developing",        color: "#fdba74", bg: "rgba(251,146,60,0.25)" },
-  3: { label: "On Track",          color: "#fcd34d", bg: "rgba(245,158,11,0.25)" },
-  4: { label: "Consistent",        color: "#86efac", bg: "rgba(34,197,94,0.25)" },
-  5: { label: "Role Model",        color: "#6ee7b7", bg: "rgba(16,185,129,0.28)" },
+const BEHAVIOR_LEVELS: Record<number, { label: string; short: string; icon: string; color: string; bg: string; glow: string }> = {
+  1: { label: "Needs Redirection", short: "Redirect",   icon: "↩", color: "#fca5a5", bg: "rgba(239,68,68,0.28)",   glow: "rgba(239,68,68,0.3)" },
+  2: { label: "Developing",        short: "Developing",  icon: "📈", color: "#fdba74", bg: "rgba(251,146,60,0.28)", glow: "rgba(251,146,60,0.3)" },
+  3: { label: "On Track",          short: "On Track",    icon: "✓",  color: "#fcd34d", bg: "rgba(245,158,11,0.28)", glow: "rgba(245,158,11,0.3)" },
+  4: { label: "Consistent",        short: "Consistent",  icon: "💪", color: "#86efac", bg: "rgba(34,197,94,0.28)",  glow: "rgba(34,197,94,0.3)" },
+  5: { label: "Role Model",        short: "Role Model",  icon: "⭐", color: "#6ee7b7", bg: "rgba(16,185,129,0.32)", glow: "rgba(16,185,129,0.35)" },
 };
 
 const ACTIVITY_EMOJI: Array<[string, string]> = [
@@ -313,68 +313,94 @@ export default function ClassroomBoard() {
               const isFull = stars >= 5;
               const isHigh = stars >= 3;
               const lc = BEHAVIOR_LEVELS[lv];
+              const initial = (s.name || "?")[0].toUpperCase();
               return (
                 <div key={s.id} style={{
-                  borderRadius: 14, padding: "10px 8px", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 5, textAlign: "center",
+                  borderRadius: 16, display: "flex", flexDirection: "column",
+                  alignItems: "stretch", textAlign: "center",
                   background: isFull
-                    ? "linear-gradient(145deg, rgba(245,158,11,.42), rgba(234,179,8,.24))"
-                    : isHigh
-                    ? "linear-gradient(145deg, rgba(139,92,246,.28), rgba(99,102,241,.16))"
-                    : g(0.05),
-                  border: isFull ? "1px solid rgba(245,158,11,.7)" : isHigh ? "1px solid rgba(139,92,246,.5)" : `1px solid ${g(0.09)}`,
+                    ? "linear-gradient(160deg, rgba(245,158,11,.28), rgba(234,179,8,.14))"
+                    : "linear-gradient(160deg, rgba(139,92,246,.15), rgba(99,102,241,.08))",
+                  border: isFull ? "1px solid rgba(245,158,11,.55)" : `1px solid ${g(0.1)}`,
+                  boxShadow: isFull ? `0 0 20px rgba(245,158,11,.22)` : `0 0 0 0 transparent`,
                   animation: isFull ? `cardPulse 2.5s ease-in-out infinite, popIn .4s ease ${idx * 0.05}s both` : `popIn .4s ease ${idx * 0.05}s both`,
                   overflow: "hidden",
                 }}>
-                  {/* Avatar */}
+                  {/* Level color stripe at top */}
                   <div style={{
-                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18, fontWeight: 800,
-                    background: isFull
-                      ? "linear-gradient(135deg, rgba(245,158,11,.6), rgba(234,179,8,.45))"
-                      : "linear-gradient(135deg, rgba(139,92,246,.55), rgba(99,102,241,.4))",
-                    border: `2px solid ${isFull ? "rgba(245,158,11,.6)" : g(0.18)}`,
-                    boxShadow: isFull ? "0 0 14px rgba(245,158,11,.4)" : "none",
-                  }}>
-                    {s.avatar_url ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.name || "?")[0].toUpperCase()}
-                  </div>
+                    height: 4, flexShrink: 0,
+                    background: `linear-gradient(90deg, ${lc.color}, ${lc.color}88)`,
+                    boxShadow: `0 0 8px ${lc.glow}`,
+                  }} />
 
-                  {/* Name */}
-                  <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>{s.name}</div>
-
-                  {/* Stars */}
-                  <div style={{ display: "flex", gap: 2 }}>
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <span key={i} style={{
-                        fontSize: 17,
-                        opacity: i < stars ? 1 : 0.12,
-                        filter: i < stars ? undefined : "grayscale(1) brightness(.3)",
-                        animation: i < stars && isFull ? "starGlow 2s ease-in-out infinite" : undefined,
-                        animationDelay: isFull ? `${i * 0.15}s` : undefined,
-                      }}>⭐</span>
-                    ))}
-                  </div>
-
-                  {/* Progress bar */}
-                  <div style={{ width: "80%", height: 4, borderRadius: 4, background: g(0.1), overflow: "hidden" }}>
+                  {/* Card body */}
+                  <div style={{ flex: 1, padding: "8px 6px 7px", display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                    {/* Avatar */}
                     <div style={{
-                      height: "100%", borderRadius: 4, transition: "width .6s ease",
-                      width: `${(stars / 5) * 100}%`,
-                      background: isFull ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)" : isHigh ? "#a78bfa" : "#818cf8",
-                    }} />
-                  </div>
+                      width: 50, height: 50, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 20, fontWeight: 900, color: "white",
+                      background: isFull
+                        ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                        : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
+                      border: `3px solid ${isFull ? "rgba(245,158,11,.7)" : lc.color + "55"}`,
+                      boxShadow: isFull ? `0 0 16px rgba(245,158,11,.5)` : `0 0 10px ${lc.glow}`,
+                    }}>
+                      {s.avatar_url
+                        ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : initial}
+                    </div>
 
-                  {/* Level badge + reward */}
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <div style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: lc.bg, color: lc.color, fontWeight: 700 }}>L{lv}</div>
-                    {s.reward_count > 0 && (
+                    {/* Name */}
+                    <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 3px" }}>
+                      {s.name}
+                    </div>
+
+                    {/* Stars — big and prominent */}
+                    <div style={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span key={i} style={{
+                          fontSize: 20,
+                          lineHeight: 1,
+                          opacity: i < stars ? 1 : 0.13,
+                          filter: i < stars ? (isFull ? "drop-shadow(0 0 5px rgba(251,191,36,0.9))" : "none") : "grayscale(1) brightness(.25)",
+                          animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.15}s infinite` : undefined,
+                        }}>⭐</span>
+                      ))}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ width: "85%", height: 5, borderRadius: 5, background: g(0.1), overflow: "hidden" }}>
                       <div style={{
-                        fontSize: 10, padding: "1px 7px", borderRadius: 20,
-                        background: "rgba(245,158,11,.3)", color: "#fcd34d", fontWeight: 700, border: "1px solid rgba(245,158,11,.4)",
-                        animation: "rewardBounce 1.5s ease-in-out infinite",
-                      }}>🏆 {s.reward_count}×</div>
-                    )}
+                        height: "100%", borderRadius: 5, transition: "width .6s ease",
+                        width: `${(stars / 5) * 100}%`,
+                        background: isFull
+                          ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)"
+                          : `linear-gradient(90deg,${lc.color}cc,${lc.color})`,
+                        boxShadow: `0 0 6px ${lc.glow}`,
+                      }} />
+                    </div>
+
+                    {/* Level label + reward */}
+                    <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                      <div style={{
+                        fontSize: 9, padding: "2px 7px", borderRadius: 20,
+                        background: lc.bg, color: lc.color, fontWeight: 800,
+                        border: `1px solid ${lc.color}44`,
+                        boxShadow: `0 0 6px ${lc.glow}`,
+                        letterSpacing: "0.04em",
+                      }}>
+                        {lc.icon} {lc.short}
+                      </div>
+                      {s.reward_count > 0 && (
+                        <div style={{
+                          fontSize: 9, padding: "2px 7px", borderRadius: 20,
+                          background: "rgba(245,158,11,.3)", color: "#fcd34d", fontWeight: 800,
+                          border: "1px solid rgba(245,158,11,.45)",
+                          animation: "rewardBounce 1.5s ease-in-out infinite",
+                        }}>🏆 {s.reward_count}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

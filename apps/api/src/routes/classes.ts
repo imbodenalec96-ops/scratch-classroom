@@ -1112,7 +1112,7 @@ const STAR_STUDENTS_SEED = [
   { id: "s0000000-0000-0000-0000-000000000005", name: "Aiden",  email: "aiden.star@star.local",  specials_grade: 3 },
   { id: "s0000000-0000-0000-0000-000000000006", name: "Kaleb",  email: "kaleb.star@star.local",  specials_grade: 5 },
   { id: "s0000000-0000-0000-0000-000000000007", name: "Anna",   email: "anna.star@star.local",   specials_grade: 3 },
-  { id: "s0000000-0000-0000-0000-000000000008", name: "Ameer",  email: "ameer.star@star.local",  specials_grade: null },
+  { id: "s0000000-0000-0000-0000-000000000008", name: "Ameer",  email: "ameer.star@star.local",  specials_grade: 4 },
 ] as const;
 
 let starStudentSeedRan = false;
@@ -1151,6 +1151,10 @@ async function seedStarStudents() {
         await db.prepare(
           `UPDATE users SET specials_grade = ? WHERE LOWER(name) = LOWER(?) AND specials_grade IS NULL AND role = 'student'`
         ).run(s.specials_grade, s.name);
+        // Also force-update the canonical seed students by ID so grade corrections propagate
+        await db.prepare(
+          `UPDATE users SET specials_grade = ? WHERE id = ? AND role = 'student'`
+        ).run(s.specials_grade, s.id);
       }
     }
 

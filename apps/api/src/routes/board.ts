@@ -141,6 +141,18 @@ router.post("/students/:id/level", requireRole("teacher", "admin"), async (req: 
   }
 });
 
+// ── Student specials grade ──
+router.post("/students/:id/specials-grade", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const id = req.params.id;
+  const grade = req.body?.grade != null ? Math.trunc(Number(req.body.grade)) : null;
+  try {
+    await db.prepare(`UPDATE users SET specials_grade = ? WHERE id = ?::uuid AND role = 'student'`).run(grade, id);
+    res.json({ id, specials_grade: grade });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "specials_grade update failed" });
+  }
+});
+
 // ── Resource schedules per student (replace-all) ──
 router.put("/resource-schedules/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const studentId = req.params.studentId;

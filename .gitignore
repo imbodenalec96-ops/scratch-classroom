@@ -6,3 +6,9 @@ dist/
 .DS_Store
 .vercel
 .env*.local
+
+# Tesseract OCR training data
+*.traineddata
+.claude/worktrees/
+.env.seed
+scripts/

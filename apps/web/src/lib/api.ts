@@ -371,6 +371,8 @@ export const api = {
     request<any>(`/board/students/${studentId}/stars`, { method: "POST", body: JSON.stringify({ delta }) }),
   setStudentLevel: (studentId: string, level: number) =>
     request<any>(`/board/students/${studentId}/level`, { method: "POST", body: JSON.stringify({ level }) }),
+  setStudentSpecialsGrade: (studentId: string, grade: number | null) =>
+    request<any>(`/board/students/${studentId}/specials-grade`, { method: "POST", body: JSON.stringify({ grade }) }),
   saveResourceSchedule: (studentId: string, rows: any[]) =>
     request<any>(`/board/resource-schedules/${studentId}`, { method: "PUT", body: JSON.stringify({ rows }) }),
   saveSpecialsRotation: (grade: number, rows: any[]) =>

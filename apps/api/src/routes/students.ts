@@ -271,16 +271,21 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PUT /:id/paper-only — toggle paper-only flag (teacher/admin only).
+// PUT /:id/paper-only — toggle paper-only flag on the users table (teacher/admin only).
 // Paper-only students never see digital assignments; teacher prints them instead.
+let usersPaperOnlyReady = false;
+async function ensureUsersPaperOnly() {
+  if (usersPaperOnlyReady) return;
+  try { await db.exec(`ALTER TABLE users ADD COLUMN paper_only INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+  usersPaperOnlyReady = true;
+}
 router.put("/:id/paper-only", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   try {
-    await ensurePaperOnlyColumn();
+    await ensureUsersPaperOnly();
     const paperOnly = req.body?.paper_only ? 1 : 0;
-    const r = await db.prepare("UPDATE students SET paper_only=? WHERE id=?").run(paperOnly, req.params.id);
+    const r = await db.prepare("UPDATE users SET paper_only=? WHERE id=?::uuid AND role='student'").run(paperOnly, req.params.id);
     if (!r.changes) return res.status(404).json({ error: "Student not found" });
-    const row = await db.prepare("SELECT * FROM students WHERE id=?").get(req.params.id);
-    res.json(row);
+    res.json({ id: req.params.id, paper_only: paperOnly });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to set paper-only" });
   }

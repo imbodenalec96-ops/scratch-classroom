@@ -877,11 +877,10 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
   try {
     // Paper-only students never see digital assignments — teacher prints them
     try {
-      const { ensurePaperOnlyColumn } = await import("./students.js");
-      await ensurePaperOnlyColumn();
-      const s: any = await db.prepare("SELECT paper_only FROM students WHERE id=?").get(userId);
+      try { await db.exec(`ALTER TABLE users ADD COLUMN paper_only INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+      const s: any = await db.prepare("SELECT paper_only FROM users WHERE id=?::uuid").get(userId);
       if (s && Number(s.paper_only) === 1) return res.json([]);
-    } catch { /* students row may not exist (teacher/admin hitting endpoint) */ }
+    } catch { /* column not yet migrated */ }
     // Honors per-student assignments via the student_id column:
     //   - student_id IS NULL  → class-wide assignment (everyone sees it)
     //   - student_id = userId → only this student sees it
