@@ -311,9 +311,9 @@ export default function ClassroomBoard() {
 
         {/* LEFT: Behavior Stars */}
         <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>⭐ Behavior Stars</div>
-            <div style={{ fontSize: 11, opacity: 0.35 }}>5 = McDonald's</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexShrink: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>⭐ Behavior Stars</div>
+            <div style={{ marginLeft: "auto", fontSize: 10, opacity: 0.3, fontWeight: 600 }}>5 stars = reward 🎉</div>
           </div>
           {(() => {
             const n = board.students.length || 1;
@@ -325,131 +325,132 @@ export default function ClassroomBoard() {
             display: "grid",
             gridTemplateColumns: `repeat(${cols}, 1fr)`,
             gridTemplateRows: `repeat(${rows}, 1fr)`,
-            gap: 6,
+            gap: 7,
           }}>
             {board.students.map((s, idx) => {
               const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
               const lv = s.level || 1;
               const isFull = stars >= 5;
-              const isHigh = stars >= 3;
               const lc = BEHAVIOR_LEVELS[lv];
               const initial = (s.name || "?")[0].toUpperCase();
+              const firstName = (s.name || "?").split(" ")[0];
               return (
                 <div key={s.id} style={{
-                  borderRadius: 10, display: "flex", flexDirection: "column",
+                  borderRadius: 14, display: "flex", flexDirection: "column",
                   alignItems: "stretch", textAlign: "center",
                   background: isFull
-                    ? "linear-gradient(160deg, rgba(245,158,11,.28), rgba(234,179,8,.14))"
-                    : "linear-gradient(160deg, rgba(139,92,246,.15), rgba(99,102,241,.08))",
-                  border: isFull ? "1px solid rgba(245,158,11,.55)" : `1px solid ${g(0.1)}`,
-                  boxShadow: isFull ? `0 0 20px rgba(245,158,11,.22)` : `0 0 0 0 transparent`,
+                    ? "linear-gradient(160deg, rgba(245,158,11,.22) 0%, rgba(251,191,36,.08) 100%)"
+                    : `linear-gradient(160deg, ${lc.bg} 0%, rgba(0,0,0,0.15) 100%)`,
+                  border: isFull ? "1.5px solid rgba(245,158,11,.6)" : `1.5px solid ${lc.color}44`,
+                  boxShadow: isFull
+                    ? `0 0 22px rgba(245,158,11,.3), inset 0 1px 0 rgba(255,255,255,0.1)`
+                    : `0 0 12px ${lc.glow}, inset 0 1px 0 rgba(255,255,255,0.06)`,
                   animation: isFull ? `cardPulse 2.5s ease-in-out infinite, popIn .4s ease ${idx * 0.05}s both` : `popIn .4s ease ${idx * 0.05}s both`,
                   overflow: "hidden",
+                  position: "relative",
                 }}>
-                  {/* Level color stripe at top */}
+                  {/* Glowing top line */}
                   <div style={{
-                    height: 4, flexShrink: 0,
-                    background: `linear-gradient(90deg, ${lc.color}, ${lc.color}88)`,
-                    boxShadow: `0 0 8px ${lc.glow}`,
+                    height: 3, flexShrink: 0,
+                    background: isFull
+                      ? "linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)"
+                      : `linear-gradient(90deg, ${lc.color}, transparent)`,
+                    boxShadow: `0 0 10px ${isFull ? "rgba(245,158,11,.8)" : lc.glow}`,
                   }} />
 
+                  {/* Level chip — top-right corner */}
+                  <div style={{
+                    position: "absolute", top: 8, right: 8,
+                    fontSize: 10, fontWeight: 900, width: 22, height: 22, borderRadius: "50%",
+                    background: lc.bg, color: lc.color,
+                    border: `1.5px solid ${lc.color}66`,
+                    boxShadow: `0 0 6px ${lc.glow}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    zIndex: 1,
+                  }}>{lv}</div>
+
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "12px 8px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, justifyContent: "center" }}>
+                  <div style={{ flex: 1, padding: "10px 6px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
                     {/* Avatar */}
                     <div style={{
-                      width: 72, height: 72, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 68, height: 68, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 28, fontWeight: 900, color: "white",
+                      fontSize: s.avatar_emoji ? 34 : 26, fontWeight: 900, color: "white",
                       background: isFull
-                        ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                        : `linear-gradient(135deg, ${lc.color}cc, ${lc.color}66)`,
-                      border: `3px solid ${isFull ? "rgba(245,158,11,.8)" : lc.color + "77"}`,
+                        ? "radial-gradient(circle at 30% 30%, #fbbf24, #b45309)"
+                        : `radial-gradient(circle at 30% 30%, ${lc.color}dd, ${lc.color}55)`,
+                      border: `3px solid ${isFull ? "rgba(251,191,36,.9)" : lc.color + "88"}`,
                       boxShadow: isFull
-                        ? `0 0 18px rgba(245,158,11,.6), 0 0 40px rgba(245,158,11,.2)`
-                        : `0 0 10px ${lc.glow}, 0 4px 16px rgba(0,0,0,0.3)`,
+                        ? `0 0 22px rgba(245,158,11,.7), 0 0 50px rgba(245,158,11,.25), 0 4px 16px rgba(0,0,0,0.4)`
+                        : `0 0 14px ${lc.glow}, 0 4px 16px rgba(0,0,0,0.3)`,
                       animation: isFull ? "popIn .4s ease both, pulseRing 2s ease-in-out 0.5s infinite" : undefined,
                     }}>
                       {s.avatar_url
                         ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : s.avatar_emoji
+                        ? s.avatar_emoji
                         : initial}
                     </div>
 
                     {/* Name */}
                     <div style={{
-                      fontSize: 18, fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.01em",
-                      maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px",
-                      textShadow: isFull ? "0 0 12px rgba(251,191,36,0.6)" : "0 1px 4px rgba(0,0,0,0.5)",
+                      fontSize: 16, fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.02em",
+                      maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 6px",
+                      color: isFull ? "#fde68a" : "rgba(255,255,255,0.95)",
+                      textShadow: isFull ? "0 0 16px rgba(251,191,36,0.7)" : "0 1px 6px rgba(0,0,0,0.6)",
                     }}>
-                      {s.name}
+                      {firstName}
                     </div>
 
-                    {/* Stars — pill with count */}
+                    {/* Stars row */}
                     <div style={{
-                      display: "flex", alignItems: "center", gap: 4, justifyContent: "center",
-                      background: isFull ? "rgba(245,158,11,0.2)" : "rgba(0,0,0,0.25)",
-                      borderRadius: 20, padding: "4px 10px",
-                      border: isFull ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                      display: "flex", alignItems: "center", gap: 3, justifyContent: "center",
+                      background: isFull ? "rgba(245,158,11,0.18)" : "rgba(0,0,0,0.3)",
+                      borderRadius: 20, padding: "3px 8px",
+                      border: isFull ? "1px solid rgba(245,158,11,0.45)" : "1px solid rgba(255,255,255,0.07)",
                     }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 16, lineHeight: 1,
-                          opacity: i < stars ? 1 : 0.12,
-                          filter: i < stars ? (isFull ? "drop-shadow(0 0 5px rgba(251,191,36,1))" : "drop-shadow(0 0 2px rgba(251,191,36,0.5))") : "grayscale(1) brightness(.2)",
+                          fontSize: 14, lineHeight: 1,
+                          opacity: i < stars ? 1 : 0.1,
+                          filter: i < stars ? (isFull ? "drop-shadow(0 0 5px rgba(251,191,36,1))" : "drop-shadow(0 0 2px rgba(251,191,36,0.5))") : "none",
                           animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.15}s infinite` : undefined,
-                          transition: "opacity 0.3s ease",
                         }}>⭐</span>
                       ))}
-                      {stars > 0 && (
-                        <span style={{ fontSize: 11, fontWeight: 900, color: isFull ? "#fde68a" : "rgba(255,255,255,0.5)", marginLeft: 2 }}>{stars}</span>
-                      )}
                     </div>
 
-                    {/* Schedule pills — show all entries */}
+                    {/* Schedule pills */}
                     {(() => {
                       const studentSchedules = board.schedules
                         .filter((sc: any) => sc.student_id === s.id)
                         .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time))
-                        .slice(0, 3);
+                        .slice(0, 2);
                       return studentSchedules.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center', maxWidth: '100%' }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", width: "100%", padding: "0 4px" }}>
                           {studentSchedules.map((sc: any, i: number) => (
-                            <span key={i} style={{
-                              fontSize: 10, padding: '2px 8px', borderRadius: 10,
-                              background: 'rgba(99,102,241,0.22)', color: 'rgba(196,181,253,0.95)',
-                              border: '1px solid rgba(99,102,241,0.35)', whiteSpace: 'nowrap' as const,
-                              fontWeight: 700, letterSpacing: '0.01em', maxWidth: '100%',
-                              overflow: 'hidden', textOverflow: 'ellipsis',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                              animation: `slideIn .3s ease ${i * 0.08}s both`,
+                            <div key={i} style={{
+                              fontSize: 10, padding: "2px 6px", borderRadius: 8,
+                              background: "rgba(99,102,241,0.25)", color: "rgba(196,181,253,0.95)",
+                              border: "1px solid rgba(99,102,241,0.4)", width: "100%",
+                              fontWeight: 700, textAlign: "center",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
-                              {sc.start_time.slice(0, 5)} {sc.activity}
-                            </span>
+                              {actEmoji(sc.activity)} {sc.activity}
+                            </div>
                           ))}
                         </div>
                       ) : null;
                     })()}
 
-                    {/* Level badge + reward */}
-                    <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                    {/* Reward badge */}
+                    {s.reward_count > 0 && (
                       <div style={{
-                        fontSize: 11, width: 26, height: 26, borderRadius: "50%",
-                        background: lc.bg, color: lc.color, fontWeight: 900,
-                        border: `2px solid ${lc.color}66`,
-                        boxShadow: `0 0 8px ${lc.glow}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {lv}
-                      </div>
-                      {s.reward_count > 0 && (
-                        <div style={{
-                          fontSize: 9, padding: "2px 7px", borderRadius: 20,
-                          background: "rgba(245,158,11,.3)", color: "#fde68a", fontWeight: 800,
-                          border: "1px solid rgba(245,158,11,.5)",
-                          boxShadow: "0 0 8px rgba(245,158,11,.3)",
-                          animation: "rewardBounce 1.5s ease-in-out infinite",
-                        }}>🏆 {s.reward_count}</div>
-                      )}
-                    </div>
+                        fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                        background: "rgba(245,158,11,.25)", color: "#fde68a", fontWeight: 800,
+                        border: "1px solid rgba(245,158,11,.5)",
+                        animation: "rewardBounce 1.5s ease-in-out infinite",
+                      }}>🏆 {s.reward_count}</div>
+                    )}
                   </div>
                 </div>
               );
@@ -552,26 +553,28 @@ export default function ClassroomBoard() {
           <section style={{
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
             borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(160deg, rgba(15,10,35,0.95), rgba(8,4,20,0.98))",
+            background: "linear-gradient(160deg, rgba(12,8,28,0.97), rgba(6,4,18,0.99))",
             padding: "10px 10px 8px",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
           }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)", marginBottom: 7, flexShrink: 0 }}>WEEK SCHEDULE</div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)", marginBottom: 8, flexShrink: 0 }}>WEEK SCHEDULE</div>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
               {/* Day header */}
-              <div style={{ display: "grid", gridTemplateColumns: "36px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
                 <div />
                 {DAY_LETTERS.map(d => {
                   const isToday = d === dayLetter;
                   return (
                     <div key={d} style={{
-                      textAlign: "center", fontSize: 13, fontWeight: 900,
-                      padding: "5px 2px", borderRadius: 8,
-                      background: isToday ? "linear-gradient(135deg, rgba(245,158,11,0.4), rgba(251,191,36,0.25))" : "rgba(255,255,255,0.04)",
-                      color: isToday ? "#fde68a" : "rgba(255,255,255,0.3)",
-                      border: isToday ? "1px solid rgba(245,158,11,0.6)" : "1px solid rgba(255,255,255,0.06)",
-                      boxShadow: isToday ? "0 0 12px rgba(245,158,11,0.3)" : "none",
-                      letterSpacing: isToday ? "0.05em" : 0,
+                      textAlign: "center", fontSize: 14, fontWeight: 900,
+                      padding: "6px 2px", borderRadius: 9,
+                      background: isToday
+                        ? "linear-gradient(135deg, rgba(245,158,11,0.5), rgba(251,191,36,0.3))"
+                        : "rgba(255,255,255,0.05)",
+                      color: isToday ? "#fde68a" : "rgba(255,255,255,0.35)",
+                      border: isToday ? "1.5px solid rgba(245,158,11,0.7)" : "1px solid rgba(255,255,255,0.07)",
+                      boxShadow: isToday ? "0 0 16px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.15)" : "none",
+                      letterSpacing: "0.04em",
                     }}>
                       {d}{isToday ? " ★" : ""}
                     </div>
@@ -582,15 +585,15 @@ export default function ClassroomBoard() {
               {GRADES.map(grade => {
                 const gc = GRADE_COLORS[grade];
                 return (
-                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "36px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
                     {/* Grade label */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 12, fontWeight: 900, borderRadius: 8,
+                      fontSize: 13, fontWeight: 900, borderRadius: 9,
                       color: gc.text,
-                      background: `linear-gradient(135deg, ${gc.from.replace("0.22","0.45")}, ${gc.to.replace("0.12","0.2")})`,
-                      border: `1px solid ${gc.border}`,
-                      boxShadow: `0 0 6px ${gc.glow}`,
+                      background: `linear-gradient(135deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.25")})`,
+                      border: `1.5px solid ${gc.border}`,
+                      boxShadow: `0 0 8px ${gc.glow}`,
                     }}>{grade}th</div>
                     {DAY_LETTERS.map(day => {
                       const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
@@ -598,28 +601,27 @@ export default function ClassroomBoard() {
                       return (
                         <div key={day} style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, fontWeight: 800, textAlign: "center", borderRadius: 8, padding: "3px 3px",
+                          textAlign: "center", borderRadius: 9, padding: "4px 2px",
                           background: isToday
-                            ? `linear-gradient(135deg, ${gc.from.replace("0.22","0.45")}, ${gc.to.replace("0.12","0.25")})`
+                            ? `linear-gradient(160deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.28")})`
                             : "rgba(255,255,255,0.03)",
-                          border: isToday ? `1px solid ${gc.border}` : "1px solid rgba(255,255,255,0.05)",
-                          color: isToday ? gc.text : "rgba(255,255,255,0.55)",
-                          overflow: "hidden",
-                          boxShadow: isToday && c ? `0 0 8px ${gc.glow}` : "none",
-                          gap: 2,
+                          border: isToday ? `1.5px solid ${gc.border}` : "1px solid rgba(255,255,255,0.06)",
+                          boxShadow: isToday && c ? `0 0 10px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.1)` : "none",
+                          gap: 2, overflow: "hidden",
                         }}>
                           {c?.activity ? (
                             <>
-                              <span style={{ fontSize: 14, lineHeight: 1 }}>{actEmoji(c.activity)}</span>
+                              <span style={{ fontSize: 16, lineHeight: 1 }}>{actEmoji(c.activity)}</span>
                               <span style={{
-                                fontSize: 11, fontWeight: 800, lineHeight: 1.1,
+                                fontSize: 12, fontWeight: 900, lineHeight: 1.15,
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                maxWidth: "100%", padding: "0 2px",
-                                color: isToday ? gc.text : "rgba(255,255,255,0.6)",
+                                maxWidth: "100%", padding: "0 3px",
+                                color: isToday ? gc.text : "rgba(255,255,255,0.65)",
+                                textShadow: isToday ? `0 0 8px ${gc.glow}` : "none",
                               }}>{c.activity}</span>
                             </>
                           ) : (
-                            <span style={{ opacity: 0.15, fontSize: 13 }}>✦</span>
+                            <span style={{ opacity: 0.12, fontSize: 14 }}>✦</span>
                           )}
                         </div>
                       );

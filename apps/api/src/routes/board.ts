@@ -56,6 +56,8 @@ async function ensureBoardSchema() {
         await db.prepare(`UPDATE users SET specials_grade = ? WHERE LOWER(name) = ? AND role = 'student'`).run(grade, name);
       } catch { /* ignore */ }
     }
+    // Additive: avatar_emoji column on users
+    try { await db.exec(`ALTER TABLE users ADD COLUMN avatar_emoji TEXT`); } catch { /* already exists */ }
   } catch (e) { console.error("ensureBoardSchema:", e); }
   schemaReady = true;
 }
@@ -67,7 +69,7 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
   const classId = req.params.classId;
   try {
     const students = await db.prepare(
-      `SELECT u.id, u.name, u.avatar_url, u.specials_grade,
+      `SELECT u.id, u.name, u.avatar_url, u.avatar_emoji, u.specials_grade,
               COALESCE(bd.behavior_stars, 0) AS behavior_stars,
               COALESCE(bd.reward_count, 0)    AS reward_count,
               COALESCE(bd.level, 1)           AS level
@@ -147,6 +149,23 @@ router.post("/students/:id/level", requireRole("teacher", "admin"), async (req: 
     res.json({ id, level });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "level update failed" });
+  }
+});
+
+// ── Student: set own avatar emoji ──
+// Students can only change their own avatar; teachers can change any student's.
+router.post("/students/:id/avatar", async (req: AuthRequest, res: Response) => {
+  const id = req.params.id;
+  const emoji = String(req.body?.avatarEmoji || "").trim();
+  // Students may only change their own avatar
+  if (req.user!.role === "student" && req.user!.id !== id) {
+    return res.status(403).json({ error: "Cannot change another student's avatar" });
+  }
+  try {
+    await db.prepare(`UPDATE users SET avatar_emoji = ? WHERE id = ?`).run(emoji || null, id);
+    res.json({ id, avatar_emoji: emoji || null });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "avatar update failed" });
   }
 });
 

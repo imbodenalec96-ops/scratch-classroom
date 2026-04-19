@@ -399,6 +399,8 @@ export const api = {
   saveBoardSetting: (key: string, value: string) =>
     request<any>(`/board/settings`, { method: "PUT", body: JSON.stringify({ key, value }) }),
   getMyStars: () => request<{ stars: number; rewards: number }>(`/board/me/stars`),
+  setMyAvatar: (studentId: string, avatarEmoji: string) =>
+    request<any>(`/board/students/${studentId}/avatar`, { method: "POST", body: JSON.stringify({ avatarEmoji }) }),
 
   // ── Paper-only students (printable worksheets flow) ──
   // ── Group / center shared notes ──

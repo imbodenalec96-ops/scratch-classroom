@@ -47,6 +47,38 @@ async function ensureTables() {
     `);
     // Additive migration for existing DBs that predate icon_emoji
     try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
+
+    // Seed default school-appropriate websites if library is empty
+    try {
+      const existing = await db.prepare(`SELECT COUNT(*) as n FROM approved_websites`).get() as any;
+      if ((existing?.n ?? 0) === 0) {
+        const defaults = [
+          { title: "Cool Math Games",   url: "https://www.coolmathgames.com",        category: "Math Games",    icon: "🧮" },
+          { title: "Poki",              url: "https://poki.com",                     category: "Games",         icon: "🎮" },
+          { title: "Khan Academy",      url: "https://www.khanacademy.org",          category: "Learning",      icon: "📚" },
+          { title: "Scratch",           url: "https://scratch.mit.edu",             category: "Coding",        icon: "💻" },
+          { title: "ABCya!",            url: "https://www.abcya.com",               category: "Educational Games", icon: "🎯" },
+          { title: "Typing.com",        url: "https://www.typing.com",              category: "Typing",        icon: "⌨️" },
+          { title: "NASA Kids' Club",   url: "https://www.nasa.gov/nasa-kids-club", category: "Science",       icon: "🚀" },
+          { title: "National Geographic Kids", url: "https://kids.nationalgeographic.com", category: "Science", icon: "🌍" },
+          { title: "Prodigy Math",      url: "https://www.prodigygame.com",         category: "Math Games",    icon: "⚔️" },
+          { title: "Google Arts & Culture", url: "https://artsandculture.google.com", category: "Art",         icon: "🎨" },
+          { title: "Code.org",          url: "https://code.org",                    category: "Coding",        icon: "🖥️" },
+          { title: "Funbrain",          url: "https://www.funbrain.com",            category: "Educational Games", icon: "🧠" },
+          { title: "Starfall",          url: "https://www.starfall.com",            category: "Reading",       icon: "⭐" },
+          { title: "PBS Kids",          url: "https://pbskids.org",                 category: "Educational",   icon: "📺" },
+          { title: "BrainPOP",          url: "https://www.brainpop.com",            category: "Learning",      icon: "🎬" },
+        ];
+        for (const site of defaults) {
+          const id = crypto.randomUUID();
+          await db.prepare(
+            `INSERT INTO approved_websites (id, class_id, title, url, category, icon_emoji, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).run(id, null, site.title, site.url, site.category, site.icon, "system");
+        }
+      }
+    } catch (e) {
+      console.error("[websites] seed error:", e);
+    }
   } catch (e) {
     console.error("[websites] migration error:", e);
   }
