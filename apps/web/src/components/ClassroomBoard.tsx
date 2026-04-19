@@ -14,18 +14,23 @@ const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string
   { id: "tibetan",  label: "Healing Bowls",  videoId: "UgHKb_7884o", emoji: "🔔" },
 ];
 
-const GRADE_COLORS: Record<number, { from: string; to: string; border: string; text: string; glow: string }> = {
-  3: { from: "rgba(20,184,166,0.22)", to: "rgba(6,182,212,0.12)", border: "rgba(20,184,166,0.55)", text: "#5eead4", glow: "rgba(20,184,166,0.4)" },
-  4: { from: "rgba(251,146,60,0.22)", to: "rgba(245,158,11,0.12)", border: "rgba(251,146,60,0.55)", text: "#fdba74", glow: "rgba(251,146,60,0.4)" },
-  5: { from: "rgba(167,139,250,0.22)", to: "rgba(139,92,246,0.12)", border: "rgba(167,139,250,0.55)", text: "#c4b5fd", glow: "rgba(167,139,250,0.4)" },
+// Editorial palette: each grade is a distinct tradition, not a tint of purple
+//   3rd — deep teal (study / library green)
+//   4th — warm amber (afternoon sun)
+//   5th — brick red (masthead / upperclass)
+const GRADE_COLORS: Record<number, { from: string; to: string; border: string; text: string; glow: string; ink: string; motif: string }> = {
+  3: { from: "rgba(42,111,106,0.28)", to: "rgba(42,111,106,0.08)", border: "rgba(94,234,212,0.55)", text: "#7dd3c5", glow: "rgba(20,184,166,0.35)", ink: "#0f2b29", motif: "3RD" },
+  4: { from: "rgba(217,119,6,0.28)",  to: "rgba(217,119,6,0.08)",  border: "rgba(251,191,36,0.55)", text: "#fbbf24", glow: "rgba(245,158,11,0.35)", ink: "#2a1805", motif: "4TH" },
+  5: { from: "rgba(178,58,72,0.28)",  to: "rgba(178,58,72,0.08)",  border: "rgba(248,113,113,0.55)", text: "#fca5a5", glow: "rgba(178,58,72,0.35)",  ink: "#2b0d11", motif: "5TH" },
 };
 
+// Behavior levels: keep semantic traffic-light logic but shift off candy tones
 const BEHAVIOR_LEVELS: Record<number, { label: string; short: string; icon: string; color: string; bg: string; glow: string }> = {
-  1: { label: "Level 1",  short: "Lv 1",  icon: "1", color: "#fca5a5", bg: "rgba(239,68,68,0.22)",   glow: "rgba(239,68,68,0.25)" },
-  2: { label: "Level 2",  short: "Lv 2",  icon: "2", color: "#fdba74", bg: "rgba(251,146,60,0.22)", glow: "rgba(251,146,60,0.25)" },
-  3: { label: "Level 3",  short: "Lv 3",  icon: "3", color: "#fcd34d", bg: "rgba(245,158,11,0.22)", glow: "rgba(245,158,11,0.25)" },
-  4: { label: "Level 4",  short: "Lv 4",  icon: "4", color: "#86efac", bg: "rgba(34,197,94,0.22)",  glow: "rgba(34,197,94,0.25)" },
-  5: { label: "Level 5",  short: "Lv 5",  icon: "5", color: "#6ee7b7", bg: "rgba(16,185,129,0.25)", glow: "rgba(16,185,129,0.3)" },
+  1: { label: "Level 1",  short: "Lv 1",  icon: "1", color: "#f87171", bg: "rgba(178,58,72,0.28)",  glow: "rgba(178,58,72,0.28)" },
+  2: { label: "Level 2",  short: "Lv 2",  icon: "2", color: "#fb923c", bg: "rgba(217,119,6,0.28)",  glow: "rgba(217,119,6,0.28)" },
+  3: { label: "Level 3",  short: "Lv 3",  icon: "3", color: "#fbbf24", bg: "rgba(202,138,4,0.28)",  glow: "rgba(202,138,4,0.28)" },
+  4: { label: "Level 4",  short: "Lv 4",  icon: "4", color: "#86efac", bg: "rgba(21,128,61,0.28)",  glow: "rgba(21,128,61,0.28)" },
+  5: { label: "Level 5",  short: "Lv 5",  icon: "5", color: "#7dd3c5", bg: "rgba(42,111,106,0.32)", glow: "rgba(42,111,106,0.32)" },
 };
 
 const ACTIVITY_EMOJI: Array<[string, string]> = [
@@ -37,69 +42,32 @@ function actEmoji(name = "") {
   return "✨";
 }
 
+// Subject accents use the editorial palette (teal/amber/brick/ink) — not rainbow
 const SUBJECT_ACCENT: Record<string, string> = {
-  math: "#ef4444", sel: "#f59e0b", coding_art_gym: "#a78bfa",
-  video_learning: "#3b82f6", writing: "#10b981", daily_news: "#6366f1",
-  review: "#ec4899", cashout: "#f59e0b", lunch: "#22c55e", recess: "#22c55e",
-  calm_down: "#a78bfa", ted_talk: "#3b82f6",
+  math: "#b23a48", sel: "#d97706", coding_art_gym: "#2a6f6a",
+  video_learning: "#5b7ca8", writing: "#2a6f6a", daily_news: "#8a6d3b",
+  review: "#b23a48", cashout: "#d97706", lunch: "#5b8a6e", recess: "#5b8a6e",
+  calm_down: "#5b7ca8", ted_talk: "#5b7ca8",
 };
 
+// Motion policy: two focal animations (full-star celebration + urgent countdown).
+// Everything else is still — editorial pages don't breathe.
 const ANIM = `
   @keyframes starGlow {
-    0%,100% { filter: drop-shadow(0 0 4px rgba(251,191,36,.9)); }
-    50%      { filter: drop-shadow(0 0 11px rgba(251,191,36,1)) drop-shadow(0 0 22px rgba(245,158,11,.7)); }
+    0%,100% { filter: drop-shadow(0 0 3px rgba(251,191,36,.7)); }
+    50%     { filter: drop-shadow(0 0 9px rgba(251,191,36,.95)) drop-shadow(0 0 18px rgba(217,119,6,.55)); }
   }
-  @keyframes cardPulse {
-    0%,100% { box-shadow: 0 0 18px rgba(245,158,11,.3), inset 0 0 16px rgba(245,158,11,.06); }
-    50%      { box-shadow: 0 0 36px rgba(245,158,11,.55), inset 0 0 28px rgba(245,158,11,.12); }
-  }
-  @keyframes popIn {
-    from { opacity:0; transform:scale(.9) translateY(6px); }
-    to   { opacity:1; transform:scale(1)  translateY(0); }
-  }
-  @keyframes shimmer {
-    0%   { background-position:-200% center; }
-    100% { background-position: 200% center; }
-  }
-  @keyframes breathe {
-    0%,100% { transform:scale(1); opacity:.85; }
-    50%     { transform:scale(1.015); opacity:1; }
-  }
-  @keyframes rewardBounce {
-    0%,100% { transform:scale(1) rotate(0deg); }
-    30%     { transform:scale(1.25) rotate(-8deg); }
-    60%     { transform:scale(1.15) rotate(6deg); }
-  }
-  @keyframes blockBreathe {
-    0%,100% { box-shadow:0 0 25px rgba(139,92,246,.3); }
-    50%     { box-shadow:0 0 50px rgba(139,92,246,.6), 0 0 80px rgba(99,102,241,.2); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes tickPulse {
-    0%,100% { opacity:1; }
-    50%     { opacity:.55; }
+    0%,100% { opacity: 1; }
+    50%     { opacity: .55; }
   }
-  @keyframes gradShift {
-    0%,100% { background-position:0% 50%; }
-    50%     { background-position:100% 50%; }
-  }
-  @keyframes floatUp {
-    0%,100% { transform:translateY(0); }
-    50%     { transform:translateY(-3px); }
-  }
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(-8px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes pulseRing {
-    0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
-    70%  { box-shadow: 0 0 0 10px rgba(139,92,246,0); }
-    100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
-  }
-  @keyframes starPop {
-    0%   { transform: scale(1); }
-    40%  { transform: scale(1.35) rotate(-5deg); }
-    70%  { transform: scale(0.9) rotate(3deg); }
-    100% { transform: scale(1) rotate(0deg); }
+  @keyframes fullCard {
+    0%,100% { box-shadow: 0 0 0 1px rgba(251,191,36,.4), 0 6px 24px rgba(217,119,6,.18); }
+    50%     { box-shadow: 0 0 0 1px rgba(251,191,36,.75), 0 10px 36px rgba(217,119,6,.35); }
   }
 `;
 
@@ -207,114 +175,241 @@ export default function ClassroomBoard() {
   if (!cls)  return <div className="min-h-screen flex items-center justify-center bg-black text-white/60 text-2xl">Loading…</div>;
 
   const bgUrl = board.settings?.background_image_url;
-  const bg = "linear-gradient(135deg, #0b0520 0%, #14082e 40%, #0d1a3a 70%, #0a0520 100%)";
+  // Editorial deep-night background — ink navy with a whisper of warmth,
+  // a subtle paper-grain overlay, and a single brick-red corner mark.
+  const bg = "radial-gradient(ellipse at top left, #17192b 0%, #0d1321 55%, #07080f 100%)";
   const musicPreset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
-  const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#8b5cf6";
+  const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#d97706";
 
   const g = (a: number) => `rgba(255,255,255,${a})`;
-  const card = { background: g(0.04), border: `1px solid ${g(0.1)}`, borderRadius: 14, backdropFilter: "blur(10px)" } as const;
+  // Serif for the masthead / hero moments, Inter for dense data.
+  const serif = "'Fraunces', 'Playfair Display', Georgia, serif";
+  const mono  = "'JetBrains Mono', 'SF Mono', ui-monospace, monospace";
+
+  // Editorial section label: small-caps serif + tracking + a thin rule, numbered.
+  const SectionLabel: React.FC<{ n: string; title: string; kicker?: string; align?: "left" | "right" }> = ({ n, title, kicker, align = "left" }) => (
+    <div style={{
+      display: "flex", alignItems: "baseline", gap: 10,
+      borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 4, marginBottom: 7,
+      flexDirection: align === "right" ? "row-reverse" : "row",
+    }}>
+      <span style={{
+        fontFamily: serif, fontSize: 11, fontWeight: 600, fontStyle: "italic",
+        color: "rgba(217,119,6,0.9)", letterSpacing: "0.02em",
+      }}>№ {n}</span>
+      <span style={{
+        fontFamily: serif, fontSize: 14, fontWeight: 600, letterSpacing: "0.18em",
+        textTransform: "uppercase", color: "rgba(255,255,255,0.88)",
+      }}>{title}</span>
+      {kicker && (
+        <span style={{
+          fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 500,
+          color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", marginLeft: align === "right" ? 0 : "auto", marginRight: align === "right" ? "auto" : 0,
+        }}>{kicker}</span>
+      )}
+    </div>
+  );
+
+  const card = {
+    background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008))",
+    border: `1px solid ${g(0.07)}`,
+    borderRadius: 6,
+  } as const;
 
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 999,
       overflow: "hidden", display: "grid",
-      gridTemplateRows: "54px 72px 1fr 50px",
-      gap: 5, padding: "8px 10px 8px 10px",
+      gridTemplateRows: "62px 82px 1fr 50px",
+      gap: 6, padding: "10px 14px 10px 14px",
       background: bgUrl ? `url(${bgUrl}) center/cover no-repeat fixed` : bg,
       color: "white", fontFamily: "'Inter', system-ui, sans-serif",
     }}>
       <style>{ANIM}</style>
 
-      {/* Dark tint */}
-      <div style={{ position: "absolute", inset: 0, background: bgUrl ? "rgba(4,2,16,.7)" : "rgba(4,2,16,.2)", pointerEvents: "none", zIndex: 0 }} />
+      {/* Dark tint for bg image path */}
+      {bgUrl && <div style={{ position: "absolute", inset: 0, background: "rgba(7,8,15,.78)", pointerEvents: "none", zIndex: 0 }} />}
 
-      {/* ── ROW 1: Header ── */}
-      <header style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 5 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+      {/* Paper-grain overlay — subtle, static, not a gradient */}
+      {!bgUrl && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0, opacity: 0.35,
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)," +
+            "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
+          backgroundSize: "3px 3px, 7px 7px",
+          backgroundPosition: "0 0, 1px 2px",
+          mixBlendMode: "screen",
+        }} />
+      )}
+
+      {/* Single bold brick-red masthead mark — top-left corner, structural not decorative */}
+      {!bgUrl && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, width: 200, height: 3,
+          background: "linear-gradient(90deg, #b23a48 0%, #d97706 55%, transparent 100%)",
+          pointerEvents: "none", zIndex: 2,
+        }} />
+      )}
+
+      {/* ── ROW 1: Masthead header ── */}
+      <header style={{
+        position: "relative", zIndex: 1,
+        display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12,
+        borderBottom: `1px solid ${g(0.12)}`, paddingBottom: 6,
+      }}>
+        {/* Left: class identity */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <h1 style={{
-            fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: 0,
-            background: "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
-            backgroundSize: "200% auto",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            animation: "gradShift 4s linear infinite",
+            fontFamily: serif, fontSize: 38, fontWeight: 500, fontStyle: "italic",
+            letterSpacing: "-0.015em", margin: 0, color: "#f5f1e8",
+            lineHeight: 1,
           }}>{cls.name}</h1>
-          <span style={{ fontSize: 12, opacity: 0.5, fontWeight: 600 }}>{dateStr}</span>
           <span style={{
-            fontSize: 13, fontWeight: 800, padding: "2px 10px", borderRadius: 8,
-            background: "rgba(245,158,11,.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,.4)",
-          }}>Day {dayLetter}</span>
+            fontFamily: serif, fontStyle: "italic", fontSize: 13,
+            color: "rgba(245,241,232,0.45)", letterSpacing: "0.01em",
+          }}>— {dateStr}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+        {/* Center: Day letter medallion — the one decorative focal point */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          padding: "2px 14px",
+          borderLeft: `1px solid ${g(0.1)}`, borderRight: `1px solid ${g(0.1)}`,
+        }}>
+          <span style={{
+            fontFamily: serif, fontStyle: "italic", fontSize: 9, fontWeight: 500,
+            color: "rgba(217,119,6,0.85)", letterSpacing: "0.28em", textTransform: "uppercase",
+          }}>Cycle Day</span>
+          <span style={{
+            fontFamily: serif, fontSize: 32, fontWeight: 600, lineHeight: 1,
+            color: "#fbbf24", letterSpacing: "-0.02em",
+          }}>{dayLetter}</span>
+        </div>
+
+        {/* Right: time + controls */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
           {musicPreset && (
             <button onClick={toggleMusic} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "4px 12px",
-              borderRadius: 10, border: `1px solid ${g(0.18)}`, background: g(0.08),
-              color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 7, padding: "5px 11px",
+              borderRadius: 3, border: `1px solid ${g(0.16)}`,
+              background: musicPlaying ? "rgba(42,111,106,0.2)" : "transparent",
+              color: "rgba(255,255,255,0.85)", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, letterSpacing: "0.02em",
+              fontFamily: serif, fontStyle: "italic",
             }}>
-              <span>{musicPreset.emoji}</span>
-              <span style={{ opacity: 0.8 }}>{musicPreset.label}</span>
-              <span style={{ fontSize: 16 }}>{musicPlaying ? "⏸" : "▶"}</span>
+              <span style={{ fontStyle: "normal" }}>{musicPreset.emoji}</span>
+              <span>{musicPreset.label}</span>
+              <span style={{ fontSize: 11, opacity: 0.7, fontStyle: "normal" }}>{musicPlaying ? "❙❙" : "▸"}</span>
             </button>
           )}
-          <div style={{ fontSize: 32, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
+          <div style={{
+            fontFamily: mono, fontSize: 30, fontWeight: 500,
+            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+            color: "#f5f1e8",
+          }}>{timeStr}</div>
           <button onClick={toggleFullscreen} style={{
-            padding: "4px 10px", borderRadius: 8, border: `1px solid ${g(0.18)}`,
-            background: g(0.08), color: g(0.7), cursor: "pointer", fontSize: 11, fontWeight: 600,
+            padding: "5px 9px", borderRadius: 3, border: `1px solid ${g(0.16)}`,
+            background: "transparent", color: g(0.55), cursor: "pointer",
+            fontSize: 11, fontWeight: 600,
           }}>{isFullscreen ? "✕" : "⛶"}</button>
         </div>
       </header>
 
-      {/* ── ROW 2: Current Block ── */}
+      {/* ── ROW 2: Right Now — the editorial "lead story" ── */}
       <section style={{
         position: "relative", zIndex: 1,
-        ...card, borderRadius: 16,
-        background: `linear-gradient(135deg, ${blockAccent}33, ${blockAccent}18)`,
+        borderRadius: 4,
+        background: `linear-gradient(100deg, ${blockAccent}26 0%, ${blockAccent}10 45%, rgba(13,19,33,0.3) 100%)`,
         border: `1px solid ${blockAccent}55`,
-        animation: "blockBreathe 3s ease-in-out infinite",
-        display: "flex", alignItems: "center", padding: "0 18px", gap: 14,
+        borderLeft: `4px solid ${blockAccent}`,
+        display: "flex", alignItems: "center", padding: "0 20px", gap: 18,
       }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.25em", marginBottom: 2 }}>Right Now</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
+            color: `${blockAccent}`, opacity: 0.9,
+            textTransform: "uppercase", letterSpacing: "0.28em", marginBottom: 3,
+          }}>The Hour</div>
           {currentBlock ? (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.02em" }}>{currentBlock.label || currentBlock.subject}</span>
-              <span style={{ fontSize: 13, opacity: 0.6, fontFamily: "monospace" }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
-              {currentBlock.is_break && <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 20, background: "rgba(34,197,94,.25)", color: "#86efac" }}>☕ Break</span>}
-              {nextBlock && <span style={{ fontSize: 12, opacity: 0.5 }}>→ {nextBlock.block.label} <span style={{ fontFamily: "monospace" }}>{nextBlock.block.start_time}</span></span>}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+              <span style={{
+                fontFamily: serif, fontSize: 30, fontWeight: 600,
+                letterSpacing: "-0.02em", color: "#f5f1e8", lineHeight: 1,
+              }}>{currentBlock.label || currentBlock.subject}</span>
+              <span style={{
+                fontFamily: mono, fontSize: 13, color: "rgba(245,241,232,0.55)",
+                fontVariantNumeric: "tabular-nums",
+              }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
+              {currentBlock.is_break && (
+                <span style={{
+                  fontFamily: serif, fontStyle: "italic", fontSize: 12, fontWeight: 500,
+                  padding: "2px 10px", borderRadius: 2,
+                  background: "rgba(42,111,106,0.25)", color: "#7dd3c5",
+                  border: "1px solid rgba(42,111,106,0.45)",
+                }}>Break</span>
+              )}
+              {nextBlock && (
+                <span style={{
+                  fontFamily: serif, fontStyle: "italic", fontSize: 12,
+                  color: "rgba(245,241,232,0.45)",
+                }}>then <span style={{ color: "rgba(245,241,232,0.75)", fontStyle: "normal", fontWeight: 500 }}>{nextBlock.block.label}</span> <span style={{ fontFamily: mono }}>{nextBlock.block.start_time}</span></span>
+              )}
             </div>
           ) : (
-            <span style={{ fontSize: 22, opacity: 0.45, fontWeight: 700 }}>No active block</span>
+            <span style={{
+              fontFamily: serif, fontStyle: "italic", fontSize: 22,
+              color: "rgba(245,241,232,0.4)", fontWeight: 500,
+            }}>the room is between blocks</span>
           )}
         </div>
         {countdown && (
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center",
-            padding: "6px 18px", borderRadius: 14,
-            background: countdown.urgent ? "rgba(239,68,68,.25)" : "rgba(0,0,0,.35)",
-            border: `1px solid ${countdown.urgent ? "rgba(239,68,68,.5)" : g(0.12)}`,
+            padding: "4px 16px", borderRadius: 3,
+            background: countdown.urgent ? "rgba(178,58,72,.25)" : "rgba(7,8,15,.5)",
+            border: `1px solid ${countdown.urgent ? "rgba(178,58,72,.6)" : g(0.12)}`,
             animation: countdown.urgent ? "tickPulse 1s ease-in-out infinite" : undefined,
           }}>
-            <div style={{ fontSize: 10, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.2em" }}>Ends in</div>
-            <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "monospace", color: countdown.urgent ? "#fca5a5" : "white" }}>{countdown.str}</div>
+            <div style={{
+              fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
+              color: countdown.urgent ? "rgba(252,165,165,0.85)" : "rgba(245,241,232,0.55)",
+              textTransform: "uppercase", letterSpacing: "0.22em",
+            }}>ends in</div>
+            <div style={{
+              fontFamily: mono, fontSize: 26, fontWeight: 500,
+              color: countdown.urgent ? "#fca5a5" : "#f5f1e8",
+              fontVariantNumeric: "tabular-nums",
+            }}>{countdown.str}</div>
           </div>
         )}
         {board.settings?.specialist_name && (
-          <div style={{ padding: "6px 14px", borderRadius: 12, background: "rgba(245,158,11,.18)", border: "1px solid rgba(245,158,11,.35)", textAlign: "center" }}>
-            <div style={{ fontSize: 10, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.2em" }}>11AM Specialist</div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#fbbf24" }}>{board.settings.specialist_name}</div>
+          <div style={{
+            padding: "5px 14px", borderRadius: 3,
+            background: "rgba(217,119,6,.14)",
+            border: "1px solid rgba(217,119,6,.4)",
+            borderLeft: "3px solid #d97706",
+            textAlign: "left",
+          }}>
+            <div style={{
+              fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
+              color: "rgba(217,119,6,0.9)",
+              textTransform: "uppercase", letterSpacing: "0.22em",
+            }}>11 o'clock specialist</div>
+            <div style={{
+              fontFamily: serif, fontSize: 16, fontWeight: 600,
+              color: "#fbbf24", letterSpacing: "-0.01em",
+            }}>{board.settings.specialist_name}</div>
           </div>
         )}
       </section>
 
       {/* ── ROW 3: Main content ── */}
-      <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "55% 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
+      <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "55% 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
 
-        {/* LEFT: Behavior Stars */}
-        <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>⭐ Behavior Stars</div>
-            <div style={{ marginLeft: "auto", fontSize: 10, opacity: 0.3, fontWeight: 600 }}>5 stars = reward 🎉</div>
-          </div>
+        {/* LEFT: Behavior Stars — "The Roster" */}
+        <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 14px" }}>
+          <SectionLabel n="01" title="The Roster" kicker="Five stars earns a reward" />
           {(() => {
             const n = board.students.length || 1;
             const cols = n <= 4 ? 2 : n <= 9 ? 3 : n <= 16 ? 4 : 5;
@@ -325,7 +420,7 @@ export default function ClassroomBoard() {
             display: "grid",
             gridTemplateColumns: `repeat(${cols}, 1fr)`,
             gridTemplateRows: `repeat(${rows}, 1fr)`,
-            gap: 7,
+            gap: 8,
           }}>
             {board.students.map((s, idx) => {
               const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
@@ -336,54 +431,50 @@ export default function ClassroomBoard() {
               const firstName = (s.name || "?").split(" ")[0];
               return (
                 <div key={s.id} style={{
-                  borderRadius: 14, display: "flex", flexDirection: "column",
+                  borderRadius: 4, display: "flex", flexDirection: "column",
                   alignItems: "stretch", textAlign: "center",
                   background: isFull
-                    ? "linear-gradient(160deg, rgba(245,158,11,.22) 0%, rgba(251,191,36,.08) 100%)"
-                    : `linear-gradient(160deg, ${lc.bg} 0%, rgba(0,0,0,0.15) 100%)`,
-                  border: isFull ? "1.5px solid rgba(245,158,11,.6)" : `1.5px solid ${lc.color}44`,
-                  boxShadow: isFull
-                    ? `0 0 22px rgba(245,158,11,.3), inset 0 1px 0 rgba(255,255,255,0.1)`
-                    : `0 0 12px ${lc.glow}, inset 0 1px 0 rgba(255,255,255,0.06)`,
-                  animation: isFull ? `cardPulse 2.5s ease-in-out infinite, popIn .4s ease ${idx * 0.05}s both` : `popIn .4s ease ${idx * 0.05}s both`,
+                    ? "linear-gradient(180deg, rgba(217,119,6,0.18) 0%, rgba(178,58,72,0.08) 100%)"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+                  border: isFull ? "1px solid rgba(251,191,36,.55)" : `1px solid ${g(0.08)}`,
+                  animation: isFull
+                    ? `fullCard 3.5s ease-in-out infinite, fadeUp .5s ease ${idx * 0.04}s both`
+                    : `fadeUp .5s ease ${idx * 0.04}s both`,
                   overflow: "hidden",
                   position: "relative",
                 }}>
-                  {/* Glowing top line */}
+                  {/* Left spine: level color as a vertical rule (magazine pull-quote treatment) */}
                   <div style={{
-                    height: 3, flexShrink: 0,
+                    position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
                     background: isFull
-                      ? "linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)"
-                      : `linear-gradient(90deg, ${lc.color}, transparent)`,
-                    boxShadow: `0 0 10px ${isFull ? "rgba(245,158,11,.8)" : lc.glow}`,
+                      ? "linear-gradient(180deg, #fbbf24, #d97706)"
+                      : lc.color,
+                    opacity: isFull ? 1 : 0.85,
                   }} />
 
-                  {/* Level chip — top-right corner */}
+                  {/* Level marker — small-caps serif, top-right, editorial footnote vibe */}
                   <div style={{
-                    position: "absolute", top: 8, right: 8,
-                    fontSize: 10, fontWeight: 900, width: 22, height: 22, borderRadius: "50%",
-                    background: lc.bg, color: lc.color,
-                    border: `1.5px solid ${lc.color}66`,
-                    boxShadow: `0 0 6px ${lc.glow}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    position: "absolute", top: 7, right: 9,
+                    fontFamily: serif, fontStyle: "italic",
+                    fontSize: 11, fontWeight: 600, color: lc.color,
+                    letterSpacing: "0.04em",
                     zIndex: 1,
-                  }}>{lv}</div>
+                  }}>lv.{lv}</div>
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "10px 6px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                    {/* Avatar */}
+                  <div style={{ flex: 1, padding: "10px 8px 10px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                    {/* Avatar — flat disc, no inner glow soup */}
                     <div style={{
-                      width: 68, height: 68, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 66, height: 66, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: s.avatar_emoji ? 34 : 26, fontWeight: 900, color: "white",
+                      fontFamily: serif, fontSize: s.avatar_emoji ? 34 : 28, fontWeight: 600, color: "#0d1321",
                       background: isFull
-                        ? "radial-gradient(circle at 30% 30%, #fbbf24, #b45309)"
-                        : `radial-gradient(circle at 30% 30%, ${lc.color}dd, ${lc.color}55)`,
-                      border: `3px solid ${isFull ? "rgba(251,191,36,.9)" : lc.color + "88"}`,
+                        ? "radial-gradient(circle at 35% 30%, #fde68a 0%, #d97706 85%)"
+                        : `radial-gradient(circle at 35% 30%, ${lc.color} 0%, ${lc.color}aa 85%)`,
+                      border: isFull ? "2px solid rgba(251,191,36,.85)" : `2px solid ${lc.color}cc`,
                       boxShadow: isFull
-                        ? `0 0 22px rgba(245,158,11,.7), 0 0 50px rgba(245,158,11,.25), 0 4px 16px rgba(0,0,0,0.4)`
-                        : `0 0 14px ${lc.glow}, 0 4px 16px rgba(0,0,0,0.3)`,
-                      animation: isFull ? "popIn .4s ease both, pulseRing 2s ease-in-out 0.5s infinite" : undefined,
+                        ? "0 4px 14px rgba(217,119,6,.35)"
+                        : "0 2px 10px rgba(0,0,0,0.3)",
                     }}>
                       {s.avatar_url
                         ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -392,34 +483,35 @@ export default function ClassroomBoard() {
                         : initial}
                     </div>
 
-                    {/* Name */}
+                    {/* Name — serif, italic when full (they're the featured story) */}
                     <div style={{
-                      fontSize: 16, fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.02em",
+                      fontFamily: serif, fontSize: 17,
+                      fontWeight: isFull ? 600 : 500,
+                      fontStyle: isFull ? "italic" : "normal",
+                      lineHeight: 1.05, letterSpacing: "-0.01em",
                       maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 6px",
-                      color: isFull ? "#fde68a" : "rgba(255,255,255,0.95)",
-                      textShadow: isFull ? "0 0 16px rgba(251,191,36,0.7)" : "0 1px 6px rgba(0,0,0,0.6)",
+                      color: isFull ? "#fde68a" : "#f5f1e8",
                     }}>
                       {firstName}
                     </div>
 
-                    {/* Stars row */}
+                    {/* Stars — plain row on a thin rule, no bubble chrome */}
                     <div style={{
                       display: "flex", alignItems: "center", gap: 3, justifyContent: "center",
-                      background: isFull ? "rgba(245,158,11,0.18)" : "rgba(0,0,0,0.3)",
-                      borderRadius: 20, padding: "3px 8px",
-                      border: isFull ? "1px solid rgba(245,158,11,0.45)" : "1px solid rgba(255,255,255,0.07)",
+                      padding: "2px 0",
                     }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 14, lineHeight: 1,
-                          opacity: i < stars ? 1 : 0.1,
-                          filter: i < stars ? (isFull ? "drop-shadow(0 0 5px rgba(251,191,36,1))" : "drop-shadow(0 0 2px rgba(251,191,36,0.5))") : "none",
-                          animation: i < stars && isFull ? `starGlow 2s ease-in-out ${i * 0.15}s infinite` : undefined,
-                        }}>⭐</span>
+                          fontSize: 13, lineHeight: 1,
+                          opacity: i < stars ? 1 : 0.14,
+                          filter: i < stars ? (isFull ? "drop-shadow(0 0 4px rgba(251,191,36,.9))" : "none") : "none",
+                          animation: i < stars && isFull ? `starGlow 2.2s ease-in-out ${i * 0.15}s infinite` : undefined,
+                          color: i < stars ? (isFull ? "#fbbf24" : "#fde68a") : "rgba(245,241,232,0.3)",
+                        }}>★</span>
                       ))}
                     </div>
 
-                    {/* Schedule pills */}
+                    {/* Schedule pills — teal/brick editorial ticket style */}
                     {(() => {
                       const studentSchedules = board.schedules
                         .filter((sc: any) => sc.student_id === s.id)
@@ -429,35 +521,41 @@ export default function ClassroomBoard() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", width: "100%", padding: "0 4px" }}>
                           {studentSchedules.map((sc: any, i: number) => (
                             <div key={i} style={{
-                              fontSize: 10, padding: "2px 6px", borderRadius: 8,
-                              background: "rgba(99,102,241,0.25)", color: "rgba(196,181,253,0.95)",
-                              border: "1px solid rgba(99,102,241,0.4)", width: "100%",
-                              fontWeight: 700, textAlign: "center",
+                              fontSize: 10, padding: "2px 6px", borderRadius: 2,
+                              background: "rgba(42,111,106,0.22)", color: "#7dd3c5",
+                              border: "1px solid rgba(42,111,106,0.4)",
+                              borderLeft: "2px solid #2a6f6a", width: "100%",
+                              fontWeight: 600, letterSpacing: "0.01em", textAlign: "left",
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              fontFamily: "'Inter', sans-serif",
                             }}>
-                              {actEmoji(sc.activity)} {sc.activity}
+                              <span style={{ opacity: 0.8, marginRight: 4 }}>{actEmoji(sc.activity)}</span>{sc.activity}
                             </div>
                           ))}
                         </div>
                       ) : null;
                     })()}
 
-                    {/* Reward badge */}
+                    {/* Reward tally — restrained, serif italic */}
                     {s.reward_count > 0 && (
                       <div style={{
-                        fontSize: 10, padding: "2px 8px", borderRadius: 20,
-                        background: "rgba(245,158,11,.25)", color: "#fde68a", fontWeight: 800,
-                        border: "1px solid rgba(245,158,11,.5)",
-                        animation: "rewardBounce 1.5s ease-in-out infinite",
-                      }}>🏆 {s.reward_count}</div>
+                        fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 500,
+                        padding: "1px 8px", borderRadius: 2,
+                        background: "rgba(178,58,72,0.2)", color: "#fca5a5",
+                        border: "1px solid rgba(178,58,72,0.4)",
+                      }}>{s.reward_count}× rewarded</div>
                     )}
                   </div>
                 </div>
               );
             })}
             {board.students.length === 0 && (
-              <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35, fontSize: 14 }}>
-                No students in this class yet.
+              <div style={{
+                gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: serif, fontStyle: "italic",
+                color: "rgba(245,241,232,0.35)", fontSize: 15,
+              }}>
+                No students enrolled in this class yet.
               </div>
             )}
           </div>
@@ -466,28 +564,16 @@ export default function ClassroomBoard() {
         </section>
 
         {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}
-        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Specials Today — hero cards */}
+          {/* Specials Today — "On Today" editorial feature */}
           <section style={{
+            ...card,
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
-            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(160deg, rgba(15,10,35,0.95), rgba(8,4,20,0.98))",
-            padding: "10px 10px 8px",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+            padding: "10px 14px",
           }}>
-            {/* Header row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7, flexShrink: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)" }}>NOW IN SESSION</div>
-              <div style={{
-                fontSize: 13, fontWeight: 900, padding: "2px 10px", borderRadius: 10,
-                background: "linear-gradient(135deg, rgba(245,158,11,0.35), rgba(251,191,36,0.2))",
-                color: "#fde68a", border: "1px solid rgba(245,158,11,0.6)",
-                boxShadow: "0 0 10px rgba(245,158,11,0.25)",
-              }}>DAY {dayLetter}</div>
-            </div>
-            {/* Grade hero cards */}
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            <SectionLabel n="02" title="On Today" kicker={`Day ${dayLetter}`} />
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               {GRADES.map((grade, gi) => {
                 const students = board.students.filter(s => s.specials_grade === grade);
                 if (students.length === 0) return null;
@@ -496,36 +582,47 @@ export default function ClassroomBoard() {
                 const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 10, overflow: "hidden",
+                    flex: 1, borderRadius: 3, overflow: "hidden",
                     display: "flex", alignItems: "stretch",
+                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(13,19,33,0.1) 80%)`,
                     border: `1px solid ${gc.border}`,
-                    boxShadow: `0 0 12px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
-                    animation: `popIn .4s ease ${gi * 0.07}s both`,
+                    borderLeft: `4px solid ${gc.text}`,
+                    animation: `fadeUp .5s ease ${gi * 0.06}s both`,
                   }}>
-                    {/* Left accent */}
+                    {/* Grade motif — bold, all-caps masthead letter */}
                     <div style={{
-                      width: 34, flexShrink: 0, display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: 2,
-                      background: `linear-gradient(180deg, ${gc.from.replace("0.22", "0.55")}, ${gc.to.replace("0.12", "0.3")})`,
+                      width: 48, flexShrink: 0, display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: 0,
                       borderRight: `1px solid ${gc.border}`,
+                      background: "rgba(7,8,15,0.35)",
                     }}>
-                      <div style={{ fontSize: 20, lineHeight: 1 }}>{emoji}</div>
-                      <div style={{ fontSize: 9, fontWeight: 900, color: gc.text, letterSpacing: "0.05em" }}>{grade}TH</div>
+                      <div style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</div>
+                      <div style={{
+                        fontFamily: serif, fontStyle: "italic",
+                        fontSize: 10, fontWeight: 600, color: gc.text,
+                        letterSpacing: "0.1em", marginTop: 2,
+                      }}>{gc.motif}</div>
                     </div>
-                    {/* Right content */}
+                    {/* Activity + roster */}
                     <div style={{
-                      flex: 1, padding: "5px 8px", display: "flex", flexDirection: "column", justifyContent: "center",
-                      background: `linear-gradient(135deg, ${gc.from.replace("0.22", "0.15")}, rgba(0,0,0,0))`,
+                      flex: 1, padding: "6px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3,
+                      minWidth: 0,
                     }}>
-                      <div style={{ fontSize: 13, fontWeight: 900, color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
-                        {act || <span style={{ opacity: 0.3, fontStyle: "italic", fontWeight: 500 }}>not set</span>}
+                      <div style={{
+                        fontFamily: serif, fontSize: 16, fontWeight: 600,
+                        color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        lineHeight: 1.1, letterSpacing: "-0.01em",
+                      }}>
+                        {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
-                        {students.map(s => (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
+                        {students.map((s, si) => (
                           <span key={s.id} style={{
-                            fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20,
-                            background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.8)",
-                            border: "1px solid rgba(255,255,255,0.08)",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: 10, fontWeight: 500, padding: "1px 6px",
+                            color: "rgba(245,241,232,0.78)",
+                            borderRight: si < students.length - 1 ? `1px solid ${g(0.15)}` : "none",
+                            letterSpacing: "0.01em",
                           }}>{s.name}</span>
                         ))}
                       </div>
@@ -535,13 +632,20 @@ export default function ClassroomBoard() {
               })}
               {board.students.filter(s => !s.specials_grade).length > 0 && (
                 <div style={{
-                  borderRadius: 10, padding: "5px 8px", display: "flex", alignItems: "center", gap: 8,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                  borderRadius: 3, padding: "4px 10px", display: "flex", alignItems: "center", gap: 10,
+                  background: "rgba(255,255,255,0.02)", border: `1px dashed ${g(0.1)}`,
                 }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>TBD</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                    {board.students.filter(s => !s.specials_grade).map(s => (
-                      <span key={s.id} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }}>{s.name}</span>
+                  <div style={{
+                    fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
+                    color: "rgba(245,241,232,0.3)", letterSpacing: "0.16em", textTransform: "uppercase",
+                  }}>unassigned</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                    {board.students.filter(s => !s.specials_grade).map((s, si, arr) => (
+                      <span key={s.id} style={{
+                        fontSize: 10, padding: "0 5px",
+                        color: "rgba(245,241,232,0.4)",
+                        borderRight: si < arr.length - 1 ? `1px solid ${g(0.1)}` : "none",
+                      }}>{s.name}</span>
                     ))}
                   </div>
                 </div>
@@ -549,34 +653,43 @@ export default function ClassroomBoard() {
             </div>
           </section>
 
-          {/* Specials Rotation — week-at-a-glance */}
+          {/* Specials Rotation — "The Cycle" week-at-a-glance, newspaper grid */}
           <section style={{
+            ...card,
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
-            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(160deg, rgba(12,8,28,0.97), rgba(6,4,18,0.99))",
-            padding: "10px 10px 8px",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+            padding: "10px 14px",
           }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)", marginBottom: 8, flexShrink: 0 }}>WEEK SCHEDULE</div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-              {/* Day header */}
-              <div style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
+            <SectionLabel n="03" title="The Cycle" kicker="A–F rotation" />
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+              {/* Day header row */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flexShrink: 0,
+                borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 4,
+              }}>
                 <div />
                 {DAY_LETTERS.map(d => {
                   const isToday = d === dayLetter;
                   return (
                     <div key={d} style={{
-                      textAlign: "center", fontSize: 14, fontWeight: 900,
-                      padding: "6px 2px", borderRadius: 9,
-                      background: isToday
-                        ? "linear-gradient(135deg, rgba(245,158,11,0.5), rgba(251,191,36,0.3))"
-                        : "rgba(255,255,255,0.05)",
-                      color: isToday ? "#fde68a" : "rgba(255,255,255,0.35)",
-                      border: isToday ? "1.5px solid rgba(245,158,11,0.7)" : "1px solid rgba(255,255,255,0.07)",
-                      boxShadow: isToday ? "0 0 16px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.15)" : "none",
+                      textAlign: "center",
+                      fontFamily: serif, fontSize: 15,
+                      fontWeight: isToday ? 600 : 500,
+                      fontStyle: isToday ? "normal" : "italic",
+                      padding: "3px 2px", borderRadius: 2,
+                      background: isToday ? "rgba(217,119,6,0.22)" : "transparent",
+                      color: isToday ? "#fbbf24" : "rgba(245,241,232,0.35)",
+                      border: isToday ? "1px solid rgba(217,119,6,0.55)" : "1px solid transparent",
                       letterSpacing: "0.04em",
+                      position: "relative",
                     }}>
-                      {d}{isToday ? " ★" : ""}
+                      {d}
+                      {isToday && (
+                        <span style={{
+                          position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)",
+                          width: 5, height: 5, borderRadius: "50%",
+                          background: "#d97706",
+                        }} />
+                      )}
                     </div>
                   );
                 })}
@@ -585,43 +698,47 @@ export default function ClassroomBoard() {
               {GRADES.map(grade => {
                 const gc = GRADE_COLORS[grade];
                 return (
-                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
-                    {/* Grade label */}
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                    {/* Grade motif cell */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 900, borderRadius: 9,
+                      fontFamily: serif, fontStyle: "italic",
+                      fontSize: 15, fontWeight: 600, borderRadius: 2,
                       color: gc.text,
-                      background: `linear-gradient(135deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.25")})`,
-                      border: `1.5px solid ${gc.border}`,
-                      boxShadow: `0 0 8px ${gc.glow}`,
-                    }}>{grade}th</div>
+                      background: `linear-gradient(180deg, ${gc.from}, rgba(13,19,33,0.2))`,
+                      border: `1px solid ${gc.border}`,
+                      borderLeft: `3px solid ${gc.text}`,
+                    }}>{grade}</div>
                     {DAY_LETTERS.map(day => {
                       const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
                       const isToday = day === dayLetter;
                       return (
                         <div key={day} style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          textAlign: "center", borderRadius: 9, padding: "4px 2px",
-                          background: isToday
-                            ? `linear-gradient(160deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.28")})`
-                            : "rgba(255,255,255,0.03)",
-                          border: isToday ? `1.5px solid ${gc.border}` : "1px solid rgba(255,255,255,0.06)",
-                          boxShadow: isToday && c ? `0 0 10px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.1)` : "none",
-                          gap: 2, overflow: "hidden",
+                          textAlign: "center", borderRadius: 2, padding: "3px 2px",
+                          background: isToday && c ? `${gc.from}` : "rgba(255,255,255,0.015)",
+                          border: isToday
+                            ? `1px solid ${gc.border}`
+                            : `1px solid ${g(0.05)}`,
+                          gap: 1, overflow: "hidden",
+                          minHeight: 0,
                         }}>
                           {c?.activity ? (
                             <>
-                              <span style={{ fontSize: 16, lineHeight: 1 }}>{actEmoji(c.activity)}</span>
+                              <span style={{ fontSize: 15, lineHeight: 1, opacity: isToday ? 1 : 0.75 }}>{actEmoji(c.activity)}</span>
                               <span style={{
-                                fontSize: 12, fontWeight: 900, lineHeight: 1.15,
+                                fontFamily: serif,
+                                fontSize: 11,
+                                fontWeight: isToday ? 600 : 500,
+                                fontStyle: isToday ? "normal" : "italic",
+                                lineHeight: 1.1,
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 maxWidth: "100%", padding: "0 3px",
-                                color: isToday ? gc.text : "rgba(255,255,255,0.65)",
-                                textShadow: isToday ? `0 0 8px ${gc.glow}` : "none",
+                                color: isToday ? gc.text : "rgba(245,241,232,0.55)",
                               }}>{c.activity}</span>
                             </>
                           ) : (
-                            <span style={{ opacity: 0.12, fontSize: 14 }}>✦</span>
+                            <span style={{ opacity: 0.18, fontSize: 12, color: gc.text }}>·</span>
                           )}
                         </div>
                       );
@@ -634,24 +751,43 @@ export default function ClassroomBoard() {
         </div>
       </div>
 
-      {/* ── ROW 4: Behavior Levels strip ── */}
+      {/* ── ROW 4: "The Ledger" — Behavior Levels strip ── */}
       <section style={{
         position: "relative", zIndex: 1,
-        ...card, borderRadius: 12,
-        display: "flex", alignItems: "center", gap: 8, padding: "0 12px", overflow: "hidden", flexShrink: 0,
-        animation: "pulseRing 2.5s ease-in-out infinite",
+        ...card, borderRadius: 3,
+        display: "flex", alignItems: "center", gap: 14, padding: "0 16px",
+        overflow: "hidden", flexShrink: 0,
+        borderTop: `1px solid ${g(0.12)}`,
       }}>
-        <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.25em", flexShrink: 0 }}>Behavior Levels</div>
-        <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", overflow: "hidden" }}>
+        <div style={{
+          fontFamily: serif, fontStyle: "italic", fontSize: 12, fontWeight: 600,
+          color: "rgba(217,119,6,0.85)", letterSpacing: "0.16em", textTransform: "uppercase",
+          flexShrink: 0, borderRight: `1px solid ${g(0.12)}`, paddingRight: 14,
+        }}>№ 04 · The Ledger</div>
+        <div style={{ flex: 1, display: "flex", gap: 16, alignItems: "center", overflow: "hidden" }}>
           {[5, 4, 3, 2, 1].map(lv => {
             const at = board.students.filter(s => (s.level || 1) === lv);
             if (at.length === 0) return null;
             const lc = BEHAVIOR_LEVELS[lv];
             return (
-              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: lc.bg, color: lc.color }}>{lc.label}</div>
-                {at.map(s => (
-                  <div key={s.id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: g(0.1), color: g(0.85) }}>{s.name}</div>
+              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <div style={{
+                  fontFamily: serif, fontStyle: "italic",
+                  fontSize: 12, fontWeight: 600,
+                  padding: "1px 9px 2px", borderRadius: 2,
+                  background: lc.bg, color: lc.color,
+                  borderLeft: `2px solid ${lc.color}`,
+                  letterSpacing: "0.02em",
+                }}>Lv {lv}</div>
+                {at.map((s, si) => (
+                  <span key={s.id} style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 12, fontWeight: 500,
+                    color: "rgba(245,241,232,0.82)",
+                    letterSpacing: "0.01em",
+                    paddingRight: si < at.length - 1 ? 6 : 0,
+                    borderRight: si < at.length - 1 ? `1px solid ${g(0.1)}` : "none",
+                  }}>{s.name}</span>
                 ))}
               </div>
             );

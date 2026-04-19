@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
-import { Globe, Plus, Send, X } from "lucide-react";
+import { ArrowLeft, Globe, Plus, Send, X } from "lucide-react";
 import { LearningAppTile, LearningAppGrid, inferCategoryIcon } from "./LearningAppTile.tsx";
 
 export default function StudentWebsites() {
@@ -55,6 +56,25 @@ export default function StudentWebsites() {
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1100, margin: "0 auto" }}>
+      {/* Back button */}
+      <div style={{ marginBottom: 16 }}>
+        <Link
+          to="/student"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 13, fontWeight: 600,
+            color: dk ? "rgba(255,255,255,0.5)" : "#64748b",
+            textDecoration: "none",
+            padding: "6px 10px 6px 6px",
+            borderRadius: 10,
+            background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+            border: dk ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)",
+            transition: "opacity .15s",
+          }}
+        >
+          <ArrowLeft size={15} /> Dashboard
+        </Link>
+      </div>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>

@@ -78,6 +78,13 @@ export function setupWebSocket(io: IOServer) {
       }
     });
 
+    // Teacher: force-reload all student browsers in a class
+    socket.on("class:reload", (data: { classId: string }) => {
+      if (user.role === "teacher" || user.role === "admin") {
+        io.to(`class:${data.classId}`).emit("class:reload", {});
+      }
+    });
+
     // Teacher/admin: broadcast a YouTube video to the whole class
     socket.on("class:video", (data: { classId: string; videoId: string; url?: string; title?: string }) => {
       if (user.role === "teacher" || user.role === "admin") {

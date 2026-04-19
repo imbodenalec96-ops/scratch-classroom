@@ -8,7 +8,7 @@ import {
   LockOpen, Youtube, BarChart3, Trophy,
   ClipboardList, Monitor, HelpCircle, CheckSquare,
   Download, AlertTriangle, Tv, CircleDot, ArrowRight,
-  UserPlus, LogIn, Sparkles,
+  UserPlus, LogIn, Sparkles, KeyRound, Pencil, Search, X, Check,
 } from "lucide-react";
 
 const ANIM = `
@@ -425,6 +425,21 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* ─── Students admin panel ─── */}
+        <StudentsAdminPanel
+          students={students}
+          classes={classes}
+          cardStyle={cardStyle}
+          dk={dk}
+          border={border}
+          text1={text1}
+          text2={text2}
+          Divider={Divider}
+          onStudentUpdated={(updated) => {
+            setStudents(list => list.map(s => s.id === updated.id ? { ...s, ...updated } : s));
+          }}
+        />
+
         {/* ─── System Health + Recent Activity ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .22s both" }}>
           <Divider label="Platform" />
@@ -487,6 +502,275 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+/* ─── Student admin panel: search + per-row reset password + edit ─── */
+function StudentsAdminPanel({
+  students, classes, cardStyle, dk, border, text1, text2, Divider, onStudentUpdated,
+}: {
+  students: any[]; classes: any[]; cardStyle: React.CSSProperties;
+  dk: boolean; border: string; text1: string; text2: string;
+  Divider: (props: { label: string }) => React.JSX.Element;
+  onStudentUpdated: (updated: any) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [pwOpen, setPwOpen] = useState<string | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwDone, setPwDone] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const filtered = query.trim()
+    ? students.filter(s =>
+        (s.name || "").toLowerCase().includes(query.toLowerCase()) ||
+        (s.email || "").toLowerCase().includes(query.toLowerCase()))
+    : students;
+
+  const resetPassword = async (id: string) => {
+    if (!pwValue.trim()) return;
+    setPwSaving(true);
+    try {
+      await api.resetUserPassword(id, pwValue.trim());
+      setPwDone(id);
+      setPwValue("");
+      setPwOpen(null);
+      setTimeout(() => setPwDone(null), 2500);
+    } catch (e: any) {
+      alert("Reset failed: " + (e?.message || "unknown"));
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editName.trim() && !editEmail.trim()) return;
+    setEditSaving(true);
+    try {
+      const updates: any = {};
+      if (editName.trim()) updates.name = editName.trim();
+      if (editEmail.trim()) updates.email = editEmail.trim();
+      const updated = await api.updateUser(id, updates);
+      onStudentUpdated(updated);
+      setEditOpen(null);
+    } catch (e: any) {
+      alert("Save failed: " + (e?.message || "unknown"));
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const openEdit = (s: any) => {
+    setEditName(s.name || "");
+    setEditEmail(s.email || "");
+    setEditOpen(s.id);
+  };
+
+  return (
+    <div style={{ marginBottom: 36, animation: "ad-fadeUp .5s ease .2s both" }}>
+      <Divider label="Students" />
+      <div style={{ ...cardStyle, padding: "20px 22px" }}>
+        {/* Header + search */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: text2, marginBottom: 4 }}>Manage accounts</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: text1, letterSpacing: "-0.02em" }}>All Students</div>
+          </div>
+          <div style={{ position: "relative", minWidth: 220 }}>
+            <Search size={13} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: text2 }} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search by name or email…"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "8px 12px 8px 32px", fontSize: 12, borderRadius: 10,
+                background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                border: `1px solid ${border}`, color: text1, outline: "none",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* List */}
+        {filtered.length === 0 ? (
+          <p style={{ fontSize: 12, textAlign: "center", padding: "32px 0", color: text2 }}>
+            {query ? "No students match that search." : "No students yet."}
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 440, overflowY: "auto", paddingRight: 4 }}>
+            {filtered.map(s => {
+              const initial = (s.name || "?").charAt(0).toUpperCase();
+              const isPwOpen = pwOpen === s.id;
+              const isEditOpen = editOpen === s.id;
+              const justReset = pwDone === s.id;
+              return (
+                <div key={s.id} style={{
+                  padding: "10px 12px", borderRadius: 12, border: `1px solid ${isPwOpen || isEditOpen ? "rgba(139,92,246,0.35)" : "transparent"}`,
+                  background: isPwOpen || isEditOpen ? (dk ? "rgba(139,92,246,0.05)" : "rgba(139,92,246,0.04)") : "transparent",
+                  transition: "all 0.15s ease",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                      background: "linear-gradient(135deg,#3b82f6,#2563eb)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "white", fontSize: 12, fontWeight: 800,
+                      boxShadow: "0 4px 12px rgba(59,130,246,0.25)",
+                    }}>
+                      {s.avatar_emoji || initial}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: text1, display: "flex", alignItems: "center", gap: 8 }}>
+                        {s.name}
+                        {justReset && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#34d399", display: "flex", alignItems: "center", gap: 3 }}>
+                            <Check size={11} /> Password updated
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10, color: text2, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {s.email || "no email"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => { setEditOpen(null); openEdit(s); setPwOpen(null); }}
+                        title="Edit student"
+                        style={{
+                          padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                          border: `1px solid ${border}`, borderRadius: 8,
+                          background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                          color: text1, display: "flex", alignItems: "center", gap: 4,
+                        }}
+                      >
+                        <Pencil size={11} /> Edit
+                      </button>
+                      <button
+                        onClick={() => { setPwOpen(isPwOpen ? null : s.id); setPwValue(""); setEditOpen(null); }}
+                        title="Reset password"
+                        style={{
+                          padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                          border: "1px solid rgba(139,92,246,0.35)", borderRadius: 8,
+                          background: "rgba(139,92,246,0.12)",
+                          color: "#c4b5fd", display: "flex", alignItems: "center", gap: 4,
+                        }}
+                      >
+                        <KeyRound size={11} /> Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Reset password inline */}
+                  {isPwOpen && (
+                    <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: dk ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.03)", display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={pwValue}
+                        onChange={e => setPwValue(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && resetPassword(s.id)}
+                        placeholder="New passcode…"
+                        style={{
+                          flex: 1, padding: "7px 10px", fontSize: 12, borderRadius: 8,
+                          background: dk ? "rgba(255,255,255,0.06)" : "white",
+                          border: `1px solid ${border}`, color: text1, outline: "none",
+                        }}
+                      />
+                      <button
+                        disabled={pwSaving || !pwValue.trim()}
+                        onClick={() => resetPassword(s.id)}
+                        style={{
+                          padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: pwSaving || !pwValue.trim() ? "default" : "pointer",
+                          border: "none", borderRadius: 8,
+                          background: pwSaving || !pwValue.trim() ? (dk ? "rgba(255,255,255,0.06)" : "#e5e7eb") : "linear-gradient(135deg,#7c3aed,#6d28d9)",
+                          color: pwSaving || !pwValue.trim() ? text2 : "white",
+                          opacity: pwSaving ? 0.6 : 1,
+                        }}
+                      >
+                        {pwSaving ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => { setPwOpen(null); setPwValue(""); }}
+                        style={{
+                          padding: "7px 8px", fontSize: 11, cursor: "pointer",
+                          border: "none", borderRadius: 8,
+                          background: "transparent", color: text2,
+                          display: "flex", alignItems: "center",
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Edit profile inline */}
+                  {isEditOpen && (
+                    <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: dk ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          placeholder="Name"
+                          style={{
+                            flex: 1, padding: "7px 10px", fontSize: 12, borderRadius: 8,
+                            background: dk ? "rgba(255,255,255,0.06)" : "white",
+                            border: `1px solid ${border}`, color: text1, outline: "none",
+                          }}
+                        />
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          placeholder="email@example.com"
+                          style={{
+                            flex: 1, padding: "7px 10px", fontSize: 12, borderRadius: 8,
+                            background: dk ? "rgba(255,255,255,0.06)" : "white",
+                            border: `1px solid ${border}`, color: text1, outline: "none",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setEditOpen(null)}
+                          style={{
+                            padding: "7px 14px", fontSize: 11, cursor: "pointer",
+                            border: `1px solid ${border}`, borderRadius: 8,
+                            background: "transparent", color: text2,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          disabled={editSaving}
+                          onClick={() => saveEdit(s.id)}
+                          style={{
+                            padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: editSaving ? "default" : "pointer",
+                            border: "none", borderRadius: 8,
+                            background: "linear-gradient(135deg,#7c3aed,#6d28d9)",
+                            color: "white", opacity: editSaving ? 0.6 : 1,
+                          }}
+                        >
+                          {editSaving ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ marginTop: 14, fontSize: 10, color: text2, textAlign: "center" }}>
+          Showing {filtered.length} of {students.length} students
+        </div>
       </div>
     </div>
   );
