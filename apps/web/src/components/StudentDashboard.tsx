@@ -983,6 +983,17 @@ export default function StudentDashboard() {
   const c1 = useCountUp(statSubmitted, 900, 290);
   const c2 = useCountUp(statGraded, 900, 380);
 
+  // Behavior stars
+  const [myStars, setMyStars] = useState({ stars: 0, rewards: 0 });
+  useEffect(() => {
+    if (user?.role !== "student") return;
+    let cancelled = false;
+    const load = () => api.getMyStars().then(d => { if (!cancelled) setMyStars({ stars: d.stars ?? 0, rewards: d.rewards ?? 0 }); }).catch(() => {});
+    load();
+    const iv = setInterval(load, 20_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [user?.role]);
+
   // Welcome → loading transition
   useEffect(() => {
     const t = setTimeout(() => setPhase('loading'), 1800);
@@ -1221,98 +1232,143 @@ export default function StudentDashboard() {
 
   // ── DONE / DASHBOARD ──
   const unlocked = accessUnlocked;
-  // Editorial date line "Thursday, April 17" style
-  const dateLine = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const starsCount = Math.max(0, Math.min(5, myStars.stars));
+  const firstName = user?.name?.split(" ")[0] || "Student";
+
+  const DB_ANIM = `
+    @keyframes dbGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    @keyframes dbFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    @keyframes dbPop { from{opacity:0;transform:scale(.85) translateY(10px)} to{opacity:1;transform:none} }
+    @keyframes dbStarPulse { 0%,100%{filter:drop-shadow(0 0 3px rgba(251,191,36,.8))} 50%{filter:drop-shadow(0 0 9px rgba(251,191,36,1)) drop-shadow(0 0 18px rgba(245,158,11,.6))} }
+    @keyframes dbSlide { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+    @keyframes dbShimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+  `;
 
   return (
-    <div className="p-6 space-y-6 animate-page-enter relative" style={{ paddingBottom: unlocked ? 100 : undefined }}>
+    <div style={{
+      minHeight: "100dvh",
+      background: "linear-gradient(135deg, #0b0520 0%, #14082e 40%, #0d1a3a 70%, #0a0520 100%)",
+      color: "white",
+      fontFamily: "'Inter', system-ui, sans-serif",
+      padding: "0 0 100px 0",
+      position: "relative",
+    }}>
+      <style>{DB_ANIM}</style>
       {broadcast && (
-        <div className="fixed top-0 left-0 right-0 z-40 px-6 py-3 text-center text-sm font-medium flex items-center justify-center gap-2" style={{ background: "var(--accent)", color: "white", borderBottom: "2px solid var(--accent-hover)" }}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 40,
+          padding: "12px 24px", textAlign: "center", fontSize: 14, fontWeight: 700,
+          background: "linear-gradient(90deg, #7c3aed, #6d28d9)",
+          color: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
           <Megaphone size={15} />{broadcast}
         </div>
       )}
 
-      {/* ── Editorial header: masthead + date + headline + leaderboard chip ── */}
-      <header className="border-b pb-5 animate-slide-up" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
-          <span>{dateLine}</span>
-          <span className="font-mono">BLOCKFORGE · STUDENT</span>
-        </div>
-        <div className="flex items-end justify-between gap-4 flex-wrap">
+      {/* ── Header ── */}
+      <header style={{
+        padding: "24px 20px 20px",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        animation: "dbPop .5s ease both",
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div className="section-label mb-2">— Today's pages —</div>
-            <h1 className="font-display text-4xl sm:text-5xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
-              {unlocked
-                ? <>Free time, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>well earned.</em></>
-                : <>Good to see you, <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{user?.name?.split(" ")[0]}.</em></>
-              }
+            <div style={{ fontSize: 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 4 }}>
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </div>
+            <h1 style={{
+              fontSize: "clamp(28px, 6vw, 42px)", fontWeight: 900, margin: 0, lineHeight: 1.1,
+              background: unlocked
+                ? "linear-gradient(90deg,#6ee7b7,#34d399,#a7f3d0)"
+                : "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
+              backgroundSize: "200% auto",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              animation: "dbGrad 4s linear infinite",
+            }}>
+              {unlocked ? `Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
             </h1>
-            <p className="text-sm mt-2 max-w-md" style={{ color: "var(--text-2)" }}>
-              {unlocked ? "Everything's done. Pick a page, enjoy yourself." : "Your work is set up below. Start from the top — you've got this."}
+            <p style={{ fontSize: 13, opacity: 0.55, marginTop: 4 }}>
+              {unlocked ? "Work done — you've earned it. Play something!" : "Ready to learn? Your work is below."}
             </p>
           </div>
-          {myEntry && (
-            <div className="flex items-baseline gap-3 px-4 py-3" style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderLeft: "3px solid var(--accent)",
-              borderRadius: "var(--r-md)",
-            }}>
-              <Trophy size={16} style={{ color: "var(--accent)" }} />
-              <div>
-                <div className="font-display text-2xl leading-none" style={{ color: "var(--text-1)" }}>{myEntry.points}</div>
-                <div className="text-[10px] uppercase tracking-wider mt-1" style={{ color: "var(--text-3)" }}>pts · Lvl {myEntry.level}</div>
-              </div>
+
+          {/* Stars display */}
+          <div style={{
+            padding: "12px 18px", borderRadius: 16,
+            background: starsCount >= 5
+              ? "linear-gradient(135deg,rgba(245,158,11,.4),rgba(234,179,8,.25))"
+              : "rgba(255,255,255,0.06)",
+            border: starsCount >= 5
+              ? "1px solid rgba(245,158,11,.65)"
+              : "1px solid rgba(255,255,255,0.1)",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            animation: starsCount >= 5 ? "dbPop .5s ease .2s both" : "dbSlide .5s ease .2s both",
+          }}>
+            <div style={{ fontSize: 10, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.2em" }}>Behavior Stars</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} style={{
+                  fontSize: 22,
+                  opacity: i < starsCount ? 1 : 0.15,
+                  filter: i < starsCount ? undefined : "grayscale(1) brightness(.3)",
+                  animation: i < starsCount && starsCount >= 5 ? "dbStarPulse 2s ease-in-out infinite" : undefined,
+                  animationDelay: `${i * 0.12}s`,
+                }}>⭐</span>
+              ))}
             </div>
-          )}
+            <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>
+              {starsCount}/5
+              {myStars.rewards > 0 && <span style={{ marginLeft: 8, color: "#fbbf24" }}>· 🏆 {myStars.rewards}</span>}
+            </div>
+            {starsCount >= 5 && <div style={{ fontSize: 11, color: "#fcd34d", fontWeight: 700 }}>McDonald's! 🎉</div>}
+          </div>
         </div>
       </header>
 
-      {/* ── Stats — editorial Fraunces numerals with semantic left border ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* ── Stats ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {[
-          { label: "Classes",   value: c0, icon: Users,       accent: "var(--info)" },
-          { label: "Submitted", value: c1, icon: CheckCircle, accent: "var(--success)" },
-          { label: "Graded",    value: c2, icon: Star,        accent: "var(--accent)" },
+          { label: "Classes",   value: c0, color: "#38bdf8" },
+          { label: "Submitted", value: c1, color: "#34d399" },
+          { label: "Graded",    value: c2, color: "#a78bfa" },
         ].map((s, i) => (
-          <div key={s.label} className="card flex items-baseline gap-3 animate-slide-up"
-            style={{ padding: "14px 16px", borderLeft: `3px solid ${s.accent}`, animationDelay: `${80 + i * 60}ms` }}>
-            <div style={{ color: s.accent }}><s.icon size={15}/></div>
-            <div className="flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{s.label}</div>
-              <div className="font-display text-3xl leading-none mt-1 tabular-nums" style={{ color: "var(--text-1)" }}>{s.value}</div>
-            </div>
+          <div key={s.label} style={{
+            borderRadius: 14, padding: "14px 12px", textAlign: "center",
+            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)",
+            animation: `dbSlide .45s ease ${80 + i * 60}ms both`,
+          }}>
+            <div style={{ fontSize: 28, fontWeight: 900, color: s.color, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
+            <div style={{ fontSize: 10, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Today's Quizzes (Bug #32): quizzes created by teacher surface here ── */}
+      {/* ── Today's Quizzes ── */}
       {pendingQuizzes.length > 0 && !activeQuiz && (
-        <div className="animate-slide-up" style={{ animationDelay: "160ms" }}>
-          <div className="section-label mb-3" style={{ color: "var(--accent)" }}>
-            — Today's quizzes —
+        <div style={{ animation: "dbSlide .5s ease .16s both" }}>
+          <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 10 }}>
+            📝 Today's Quizzes
           </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
             {pendingQuizzes.map((q) => (
               <button key={q.id}
                 onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
-                className="text-left p-5 card-hover transition-all"
                 style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                  borderLeft: "3px solid var(--accent)",
-                  borderRadius: "var(--r-xl)",
-                  cursor: "pointer",
-                }}>
-                <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>
+                  textAlign: "left", padding: "16px", cursor: "pointer",
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  borderLeft: "3px solid #a78bfa", borderRadius: 14,
+                  transition: "transform .15s", color: "white",
+                }}
+                onMouseEnter={e => { (e.currentTarget as any).style.transform = "scale(1.02)"; }}
+                onMouseLeave={e => { (e.currentTarget as any).style.transform = ""; }}
+              >
+                <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>
                   {q._className || "Quiz"} · {(q.questions || []).length} questions
                 </div>
-                <div className="font-display text-xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  {q.title || "Untitled quiz"}
-                </div>
-                {q.estimated_minutes ? (
-                  <div className="text-xs mt-2" style={{ color: "var(--text-2)" }}>~{q.estimated_minutes} min</div>
-                ) : null}
+                <div style={{ fontSize: 18, fontWeight: 800 }}>{q.title || "Untitled quiz"}</div>
+                {q.estimated_minutes && <div style={{ fontSize: 11, opacity: 0.45, marginTop: 4 }}>~{q.estimated_minutes} min</div>}
               </button>
             ))}
           </div>
@@ -1321,39 +1377,48 @@ export default function StudentDashboard() {
 
       {/* Inline quiz taker */}
       {activeQuiz && (
-        <div className="animate-slide-up card p-6" style={{ borderLeft: "3px solid var(--accent)" }}>
-          <div className="flex items-start justify-between gap-4 mb-4">
+        <div style={{
+          borderRadius: 16, padding: "20px",
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,.4)",
+          animation: "dbSlide .4s ease both",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
             <div>
-              <div className="section-label mb-1">— Quiz —</div>
-              <h2 className="font-display text-2xl" style={{ color: "var(--text-1)" }}>{activeQuiz.title}</h2>
+              <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 4 }}>Quiz</div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{activeQuiz.title}</h2>
             </div>
-            <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} className="text-sm" style={{ color: "var(--text-3)" }}>Close</button>
+            <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize: 13, opacity: 0.5, background: "none", border: "none", color: "white", cursor: "pointer" }}>Close</button>
           </div>
 
           {quizResult ? (
-            <div className="text-center py-8">
-              <div className="font-display text-5xl mb-2" style={{ color: "var(--accent)" }}>{quizResult.score}%</div>
-              <div style={{ color: "var(--text-2)" }}>Quiz submitted. Nice work.</div>
+            <div style={{ textAlign: "center", padding: "24px 0" }}>
+              <div style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}>{quizResult.score}%</div>
+              <div style={{ opacity: 0.6, marginTop: 8 }}>Quiz submitted. Nice work! 🎉</div>
               <button
                 onClick={() => {
                   setPendingQuizzes((prev) => prev.filter((x) => x.id !== activeQuiz.id));
                   setActiveQuiz(null); setQuizResult(null);
                 }}
-                className="btn-primary mt-4">Done</button>
+                style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>
+                Done
+              </button>
             </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {(activeQuiz.questions || []).map((q: any, qi: number) => (
-                  <div key={qi} className="p-4" style={{ background: "var(--bg-muted)", borderRadius: "var(--r-md)" }}>
-                    <div className="font-medium mb-3" style={{ color: "var(--text-1)" }}>{qi + 1}. {q.text}</div>
-                    <div className="space-y-2">
+                  <div key={qi} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)" }}>
+                    <div style={{ fontWeight: 700, marginBottom: 10 }}>{qi + 1}. {q.text}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {(q.options || []).map((opt: string, oi: number) => (
-                        <label key={oi} className="flex items-center gap-2 cursor-pointer p-2 rounded"
-                          style={{ background: quizAnswers[qi] === oi ? "var(--accent-light)" : "transparent" }}>
+                        <label key={oi} style={{
+                          display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 10px", borderRadius: 10,
+                          background: quizAnswers[qi] === oi ? "rgba(139,92,246,.3)" : "rgba(255,255,255,.04)",
+                          border: quizAnswers[qi] === oi ? "1px solid rgba(139,92,246,.5)" : "1px solid rgba(255,255,255,.06)",
+                        }}>
                           <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
                             onChange={() => setQuizAnswers((a) => { const n = [...a]; n[qi] = oi; return n; })} />
-                          <span style={{ color: "var(--text-1)" }}>{opt}</span>
+                          <span>{opt}</span>
                         </label>
                       ))}
                     </div>
@@ -1371,7 +1436,7 @@ export default function StudentDashboard() {
                     alert("Could not submit: " + (e?.message || "unknown error"));
                   } finally { setQuizSubmitting(false); }
                 }}
-                className="btn-primary mt-6">
+                style={{ marginTop: 16, padding: "12px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: (quizSubmitting || quizAnswers.some(a => a < 0)) ? 0.4 : 1 }}>
                 {quizSubmitting ? "Submitting…" : "Submit quiz"}
               </button>
             </>
@@ -1379,55 +1444,45 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* ── Free Time Unlocked — editorial tile set ── */}
+      {/* ── Free Time Unlocked ── */}
       {unlocked && (
-        <div className="animate-spring-in" style={{ animationDelay: "200ms" }}>
-          <div className="section-label mb-3" style={{ color: "var(--success)" }}>
-            — Free time earned —
+        <div style={{ animation: "dbSlide .5s ease .2s both" }}>
+          <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 10 }}>
+            ✅ Free time earned
           </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-            <Link to="/arcade"
-              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
-              style={{
-                animationDelay: "240ms",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderLeft: "3px solid var(--accent)",
-                borderRadius: "var(--r-xl)",
-                textDecoration: "none",
-              }}>
-              <div className="w-12 h-12 flex items-center justify-center text-2xl"
-                style={{ background: "var(--accent-light)", borderRadius: "var(--r-md)" }}>
-                🎮
-              </div>
-              <div>
-                <div className="section-label mb-1">— Arcade —</div>
-                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  Play some<em style={{ color: "var(--accent)", fontStyle: "italic" }}> games.</em>
-                </div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>29 games · keep it fun</div>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+            <Link to="/arcade" style={{ textDecoration: "none" }}>
+              <div style={{
+                padding: "20px 18px", borderRadius: 18, cursor: "pointer",
+                background: "linear-gradient(135deg,rgba(139,92,246,.45),rgba(99,102,241,.3))",
+                border: "1px solid rgba(139,92,246,.6)",
+                boxShadow: "0 0 30px rgba(139,92,246,.2)",
+                animation: "dbPop .5s ease .24s both",
+                transition: "transform .15s, box-shadow .15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(139,92,246,.4)"; }}
+              onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(139,92,246,.2)"; }}
+              >
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🎮</div>
+                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Arcade</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>29 games · keep it fun</div>
               </div>
             </Link>
-            <Link to="/projects"
-              className="group flex flex-col gap-2 p-6 text-left transition-all animate-spring-in card-hover"
-              style={{
-                animationDelay: "310ms",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderLeft: "3px solid var(--accent-sage)",
-                borderRadius: "var(--r-xl)",
-                textDecoration: "none",
-              }}>
-              <div className="w-12 h-12 flex items-center justify-center text-2xl"
-                style={{ background: "color-mix(in srgb, var(--accent-sage) 14%, transparent)", borderRadius: "var(--r-md)" }}>
-                💻
-              </div>
-              <div>
-                <div className="section-label mb-1" style={{ color: "var(--accent-sage)" }}>— Projects —</div>
-                <div className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>
-                  Build<em style={{ color: "var(--accent-sage)", fontStyle: "italic" }}> something.</em>
-                </div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>BlockForge · 2D & 3D stages</div>
+            <Link to="/projects" style={{ textDecoration: "none" }}>
+              <div style={{
+                padding: "20px 18px", borderRadius: 18, cursor: "pointer",
+                background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
+                border: "1px solid rgba(16,185,129,.55)",
+                boxShadow: "0 0 30px rgba(16,185,129,.18)",
+                animation: "dbPop .5s ease .31s both",
+                transition: "transform .15s, box-shadow .15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(16,185,129,.38)"; }}
+              onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(16,185,129,.18)"; }}
+              >
+                <div style={{ fontSize: 36, marginBottom: 8 }}>💻</div>
+                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Projects</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>BlockForge · 2D & 3D stages</div>
               </div>
             </Link>
           </div>
@@ -1436,17 +1491,21 @@ export default function StudentDashboard() {
 
       {/* Class video */}
       {classVideo && (
-        <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: "280ms" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-            <h2 className="text-sm font-semibold" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>📺 Your Teacher Shared a Video</h2>
-            {classVideo.video_title && <span className="text-xs ml-auto" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#9ca3af" }}>{classVideo.video_title}</span>}
+        <div style={{
+          borderRadius: 16, overflow: "hidden",
+          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+          animation: "dbSlide .5s ease .28s both",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
+            <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>📺 Your Teacher Shared a Video</span>
+            {classVideo.video_title && <span style={{ fontSize: 11, opacity: 0.4, marginLeft: "auto" }}>{classVideo.video_title}</span>}
           </div>
-          <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ position: "relative", paddingTop: "56.25%", overflow: "hidden" }}>
             <iframe
-              src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
+              src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
               title={classVideo.video_title || "Class Video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
             />
@@ -1454,30 +1513,39 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library — gated by unlock/break state + teacher config
-          Hidden unless: student is unlocked OR on a break, AND teacher hasn't disabled YouTube */}
+      {/* YouTube Library */}
       {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
-      <div className="card animate-slide-up" style={{ animationDelay: "300ms" }}>
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
-          📺 Video Library
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(239,68,68,0.1)" : "#fee2e2", color: dk ? "#f87171" : "#dc2626" }}>
+      <div style={{
+        borderRadius: 16, padding: "14px",
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+        animation: "dbSlide .5s ease .3s both",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>📺 Video Library</span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+            background: "rgba(239,68,68,.2)", color: "#f87171",
+          }}>
             {youtubeLibrary.length} {youtubeLibrary.length === 1 ? "video" : "videos"}
           </span>
-        </h2>
+        </div>
 
         {/* Playing inline */}
         {playingLibVideo && (
-          <div className="mb-4 animate-spring-in">
+          <div style={{ marginBottom: 12 }}>
             <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
                 title={playingLibVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen
                 style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
               />
             </div>
-            <button onClick={() => setPlayingLibVideo(null)} className="mt-2 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-colors" style={{ background: dk?"rgba(255,255,255,0.05)":"#f1f5f9", color: dk?"rgba(255,255,255,0.5)":"#64748b" }}>
+            <button onClick={() => setPlayingLibVideo(null)} style={{
+              marginTop: 8, fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 20, cursor: "pointer",
+              background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", border: "none",
+            }}>
               ✕ Close video
             </button>
           </div>
@@ -1491,61 +1559,62 @@ export default function StudentDashboard() {
                 key={v.id}
                 onClick={async () => {
                   setPlayingLibVideo({ videoId: v.video_id, title: v.title });
-                  if (user?.id) {
-                    api.pickLibraryVideo(v.id, user.id).catch(() => {});
-                  }
+                  if (user?.id) api.pickLibraryVideo(v.id, user.id).catch(() => {});
                 }}
                 style={{
                   textAlign:"left", padding:0, background:"none", border:"none", cursor:"pointer",
                   borderRadius:12, overflow:"hidden",
-                  boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.08)",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
                   transition:"transform 0.15s, box-shadow 0.15s",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px) scale(1.03)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
               >
                 <div style={{ position:"relative", overflow:"hidden" }}>
                   <img src={v.thumbnail_url || `https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%", aspectRatio:"16/9", objectFit:"cover", display:"block" }} />
                 </div>
-                <div style={{ padding:"8px 10px", background: dk?"rgba(255,255,255,0.04)":"white" }}>
-                  <div style={{ fontSize:11, fontWeight:700, color: dk?"rgba(255,255,255,0.85)":"#1e293b", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
-                  {v.category && <div style={{ fontSize:9, fontWeight:600, marginTop:3, color: dk?"rgba(239,68,68,0.7)":"#dc2626", textTransform:"uppercase", letterSpacing:"0.05em" }}>{v.category}</div>}
+                <div style={{ padding:"8px 10px", background:"rgba(255,255,255,0.07)" }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,.85)", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
+                  {v.category && <div style={{ fontSize:9, fontWeight:600, marginTop:3, color:"#f87171", textTransform:"uppercase", letterSpacing:"0.05em" }}>{v.category}</div>}
                 </div>
               </button>
             ))}
           </div>
         ) : (
-          <div className="text-center py-6" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
-            <div className="text-3xl mb-2">📼</div>
-            <p className="text-xs">No videos in the library yet.<br/>Ask your teacher to add some, or request one below!</p>
+          <div style={{ textAlign:"center", padding:"24px 16px", opacity: 0.4 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📼</div>
+            <p style={{ fontSize: 12 }}>No videos yet — ask your teacher!</p>
           </div>
         )}
 
-        {/* Request a video — only when fully unlocked (not during a break) */}
+        {/* Request a video */}
         {unlocked && !isOnBreak() && (
-          <div className={`mt-4 pt-4 border-t ${dk ? "border-white/[0.05]" : "border-gray-100"}`}>
-            <YouTubeRequestForm dk={dk} userId={user?.id} onSent={() => { /* toast or refresh */ }} />
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <YouTubeRequestForm dk={true} userId={user?.id} onSent={() => {}} />
           </div>
         )}
       </div>
       )}
 
-      {/* Learning Apps — teacher-granted websites (only shows if any) */}
+      {/* Learning Apps */}
       {(unlocked || isOnBreak()) && (myWebsites.length > 0 || true) && (
-        <div className="card animate-slide-up" style={{ animationDelay: "310ms" }}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>
-              🌐 Learning Apps
+        <div style={{
+          borderRadius: 16, padding: "14px",
+          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+          animation: "dbSlide .5s ease .31s both",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>🌐 Learning Apps</span>
               {myWebsites.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: dk ? "rgba(99,102,241,0.15)" : "#e0e7ff", color: dk ? "#a5b4fc" : "#4338ca" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "rgba(99,102,241,.25)", color: "#a5b4fc" }}>
                   {myWebsites.length}
                 </span>
               )}
-            </h2>
+            </div>
             <button
               onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
-              style={{ background: dk ? "rgba(99,102,241,0.15)" : "#eef2ff", color: dk ? "#a5b4fc" : "#4338ca" }}
+              style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}
             >
               📝 Ask for a new website
             </button>
@@ -1554,32 +1623,14 @@ export default function StudentDashboard() {
           {myWebsites.length > 0 ? (
             <LearningAppGrid>
               {myWebsites.map((w: any) => (
-                <LearningAppTile key={w.id} app={w} dk={dk} />
+                <LearningAppTile key={w.id} app={w} dk={true} />
               ))}
             </LearningAppGrid>
           ) : (
-            <div className="text-center py-10 px-4 rounded-2xl" style={{
-              background: dk ? "rgba(255,255,255,0.02)" : "#f8fafc",
-              border: dk ? "1px dashed rgba(255,255,255,0.08)" : "1px dashed #e2e8f0",
-            }}>
-              <div className="text-5xl mb-3">🌐</div>
-              <p className="text-sm font-bold mb-1" style={{ color: dk ? "rgba(255,255,255,0.85)" : "#1e293b" }}>
-                No learning apps yet — ask your teacher!
-              </p>
-              <p className="text-xs mb-4" style={{ color: dk ? "rgba(255,255,255,0.4)" : "#64748b" }}>
-                Got a site you'd love to use? Let them know below.
-              </p>
-              <button
-                onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-                className="text-sm font-bold px-5 py-2.5 rounded-full cursor-pointer transition-all hover:scale-105"
-                style={{
-                  background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                  color: "white",
-                  boxShadow: "0 6px 16px rgba(99,102,241,0.35)",
-                }}
-              >
-                📝 Ask for a new website
-              </button>
+            <div style={{ textAlign: "center", padding: "24px 16px", opacity: 0.35 }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🌐</div>
+              <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>No learning apps yet — ask your teacher!</p>
+              <p style={{ fontSize: 11 }}>Got a site you'd love? Let them know.</p>
             </div>
           )}
         </div>
@@ -1587,17 +1638,23 @@ export default function StudentDashboard() {
 
       {/* Website request modal */}
       {showWebsiteRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowWebsiteRequest(false)}>
-          <div className="card max-w-md w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-2" style={{ color: dk ? "white" : "#1e293b" }}>Request a website</h3>
-            <p className="text-sm mb-4" style={{ color: dk ? "rgba(255,255,255,0.5)" : "#64748b" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.7)" }} onClick={() => setShowWebsiteRequest(false)}>
+          <div style={{
+            maxWidth: 440, width: "100%", padding: 24, borderRadius: 20,
+            background: "linear-gradient(135deg,#1a0f40,#0f1a3a)",
+            border: "1px solid rgba(139,92,246,.4)",
+            boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+            color: "white",
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Request a website</h3>
+            <p style={{ fontSize: 13, opacity: 0.55, marginBottom: 16 }}>
               Tell your teacher the name of the site you'd like to use. They'll review it and unlock it for you.
             </p>
             {websiteRequestSent ? (
-              <div className="text-center py-4">
-                <div className="text-4xl mb-2">✅</div>
-                <p className="text-sm font-semibold text-emerald-500">Request sent! Your teacher will review it.</p>
-                <button onClick={() => setShowWebsiteRequest(false)} className="btn-primary mt-4">Close</button>
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>Request sent! Your teacher will review it.</p>
+                <button onClick={() => setShowWebsiteRequest(false)} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Close</button>
               </div>
             ) : (
               <>
@@ -1606,7 +1663,7 @@ export default function StudentDashboard() {
                   value={websiteRequestTitle}
                   onChange={e => setWebsiteRequestTitle(e.target.value)}
                   placeholder="e.g. Typing Club, Prodigy, Cool Math…"
-                  className="input w-full mb-4"
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, marginBottom: 14, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                   maxLength={200}
                   onKeyDown={async e => {
                     if (e.key === "Enter" && websiteRequestTitle.trim()) {
@@ -1614,14 +1671,14 @@ export default function StudentDashboard() {
                     }
                   }}
                 />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowWebsiteRequest(false)} className="px-4 py-2 rounded-lg font-semibold" style={{ background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9", color: dk ? "rgba(255,255,255,0.7)" : "#64748b" }}>Cancel</button>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button onClick={() => setShowWebsiteRequest(false)} style={{ padding: "10px 18px", borderRadius: 12, background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)", border: "none", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
                   <button
                     disabled={!websiteRequestTitle.trim()}
                     onClick={async () => {
                       try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
                     }}
-                    className="btn-primary disabled:opacity-40"
+                    style={{ padding: "10px 22px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: websiteRequestTitle.trim() ? 1 : 0.4 }}
                   >
                     Send request
                   </button>
@@ -1633,58 +1690,72 @@ export default function StudentDashboard() {
       )}
 
       {/* Join a class */}
-      <div className="card animate-slide-up" style={{ animationDelay: "320ms" }}>
-        <h2 className="text-sm font-semibold mb-3" style={{ color: dk ? "rgba(255,255,255,0.7)" : "#374151" }}>Join a Class</h2>
-        <div className="flex gap-2">
+      <div style={{
+        borderRadius: 16, padding: "14px",
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+        animation: "dbSlide .5s ease .32s both",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 10 }}>Join a Class</div>
+        <div style={{ display: "flex", gap: 8 }}>
           <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
             placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
-            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} style={{ minHeight: 48 }} />
+            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} style={{ minHeight: 48, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }} />
           <button ref={joinBtnRef} onClick={handleJoinClass}
-            className={`btn-primary px-4 transition-all duration-200 ${joinSuccess ? "bg-emerald-500 hover:bg-emerald-500" : ""}`}
-            style={{ minHeight: 48 }}>
+            style={{
+              minHeight: 48, padding: "0 20px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer",
+              background: joinSuccess ? "#10b981" : "linear-gradient(135deg,#7c3aed,#6d28d9)",
+              color: "white", border: "none", transition: "all .2s",
+            }}>
             {joinSuccess ? "✓" : "Join"}
           </button>
         </div>
       </div>
 
       {/* Recent grades */}
-      <div className="card animate-slide-up" style={{ animationDelay: "400ms" }}>
-        <h2 className="text-base font-semibold mb-4" style={{ color: dk ? "white" : "#1e293b" }}>Recent Grades</h2>
-        <div className="space-y-2">
+      <div style={{
+        borderRadius: 16, padding: "14px",
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+        animation: "dbSlide .5s ease .4s both",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 10 }}>Recent Grades</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {submissions.slice(0, 5).map((s: any, i: number) => (
-            <div key={s.id} className="list-row animate-slide-in-right" style={{ animationDelay: `${500 + i * 50}ms` }}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: dk ? "rgba(139,92,246,0.1)" : "#f5f3ff" }}>
-                  <CheckCircle size={14} className="text-violet-400" />
+            <div key={s.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 12px", borderRadius: 12,
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+              animation: `dbSlide .4s ease ${500 + i * 50}ms both`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(139,92,246,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <CheckCircle size={14} style={{ color: "#a78bfa" }} />
                 </div>
                 <div>
-                  <div className="text-sm font-medium" style={{ color: dk ? "white" : "#1e293b" }}>{s.assignment_title || "Assignment"}</div>
-                  <div className="text-xs flex items-center gap-1" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
-                    <Clock size={10} />{new Date(s.submitted_at).toLocaleDateString()}
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.assignment_title || "Assignment"}</div>
+                  <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(s.submitted_at).toLocaleDateString()}</div>
                 </div>
               </div>
               <div>
                 {s.grade !== null ? (
-                  <span className="text-sm font-bold" style={{ color: s.grade >= 70 ? "#10b981" : "#ef4444" }}>{s.grade}%</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: s.grade >= 70 ? "#34d399" : "#f87171" }}>{s.grade}%</span>
                 ) : (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8", background: dk ? "rgba(255,255,255,0.05)" : "#f1f5f9" }}>Pending</span>
+                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,0.07)", opacity: 0.5 }}>Pending</span>
                 )}
               </div>
             </div>
           ))}
           {submissions.length === 0 && (
-            <p className="text-center text-sm py-8" style={{ color: dk ? "rgba(255,255,255,0.25)" : "#9ca3af" }}>No submissions yet</p>
+            <div style={{ textAlign: "center", padding: "24px", opacity: 0.3, fontSize: 13 }}>No submissions yet</div>
           )}
         </div>
       </div>
 
-      {/* Celebrating mascot on done dashboard */}
-      {!dk && (
-        <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
-          <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
-        </div>
-      )}
+      </div>{/* end padding wrapper */}
+
+      {/* Mascot corner badge */}
+      <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
+        <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
+      </div>
     </div>
   );
 }

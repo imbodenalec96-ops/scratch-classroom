@@ -100,7 +100,7 @@ export default function ClassroomBoard() {
   const [now, setNow] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [musicPlaying, setMusicPlaying] = useState(true);
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const musicRef = useRef<HTMLIFrameElement>(null);
 
   const toggleFullscreen = useCallback(async () => {
@@ -508,8 +508,8 @@ export default function ClassroomBoard() {
           title="ambient-music"
           width="1" height="1"
           style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
-          src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=1&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1`}
-          allow="autoplay"
+          src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=0&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1&playsinline=1`}
+          allow="autoplay; fullscreen"
         />
       )}
     </div>
