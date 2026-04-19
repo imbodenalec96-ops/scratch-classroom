@@ -41,6 +41,7 @@ import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
 import ClassroomBoard from "./components/ClassroomBoard.tsx";
 import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
+import StudentVideoPage from "./components/StudentVideoPage.tsx";
 import PrintAssignment from "./components/PrintAssignment.tsx";
 
 function AppLoader() {
@@ -136,6 +137,7 @@ export default function App() {
             <Route path="admin-dashboard" element={<AdminDashboard />} />
             <Route path="teacher" element={<TeacherDashboard />} />
             <Route path="student" element={<StudentDashboard />} />
+            <Route path="student/videos" element={<StudentVideoPage />} />
             <Route path="projects" element={<ProjectsGuard />} />
             <Route path="classes/:id" element={<ClassManager />} />
             <Route path="assignments" element={<AssignmentBuilder />} />

@@ -212,9 +212,10 @@ export const api = {
   // PDF → assignment pipeline
   // uploadPdf hits a different endpoint than the generic upload (multer memory
   // storage + base64 into assignment_files, not disk). Returns { id, ... }.
-  uploadPdf: async (file: File) => {
+  uploadPdf: async (file: File, classId?: string) => {
     const form = new FormData();
     form.append("file", file);
+    if (classId) form.append("classId", classId);
     const token = localStorage.getItem("token");
     const res = await fetch(`${BASE}/assignments/upload-pdf`, {
       method: "POST",
