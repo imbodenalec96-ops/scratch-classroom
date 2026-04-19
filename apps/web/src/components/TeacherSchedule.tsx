@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle } from "lucide-react";
+import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle, Coffee } from "lucide-react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 
@@ -17,7 +17,7 @@ type Block = {
 };
 
 const SUBJECTS = [
-  { value: "", label: "—" },
+  { value: "", label: "None" },
   { value: "daily_news", label: "Daily News" },
   { value: "sel", label: "SEL" },
   { value: "math", label: "Math" },
@@ -44,6 +44,39 @@ const BREAK_TYPES = [
 ];
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+// Subject color palette — each returns { bg, text, dot } tailwind-friendly inline style strings
+const SUBJECT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  math:           { bg: "rgba(59,130,246,0.15)",  text: "#60a5fa", dot: "#3b82f6" },
+  reading:        { bg: "rgba(16,185,129,0.15)",  text: "#34d399", dot: "#10b981" },
+  writing:        { bg: "rgba(168,85,247,0.15)",  text: "#c084fc", dot: "#a855f7" },
+  spelling:       { bg: "rgba(236,72,153,0.15)",  text: "#f472b6", dot: "#ec4899" },
+  sel:            { bg: "rgba(245,158,11,0.15)",  text: "#fbbf24", dot: "#f59e0b" },
+  daily_news:     { bg: "rgba(99,102,241,0.15)",  text: "#818cf8", dot: "#6366f1" },
+  review:         { bg: "rgba(20,184,166,0.15)",  text: "#2dd4bf", dot: "#14b8a6" },
+  extra_review:   { bg: "rgba(20,184,166,0.12)",  text: "#2dd4bf", dot: "#14b8a6" },
+  cashout:        { bg: "rgba(234,179,8,0.15)",   text: "#facc15", dot: "#eab308" },
+  video_learning: { bg: "rgba(239,68,68,0.15)",   text: "#f87171", dot: "#ef4444" },
+  ted_talk:       { bg: "rgba(239,68,68,0.15)",   text: "#f87171", dot: "#ef4444" },
+  coding_art_gym: { bg: "rgba(139,92,246,0.2)",   text: "#a78bfa", dot: "#7c3aed" },
+  dismissal:      { bg: "rgba(107,114,128,0.15)", text: "#9ca3af", dot: "#6b7280" },
+  recess:         { bg: "rgba(34,197,94,0.15)",   text: "#4ade80", dot: "#22c55e" },
+  calm_down:      { bg: "rgba(56,189,248,0.15)",  text: "#38bdf8", dot: "#0ea5e9" },
+  lunch:          { bg: "rgba(251,146,60,0.15)",  text: "#fb923c", dot: "#f97316" },
+};
+
+const BREAK_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  recess:    { bg: "rgba(34,197,94,0.12)",  text: "#4ade80", dot: "#22c55e" },
+  calm_down: { bg: "rgba(56,189,248,0.12)", text: "#38bdf8", dot: "#0ea5e9" },
+  lunch:     { bg: "rgba(251,146,60,0.12)", text: "#fb923c", dot: "#f97316" },
+  regular:   { bg: "rgba(255,255,255,0.06)", text: "#9ca3af", dot: "#6b7280" },
+};
+
+function getBlockColor(b: Block) {
+  if (b.is_break) return BREAK_COLORS[b.break_type || "regular"] || BREAK_COLORS.regular;
+  if (b.subject && SUBJECT_COLORS[b.subject]) return SUBJECT_COLORS[b.subject];
+  return { bg: "rgba(255,255,255,0.04)", text: "var(--t2)", dot: "#6b7280" };
+}
 
 function parseSelContent(raw: string | null | undefined): { videoUrl: string; assignmentUrl: string } {
   if (!raw) return { videoUrl: "", assignmentUrl: "" };
@@ -81,6 +114,14 @@ function currentBlock(blocks: Block[], now: string): Block | null {
   return null;
 }
 
+function formatTime(t: string): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
 export default function TeacherSchedule() {
   const { theme } = useTheme();
   const dk = theme === "dark";
@@ -93,13 +134,13 @@ export default function TeacherSchedule() {
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [now, setNow] = useState(nowHHMM());
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const iv = setInterval(() => setNow(nowHHMM()), 30_000);
     return () => clearInterval(iv);
   }, []);
 
-  // Load class list
   useEffect(() => {
     api.getClasses()
       .then((cs: any[]) => {
@@ -109,7 +150,6 @@ export default function TeacherSchedule() {
       .catch((e) => setError(e?.message || "Failed to load classes"));
   }, []);
 
-  // Load schedule for selected class
   useEffect(() => {
     if (!classId) return;
     setLoading(true);
@@ -137,6 +177,7 @@ export default function TeacherSchedule() {
   function addBlock() {
     const last = blocks[blocks.length - 1];
     const start = last?.end_time || "09:00";
+    const newIndex = blocks.length;
     setBlocks((prev) => [
       ...prev,
       {
@@ -150,12 +191,14 @@ export default function TeacherSchedule() {
       },
     ]);
     setDirty(true);
+    setExpandedIndex(newIndex);
   }
 
   function deleteBlock(index: number) {
     const b = blocks[index];
     if (!confirm(`Delete block "${b?.label || index + 1}"?`)) return;
     setBlocks((prev) => prev.filter((_, i) => i !== index));
+    if (expandedIndex === index) setExpandedIndex(null);
     setDirty(true);
   }
 
@@ -214,20 +257,27 @@ export default function TeacherSchedule() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 pb-24">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div className="max-w-4xl mx-auto p-6 pb-28">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold flex items-center gap-2 text-t1">
-            <Clock size={22} className="text-violet-400" style={{ filter: "drop-shadow(0 0 6px rgba(139,92,246,0.5))" }} />
+          <div className="text-[10px] uppercase tracking-[0.18em] mb-1.5" style={{ color: "var(--t3)" }}>Teacher Settings</div>
+          <h1 className="text-2xl font-bold flex items-center gap-2.5" style={{ color: "var(--t1)" }}>
+            <span className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(124,58,237,0.2)" }}>
+              <Clock size={16} style={{ color: "#a78bfa" }} />
+            </span>
             Schedule Editor
           </h1>
-          <p className="text-sm text-t3 mt-1">Edit daily blocks, breaks, and subjects. Students' auto-nav and dashboards read from here.</p>
+          <p className="text-sm mt-1.5 max-w-lg" style={{ color: "var(--t3)" }}>
+            Define daily blocks, breaks, and subjects. Students' auto-navigation reads from here.
+          </p>
         </div>
         {classes.length > 1 && (
           <select
             value={classId}
             onChange={(e) => setClassId(e.target.value)}
             className="input text-sm"
+            style={{ minWidth: 160 }}
           >
             {classes.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -237,195 +287,370 @@ export default function TeacherSchedule() {
       </div>
 
       {error && (
-        <div className={`mb-3 rounded-lg border px-3 py-2 text-sm flex items-start gap-2 ${dk ? "bg-red-500/10 border-red-500/30 text-red-300" : "bg-red-50 border-red-200 text-red-700"}`}>
-          <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{error}</span>
+        <div className="mb-5 rounded-xl border px-4 py-3 text-sm flex items-start gap-2.5"
+          style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.25)", color: "#fca5a5" }}>
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Live now strip */}
+      {!loading && (
+        <div className="mb-5 rounded-xl border px-4 py-3 flex items-center gap-3 flex-wrap"
+          style={{
+            background: liveBlock ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.02)",
+            borderColor: liveBlock ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.06)",
+          }}>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ background: liveBlock ? "#a78bfa" : "#4b5563" }} />
+            <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>
+              Now · {formatTime(now)}
+            </span>
+          </div>
+          {liveBlock ? (
+            <>
+              <span className="text-[11px]" style={{ color: "var(--t3)" }}>|</span>
+              <span className="text-sm font-semibold" style={{ color: "var(--t1)" }}>{liveBlock.label}</span>
+              <span className="text-xs" style={{ color: "var(--t3)" }}>
+                {formatTime(liveBlock.start_time)} – {formatTime(liveBlock.end_time)}
+              </span>
+              {liveBlock.subject && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    background: getBlockColor(liveBlock).bg,
+                    color: getBlockColor(liveBlock).text,
+                  }}>
+                  {SUBJECTS.find(s => s.value === liveBlock.subject)?.label || liveBlock.subject}
+                </span>
+              )}
+              {liveBlock.is_break && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "var(--t2)" }}>
+                  Break
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm" style={{ color: "var(--t3)" }}>No block active right now</span>
+          )}
         </div>
       )}
 
       {loading ? (
-        <div className="text-sm text-t3 py-10 text-center">Loading schedule…</div>
+        <div className="rounded-2xl border flex items-center justify-center py-24"
+          style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
+          <div className="text-sm" style={{ color: "var(--t3)" }}>Loading schedule…</div>
+        </div>
       ) : (
         <>
-          <div className={`rounded-xl border overflow-hidden ${dk ? "border-white/[0.08]" : "border-gray-200"}`}>
-            <div className={`grid grid-cols-[36px_100px_100px_minmax(140px,1fr)_160px_80px_140px_180px_40px] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${dk ? "bg-white/[0.03] text-white/50" : "bg-gray-50 text-gray-500"}`}>
-              <div>#</div>
-              <div>Start</div>
-              <div>End</div>
-              <div>Label</div>
-              <div>Subject</div>
-              <div>Break?</div>
-              <div>Break type</div>
-              <div>Active days</div>
-              <div></div>
-            </div>
+          {/* Block list */}
+          <div className="space-y-2">
             {blocks.length === 0 && (
-              <div className="px-3 py-6 text-sm text-t3 text-center">No blocks yet. Click "Add block" to begin.</div>
+              <div className="rounded-2xl border flex flex-col items-center justify-center py-16 gap-3"
+                style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
+                <Clock size={24} style={{ color: "var(--t3)", opacity: 0.4 }} />
+                <p className="text-sm" style={{ color: "var(--t3)" }}>No blocks yet. Click "Add block" below to start.</p>
+              </div>
             )}
             {blocks.map((b, i) => {
               const days = normalizeDays(b.active_days);
               const isLive = liveBlock === b;
+              const color = getBlockColor(b);
+              const isExpanded = expandedIndex === i;
               const selContent = b.subject === "sel" ? parseSelContent(b.content_source) : null;
+
               return (
                 <Fragment key={i}>
-                <div
-                  className={`grid grid-cols-[36px_100px_100px_minmax(140px,1fr)_160px_80px_140px_180px_40px] gap-2 px-3 py-2 items-center border-t ${dk ? "border-white/[0.06]" : "border-gray-100"} ${isLive ? (dk ? "bg-violet-500/10" : "bg-violet-50") : ""}`}
-                >
-                  <div className="text-xs text-t3 font-mono">{i + 1}</div>
-                  <input
-                    type="time"
-                    value={b.start_time}
-                    onChange={(e) => updateBlock(i, { start_time: e.target.value })}
-                    className="input text-xs py-1"
-                  />
-                  <input
-                    type="time"
-                    value={b.end_time}
-                    onChange={(e) => updateBlock(i, { end_time: e.target.value })}
-                    className="input text-xs py-1"
-                  />
-                  <input
-                    type="text"
-                    value={b.label}
-                    onChange={(e) => updateBlock(i, { label: e.target.value })}
-                    className="input text-xs py-1"
-                    placeholder="Block label"
-                  />
-                  <select
-                    value={b.subject || ""}
-                    onChange={(e) => updateBlock(i, { subject: e.target.value || null })}
-                    className="input text-xs py-1"
+                  {/* Block card */}
+                  <div
+                    className="rounded-2xl border overflow-hidden transition-all"
+                    style={{
+                      borderColor: isLive ? "rgba(124,58,237,0.4)" : isExpanded ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)",
+                      background: isLive ? "rgba(124,58,237,0.07)" : isExpanded ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                      boxShadow: isLive ? "0 0 0 1px rgba(124,58,237,0.2)" : "none",
+                    }}
                   >
-                    {SUBJECTS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                  <label className="flex items-center gap-2 text-xs text-t3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!b.is_break}
-                      onChange={(e) => updateBlock(i, { is_break: e.target.checked, break_type: e.target.checked ? (b.break_type || "regular") : null })}
-                    />
-                    <span>Break</span>
-                  </label>
-                  {b.is_break ? (
-                    <select
-                      value={b.break_type || "regular"}
-                      onChange={(e) => updateBlock(i, { break_type: e.target.value })}
-                      className="input text-xs py-1"
+                    {/* Collapsed summary row — click to expand */}
+                    <button
+                      className="w-full text-left"
+                      onClick={() => setExpandedIndex(isExpanded ? null : i)}
                     >
-                      {BREAK_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="text-xs text-t3/40">—</div>
-                  )}
-                  <div className="flex gap-1">
-                    {DAYS.map((d) => {
-                      const on = days.includes(d);
-                      return (
-                        <button
-                          key={d}
-                          onClick={() => {
-                            const next = on ? days.filter((x) => x !== d) : [...days, d];
-                            updateBlock(i, { active_days: DAYS.filter((x) => next.includes(x)) });
-                          }}
-                          className={`text-[10px] font-medium w-8 h-6 rounded border transition-all ${
-                            on
-                              ? (dk ? "bg-violet-600/70 border-violet-500/60 text-white" : "bg-violet-500 border-violet-500 text-white")
-                              : (dk ? "bg-white/5 border-white/10 text-white/40 hover:bg-white/10" : "bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200")
-                          }`}
-                          title={d}
-                        >
-                          {d[0]}
-                        </button>
-                      );
-                    })}
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        {/* Color dot + block number */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ background: color.dot }} />
+                          <span className="text-[11px] font-mono font-semibold w-5 text-right" style={{ color: "var(--t3)" }}>
+                            {i + 1}
+                          </span>
+                        </div>
+
+                        {/* Time range */}
+                        <div className="shrink-0 text-xs font-mono font-semibold w-32" style={{ color: "var(--t2)" }}>
+                          {formatTime(b.start_time)} – {formatTime(b.end_time)}
+                        </div>
+
+                        {/* Label */}
+                        <div className="flex-1 text-sm font-semibold truncate" style={{ color: "var(--t1)" }}>
+                          {b.label || <span style={{ color: "var(--t3)" }}>Untitled block</span>}
+                        </div>
+
+                        {/* Subject / break pill */}
+                        {(b.subject || b.is_break) && (
+                          <div className="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full"
+                            style={{ background: color.bg, color: color.text }}>
+                            {b.is_break
+                              ? (BREAK_TYPES.find(t => t.value === (b.break_type || "regular"))?.label || "Break")
+                              : (SUBJECTS.find(s => s.value === b.subject)?.label || b.subject)}
+                          </div>
+                        )}
+
+                        {/* Day pills */}
+                        <div className="flex gap-0.5 shrink-0">
+                          {DAYS.map((d) => (
+                            <span key={d}
+                              className="text-[9px] font-bold w-6 h-5 rounded flex items-center justify-center"
+                              style={{
+                                background: days.includes(d) ? color.bg : "rgba(255,255,255,0.04)",
+                                color: days.includes(d) ? color.text : "rgba(255,255,255,0.2)",
+                              }}>
+                              {d[0]}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Live badge */}
+                        {isLive && (
+                          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse"
+                            style={{ background: "rgba(124,58,237,0.25)", color: "#a78bfa" }}>
+                            LIVE
+                          </span>
+                        )}
+
+                        {/* Expand chevron */}
+                        <span className="shrink-0 text-xs transition-transform ml-1"
+                          style={{
+                            color: "var(--t3)",
+                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                            display: "inline-block",
+                          }}>
+                          ▾
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Expanded edit form */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-1 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                          {/* Start time */}
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Start</span>
+                            <input
+                              type="time"
+                              value={b.start_time}
+                              onChange={(e) => updateBlock(i, { start_time: e.target.value })}
+                              className="input text-sm font-mono"
+                            />
+                          </label>
+                          {/* End time */}
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>End</span>
+                            <input
+                              type="time"
+                              value={b.end_time}
+                              onChange={(e) => updateBlock(i, { end_time: e.target.value })}
+                              className="input text-sm font-mono"
+                            />
+                          </label>
+                          {/* Label */}
+                          <label className="flex flex-col gap-1.5 sm:col-span-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Label</span>
+                            <input
+                              type="text"
+                              value={b.label}
+                              onChange={(e) => updateBlock(i, { label: e.target.value })}
+                              className="input text-sm"
+                              placeholder="Block label"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+                          {/* Subject */}
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Subject</span>
+                            <select
+                              value={b.subject || ""}
+                              onChange={(e) => updateBlock(i, { subject: e.target.value || null })}
+                              className="input text-sm"
+                            >
+                              {SUBJECTS.map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                              ))}
+                            </select>
+                          </label>
+
+                          {/* Break toggle + type */}
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Break type</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => updateBlock(i, {
+                                  is_break: !b.is_break,
+                                  break_type: !b.is_break ? (b.break_type || "regular") : null,
+                                })}
+                                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-all"
+                                style={{
+                                  background: b.is_break ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                                  borderColor: b.is_break ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.07)",
+                                  color: b.is_break ? "var(--t1)" : "var(--t3)",
+                                }}>
+                                <Coffee size={12} />
+                                {b.is_break ? "Yes" : "No"}
+                              </button>
+                              {b.is_break && (
+                                <select
+                                  value={b.break_type || "regular"}
+                                  onChange={(e) => updateBlock(i, { break_type: e.target.value })}
+                                  className="input text-sm flex-1"
+                                >
+                                  {BREAK_TYPES.map((t) => (
+                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          </label>
+
+                          {/* Active days */}
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Active days</span>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {DAYS.map((d) => {
+                                const on = days.includes(d);
+                                return (
+                                  <button
+                                    key={d}
+                                    onClick={() => {
+                                      const next = on ? days.filter((x) => x !== d) : [...days, d];
+                                      updateBlock(i, { active_days: DAYS.filter((x) => next.includes(x)) });
+                                    }}
+                                    className="text-[11px] font-bold w-9 h-8 rounded-lg border transition-all"
+                                    style={{
+                                      background: on ? color.bg : "rgba(255,255,255,0.04)",
+                                      borderColor: on ? color.dot + "60" : "rgba(255,255,255,0.08)",
+                                      color: on ? color.text : "rgba(255,255,255,0.3)",
+                                    }}
+                                    title={d}
+                                  >
+                                    {d[0]}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SEL content sub-row */}
+                        {selContent && (
+                          <div className="rounded-xl p-3 mb-3 border"
+                            style={{ background: "rgba(245,158,11,0.07)", borderColor: "rgba(245,158,11,0.2)" }}>
+                            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#fbbf24" }}>
+                              SEL Content Links
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>Video URL</span>
+                                <input
+                                  type="url"
+                                  placeholder="YouTube, Vimeo…"
+                                  value={selContent.videoUrl}
+                                  onChange={(e) => updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) })}
+                                  className="input text-xs"
+                                />
+                              </label>
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[10px]" style={{ color: "var(--t3)" }}>Assignment URL</span>
+                                <input
+                                  type="url"
+                                  placeholder="Google Form…"
+                                  value={selContent.assignmentUrl}
+                                  onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
+                                  className="input text-xs"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Delete action */}
+                        <div className="flex justify-end pt-1">
+                          <button
+                            onClick={() => deleteBlock(i)}
+                            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all"
+                            style={{
+                              background: "rgba(239,68,68,0.07)",
+                              borderColor: "rgba(239,68,68,0.2)",
+                              color: "#f87171",
+                            }}
+                          >
+                            <Trash2 size={12} /> Delete block
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteBlock(i)}
-                    className={`flex items-center justify-center w-8 h-8 rounded-lg ${dk ? "text-red-400 hover:bg-red-500/15" : "text-red-600 hover:bg-red-50"}`}
-                    title="Delete block"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                {selContent && (
-                  <div className={`px-3 pb-2 pt-1 border-t ${dk ? "border-amber-500/15" : "border-amber-200/60"} ${dk ? "bg-amber-500/5" : "bg-amber-50/60"}`}>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-semibold text-amber-400 shrink-0">💛 SEL Content</span>
-                      <input
-                        type="url"
-                        placeholder="Video URL (YouTube, etc.)"
-                        value={selContent.videoUrl}
-                        onChange={(e) => updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) })}
-                        className="input text-xs py-1 flex-1 min-w-[180px]"
-                      />
-                      <input
-                        type="url"
-                        placeholder="Assignment URL (Google Form, etc.)"
-                        value={selContent.assignmentUrl}
-                        onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
-                        className="input text-xs py-1 flex-1 min-w-[180px]"
-                      />
-                    </div>
-                  </div>
-                )}
                 </Fragment>
               );
             })}
           </div>
 
-          <div className="flex items-center gap-2 mt-4 flex-wrap">
-            <button onClick={addBlock} className="btn-secondary gap-2 text-sm">
-              <Plus size={14} /> Add block
-            </button>
+          {/* Bottom action bar */}
+          <div className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 px-6 py-4 border-t"
+            style={{
+              background: "rgba(7,7,20,0.85)",
+              backdropFilter: "blur(16px)",
+              borderColor: "rgba(255,255,255,0.07)",
+            }}>
             <button
-              onClick={saveAll}
-              disabled={!dirty || saving}
-              className={`btn-primary gap-2 text-sm ${savedFlash ? "bg-emerald-500 border-emerald-500" : ""} disabled:opacity-40`}
-            >
-              <Save size={14} />
-              {saving ? "Saving…" : savedFlash ? "Saved!" : dirty ? "Save all changes" : "No changes"}
+              onClick={addBlock}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                borderColor: "rgba(255,255,255,0.1)",
+                color: "var(--t1)",
+              }}>
+              <Plus size={15} /> Add block
             </button>
-            <button
-              onClick={resetDefault}
-              disabled={saving}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border cursor-pointer transition-all disabled:opacity-40 ${dk ? "bg-amber-500/10 hover:bg-amber-500/18 text-amber-400 border-amber-500/25" : "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"}`}
-            >
-              <RotateCcw size={14} /> Reset to default
-            </button>
-            {dirty && (
-              <span className="text-xs text-amber-500 ml-2">Unsaved changes</span>
-            )}
-          </div>
 
-          {/* Live preview strip */}
-          <div className={`mt-6 rounded-xl border p-4 ${dk ? "bg-white/[0.03] border-white/[0.08]" : "bg-gray-50 border-gray-200"}`}>
-            <div className="flex items-center gap-3">
-              <div className={`text-[10px] font-semibold uppercase tracking-wide ${dk ? "text-white/40" : "text-gray-500"}`}>Now ({now})</div>
-              {liveBlock ? (
-                <>
-                  <div className={`px-2 py-1 rounded-md text-xs font-semibold ${dk ? "bg-violet-500/20 text-violet-300" : "bg-violet-100 text-violet-700"}`}>
-                    {liveBlock.label}
-                  </div>
-                  <div className="text-xs text-t3">
-                    {liveBlock.start_time}–{liveBlock.end_time}
-                  </div>
-                  {liveBlock.subject && (
-                    <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${dk ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-600"}`}>
-                      {liveBlock.subject}
-                    </div>
-                  )}
-                  {liveBlock.is_break ? (
-                    <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${dk ? "bg-amber-500/20 text-amber-300" : "bg-amber-100 text-amber-700"}`}>
-                      break
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="text-xs text-t3">No block matches the current time.</div>
+            <div className="flex items-center gap-2">
+              {dirty && (
+                <span className="text-xs font-medium" style={{ color: "#f59e0b" }}>Unsaved changes</span>
               )}
+              <button
+                onClick={resetDefault}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40"
+                style={{
+                  background: "rgba(245,158,11,0.08)",
+                  borderColor: "rgba(245,158,11,0.2)",
+                  color: "#fbbf24",
+                }}>
+                <RotateCcw size={14} /> Reset
+              </button>
+              <button
+                onClick={saveAll}
+                disabled={!dirty || saving}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+                style={{
+                  background: savedFlash ? "rgba(16,185,129,0.85)" : dirty ? "#7c3aed" : "rgba(255,255,255,0.06)",
+                  color: dirty || savedFlash ? "white" : "var(--t3)",
+                  boxShadow: dirty && !savedFlash ? "0 0 20px rgba(124,58,237,0.4)" : "none",
+                }}>
+                <Save size={14} />
+                {saving ? "Saving…" : savedFlash ? "Saved!" : dirty ? "Save changes" : "No changes"}
+              </button>
             </div>
           </div>
         </>

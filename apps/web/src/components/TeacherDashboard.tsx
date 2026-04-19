@@ -49,7 +49,7 @@ const PUSH_PAGES = [
 const ANIM = `
   @keyframes td-fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
   @keyframes td-shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
-  @keyframes td-pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+  @keyframes td-pulse { 0%,100%{opacity:1;} 50%{opacity:.45;} }
 `;
 
 export default function TeacherDashboard() {
@@ -135,36 +135,34 @@ export default function TeacherDashboard() {
 
   const handleForceUnlockAll = async () => {
     if (!confirm("Force-unlock EVERY class? This clears all active locks system-wide.")) return;
-    try { await api.forceUnlockAll(); setIsClassLocked(false); alert("✓ All classes unlocked."); }
+    try { await api.forceUnlockAll(); setIsClassLocked(false); alert("All classes unlocked."); }
     catch (e: any) { alert("Failed: " + (e?.message || e)); }
   };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const g = (a: number) => `rgba(255,255,255,${a})`;
-  const surface = dk ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.9)";
-  const border  = dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const surface = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
+  const border  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
   const text1   = dk ? "#f1f5f9" : "#0f172a";
-  const text2   = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
-  const card = {
+  const text2   = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const cardStyle = {
     background: surface, border: `1px solid ${border}`,
-    borderRadius: 16, backdropFilter: "blur(12px)",
+    borderRadius: 20, backdropFilter: "blur(16px)",
   } as const;
 
   return (
     <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8", color: text1, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
-      {/* Message modal */}
       {showMsgModal && (
-        <div style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center" }}
+        <div style={{ position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center" }}
           onClick={e => { if (e.target === e.currentTarget) setShowMsgModal(false); }}>
-          <div style={{ ...card, padding: 24, width: "100%", maxWidth: 440, boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
-            <h3 style={{ fontWeight: 800, fontSize: 17, marginBottom: 16, color: text1 }}>💬 Message Everyone</h3>
+          <div style={{ ...cardStyle, padding: 28, width: "100%", maxWidth: 440, boxShadow: "0 32px 80px rgba(0,0,0,0.45)" }}>
+            <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 18, color: text1, letterSpacing:"-0.01em" }}>Message Everyone</h3>
             <textarea value={msgText} onChange={e => setMsgText(e.target.value)} placeholder="Type your message…"
               className="input w-full text-sm resize-none" rows={3} autoFocus />
-            <div style={{ display:"flex", gap:8, marginTop:14 }}>
+            <div style={{ display:"flex", gap:8, marginTop:16 }}>
               <button onClick={handleSendMessage} disabled={!msgText.trim()} className="btn-primary flex-1 gap-2"><Send size={14}/> Send</button>
               <button onClick={() => { setShowMsgModal(false); setMsgText(""); }} className="btn-secondary px-4">Cancel</button>
             </div>
@@ -172,300 +170,295 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* ── Hero header ── */}
       <div style={{
         background: dk
-          ? "linear-gradient(135deg, #0d0d28 0%, #1a0a3a 60%, #0a1228 100%)"
-          : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 60%, #2563eb 100%)",
-        padding: "28px 32px 28px", marginBottom: 28,
-        position: "relative", overflow: "hidden",
+          ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
+          : "linear-gradient(160deg,#7c3aed 0%,#4f46e5 60%,#2563eb 100%)",
+        padding: "32px 40px 32px",
+        marginBottom: 32,
+        position: "relative",
+        overflow: "hidden",
       }}>
-        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 80% 50%, rgba(255,255,255,0.06) 0%, transparent 60%)",pointerEvents:"none" }} />
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 40%,rgba(124,58,237,0.2) 0%,transparent 65%)",pointerEvents:"none" }} />
+        <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 15% 80%,rgba(59,130,246,0.1) 0%,transparent 60%)",pointerEvents:"none" }} />
 
-      <header style={{ maxWidth: 1280, margin: "0 auto", position: "relative", animation: "td-fadeUp .5s ease both" }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 8 }}>
-          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        </div>
-        <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
-          <div>
-            <h1 style={{
-              fontSize: 42, fontWeight: 900, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.05,
-              color: "white",
-              backgroundSize: "200% auto",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              animation: "td-shimmer 6s linear infinite",
-            }}>
-              {greeting}, {user?.name?.split(" ")[0]}.
-            </h1>
-            <p style={{ fontSize: 13, marginTop: 6, color: "rgba(255,255,255,0.65)" }}>
-              Manage your classroom, monitor students, keep the day on track.
-            </p>
+        <header style={{ maxWidth: 1280, margin: "0 auto", position: "relative", animation: "td-fadeUp .45s ease both" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", marginBottom: 10 }}>
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </div>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {classes[0]?.id && (
-              <a href={`/board?class=${encodeURIComponent(classes[0].id)}`} target="_blank" rel="noopener noreferrer"
-                style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,textDecoration:"none",
-                  background:"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.35)", color:"white",
-                  backdropFilter:"blur(8px)",
-                }}>
-                <Tv size={13}/> Open Board
-              </a>
-            )}
-            <Link to="/teacher/board-settings" style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,textDecoration:"none",
-              background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.25)", color:"rgba(255,255,255,0.85)" }}>
-              <Tv size={13}/> Board Settings
-            </Link>
-            <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
-              background:"rgba(239,68,68,0.25)", border:"1px solid rgba(239,68,68,0.5)", color:"#fecaca" }}>
-              <LockOpen size={13}/> Force Unlock All
-            </button>
-          </div>
-        </div>
-      </header>
-      </div>
-
-      <div style={{ padding: "0 32px 32px", maxWidth: 1280, margin: "0 auto" }}>
-
-      {/* ── Tools grid ── */}
-      <div style={{
-        display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(120px, 1fr))", gap:10, marginBottom:24,
-        animation: "td-fadeUp .5s ease .08s both",
-      }}>
-        {TOOLS.map((t, i) => (
-          <Link key={t.path} to={t.path} style={{
-            display:"flex",flexDirection:"column",gap:10,padding:"14px 12px",
-            borderRadius:14, textDecoration:"none",
-            background: surface, border:`1px solid ${border}`,
-            transition:"all 0.2s ease",
-            animationDelay: `${i * 45}ms`,
-            animation: "td-fadeUp .45s ease both",
-          }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)";
-              (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 28px ${t.glow}`;
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.transform = "";
-              (e.currentTarget as HTMLElement).style.boxShadow = "";
-            }}
-          >
-            <div style={{
-              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-              background: t.grad, display:"flex", alignItems:"center", justifyContent:"center",
-              boxShadow: `0 4px 12px ${t.glow}`,
-            }}>
-              <t.icon size={17} color="white" />
+          <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
+            <div>
+              <h1 style={{ fontSize: 38, fontWeight: 900, letterSpacing: "-0.035em", margin: 0, lineHeight: 1.08, color: "white" }}>
+                {greeting}, {user?.name?.split(" ")[0]}.
+              </h1>
+              <p style={{ fontSize: 13, marginTop: 8, color: "rgba(255,255,255,0.55)", letterSpacing:"0.01em" }}>
+                Manage your classroom, monitor students, keep the day on track.
+              </p>
             </div>
-            <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:text1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                {t.label}
-                {t.label === "YouTube" && pendingYouTube > 0 && (
-                  <span style={{ marginLeft:4, fontSize:9, background:"#ef4444", color:"white", borderRadius:20, padding:"1px 5px", fontWeight:800 }}>{pendingYouTube}</span>
-                )}
-              </div>
-              <div style={{ fontSize:10, color:text2, marginTop:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.desc}</div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* ── 3-col lower grid ── */}
-      <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, animation:"td-fadeUp .5s ease .15s both" }}>
-
-        {/* Classes panel */}
-        <div style={{ ...card, padding:"16px 14px" }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", color:text2, marginBottom:10 }}>My Classes</div>
-          <div style={{ display:"flex", gap:6, marginBottom:10 }}>
-            <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="Class name…"
-              className="input text-sm flex-1" style={{ fontSize:12 }}
-              onKeyDown={e => e.key === "Enter" && handleCreateClass()} />
-            <button onClick={handleCreateClass} className="btn-primary" style={{ padding:"6px 10px" }}>
-              <Plus size={13}/>
-            </button>
-          </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-            {classes.map(cls => (
-              <button key={cls.id}
-                onClick={() => { setSelectedClass(cls); loadStudents(cls.id); setIsClassLocked(false); }}
-                style={{
-                  textAlign:"left", padding:"8px 10px", borderRadius:10, fontSize:12, cursor:"pointer",
-                  border:`1px solid ${selectedClass?.id === cls.id ? "rgba(124,58,237,0.4)" : "transparent"}`,
-                  background: selectedClass?.id === cls.id
-                    ? "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.12))"
-                    : "transparent",
-                  color: selectedClass?.id === cls.id ? "#a78bfa" : text2,
-                  transition:"all 0.15s ease",
-                }}>
-                <div style={{ fontWeight:700 }}>{cls.name}</div>
-                <div style={{ fontFamily:"monospace", fontSize:10, opacity:0.5, marginTop:2 }}>{cls.code}</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {classes[0]?.id && (
+                <a href={`/board?class=${encodeURIComponent(classes[0].id)}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:700,textDecoration:"none",
+                    background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.3)", color:"white", backdropFilter:"blur(8px)" }}>
+                  <Tv size={13}/> Open Board
+                </a>
+              )}
+              <Link to="/teacher/board-settings" style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:600,textDecoration:"none",
+                background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.18)", color:"rgba(255,255,255,0.8)" }}>
+                <Tv size={13}/> Board Settings
+              </Link>
+              <button onClick={handleForceUnlockAll} style={{ display:"flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",
+                background:"rgba(239,68,68,0.2)", border:"1px solid rgba(239,68,68,0.4)", color:"#fca5a5" }}>
+                <LockOpen size={13}/> Force Unlock All
               </button>
-            ))}
-            {classes.length === 0 && <p style={{ fontSize:12, textAlign:"center", padding:"20px 0", color:text2 }}>No classes yet</p>}
+            </div>
           </div>
-        </div>
+        </header>
+      </div>
 
-        {/* Right: controls + students + activity */}
-        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          {selectedClass ? (
-            <>
-              <DailyNewsAdmin classId={selectedClass.id} dk={dk} />
+      <div style={{ padding: "0 40px 48px", maxWidth: 1280, margin: "0 auto" }}>
 
-              {/* Classroom controls */}
-              <div style={{ ...card, padding:"16px 18px" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:text1 }}>Classroom Controls</div>
-                    <span style={{ fontSize:11, color:text2 }}>{selectedClass.name}</span>
-                  </div>
-                  {isClassLocked && (
-                    <span style={{ display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
-                      background:"rgba(239,68,68,0.15)", color:"#f87171", border:"1px solid rgba(239,68,68,0.3)",
-                      animation:"td-pulse 2s infinite",
-                    }}>
-                      <Lock size={11}/> LOCKED
-                    </span>
+        <div style={{
+          display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10, marginBottom:28,
+          animation: "td-fadeUp .5s ease .08s both",
+        }}>
+          {TOOLS.map((t, i) => (
+            <Link key={t.path} to={t.path} style={{
+              display:"flex",flexDirection:"column",gap:12,padding:"16px 14px",
+              borderRadius:16, textDecoration:"none",
+              background: surface, border:`1px solid ${border}`,
+              transition:"all 0.2s ease",
+              animationDelay: `${i * 40}ms`,
+              animation: "td-fadeUp .45s ease both",
+            }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
+                (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 32px ${t.glow}`;
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.transform = "";
+                (e.currentTarget as HTMLElement).style.boxShadow = "";
+                (e.currentTarget as HTMLElement).style.borderColor = border;
+              }}
+            >
+              <div style={{
+                width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+                background: t.grad, display:"flex", alignItems:"center", justifyContent:"center",
+                boxShadow: `0 6px 16px ${t.glow}`,
+              }}>
+                <t.icon size={17} color="white" />
+              </div>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:text1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"0.01em" }}>
+                  {t.label}
+                  {t.label === "YouTube" && pendingYouTube > 0 && (
+                    <span style={{ marginLeft:5, fontSize:9, background:"#ef4444", color:"white", borderRadius:20, padding:"2px 6px", fontWeight:800, verticalAlign:"middle" }}>{pendingYouTube}</span>
                   )}
                 </div>
+                <div style={{ fontSize:10, color:text2, marginTop:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.desc}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-                <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                  <input value={announcement} onChange={e => setAnnouncement(e.target.value)}
-                    placeholder="Type announcement…" className="input text-sm flex-1"
-                    onKeyDown={e => e.key === "Enter" && handleBroadcast()} />
-                  <button onClick={handleBroadcast}
-                    style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",
-                      border:"none",
-                      background: announceSent ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#8b5cf6,#7c3aed)",
-                      color:"white", transition:"all 0.2s ease",
-                    }}>
-                    {announceSent ? "Sent!" : <><Megaphone size={13}/> Broadcast</>}
-                  </button>
+        <div style={{ display:"grid", gridTemplateColumns:"210px 1fr", gap:16, animation:"td-fadeUp .5s ease .15s both" }}>
+
+          <div style={{ ...cardStyle, padding:"18px 16px" }}>
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:text2, marginBottom:12 }}>My Classes</div>
+            <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+              <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="New class…"
+                className="input text-sm flex-1" style={{ fontSize:12 }}
+                onKeyDown={e => e.key === "Enter" && handleCreateClass()} />
+              <button onClick={handleCreateClass} className="btn-primary" style={{ padding:"6px 10px", borderRadius:10 }}>
+                <Plus size={13}/>
+              </button>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+              {classes.map(cls => (
+                <button key={cls.id}
+                  onClick={() => { setSelectedClass(cls); loadStudents(cls.id); setIsClassLocked(false); }}
+                  style={{
+                    textAlign:"left", padding:"9px 11px", borderRadius:12, fontSize:12, cursor:"pointer",
+                    border:`1px solid ${selectedClass?.id === cls.id ? "rgba(124,58,237,0.35)" : "transparent"}`,
+                    background: selectedClass?.id === cls.id
+                      ? "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(79,70,229,0.1))"
+                      : "transparent",
+                    color: selectedClass?.id === cls.id ? "#c4b5fd" : text2,
+                    transition:"all 0.15s ease",
+                  }}>
+                  <div style={{ fontWeight:700, fontSize:12 }}>{cls.name}</div>
+                  <div style={{ fontFamily:"monospace", fontSize:10, opacity:0.5, marginTop:2 }}>{cls.code}</div>
+                </button>
+              ))}
+              {classes.length === 0 && <p style={{ fontSize:12, textAlign:"center", padding:"24px 0", color:text2 }}>No classes yet</p>}
+            </div>
+          </div>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {selectedClass ? (
+              <>
+                <DailyNewsAdmin classId={selectedClass.id} dk={dk} />
+
+                <div style={{ ...cardStyle, padding:"18px 20px" }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:text1, letterSpacing:"-0.01em" }}>Classroom Controls</div>
+                      <span style={{ fontSize:11, color:text2, padding:"3px 9px", borderRadius:8, background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.04)", border:`1px solid ${border}` }}>{selectedClass.name}</span>
+                    </div>
+                    {isClassLocked && (
+                      <span style={{ display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:800,padding:"4px 12px",borderRadius:20,
+                        background:"rgba(239,68,68,0.12)", color:"#f87171", border:"1px solid rgba(239,68,68,0.25)",
+                        animation:"td-pulse 2s infinite", letterSpacing:"0.06em",
+                      }}>
+                        <Lock size={11}/> LOCKED
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                    <input value={announcement} onChange={e => setAnnouncement(e.target.value)}
+                      placeholder="Type announcement…" className="input text-sm flex-1"
+                      onKeyDown={e => e.key === "Enter" && handleBroadcast()} />
+                    <button onClick={handleBroadcast}
+                      style={{ display:"flex",alignItems:"center",gap:7,padding:"8px 16px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
+                        border:"none",
+                        background: announceSent ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#8b5cf6,#7c3aed)",
+                        color:"white", transition:"all 0.2s ease", whiteSpace:"nowrap",
+                      }}>
+                      {announceSent ? "Sent!" : <><Megaphone size={13}/> Broadcast</>}
+                    </button>
+                  </div>
+
+                  <input value={lockMsg} onChange={e => setLockMsg(e.target.value)}
+                    placeholder="Lock screen message (optional)…" className="input text-sm w-full" style={{ marginBottom:12 }} />
+
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
+                    <button onClick={() => handleLockScreens(true)} style={{
+                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:700,cursor:"pointer",
+                      background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.28)",color:"#f87171",opacity:isClassLocked?0.5:1,
+                    }}><Lock size={12}/> Lock Screens</button>
+
+                    <button onClick={() => handleLockScreens(false)} style={{
+                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                      background: surface, border:`1px solid ${border}`, color:text2,
+                    }}><LockOpen size={12}/> Unlock</button>
+
+                    <div style={{ position:"relative" }}>
+                      <button onClick={() => setShowPushMenu(v => !v)} style={{
+                        display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                        background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.25)",color:"#93c5fd",
+                      }}><Navigation size={12}/> Push to Page</button>
+                      {showPushMenu && (
+                        <div style={{ position:"absolute",top:"calc(100% + 6px)",left:0,borderRadius:14,boxShadow:"0 16px 48px rgba(0,0,0,0.35)",
+                          border:`1px solid ${border}`, background:dk?"#0e0c1f":"white", overflow:"hidden",zIndex:50,minWidth:168 }}>
+                          {PUSH_PAGES.map(p => (
+                            <button key={p.path} onClick={() => handlePushToPage(p.path)}
+                              style={{ display:"block",width:"100%",textAlign:"left",padding:"10px 16px",fontSize:12,cursor:"pointer",
+                                color:text1, background:"transparent", border:"none", fontWeight:500,
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button onClick={() => setShowMsgModal(true)} style={{
+                      display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:600,cursor:"pointer",
+                      background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.25)",color:"#c4b5fd",
+                    }}><MessageSquare size={12}/> Message All</button>
+
+                    <Link to="/monitor" style={{ marginLeft:"auto",display:"flex",alignItems:"center",gap:6,padding:"8px 13px",borderRadius:11,fontSize:12,fontWeight:700,
+                      textDecoration:"none",
+                      background:"linear-gradient(135deg,rgba(236,72,153,0.15),rgba(244,63,94,0.08))",
+                      border:"1px solid rgba(236,72,153,0.28)",color:"#f9a8d4",
+                    }}><Eye size={12}/> Open Monitor</Link>
+                  </div>
                 </div>
 
-                <input value={lockMsg} onChange={e => setLockMsg(e.target.value)}
-                  placeholder="Lock screen message (optional)…" className="input text-sm w-full" style={{ marginBottom:10 }} />
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                  <div style={{ ...cardStyle, padding:"18px 20px" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                        <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#14b8a6,#0d9488)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(20,184,166,0.25)" }}>
+                          <Users size={13} color="white"/>
+                        </div>
+                        <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Students</span>
+                        <span style={{ fontSize:12,fontWeight:700,color:text2 }}>{studentCount}</span>
+                      </div>
+                      <Link to="/monitor" style={{ fontSize:11,fontWeight:600,color:"#a78bfa",textDecoration:"none",padding:"3px 9px",borderRadius:7,background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.18)" }}>
+                        Monitor
+                      </Link>
+                    </div>
+                    <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                      {students.map(s => (
+                        <Link key={s.id} to={`/teacher/gradebook/${s.id}`} style={{
+                          display:"flex",alignItems:"center",gap:11,padding:"8px 10px",borderRadius:12,
+                          textDecoration:"none",border:`1px solid transparent`,
+                          transition:"all 0.15s ease",
+                        }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor = border; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "transparent"; }}>
+                          <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0,boxShadow:"0 3px 10px rgba(16,185,129,0.2)" }}>
+                            {s.name.charAt(0)}
+                          </div>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ fontSize:12,fontWeight:600,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{s.name}</div>
+                            <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2 }}>{s.email}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {students.length === 0 && (
+                        <p style={{ fontSize:12,textAlign:"center",padding:"28px 0",color:text2,lineHeight:1.6 }}>
+                          Share code{" "}
+                          <strong style={{ color:"#a78bfa",fontFamily:"monospace",background:"rgba(124,58,237,0.1)",padding:"2px 7px",borderRadius:6 }}>{selectedClass.code}</strong>
+                          {" "}to add students
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
-                  <button onClick={() => handleLockScreens(true)} style={{
-                    display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",
-                    background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",color:"#f87171",opacity:isClassLocked?0.5:1,
-                  }}><Lock size={12}/> Lock Screens</button>
-
-                  <button onClick={() => handleLockScreens(false)} style={{
-                    display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
-                    background: surface, border:`1px solid ${border}`, color:text2,
-                  }}><LockOpen size={12}/> Unlock</button>
-
-                  <div style={{ position:"relative" }}>
-                    <button onClick={() => setShowPushMenu(v => !v)} style={{
-                      display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
-                      background:"rgba(59,130,246,0.12)",border:"1px solid rgba(59,130,246,0.28)",color:"#93c5fd",
-                    }}><Navigation size={12}/> Push to Page ▾</button>
-                    {showPushMenu && (
-                      <div style={{ position:"absolute",top:"calc(100% + 4px)",left:0,borderRadius:12,boxShadow:"0 12px 40px rgba(0,0,0,0.3)",
-                        border:`1px solid ${border}`, background:dk?"#0d0d24":"white", overflow:"hidden",zIndex:50,minWidth:160 }}>
-                        {PUSH_PAGES.map(p => (
-                          <button key={p.path} onClick={() => handlePushToPage(p.path)}
-                            style={{ display:"block",width:"100%",textAlign:"left",padding:"9px 14px",fontSize:12,cursor:"pointer",
-                              color:text1, background:"transparent", border:"none",
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                            → {p.label}
-                          </button>
+                  <div style={{ ...cardStyle, padding:"18px 20px" }}>
+                    <div style={{ display:"flex",alignItems:"center",gap:9,marginBottom:14 }}>
+                      <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
+                        <Activity size={13} color="white"/>
+                      </div>
+                      <span style={{ fontSize:13,fontWeight:800,color:text1,letterSpacing:"-0.01em" }}>Recent Activity</span>
+                    </div>
+                    {recentActivity.length > 0 ? (
+                      <div style={{ display:"flex",flexDirection:"column",gap:1 }}>
+                        {recentActivity.map((a, i) => (
+                          <div key={i} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${border}`,fontSize:11 }}>
+                            <span style={{ width:6,height:6,borderRadius:"50%",background:"rgba(139,92,246,0.7)",flexShrink:0 }} />
+                            <span style={{ color:text2,flex:1 }}><strong style={{ color:text1,fontWeight:600 }}>{a.name}</strong> {a.action}</span>
+                            <span style={{ color:text2,flexShrink:0,fontSize:10 }}>{a.time}</span>
+                          </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-
-                  <button onClick={() => setShowMsgModal(true)} style={{
-                    display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
-                    background:"rgba(139,92,246,0.12)",border:"1px solid rgba(139,92,246,0.28)",color:"#c4b5fd",
-                  }}><MessageSquare size={12}/> Message All</button>
-
-                  <Link to="/monitor" style={{ marginLeft:"auto",display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:700,
-                    textDecoration:"none",
-                    background:"linear-gradient(135deg,rgba(236,72,153,0.18),rgba(244,63,94,0.1))",
-                    border:"1px solid rgba(236,72,153,0.3)",color:"#f9a8d4",
-                  }}><Eye size={12}/> Open Monitor</Link>
-                </div>
-              </div>
-
-              {/* Students + Activity 2-col */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-                {/* Students */}
-                <div style={{ ...card, padding:"16px 18px" }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ width:28,height:28,borderRadius:8,background:"linear-gradient(135deg,#14b8a6,#0d9488)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 3px 10px rgba(20,184,166,0.3)" }}>
-                        <Users size={13} color="white"/>
+                    ) : (
+                      <div style={{ textAlign:"center",padding:"36px 0" }}>
+                        <div style={{ width:40,height:40,borderRadius:12,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:`1px solid ${border}` }}>
+                          <Activity size={18} style={{ opacity:0.25 }} />
+                        </div>
+                        <p style={{ fontSize:12,color:text2 }}>Quiet right now. Check back when class starts.</p>
                       </div>
-                      <span style={{ fontSize:13,fontWeight:700,color:text1 }}>Students ({studentCount})</span>
-                    </div>
-                    <Link to="/monitor" style={{ fontSize:11,fontWeight:600,color:"#a78bfa",textDecoration:"none" }}>
-                      Full monitor →
-                    </Link>
-                  </div>
-                  <div style={{ display:"flex",flexDirection:"column",gap:4 }}>
-                    {students.map(s => (
-                      <Link key={s.id} to={`/teacher/gradebook/${s.id}`} style={{
-                        display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,
-                        textDecoration:"none",border:`1px solid transparent`,
-                        transition:"all 0.15s ease",
-                      }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)"; (e.currentTarget as HTMLElement).style.borderColor = border; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "transparent"; }}>
-                        <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0 }}>
-                          {s.name.charAt(0)}
-                        </div>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ fontSize:12,fontWeight:600,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{s.name}</div>
-                          <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{s.email}</div>
-                        </div>
-                      </Link>
-                    ))}
-                    {students.length === 0 && (
-                      <p style={{ fontSize:12,textAlign:"center",padding:"24px 0",color:text2 }}>
-                        Share code <strong style={{ color:"#a78bfa",fontFamily:"monospace" }}>{selectedClass.code}</strong> to add students
-                      </p>
                     )}
                   </div>
                 </div>
-
-                {/* Activity feed */}
-                <div style={{ ...card, padding:"16px 18px" }}>
-                  <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:12 }}>
-                    <div style={{ width:28,height:28,borderRadius:8,background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 3px 10px rgba(139,92,246,0.3)" }}>
-                      <Activity size={13} color="white"/>
-                    </div>
-                    <span style={{ fontSize:13,fontWeight:700,color:text1 }}>Recent Activity</span>
-                  </div>
-                  {recentActivity.length > 0 ? (
-                    <div style={{ display:"flex",flexDirection:"column",gap:2 }}>
-                      {recentActivity.map((a, i) => (
-                        <div key={i} style={{ display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:`1px solid ${border}`,fontSize:11 }}>
-                          <span style={{ width:6,height:6,borderRadius:"50%",background:"rgba(139,92,246,0.6)",flexShrink:0 }} />
-                          <span style={{ color:text2 }}><strong style={{ color:text1 }}>{a.name}</strong> {a.action}</span>
-                          <span style={{ marginLeft:"auto",color:text2,flexShrink:0 }}>{a.time}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign:"center",padding:"32px 0" }}>
-                      <p style={{ fontSize:24,marginBottom:8 }}>🎒</p>
-                      <p style={{ fontSize:12,color:text2 }}>Quiet right now. Check back when class starts!</p>
-                    </div>
-                  )}
+              </>
+            ) : (
+              <div style={{ ...cardStyle, display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"72px 0",textAlign:"center" }}>
+                <div style={{ width:48,height:48,borderRadius:14,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:`1px solid ${border}` }}>
+                  <Users size={20} style={{ opacity:0.2 }} />
                 </div>
+                <p style={{ fontSize:13,color:text2 }}>Create or select a class to get started</p>
               </div>
-            </>
-          ) : (
-            <div style={{ ...card, display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"64px 0",textAlign:"center" }}>
-              <Users size={32} style={{ opacity:0.2,marginBottom:10 }} />
-              <p style={{ fontSize:13,color:text2 }}>Create or select a class to get started</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

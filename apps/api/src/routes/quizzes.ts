@@ -173,4 +173,16 @@ router.get("/:id/attempts", requireRole("teacher", "admin"), async (req: AuthReq
   res.json(rows);
 });
 
+// Delete quiz (teacher/admin only)
+router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const quiz = await db.prepare("SELECT id, teacher_id FROM quizzes WHERE id = ?").get(req.params.id) as any;
+  if (!quiz) return res.status(404).json({ error: "Not found" });
+  if (req.user!.role !== "admin" && quiz.teacher_id !== req.user!.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  await db.prepare("DELETE FROM quiz_attempts WHERE quiz_id = ?").run(req.params.id);
+  await db.prepare("DELETE FROM quizzes WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 export default router;

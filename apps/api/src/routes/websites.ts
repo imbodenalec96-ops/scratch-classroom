@@ -10,27 +10,29 @@ const router = Router();
 let migrated = false;
 let seeded = false;
 
+// v2 — all sites verified to allow iframe embedding (no X-Frame-Options: DENY/SAMEORIGIN)
+const SEED_VERSION = 2;
 const DEFAULT_WEBSITES = [
-  { title: "Cool Math Games",          url: "https://www.coolmathgames.com",              category: "Math Games",        icon: "🧮" },
-  { title: "Poki",                     url: "https://poki.com",                           category: "Games",             icon: "🎮" },
-  { title: "Khan Academy",             url: "https://www.khanacademy.org",               category: "Learning",          icon: "📚" },
-  { title: "Scratch",                  url: "https://scratch.mit.edu",                   category: "Coding",            icon: "💻" },
-  { title: "ABCya!",                   url: "https://www.abcya.com",                     category: "Educational Games", icon: "🎯" },
-  { title: "Typing.com",               url: "https://www.typing.com",                   category: "Typing",            icon: "⌨️" },
-  { title: "NASA Kids' Club",          url: "https://www.nasa.gov/nasa-kids-club",       category: "Science",           icon: "🚀" },
-  { title: "National Geographic Kids", url: "https://kids.nationalgeographic.com",       category: "Science",           icon: "🌍" },
-  { title: "Prodigy Math",             url: "https://www.prodigygame.com",               category: "Math Games",        icon: "⚔️" },
-  { title: "Google Arts & Culture",    url: "https://artsandculture.google.com",          category: "Art",               icon: "🎨" },
-  { title: "Code.org",                 url: "https://code.org",                          category: "Coding",            icon: "🖥️" },
-  { title: "Funbrain",                 url: "https://www.funbrain.com",                  category: "Educational Games", icon: "🧠" },
-  { title: "Starfall",                 url: "https://www.starfall.com",                  category: "Reading",           icon: "⭐" },
-  { title: "PBS Kids",                 url: "https://pbskids.org",                       category: "Educational",       icon: "📺" },
-  { title: "BrainPOP",                 url: "https://www.brainpop.com",                  category: "Learning",          icon: "🎬" },
-  { title: "Spelling City",            url: "https://www.spellingcity.com",              category: "Reading",           icon: "🔤" },
-  { title: "iXL Learning",             url: "https://www.ixl.com",                       category: "Math Games",        icon: "📐" },
-  { title: "Storyline Online",         url: "https://storylineonline.net",               category: "Reading",           icon: "📖" },
-  { title: "Google Earth",             url: "https://earth.google.com/web",              category: "Science",           icon: "🌎" },
-  { title: "Tynker",                   url: "https://www.tynker.com",                    category: "Coding",            icon: "🤖" },
+  { title: "Poki Games",           url: "https://poki.com",                       category: "Games",          icon: "🎮" },
+  { title: "Cool Math Games",      url: "https://www.coolmathgames.com",          category: "Math Games",     icon: "🧮" },
+  { title: "ABCya!",               url: "https://www.abcya.com",                  category: "Learning Games", icon: "🎯" },
+  { title: "Hooda Math",           url: "https://www.hoodamath.com",              category: "Math",           icon: "🔢" },
+  { title: "Math Playground",      url: "https://www.mathplayground.com",         category: "Math",           icon: "🏀" },
+  { title: "Arcademics",           url: "https://www.arcademics.com",             category: "Academic Games", icon: "🏆" },
+  { title: "Sheppard Software",    url: "https://www.sheppardsoftware.com",       category: "Educational",    icon: "🦊" },
+  { title: "Soft Schools",         url: "https://www.softschools.com",            category: "Educational",    icon: "📚" },
+  { title: "Turtle Diary",         url: "https://www.turtlediary.com",            category: "Learning Games", icon: "🐢" },
+  { title: "Primary Games",        url: "https://www.primarygames.com",           category: "Games",          icon: "🌟" },
+  { title: "Funbrain",             url: "https://www.funbrain.com",               category: "Learning",       icon: "🧠" },
+  { title: "PBS Kids",             url: "https://pbskids.org",                    category: "Educational",    icon: "📺" },
+  { title: "Storyline Online",     url: "https://storylineonline.net",            category: "Reading",        icon: "📖" },
+  { title: "Nitro Type",           url: "https://www.nitrotype.com",              category: "Typing",         icon: "🚗" },
+  { title: "Typing Club",          url: "https://www.typingclub.com",             category: "Typing",         icon: "⌨️" },
+  { title: "Word Wall",            url: "https://wordwall.net",                   category: "Vocabulary",     icon: "🔤" },
+  { title: "XtraMath",             url: "https://xtramath.org",                   category: "Math",           icon: "➕" },
+  { title: "Starfall",             url: "https://www.starfall.com",               category: "Reading",        icon: "⭐" },
+  { title: "Nat Geo Kids",         url: "https://kids.nationalgeographic.com",    category: "Science",        icon: "🌍" },
+  { title: "NASA STEM",            url: "https://www.nasa.gov/stem/forstudents/k-4/index.html", category: "Science", icon: "🚀" },
 ];
 
 async function ensureTables() {
@@ -78,25 +80,35 @@ async function ensureTables() {
   migrated = true;
 }
 
-// Separate seed fn — runs once per process, checks row count each time so it
-// works even when tables already existed before this code was deployed.
+// Separate seed fn — checks version tag on each cold start so updating
+// DEFAULT_WEBSITES triggers a re-seed automatically.
 async function seedDefaultsIfEmpty() {
   if (seeded) return;
   seeded = true;
   try {
-    await ensureTables(); // ensure tables exist before seeding
-    const row = await db.prepare(`SELECT COUNT(*) as n FROM approved_websites WHERE added_by = 'system'`).get() as any;
-    const count = parseInt(String(row?.n ?? "0"), 10);
-    if (count > 0) return; // already seeded
+    await ensureTables();
+    // Check stored seed version via a sentinel row with title='__seed_version__'
+    const versionRow = await db.prepare(
+      `SELECT url FROM approved_websites WHERE added_by = 'system' AND title = '__seed_version__' LIMIT 1`
+    ).get() as any;
+    const currentVersion = parseInt(String(versionRow?.url ?? "0"), 10);
+    if (currentVersion >= SEED_VERSION) return; // already at current version
+
+    // Remove old system-seeded sites and re-seed with the new list
+    await db.prepare(`DELETE FROM approved_websites WHERE added_by = 'system'`).run();
     for (const site of DEFAULT_WEBSITES) {
       const id = crypto.randomUUID();
       await db.prepare(
         `INSERT INTO approved_websites (id, class_id, title, url, category, icon_emoji, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).run(id, null, site.title, site.url, site.category, site.icon, "system");
     }
-    console.log(`[websites] seeded ${DEFAULT_WEBSITES.length} default sites`);
+    // Store version sentinel
+    await db.prepare(
+      `INSERT INTO approved_websites (id, class_id, title, url, category, icon_emoji, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(crypto.randomUUID(), null, "__seed_version__", String(SEED_VERSION), null, null, "system");
+    console.log(`[websites] seeded v${SEED_VERSION} — ${DEFAULT_WEBSITES.length} default sites`);
   } catch (e) {
-    seeded = false; // allow retry on next request if DB wasn't ready
+    seeded = false;
     console.error("[websites] seed error:", e);
   }
 }
@@ -142,8 +154,8 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
         `SELECT DISTINCT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
                 w.added_at AS granted_at
            FROM approved_websites w
-          WHERE w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?)
-             OR w.class_id IS NULL
+          WHERE (w.class_id IN (SELECT class_id FROM class_members WHERE user_id = ?) OR w.class_id IS NULL)
+            AND w.title != '__seed_version__'
           ORDER BY w.added_at DESC`
       ).all(userId) as any[];
     } catch {
@@ -152,7 +164,7 @@ router.get("/mine", async (req: AuthRequest, res: Response) => {
         `SELECT w.id, w.title, w.url, w.category, w.thumbnail_url, w.icon_emoji, w.added_at,
                 w.added_at AS granted_at
            FROM approved_websites w
-          WHERE w.class_id IS NULL
+          WHERE w.class_id IS NULL AND w.title != '__seed_version__'
           ORDER BY w.added_at DESC`
       ).all() as any[];
     }
@@ -323,9 +335,9 @@ router.get("/library", requireRole("teacher", "admin"), async (req: AuthRequest,
     const classId = req.query.classId ? String(req.query.classId) : null;
     const rows = classId
       ? await db.prepare(
-          `SELECT * FROM approved_websites WHERE class_id = ? OR class_id IS NULL ORDER BY added_at DESC`
+          `SELECT * FROM approved_websites WHERE (class_id = ? OR class_id IS NULL) AND title != '__seed_version__' ORDER BY added_at DESC`
         ).all(classId)
-      : await db.prepare(`SELECT * FROM approved_websites ORDER BY added_at DESC`).all();
+      : await db.prepare(`SELECT * FROM approved_websites WHERE title != '__seed_version__' ORDER BY added_at DESC`).all();
     res.json(rows);
   } catch (e: any) {
     console.error("[websites/library GET]", e);

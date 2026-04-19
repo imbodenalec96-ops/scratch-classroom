@@ -1121,7 +1121,6 @@ export default function StudentDashboard() {
   // Avatar emoji (persisted to server)
   const [avatarEmoji, setAvatarEmoji] = useState<string>((user as any)?.avatarEmoji || "");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
   // Welcome → loading transition
   useEffect(() => {
@@ -1363,6 +1362,8 @@ export default function StudentDashboard() {
   const unlocked = accessUnlocked;
   const starsCount = Math.max(0, Math.min(5, myStars.stars));
   const firstName = user?.name?.split(" ")[0] || "Student";
+  const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
+  const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
 
   const DB_ANIM = `
     @keyframes dbGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
@@ -1371,6 +1372,8 @@ export default function StudentDashboard() {
     @keyframes dbStarPulse { 0%,100%{filter:drop-shadow(0 0 3px rgba(251,191,36,.8))} 50%{filter:drop-shadow(0 0 9px rgba(251,191,36,1)) drop-shadow(0 0 18px rgba(245,158,11,.6))} }
     @keyframes dbSlide { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
     @keyframes dbShimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+    @keyframes lootShake { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-8deg)} 75%{transform:rotate(8deg)} }
+    @keyframes lootOpen { from{transform:scaleY(0);opacity:0;transform-origin:top} to{transform:scaleY(1);opacity:1;transform-origin:top} }
   `;
 
   return (
@@ -1379,10 +1382,11 @@ export default function StudentDashboard() {
       background: "linear-gradient(135deg, #0b0520 0%, #14082e 40%, #0d1a3a 70%, #0a0520 100%)",
       color: "white",
       fontFamily: "'Inter', system-ui, sans-serif",
-      padding: "0 0 100px 0",
+      paddingBottom: 80,
       position: "relative",
     }}>
       <style>{DB_ANIM}</style>
+
       {broadcast && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 40,
@@ -1402,561 +1406,6 @@ export default function StudentDashboard() {
           onSelect={setAvatarEmoji}
           onClose={() => setShowAvatarPicker(false)}
         />
-      )}
-
-      {/* ── Header ── */}
-      <header style={{
-        padding: "24px 20px 20px",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-        animation: "dbPop .5s ease both",
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {/* Avatar circle — clickable to open picker */}
-            <button
-              onClick={() => setShowAvatarPicker(true)}
-              title="Change your avatar"
-              style={{
-                width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
-                background: avatarEmoji
-                  ? "rgba(139,92,246,0.25)"
-                  : "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                border: "3px solid rgba(139,92,246,0.55)",
-                boxShadow: "0 0 20px rgba(139,92,246,0.35)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: avatarEmoji ? 36 : 24, fontWeight: 900, color: "white",
-                cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 28px rgba(139,92,246,0.55)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 20px rgba(139,92,246,0.35)"; }}
-            >
-              {avatarEmoji || firstName[0].toUpperCase()}
-            </button>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 4 }}>
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-              </div>
-              <h1 style={{
-                fontSize: "clamp(22px, 5vw, 36px)", fontWeight: 900, margin: 0, lineHeight: 1.1,
-                background: unlocked
-                  ? "linear-gradient(90deg,#6ee7b7,#34d399,#a7f3d0)"
-                  : "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
-                backgroundSize: "200% auto",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                animation: "dbGrad 4s linear infinite",
-              }}>
-                {unlocked ? `Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
-              </h1>
-              <p style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
-                {unlocked ? "Work done — you've earned it. Play something!" : "Ready to learn? Your work is below."}
-              </p>
-              <button onClick={() => setShowAvatarPicker(true)} style={{ marginTop: 4, fontSize: 10, color: "rgba(139,92,246,0.7)", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
-                ✏️ Edit avatar
-              </button>
-            </div>
-          </div>
-
-          {/* Stars display */}
-          <div style={{
-            padding: "12px 18px", borderRadius: 16,
-            background: starsCount >= 5
-              ? "linear-gradient(135deg,rgba(245,158,11,.4),rgba(234,179,8,.25))"
-              : "rgba(255,255,255,0.06)",
-            border: starsCount >= 5
-              ? "1px solid rgba(245,158,11,.65)"
-              : "1px solid rgba(255,255,255,0.1)",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-            animation: starsCount >= 5 ? "dbPop .5s ease .2s both" : "dbSlide .5s ease .2s both",
-          }}>
-            <div style={{ fontSize: 10, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.2em" }}>Behavior Stars</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} style={{
-                  fontSize: 22,
-                  opacity: i < starsCount ? 1 : 0.15,
-                  filter: i < starsCount ? undefined : "grayscale(1) brightness(.3)",
-                  animation: i < starsCount && starsCount >= 5 ? "dbStarPulse 2s ease-in-out infinite" : undefined,
-                  animationDelay: `${i * 0.12}s`,
-                }}>⭐</span>
-              ))}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>
-              {starsCount}/5
-              {myStars.rewards > 0 && <span style={{ marginLeft: 8, color: "#fbbf24" }}>· 🏆 {myStars.rewards}</span>}
-            </div>
-            {starsCount >= 5 && <div style={{ fontSize: 11, color: "#fcd34d", fontWeight: 700 }}>McDonald's! 🎉</div>}
-          </div>
-        </div>
-      </header>
-
-      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-
-      {/* ── Quick Stats: Stars / Rank / Awards ── */}
-      {(() => {
-        const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
-        const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
-        return (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, animation: "dbSlide .4s ease both" }}>
-            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
-              background: starsCount >= 5 ? "linear-gradient(135deg,rgba(245,158,11,.35),rgba(234,179,8,.2))" : "rgba(255,255,255,0.05)",
-              border: starsCount >= 5 ? "1px solid rgba(245,158,11,.5)" : "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Stars</div>
-              <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <span key={i} style={{ opacity: i < starsCount ? 1 : 0.15, fontSize: 16 }}>⭐</span>
-                ))}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 800 }}>{starsCount}/5</div>
-            </div>
-            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Rank</div>
-              <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 4 }}>
-                {myRank <= 3 && myRank > 0 ? ["🥇","🥈","🥉"][myRank - 1] : "🏅"}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 800 }}>
-                {myRank > 0 ? `#${myRank}` : "—"}
-              </div>
-            </div>
-            <div style={{ borderRadius: 14, padding: "12px 10px", textAlign: "center",
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Awards</div>
-              <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 4 }}>🏆</div>
-              <div style={{ fontSize: 14, fontWeight: 800 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Current Block Banner ── */}
-      {(blockInfo.state === "current" && !(blockInfo as any).block.is_break) && (
-        <div style={{
-          borderRadius: 12, padding: "10px 14px",
-          background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-          display: "flex", alignItems: "center", gap: 10,
-          animation: "dbSlide .4s ease both",
-        }}>
-          <div style={{ fontSize: 18 }}>
-            {(blockInfo as any).block.subject === "math" ? "🔢" :
-             (blockInfo as any).block.subject === "reading" ? "📖" :
-             (blockInfo as any).block.subject === "writing" ? "✏️" :
-             (blockInfo as any).block.subject === "spelling" ? "🔤" :
-             (blockInfo as any).block.subject === "sel" ? "💛" :
-             (blockInfo as any).block.subject === "daily_news" ? "📰" :
-             (blockInfo as any).block.subject === "science" ? "🔬" :
-             (blockInfo as any).block.subject === "social_studies" ? "🌎" :
-             "📚"}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>
-              Now: {(blockInfo as any).block.label}
-            </div>
-            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>
-              {(blockInfo as any).block.start_time} – {(blockInfo as any).block.end_time}
-            </div>
-          </div>
-          <div style={{ fontSize: 10, padding: "3px 9px", borderRadius: 20, background: "rgba(139,92,246,0.3)", color: "#c4b5fd", fontWeight: 700 }}>
-            IN SESSION
-          </div>
-        </div>
-      )}
-      {(blockInfo.state === "upcoming") && (
-        <div style={{
-          borderRadius: 12, padding: "10px 14px",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-          display: "flex", alignItems: "center", gap: 10,
-          animation: "dbSlide .4s ease both",
-        }}>
-          <div style={{ fontSize: 16 }}>⏱</div>
-          <div style={{ flex: 1, fontSize: 11, opacity: 0.5 }}>
-            Next: {(blockInfo as any).block.label} at {(blockInfo as any).block.start_time}
-            {(blockInfo as any).daysAway > 0 ? ` (in ${(blockInfo as any).daysAway}d)` : ""}
-          </div>
-        </div>
-      )}
-
-      {/* ── Stats ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {[
-          { label: "Classes",   value: c0, color: "#38bdf8" },
-          { label: "Submitted", value: c1, color: "#34d399" },
-          { label: "Graded",    value: c2, color: "#a78bfa" },
-        ].map((s, i) => (
-          <div key={s.label} style={{
-            borderRadius: 14, padding: "14px 12px", textAlign: "center",
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)",
-            animation: `dbSlide .45s ease ${80 + i * 60}ms both`,
-          }}>
-            <div style={{ fontSize: 28, fontWeight: 900, color: s.color, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
-            <div style={{ fontSize: 10, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Class Leaderboard ── */}
-      {leaderboard.length > 0 && (
-        <div style={{
-          borderRadius: 16, padding: "14px",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-          animation: "dbSlide .5s ease .15s both",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 10 }}>
-            🏆 Class Leaderboard
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {leaderboard.slice(0, 5).map((entry: any, i: number) => {
-              const isMe = entry.user_id === user?.id;
-              const medals = ["🥇", "🥈", "🥉"];
-              return (
-                <div key={entry.user_id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "8px 10px", borderRadius: 10,
-                  background: isMe ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.03)",
-                  border: isMe ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.05)",
-                  transition: "background .2s",
-                }}>
-                  <div style={{ width: 22, textAlign: "center", fontSize: i < 3 ? 16 : 12, fontWeight: 800, opacity: i < 3 ? 1 : 0.4 }}>
-                    {i < 3 ? medals[i] : `${i + 1}`}
-                  </div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)" }}>
-                    {entry.name}{isMe ? " (you)" : ""}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {Array.from({ length: 5 }, (_, si) => (
-                      <span key={si} style={{ fontSize: 10, opacity: si < entry.behavior_stars ? 1 : 0.15 }}>⭐</span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {myEntry && leaderboard.findIndex((e: any) => e.user_id === user?.id) >= 5 && (
-            <div style={{
-              marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)",
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "8px 10px", borderRadius: 10,
-              background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-            }}>
-              <div style={{ width: 22, textAlign: "center", fontSize: 12, fontWeight: 800, opacity: 0.6 }}>
-                {leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1}
-              </div>
-              <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#c4b5fd" }}>{myEntry.name} (you)</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                {Array.from({ length: 5 }, (_, si) => (
-                  <span key={si} style={{ fontSize: 10, opacity: si < myEntry.behavior_stars ? 1 : 0.15 }}>⭐</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Today's Quizzes ── */}
-      {pendingQuizzes.length > 0 && !activeQuiz && (
-        <div style={{ animation: "dbSlide .5s ease .16s both" }}>
-          <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 10 }}>
-            📝 Today's Quizzes
-          </div>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-            {pendingQuizzes.map((q) => (
-              <button key={q.id}
-                onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
-                style={{
-                  textAlign: "left", padding: "16px", cursor: "pointer",
-                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                  borderLeft: "3px solid #a78bfa", borderRadius: 14,
-                  transition: "transform .15s", color: "white",
-                }}
-                onMouseEnter={e => { (e.currentTarget as any).style.transform = "scale(1.02)"; }}
-                onMouseLeave={e => { (e.currentTarget as any).style.transform = ""; }}
-              >
-                <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>
-                  {q._className || "Quiz"} · {(q.questions || []).length} questions
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{q.title || "Untitled quiz"}</div>
-                {q.estimated_minutes && <div style={{ fontSize: 11, opacity: 0.45, marginTop: 4 }}>~{q.estimated_minutes} min</div>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Inline quiz taker */}
-      {activeQuiz && (
-        <div style={{
-          borderRadius: 16, padding: "20px",
-          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,.4)",
-          animation: "dbSlide .4s ease both",
-        }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 4 }}>Quiz</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{activeQuiz.title}</h2>
-            </div>
-            <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize: 13, opacity: 0.5, background: "none", border: "none", color: "white", cursor: "pointer" }}>Close</button>
-          </div>
-
-          {quizResult ? (
-            <div style={{ textAlign: "center", padding: "24px 0" }}>
-              <div style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}>{quizResult.score}%</div>
-              <div style={{ opacity: 0.6, marginTop: 8 }}>Quiz submitted. Nice work! 🎉</div>
-              <button
-                onClick={() => {
-                  setPendingQuizzes((prev) => prev.filter((x) => x.id !== activeQuiz.id));
-                  setActiveQuiz(null); setQuizResult(null);
-                }}
-                style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>
-                Done
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {(activeQuiz.questions || []).map((q: any, qi: number) => (
-                  <div key={qi} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)" }}>
-                    <div style={{ fontWeight: 700, marginBottom: 10 }}>{qi + 1}. {q.text}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {(q.options || []).map((opt: string, oi: number) => (
-                        <label key={oi} style={{
-                          display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 10px", borderRadius: 10,
-                          background: quizAnswers[qi] === oi ? "rgba(139,92,246,.3)" : "rgba(255,255,255,.04)",
-                          border: quizAnswers[qi] === oi ? "1px solid rgba(139,92,246,.5)" : "1px solid rgba(255,255,255,.06)",
-                        }}>
-                          <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
-                            onChange={() => setQuizAnswers((a) => { const n = [...a]; n[qi] = oi; return n; })} />
-                          <span>{opt}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                disabled={quizSubmitting || quizAnswers.some((a) => a < 0)}
-                onClick={async () => {
-                  setQuizSubmitting(true);
-                  try {
-                    const r = await api.submitQuiz(activeQuiz.id, quizAnswers);
-                    setQuizResult({ score: r.score });
-                  } catch (e: any) {
-                    alert("Could not submit: " + (e?.message || "unknown error"));
-                  } finally { setQuizSubmitting(false); }
-                }}
-                style={{ marginTop: 16, padding: "12px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: (quizSubmitting || quizAnswers.some(a => a < 0)) ? 0.4 : 1 }}>
-                {quizSubmitting ? "Submitting…" : "Submit quiz"}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Free Time Unlocked ── */}
-      {unlocked && (
-        <div style={{ animation: "dbSlide .5s ease .2s both" }}>
-          <div style={{ fontSize: 10, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.22em", marginBottom: 10 }}>
-            ✅ Free time earned
-          </div>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
-            <Link to="/arcade" style={{ textDecoration: "none" }}>
-              <div style={{
-                padding: "20px 18px", borderRadius: 18, cursor: "pointer",
-                background: "linear-gradient(135deg,rgba(139,92,246,.45),rgba(99,102,241,.3))",
-                border: "1px solid rgba(139,92,246,.6)",
-                boxShadow: "0 0 30px rgba(139,92,246,.2)",
-                animation: "dbPop .5s ease .24s both",
-                transition: "transform .15s, box-shadow .15s",
-              }}
-              onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(139,92,246,.4)"; }}
-              onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(139,92,246,.2)"; }}
-              >
-                <div style={{ fontSize: 36, marginBottom: 8 }}>🎮</div>
-                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Arcade</div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>31 games · keep it fun</div>
-              </div>
-            </Link>
-            <div style={{ position: "relative" }}>
-              <div
-                onClick={() => setShowProjectMenu(v => !v)}
-                style={{
-                  padding: "20px 18px", borderRadius: 18, cursor: "pointer",
-                  background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
-                  border: "1px solid rgba(16,185,129,.55)",
-                  boxShadow: "0 0 30px rgba(16,185,129,.18)",
-                  animation: "dbPop .5s ease .31s both",
-                  transition: "transform .15s, box-shadow .15s",
-                  userSelect: "none",
-                }}
-                onMouseEnter={e => { (e.currentTarget as any).style.transform="scale(1.03)"; (e.currentTarget as any).style.boxShadow="0 0 50px rgba(16,185,129,.38)"; }}
-                onMouseLeave={e => { (e.currentTarget as any).style.transform=""; (e.currentTarget as any).style.boxShadow="0 0 30px rgba(16,185,129,.18)"; }}
-              >
-                <div style={{ fontSize: 36, marginBottom: 8 }}>💻</div>
-                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.01em" }}>Projects</div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 3 }}>2D · 3D · Unity ▾</div>
-              </div>
-              {showProjectMenu && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30,
-                  background: "rgba(15,10,35,0.97)", border: "1px solid rgba(16,185,129,.45)",
-                  borderRadius: 14, overflow: "hidden",
-                  boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
-                  animation: "dbSlide .18s ease both",
-                }}>
-                  {[
-                    { label: "🎨 2D Stage", sub: "Sprites & blocks", to: "/projects?mode=2d" },
-                    { label: "🧊 3D Stage", sub: "3D world builder", to: "/projects?mode=3d" },
-                    { label: "🎮 Unity", sub: "Coming soon", to: null },
-                  ].map(opt => (
-                    <button
-                      key={opt.label}
-                      disabled={!opt.to}
-                      onClick={() => { setShowProjectMenu(false); if (opt.to) navigate(opt.to); }}
-                      style={{
-                        width: "100%", padding: "12px 16px", background: "none", border: "none",
-                        borderBottom: "1px solid rgba(255,255,255,0.05)",
-                        color: opt.to ? "white" : "rgba(255,255,255,0.35)",
-                        cursor: opt.to ? "pointer" : "default",
-                        textAlign: "left", display: "flex", flexDirection: "column", gap: 2,
-                      }}
-                      onMouseEnter={e => { if (opt.to) (e.currentTarget as any).style.background = "rgba(16,185,129,.15)"; }}
-                      onMouseLeave={e => { (e.currentTarget as any).style.background = "none"; }}
-                    >
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{opt.label}</span>
-                      <span style={{ fontSize: 11, opacity: 0.45 }}>{opt.sub}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Class video */}
-      {classVideo && (
-        <div style={{
-          borderRadius: 16, overflow: "hidden",
-          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-          animation: "dbSlide .5s ease .28s both",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>📺 Your Teacher Shared a Video</span>
-            {classVideo.video_title && <span style={{ fontSize: 11, opacity: 0.4, marginLeft: "auto" }}>{classVideo.video_title}</span>}
-          </div>
-          <div style={{ position: "relative", paddingTop: "56.25%", overflow: "hidden" }}>
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
-              title={classVideo.video_title || "Class Video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* YouTube Library nav card */}
-      {classConfig.youtubeEnabled && (
-        <button
-          onClick={() => navigate("/student/videos")}
-          style={{
-            width: "100%", padding: 0, background: "none", border: "none", cursor: "pointer",
-            borderRadius: 16, overflow: "hidden",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
-            transition: "transform 0.15s, box-shadow 0.15s",
-            animation: "dbSlide .5s ease .3s both",
-            touchAction: "manipulation",
-            textAlign: "left",
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)";
-            (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 36px rgba(139,92,246,0.35)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.transform = "";
-            (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.35)";
-          }}
-        >
-          <div style={{
-            background: "linear-gradient(135deg, rgba(139,92,246,0.25) 0%, rgba(59,130,246,0.18) 60%, rgba(239,68,68,0.12) 100%)",
-            border: "1px solid rgba(139,92,246,0.3)",
-            borderRadius: 16,
-            padding: "16px 18px",
-            display: "flex", alignItems: "center", gap: 14,
-          }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14, flexShrink: 0,
-              background: "linear-gradient(135deg, #7c3aed, #2563eb)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 26,
-              boxShadow: "0 4px 16px rgba(124,58,237,0.45)",
-            }}>📺</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: "rgba(255,255,255,0.95)" }}>Video Library</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
-                {youtubeLibrary.length > 0
-                  ? `${youtubeLibrary.length} ${youtubeLibrary.length === 1 ? "video" : "videos"} ready to watch`
-                  : "Browse your teacher's picks"}
-              </div>
-            </div>
-            <div style={{ fontSize: 18, opacity: 0.4, flexShrink: 0 }}>›</div>
-          </div>
-        </button>
-      )}
-
-      {/* Learning Apps — always visible; educational tools not gated behind free time */}
-      {(true) && (
-        <div style={{
-          borderRadius: 16, padding: "14px",
-          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-          animation: "dbSlide .5s ease .31s both",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>🌐 Learning Apps</span>
-              {myWebsites.length > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "rgba(99,102,241,.25)", color: "#a5b4fc" }}>
-                  {myWebsites.length}
-                </span>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                onClick={() => navigate("/websites")}
-                style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}
-              >See all →</button>
-              <button
-                onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }}
-                style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)" }}
-              >📝 Request</button>
-            </div>
-          </div>
-
-          {myWebsites.length > 0 ? (
-            <LearningAppGrid>
-              {myWebsites.map((w: any) => (
-                <LearningAppTile key={w.id} app={w} dk={true} />
-              ))}
-            </LearningAppGrid>
-          ) : websitesLoading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} style={{
-                  height: 120, borderRadius: 14,
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  animation: `pulse 1.5s ease-in-out ${i * 0.1}s infinite`,
-                }} />
-              ))}
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "24px 16px", opacity: 0.35 }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🌐</div>
-              <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>No learning apps yet — ask your teacher!</p>
-              <p style={{ fontSize: 11 }}>Got a site you'd love? Let them know.</p>
-            </div>
-          )}
-        </div>
       )}
 
       {/* Website request modal */}
@@ -2012,73 +1461,540 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Join a class */}
-      <div style={{
-        borderRadius: 16, padding: "14px",
-        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        animation: "dbSlide .5s ease .32s both",
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 10 }}>Join a Class</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
-            placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
-            onKeyDown={(e) => e.key === "Enter" && handleJoinClass()} style={{ minHeight: 48, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }} />
-          <button ref={joinBtnRef} onClick={handleJoinClass}
-            style={{
-              minHeight: 48, padding: "0 20px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer",
-              background: joinSuccess ? "#10b981" : "linear-gradient(135deg,#7c3aed,#6d28d9)",
-              color: "white", border: "none", transition: "all .2s",
-            }}>
-            {joinSuccess ? "✓" : "Join"}
-          </button>
-        </div>
-      </div>
+      <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px" }}>
 
-      {/* Recent grades */}
-      <div style={{
-        borderRadius: 16, padding: "14px",
-        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        animation: "dbSlide .5s ease .4s both",
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 10 }}>Recent Grades</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {submissions.slice(0, 5).map((s: any, i: number) => (
-            <div key={s.id} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "10px 12px", borderRadius: 12,
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
-              animation: `dbSlide .4s ease ${500 + i * 50}ms both`,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(139,92,246,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <CheckCircle size={14} style={{ color: "#a78bfa" }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.assignment_title || "Assignment"}</div>
-                  <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(s.submitted_at).toLocaleDateString()}</div>
-                </div>
+        {/* ── Header: Avatar + Name ── */}
+        <header style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "20px 0 16px", borderBottom: "1px solid rgba(255,255,255,0.08)",
+          animation: "dbPop .4s ease both",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              title="Change your avatar"
+              style={{
+                width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+                background: avatarEmoji ? "rgba(139,92,246,0.25)" : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                border: "2.5px solid rgba(139,92,246,0.55)",
+                boxShadow: "0 0 16px rgba(139,92,246,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: avatarEmoji ? 28 : 20, fontWeight: 900, color: "white",
+                cursor: "pointer", transition: "transform 0.2s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.1)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+            >
+              {avatarEmoji || firstName[0].toUpperCase()}
+            </button>
+            <div>
+              <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 2 }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
               </div>
-              <div>
-                {s.grade !== null ? (
-                  <span style={{ fontSize: 14, fontWeight: 800, color: s.grade >= 70 ? "#34d399" : "#f87171" }}>{s.grade}%</span>
-                ) : (
-                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,0.07)", opacity: 0.5 }}>Pending</span>
-                )}
+              <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.1 }}>
+                {unlocked ? `🎉 Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
               </div>
             </div>
-          ))}
-          {submissions.length === 0 && (
-            <div style={{ textAlign: "center", padding: "24px", opacity: 0.3, fontSize: 13 }}>No submissions yet</div>
-          )}
-        </div>
-      </div>
+          </div>
+          <button
+            onClick={() => setShowAvatarPicker(true)}
+            style={{ fontSize: 11, padding: "6px 12px", borderRadius: 20, background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.35)", color: "#c4b5fd", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+          >✏️ Avatar</button>
+        </header>
 
-      </div>{/* end padding wrapper */}
+        {/* ── Quick Nav: all pages from old sidebar ── */}
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 0 4px", scrollbarWidth: "none", animation: "dbSlide .35s ease both" }}>
+          {[
+            { label: "Assignments", icon: "📝", to: "/assignments" },
+            { label: "Lessons",     icon: "📖", to: "/lessons" },
+            { label: "Websites",    icon: "🌐", to: "/websites" },
+            { label: "Leaderboard", icon: "🏆", to: "/leaderboard" },
+            { label: "Achievements",icon: "🎖️", to: "/achievements" },
+            ...(unlocked ? [
+              { label: "Arcade",    icon: "🎮", to: "/arcade" },
+              { label: "Projects",  icon: "💻", to: "/projects" },
+              { label: "Videos",    icon: "📺", to: "/student/videos" },
+            ] : []),
+          ].map(item => (
+            <Link key={item.to} to={item.to} style={{ textDecoration: "none", flexShrink: 0 }}>
+              <div style={{
+                padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap",
+                display: "flex", alignItems: "center", gap: 6,
+                transition: "background .15s, color .15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.3)"; (e.currentTarget as HTMLElement).style.color = "#c4b5fd"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.75)"; }}
+              >{item.icon} {item.label}</div>
+            </Link>
+          ))}
+        </div>
+
+        {/* ── EARN: Stars / Rank / Awards ── */}
+        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, animation: "dbSlide .4s ease both" }}>
+          <div style={{
+            borderRadius: 14, padding: "14px 10px", textAlign: "center",
+            background: starsCount >= 5 ? "linear-gradient(135deg,rgba(245,158,11,.35),rgba(234,179,8,.2))" : "rgba(255,255,255,0.05)",
+            border: starsCount >= 5 ? "1px solid rgba(245,158,11,.5)" : "1px solid rgba(255,255,255,0.1)",
+          }}>
+            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Stars</div>
+            <div style={{ fontSize: 10, lineHeight: 1, marginBottom: 4 }}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} style={{ opacity: i < starsCount ? 1 : 0.15, fontSize: 14, animation: i < starsCount && starsCount >= 5 ? "dbStarPulse 2s ease-in-out infinite" : undefined, animationDelay: `${i * 0.12}s` }}>⭐</span>
+              ))}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>{starsCount}/5</div>
+            {starsCount >= 5 && <div style={{ fontSize: 9, color: "#fcd34d", fontWeight: 700, marginTop: 2 }}>McDonald's! 🎉</div>}
+          </div>
+          <div style={{ borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Rank</div>
+            <div style={{ fontSize: 28, lineHeight: 1, marginBottom: 4 }}>
+              {myRank <= 3 && myRank > 0 ? ["🥇","🥈","🥉"][myRank - 1] : "🏅"}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>{myRank > 0 ? `#${myRank}` : "—"}</div>
+          </div>
+          <div style={{ borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ fontSize: 9, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Awards</div>
+            <div style={{ fontSize: 28, lineHeight: 1, marginBottom: 4 }}>🏆</div>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
+          </div>
+        </div>
+
+        {/* ── Current Block Banner ── */}
+        {blockInfo.state === "current" && !(blockInfo as any).block.is_break && (
+          <div style={{
+            marginTop: 12, borderRadius: 12, padding: "10px 14px",
+            background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
+            display: "flex", alignItems: "center", gap: 10, animation: "dbSlide .4s ease both",
+          }}>
+            <div style={{ fontSize: 16 }}>
+              {({"math":"🔢","reading":"📖","writing":"✏️","spelling":"🔤","sel":"💛","daily_news":"📰","science":"🔬","social_studies":"🌎"} as Record<string,string>)[(blockInfo as any).block.subject] || "📚"}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>Now: {(blockInfo as any).block.label}</div>
+              <div style={{ fontSize: 10, opacity: 0.5 }}>{(blockInfo as any).block.start_time} – {(blockInfo as any).block.end_time}</div>
+            </div>
+            <div style={{ fontSize: 10, padding: "3px 9px", borderRadius: 20, background: "rgba(139,92,246,0.3)", color: "#c4b5fd", fontWeight: 700 }}>IN SESSION</div>
+          </div>
+        )}
+
+        {/* ── TODAY section label ── */}
+        <div style={{ marginTop: 22, marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
+          📅 Today
+        </div>
+
+        {/* Assignment tile */}
+        <div
+          onClick={() => { if (pendingAssignment && parsedAssignment) setPhase('working'); else if (pendingAssignment) setPhase('working'); }}
+          style={{
+            borderRadius: 16, padding: "18px 20px", marginBottom: 10, cursor: pendingAssignment ? "pointer" : "default",
+            background: pendingAssignment
+              ? "linear-gradient(135deg, rgba(139,92,246,0.35), rgba(99,102,241,0.2))"
+              : "rgba(255,255,255,0.04)",
+            border: pendingAssignment
+              ? "1px solid rgba(139,92,246,0.55)"
+              : "1px solid rgba(255,255,255,0.08)",
+            display: "flex", alignItems: "center", gap: 16,
+            animation: "dbSlide .4s ease both",
+            transition: "transform .15s",
+          }}
+          onMouseEnter={e => { if (pendingAssignment) (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+            background: pendingAssignment ? "rgba(139,92,246,0.4)" : "rgba(255,255,255,0.06)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
+          }}>📝</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 900 }}>{pendingAssignment ? pendingAssignment.title : "No assignment right now"}</div>
+            <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>
+              {pendingAssignment ? "Tap to start →" : "You're all caught up!"}
+            </div>
+          </div>
+          {pendingAssignment && <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>}
+        </div>
+
+        {/* Lessons tile */}
+        <Link to="/lessons" style={{ textDecoration: "none", display: "block" }}>
+          <div style={{
+            borderRadius: 16, padding: "18px 20px", marginBottom: 10,
+            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+            display: "flex", alignItems: "center", gap: 16,
+            animation: "dbSlide .45s ease both",
+            transition: "transform .15s",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+          >
+            <div style={{
+              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+              background: "rgba(59,130,246,0.25)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
+            }}>📖</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 900 }}>Lessons</div>
+              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>Review what your teacher has shared</div>
+            </div>
+            <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
+          </div>
+        </Link>
+
+        {/* Quiz tiles */}
+        {pendingQuizzes.length > 0 && !activeQuiz && pendingQuizzes.map(q => (
+          <button key={q.id}
+            onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
+            style={{
+              width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 16,
+              padding: "18px 20px", borderRadius: 16, marginBottom: 10, cursor: "pointer",
+              background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.12))",
+              border: "1px solid rgba(245,158,11,0.45)", color: "white",
+              animation: "dbSlide .48s ease both", transition: "transform .15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: "rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🧠</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 900 }}>{q.title || "Quiz"}</div>
+              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{q._className} · {(q.questions || []).length} questions{q.estimated_minutes ? ` · ~${q.estimated_minutes} min` : ""}</div>
+            </div>
+            <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
+          </button>
+        ))}
+
+        {/* Inline quiz taker */}
+        {activeQuiz && (
+          <div style={{
+            borderRadius: 16, padding: "20px", marginBottom: 10,
+            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,.4)",
+            animation: "dbSlide .4s ease both",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 4 }}>Quiz</div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{activeQuiz.title}</h2>
+              </div>
+              <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize: 13, opacity: 0.5, background: "none", border: "none", color: "white", cursor: "pointer" }}>Close</button>
+            </div>
+            {quizResult ? (
+              <div style={{ textAlign: "center", padding: "24px 0" }}>
+                <div style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}>{quizResult.score}%</div>
+                <div style={{ opacity: 0.6, marginTop: 8 }}>Quiz submitted. Nice work! 🎉</div>
+                <button onClick={() => { setPendingQuizzes(p => p.filter(x => x.id !== activeQuiz.id)); setActiveQuiz(null); setQuizResult(null); }}
+                  style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Done</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(activeQuiz.questions || []).map((q: any, qi: number) => (
+                    <div key={qi} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 10 }}>{qi + 1}. {q.text}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {(q.options || []).map((opt: string, oi: number) => (
+                          <label key={oi} style={{
+                            display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 10px", borderRadius: 10,
+                            background: quizAnswers[qi] === oi ? "rgba(139,92,246,.3)" : "rgba(255,255,255,.04)",
+                            border: quizAnswers[qi] === oi ? "1px solid rgba(139,92,246,.5)" : "1px solid rgba(255,255,255,.06)",
+                          }}>
+                            <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
+                              onChange={() => setQuizAnswers(a => { const n = [...a]; n[qi] = oi; return n; })} />
+                            <span>{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  disabled={quizSubmitting || quizAnswers.some(a => a < 0)}
+                  onClick={async () => {
+                    setQuizSubmitting(true);
+                    try { const r = await api.submitQuiz(activeQuiz.id, quizAnswers); setQuizResult({ score: r.score }); }
+                    catch (e: any) { alert("Could not submit: " + (e?.message || "unknown error")); }
+                    finally { setQuizSubmitting(false); }
+                  }}
+                  style={{ marginTop: 16, padding: "12px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: (quizSubmitting || quizAnswers.some(a => a < 0)) ? 0.4 : 1 }}>
+                  {quizSubmitting ? "Submitting…" : "Submit quiz"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── PLAY section — hidden entirely until free time earned ── */}
+        {unlocked && (
+          <>
+            <div style={{ marginTop: 22, marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
+              🎉 Play
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, animation: "dbPop .4s ease both" }}>
+              {/* Arcade */}
+              <Link to="/arcade" style={{ textDecoration: "none" }}>
+                <div style={{
+                  padding: "20px 16px", borderRadius: 18, cursor: "pointer",
+                  background: "linear-gradient(135deg,rgba(139,92,246,.45),rgba(99,102,241,.3))",
+                  border: "1px solid rgba(139,92,246,.6)", boxShadow: "0 0 30px rgba(139,92,246,.2)",
+                  transition: "transform .15s, box-shadow .15s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(139,92,246,.45)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px rgba(139,92,246,.2)"; }}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎮</div>
+                  <div style={{ fontSize: 17, fontWeight: 900 }}>Arcade</div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>31 games</div>
+                </div>
+              </Link>
+              {/* Projects */}
+              <Link to="/projects" style={{ textDecoration: "none" }}>
+                <div style={{
+                  padding: "20px 16px", borderRadius: 18, cursor: "pointer",
+                  background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
+                  border: "1px solid rgba(16,185,129,.55)", boxShadow: "0 0 30px rgba(16,185,129,.18)",
+                  transition: "transform .15s, box-shadow .15s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(16,185,129,.38)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px rgba(16,185,129,.18)"; }}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>💻</div>
+                  <div style={{ fontSize: 17, fontWeight: 900 }}>Projects</div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>2D · 3D · Unity</div>
+                </div>
+              </Link>
+              {/* Video Library */}
+              {classConfig.youtubeEnabled && (
+                <button onClick={() => navigate("/student/videos")} style={{
+                  padding: "20px 16px", borderRadius: 18, cursor: "pointer", textAlign: "left",
+                  background: "linear-gradient(135deg,rgba(239,68,68,.35),rgba(220,38,38,.2))",
+                  border: "1px solid rgba(239,68,68,.5)", color: "white",
+                  transition: "transform .15s", boxShadow: "0 0 24px rgba(239,68,68,.15)",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📺</div>
+                  <div style={{ fontSize: 17, fontWeight: 900 }}>Videos</div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks"}</div>
+                </button>
+              )}
+              {/* Learning Apps */}
+              <button onClick={() => navigate("/websites")} style={{
+                padding: "20px 16px", borderRadius: 18, cursor: "pointer", textAlign: "left",
+                background: "linear-gradient(135deg,rgba(99,102,241,.4),rgba(79,70,229,.25))",
+                border: "1px solid rgba(99,102,241,.55)", color: "white",
+                transition: "transform .15s", boxShadow: "0 0 24px rgba(99,102,241,.15)",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🌐</div>
+                <div style={{ fontSize: 17, fontWeight: 900 }}>Learning Apps</div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{myWebsites.length > 0 ? `${myWebsites.length} sites` : "Websites"}</div>
+              </button>
+            </div>
+
+            {/* Teacher-shared video inline */}
+            {classVideo && (
+              <div style={{ marginTop: 10, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
+                </div>
+                <div style={{ position: "relative", paddingTop: "56.25%" }}>
+                  <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
+                    title={classVideo.video_title || "Class Video"}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── LEADERBOARD ── */}
+        {leaderboard.length > 0 && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🏆 Leaderboard</div>
+            <div style={{
+              borderRadius: 16, padding: "12px",
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+              animation: "dbSlide .5s ease .1s both",
+            }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {leaderboard.slice(0, 10).map((entry: any, i: number) => {
+                  const isMe = entry.user_id === user?.id;
+                  const medals = ["🥇","🥈","🥉"];
+                  return (
+                    <div key={entry.user_id} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 10px", borderRadius: 10,
+                      background: isMe ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.03)",
+                      border: isMe ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.05)",
+                    }}>
+                      <div style={{ width: 24, textAlign: "center", fontSize: i < 3 ? 16 : 12, fontWeight: 800, opacity: i < 3 ? 1 : 0.4 }}>
+                        {i < 3 ? medals[i] : `${i + 1}`}
+                      </div>
+                      <div style={{ flex: 1, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)" }}>
+                        {entry.name}{isMe ? " (you)" : ""}
+                      </div>
+                      <div style={{ display: "flex", gap: 2 }}>
+                        {Array.from({ length: 5 }, (_, si) => (
+                          <span key={si} style={{ fontSize: 10, opacity: si < entry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {myEntry && myRank > 10 && (
+                <div style={{
+                  marginTop: 8, padding: "8px 10px", borderRadius: 10,
+                  background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
+                  display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <div style={{ width: 24, textAlign: "center", fontSize: 12, fontWeight: 800, opacity: 0.6 }}>{myRank}</div>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#c4b5fd" }}>{myEntry.name} (you)</div>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {Array.from({ length: 5 }, (_, si) => (
+                      <span key={si} style={{ fontSize: 10, opacity: si < myEntry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── ACHIEVEMENTS: loot-box cards ── */}
+        {(myStars.rewards > 0 || badgeCount > 0) && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🎁 Achievements</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
+              {Array.from({ length: myStars.rewards || badgeCount || 0 }).map((_, i) => (
+                <LootBox key={i} index={i} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── CLASS: Recent Grades + Join a Class ── */}
+        <div style={{ marginTop: 22 }}>
+          <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>📋 Class</div>
+
+          {/* Recent Grades */}
+          <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Recent Grades</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {submissions.slice(0, 5).map((s: any) => (
+                <div key={s.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 12px", borderRadius: 12,
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 9, background: "rgba(139,92,246,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <CheckCircle size={13} style={{ color: "#a78bfa" }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{s.assignment_title || "Assignment"}</div>
+                      <div style={{ fontSize: 10, opacity: 0.4 }}>{new Date(s.submitted_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <div>
+                    {s.grade !== null
+                      ? <span style={{ fontSize: 14, fontWeight: 800, color: s.grade >= 70 ? "#34d399" : "#f87171" }}>{s.grade}%</span>
+                      : <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 20, background: "rgba(255,255,255,0.07)", opacity: 0.5 }}>Pending</span>}
+                  </div>
+                </div>
+              ))}
+              {submissions.length === 0 && (
+                <div style={{ textAlign: "center", padding: "20px", opacity: 0.3, fontSize: 13 }}>No submissions yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Join a class */}
+          <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Join a Class</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={joinCode} onChange={e => setJoinCode(e.target.value)}
+                placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
+                onKeyDown={e => e.key === "Enter" && handleJoinClass()}
+                style={{ minHeight: 48, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }} />
+              <button ref={joinBtnRef} onClick={handleJoinClass}
+                style={{ minHeight: 48, padding: "0 20px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer", background: joinSuccess ? "#10b981" : "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "white", border: "none", transition: "all .2s" }}>
+                {joinSuccess ? "✓" : "Join"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Learning Apps — below class, quick request link when no play section shown */}
+        {!unlocked && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🌐 Learning Apps</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => navigate("/websites")} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}>See all →</button>
+                <button onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, cursor: "pointer", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)" }}>📝 Request</button>
+              </div>
+            </div>
+            <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              {myWebsites.length > 0 ? (
+                <LearningAppGrid>
+                  {myWebsites.map((w: any) => <LearningAppTile key={w.id} app={w} dk={true} />)}
+                </LearningAppGrid>
+              ) : websitesLoading ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ height: 100, borderRadius: 12, background: "rgba(255,255,255,0.04)", animation: `pulse 1.5s ease-in-out ${i * 0.1}s infinite` }} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "20px", opacity: 0.35 }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🌐</div>
+                  <p style={{ fontSize: 12, fontWeight: 700 }}>No learning apps yet — ask your teacher!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>{/* end max-width wrapper */}
 
       {/* Mascot corner badge */}
       <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
         <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
       </div>
     </div>
+  );
+}
+
+/* ── LootBox achievement card ── */
+const LOOT_PRIZES = ["🎉","🌟","🏆","💎","🎖️","🦄","🔥","✨","👑","🎯","🚀","🎪"];
+function LootBox({ index }: { index: number }) {
+  const [opened, setOpened] = React.useState(false);
+  const prize = LOOT_PRIZES[index % LOOT_PRIZES.length];
+  return (
+    <button
+      onClick={() => setOpened(true)}
+      style={{
+        padding: "16px 10px", borderRadius: 16, cursor: opened ? "default" : "pointer",
+        background: opened
+          ? "linear-gradient(135deg, rgba(245,158,11,0.3), rgba(234,179,8,0.15))"
+          : "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(79,70,229,0.18))",
+        border: opened ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(99,102,241,0.5)",
+        textAlign: "center", color: "white",
+        transition: "transform .15s",
+        animation: opened ? "dbPop .3s ease both" : undefined,
+      }}
+      onMouseEnter={e => { if (!opened) { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.animation = "lootShake .3s ease both"; } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.animation = ""; }}
+    >
+      <div style={{ fontSize: 32, marginBottom: 6 }}>{opened ? prize : "🎁"}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.65 }}>{opened ? "Earned!" : "Tap to open"}</div>
+    </button>
   );
 }

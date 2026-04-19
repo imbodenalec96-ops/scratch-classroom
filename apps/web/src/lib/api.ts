@@ -172,6 +172,7 @@ export const api = {
   createQuiz: (data: any) => request<any>("/quizzes", { method: "POST", body: JSON.stringify(data) }),
   getQuiz: (id: string) => request<any>(`/quizzes/${id}`),
   submitQuiz: (quizId: string, answers: number[]) => request<any>(`/quizzes/${quizId}/attempt`, { method: "POST", body: JSON.stringify({ answers }) }),
+  deleteQuiz: (id: string) => request<any>(`/quizzes/${id}`, { method: "DELETE" }),
 
   // Analytics
   trackAnalytics: (data: any) => request<any>("/analytics/track", { method: "POST", body: JSON.stringify(data) }),

@@ -1247,42 +1247,78 @@ export default function AssignmentBuilder() {
 
       {/* Assignment form */}
       {showForm && (
-        <div className={`card border ${dk ? "border-violet-500/25" : "border-violet-200"} space-y-4`}>
-          <div className="flex items-center gap-2 mb-1">
-            <FileText size={16} className="text-violet-400" />
-            <h2 className={`font-semibold ${dk ? "text-white" : "text-gray-900"}`}>Assignment Details</h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className={`block text-xs font-semibold mb-1.5 ${dk ? "text-white/50" : "text-gray-500"}`}>Assignment Title *</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder='e.g. "Main Idea & Details Worksheet"' className="input w-full" />
+        <div className="rounded-2xl border space-y-5 p-5" style={{
+          background: "var(--bg-surface)",
+          borderColor: dk ? "rgba(139,92,246,0.22)" : "rgba(139,92,246,0.2)",
+        }}>
+          {/* Form header */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(139,92,246,0.15)" }}>
+              <FileText size={14} className="text-violet-400" />
             </div>
             <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${dk ? "text-white/50" : "text-gray-500"}`}>
-                <BookOpen size={11} className="inline mr-1" />Subject
+              <h2 className="text-sm font-bold text-t1">Assignment Details</h2>
+              <p className="text-[10px] text-t3">Fill in the basics, then generate or save directly</p>
+            </div>
+          </div>
+
+          {/* Title — full width */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-t3 mb-1.5">
+              Title *
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder='e.g. "Main Idea & Details Worksheet"'
+              className="input w-full"
+            />
+          </div>
+
+          {/* Subject + Grade — side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-t3 mb-1.5">
+                <BookOpen size={10} /> Subject
               </label>
-              <select value={subject} onChange={(e) => setSubject(e.target.value)} className="input w-full">
+              <select value={subject} onChange={(e) => setSubject(e.target.value)} className="input w-full text-sm">
                 {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${dk ? "text-white/50" : "text-gray-500"}`}>
-                <GraduationCap size={11} className="inline mr-1" />Grade Level
+              <label className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-t3 mb-1.5">
+                <GraduationCap size={10} /> Grade Level
               </label>
-              <select value={grade} onChange={(e) => setGrade(e.target.value)} className="input w-full">
+              <select value={grade} onChange={(e) => setGrade(e.target.value)} className="input w-full text-sm">
                 {GRADES.map((g) => <option key={g}>{g}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* Due Date + Instructions — side by side */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${dk ? "text-white/50" : "text-gray-500"}`}>
-                <Calendar size={11} className="inline mr-1" />Due Date
+              <label className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-t3 mb-1.5">
+                <Calendar size={10} /> Due Date &amp; Time
               </label>
-              <input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full" />
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="input w-full text-sm"
+              />
             </div>
             <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${dk ? "text-white/50" : "text-gray-500"}`}>Special Instructions (optional)</label>
-              <input value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Any special notes for AI generation…" className="input w-full" />
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-t3 mb-1.5">
+                Special Instructions
+              </label>
+              <input
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="Notes for AI generation…"
+                className="input w-full text-sm"
+              />
             </div>
           </div>
 
@@ -1584,56 +1620,70 @@ export default function AssignmentBuilder() {
       )}
 
           {/* Assignment list below form — compact */}
-          <div className="space-y-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-t3 px-1">
-              {assignments.length > 0 ? `${assignments.length} assignment${assignments.length === 1 ? "" : "s"}` : ""}
-            </div>
-            {assignments.slice(0, 12).map((a) => {
-              const isSelected = selectedIds.has(a.id);
-              return (
-                <div
-                  key={a.id}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all group
-                    ${isSelected
-                      ? "border-indigo-500/50 bg-indigo-500/10"
-                      : "border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03]"}`}
-                  style={{ background: isSelected ? undefined : "var(--bg-surface)" }}
-                  onClick={() => toggleSelect(a.id)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelect(a.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-shrink-0 cursor-pointer accent-violet-500"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate text-t1">{a.title}</div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {a.target_subject && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300">
-                          {a.target_subject}
-                        </span>
-                      )}
-                      {a.created_at && (
-                        <span className="text-[10px] text-t3">
-                          {new Date(a.created_at).toLocaleDateString()}
-                        </span>
-                      )}
+          {assignments.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-1 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-t3">
+                  {assignments.length} assignment{assignments.length === 1 ? "" : "s"}
+                </span>
+                {selectedIds.size > 0 && (
+                  <span className="text-[10px] font-semibold" style={{ color: "var(--accent)" }}>
+                    {selectedIds.size} selected
+                  </span>
+                )}
+              </div>
+              {assignments.slice(0, 12).map((a) => {
+                const isSelected = selectedIds.has(a.id);
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all group"
+                    style={{
+                      borderColor: isSelected ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.06)",
+                      background: isSelected ? "rgba(99,102,241,0.08)" : "var(--bg-surface)",
+                    }}
+                    onClick={() => toggleSelect(a.id)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(a.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-shrink-0 cursor-pointer accent-violet-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold truncate text-t1 leading-tight">{a.title}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {a.target_subject && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                            style={{ background: "rgba(139,92,246,0.15)", color: "#c4b5fd" }}>
+                            {a.target_subject}
+                          </span>
+                        )}
+                        {a.created_at && (
+                          <span className="text-[9px] text-t3">
+                            {new Date(a.created_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); window.open(`/print/assignment/${a.id}`, "_blank", "noopener"); }}
+                      className="opacity-0 group-hover:opacity-60 text-t3 hover:text-t1 cursor-pointer transition-all p-1 rounded"
+                      title="Print"
+                    >
+                      <Printer size={11} />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); window.open(`/print/assignment/${a.id}`, "_blank", "noopener"); }}
-                    className="opacity-0 group-hover:opacity-100 text-[10px] text-t3 hover:text-t1 cursor-pointer transition-all"
-                    title="Print"
-                  >🖨</button>
+                );
+              })}
+              {assignments.length > 12 && (
+                <div className="text-[10px] text-t3 text-center py-1.5 opacity-60">
+                  +{assignments.length - 12} more…
                 </div>
-              );
-            })}
-            {assignments.length > 12 && (
-              <div className="text-[11px] text-t3 text-center py-1">+{assignments.length - 12} more…</div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
         </div>{/* end LEFT COLUMN */}
 
@@ -1835,41 +1885,62 @@ export default function AssignmentBuilder() {
               </div>
 
               {/* Per-assignment metadata strip */}
-              <div className="flex items-center gap-3 mt-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-                {a.target_subject && <span>{a.target_subject === "math" ? "🔢" : a.target_subject === "writing" ? "✏️" : "📖"} {a.target_subject}</span>}
-                {a.question_count != null && <span>· {a.question_count} Qs</span>}
-                {a.estimated_minutes != null && <span>· ~{a.estimated_minutes} min</span>}
-                <span>· {a.student_id ? "Per-student" : "Whole class"}</span>
-                {a.created_at && <span style={{ marginLeft: "auto" }}>Created {new Date(a.created_at).toLocaleDateString()}</span>}
+              <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+                {a.target_subject && (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(99,102,241,0.1)", color: "#a5b4fc" }}>
+                    {a.target_subject === "math" ? "🔢" : a.target_subject === "writing" ? "✏️" : "📖"} {a.target_subject}
+                  </span>
+                )}
+                {a.question_count != null && (
+                  <span className="text-[10px] font-semibold text-t3">{a.question_count} Qs</span>
+                )}
+                {a.estimated_minutes != null && (
+                  <span className="text-[10px] font-semibold text-t3">~{a.estimated_minutes} min</span>
+                )}
+                <span className="text-[10px] text-t3">{a.student_id ? "Per-student" : "Whole class"}</span>
+                {a.created_at && (
+                  <span className="text-[10px] text-t3 ml-auto">
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </span>
+                )}
               </div>
 
-              {/* Per-assignment action row — Edit / Easier / Harder / Regenerate / Delete */}
+              {/* Per-assignment action row */}
               <div className="flex gap-1.5 mt-3 pt-3 flex-wrap" style={{ borderTop: "1px solid var(--border)" }}>
-                <button onClick={() => setEditingAssignment(a)}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
-                  ✎ Edit
+                <button
+                  onClick={() => setEditingAssignment(a)}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-white/[0.05]"
+                  style={{ border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
+                  Edit
                 </button>
-                <button onClick={() => handleAdjust(a.id, "easier")} disabled={!!adjusting[a.id]}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--success) 35%, transparent)", color: "var(--success)", background: "color-mix(in srgb, var(--success) 8%, transparent)" }}>
-                  {adjusting[a.id] === "easier" ? "…" : "📉 Make easier"}
+                <button
+                  onClick={() => handleAdjust(a.id, "easier")}
+                  disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(16,185,129,0.25)", color: "#34d399", background: "rgba(16,185,129,0.06)" }}>
+                  {adjusting[a.id] === "easier" ? "…" : "Easier"}
                 </button>
-                <button onClick={() => handleAdjust(a.id, "harder")} disabled={!!adjusting[a.id]}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--warning) 35%, transparent)", color: "var(--warning)", background: "color-mix(in srgb, var(--warning) 8%, transparent)" }}>
-                  {adjusting[a.id] === "harder" ? "…" : "📈 Make harder"}
+                <button
+                  onClick={() => handleAdjust(a.id, "harder")}
+                  disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(245,158,11,0.25)", color: "#fbbf24", background: "rgba(245,158,11,0.06)" }}>
+                  {adjusting[a.id] === "harder" ? "…" : "Harder"}
                 </button>
-                <button onClick={() => handleRegenerate(a.id)} disabled={!!adjusting[a.id]}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)", color: "var(--accent)", background: "var(--accent-light)" }}>
-                  {adjusting[a.id] === "regen" ? "Regenerating…" : "✨ Regenerate fresh"}
+                <button
+                  onClick={() => handleRegenerate(a.id)}
+                  disabled={!!adjusting[a.id]}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(139,92,246,0.3)", color: "#a78bfa", background: "rgba(139,92,246,0.08)" }}>
+                  {adjusting[a.id] === "regen" ? "Regenerating…" : "Regenerate"}
                 </button>
-                <button onClick={() => window.open(`/print/assignment/${a.id}`, "_blank", "noopener")}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
+                <button
+                  onClick={() => window.open(`/print/assignment/${a.id}`, "_blank", "noopener")}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-white/[0.05]"
                   title="Open printable PDF view"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
-                  🖨 Print
+                  style={{ border: "1px solid var(--border-md)", color: "var(--text-2)" }}>
+                  <Printer size={11} className="inline mr-1" />Print
                 </button>
                 <button
                   onClick={async () => {
@@ -1886,9 +1957,9 @@ export default function AssignmentBuilder() {
                     finally { setAdjusting(p => { const n = { ...p }; delete n[a.id]; return n; }); }
                   }}
                   disabled={!!adjusting[a.id]}
-                  className="text-[11px] font-semibold px-2.5 py-1 cursor-pointer transition-colors"
-                  style={{ borderRadius: "var(--r-sm)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", marginLeft: "auto" }}>
-                  {adjusting[a.id] === "delete" ? "Deleting…" : "🗑 Delete"}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all ml-auto"
+                  style={{ border: "1px solid rgba(239,68,68,0.25)", color: "#f87171", background: "rgba(239,68,68,0.06)" }}>
+                  {adjusting[a.id] === "delete" ? "Deleting…" : "Delete"}
                 </button>
               </div>
 
@@ -1907,9 +1978,15 @@ export default function AssignmentBuilder() {
           );
         })}
         {assignments.length === 0 && (
-          <div className={`text-center py-14 ${dk ? "text-white/20" : "text-gray-400"}`}>
-            <FileText size={36} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No assignments yet — create one to get started!</p>
+          <div className="text-center py-16">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+              style={{ background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }}>
+              <FileText size={24} className="opacity-25 text-t3" />
+            </div>
+            <p className="text-sm font-semibold text-t3">No assignments yet</p>
+            <p className="text-xs text-t3 mt-1 opacity-60">
+              Create one above or use the Full Week generator to fill the calendar automatically.
+            </p>
           </div>
         )}
       </div>

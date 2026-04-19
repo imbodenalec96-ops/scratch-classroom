@@ -1,19 +1,43 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
-import { Tv, Star, ArrowUp, ArrowDown, Music, Image as ImageIcon, CalendarDays, Plus, Trash2, ExternalLink } from "lucide-react";
+import {
+  Tv, Star, ArrowUp, ArrowDown, Music,
+  CalendarDays, Plus, Trash2, ExternalLink, Printer, Users,
+  ChevronDown, ChevronUp,
+} from "lucide-react";
 
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
 const MUSIC_PRESETS = [
-  { id: "",         label: "— No music —" },
-  { id: "forest",   label: "🌲 Forest" },
-  { id: "ocean",    label: "🌊 Ocean" },
-  { id: "rain",     label: "🌧 Rain" },
-  { id: "piano",    label: "🎹 Piano" },
-  { id: "campfire", label: "🔥 Campfire" },
+  { id: "",         label: "No music" },
+  { id: "forest",   label: "Forest" },
+  { id: "ocean",    label: "Ocean" },
+  { id: "rain",     label: "Rain" },
+  { id: "piano",    label: "Piano" },
+  { id: "campfire", label: "Campfire" },
 ];
+
+const MUSIC_ICONS: Record<string, string> = {
+  forest: "🌲", ocean: "🌊", rain: "🌧", piano: "🎹", campfire: "🔥",
+};
+
+const LEVEL_COLORS: Record<number, { bg: string; text: string; border: string }> = {
+  1: { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.25)" },
+  2: { bg: "rgba(251,146,60,0.1)",  text: "#fb923c", border: "rgba(251,146,60,0.25)" },
+  3: { bg: "rgba(234,179,8,0.1)",   text: "#facc15", border: "rgba(234,179,8,0.25)" },
+  4: { bg: "rgba(34,197,94,0.1)",   text: "#4ade80", border: "rgba(34,197,94,0.25)" },
+  5: { bg: "rgba(16,185,129,0.12)", text: "#34d399", border: "rgba(16,185,129,0.3)" },
+};
+
+const LEVEL_LABELS: Record<number, string> = {
+  1: "Most Support",
+  2: "Guided",
+  3: "Developing",
+  4: "Independent",
+  5: "Full Independence",
+};
 
 export default function TeacherBoardSettings() {
   const { theme } = useTheme();
@@ -62,6 +86,7 @@ export default function TeacherBoardSettings() {
       }
     } catch {}
   };
+
   const setLevel = async (s: any, level: number) => {
     const lv = Math.max(1, Math.min(5, level));
     try {
@@ -69,6 +94,7 @@ export default function TeacherBoardSettings() {
       setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, level: lv } : x) }));
     } catch {}
   };
+
   const togglePaperOnly = async (s: any) => {
     const next = !s.paper_only;
     setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, paper_only: next ? 1 : 0 } : x) }));
@@ -76,6 +102,7 @@ export default function TeacherBoardSettings() {
       setBoard(b => ({ ...b, students: b.students.map(x => x.id === s.id ? { ...x, paper_only: s.paper_only } : x) }));
     }
   };
+
   const saveSetting = async (key: string, value: string) => {
     setBoard(b => ({ ...b, settings: { ...b.settings, [key]: value } }));
     try { await api.saveBoardSetting(key, value); } catch {}
@@ -83,22 +110,31 @@ export default function TeacherBoardSettings() {
 
   const currentClass = classes.find(c => c.id === classId);
   const boardUrl = currentClass ? `/board?class=${encodeURIComponent(currentClass.id)}` : "/board";
+  const currentMusicId = board.settings.music_playlist_id || "";
+  const currentMusicLabel = MUSIC_PRESETS.find(p => p.id === currentMusicId)?.label || "No music";
 
   return (
-    <div className="p-7 max-w-6xl mx-auto space-y-6 animate-page-enter" style={{ color: "var(--text-1)" }}>
+    <div className="p-6 max-w-5xl mx-auto pb-16 animate-page-enter" style={{ color: "var(--t1)" }}>
+      {/* Reward flash */}
       {rewardFlash && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-8 py-4 rounded-2xl shadow-2xl font-bold text-lg"
           style={{ background: "linear-gradient(135deg, #f59e0b, #dc2626)", color: "white", boxShadow: "0 0 60px rgba(245,158,11,0.6)" }}>
-          🎉 {rewardFlash} earned McDonald's!
+          {rewardFlash} earned McDonald's!
         </div>
       )}
 
-      <header className="border-b pb-5 flex items-end justify-between flex-wrap gap-4" style={{ borderColor: "var(--border)" }}>
+      {/* Page header */}
+      <header className="flex items-start justify-between flex-wrap gap-4 mb-8">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: "var(--text-3)" }}>Teacher · Classroom Board</div>
-          <h1 className="font-display text-3xl sm:text-4xl" style={{ color: "var(--text-1)" }}>Board Settings</h1>
-          <p className="text-sm mt-2 max-w-xl" style={{ color: "var(--text-2)" }}>
-            Edit everything that appears on the classroom TV board. Students see a read-only view at <code>/board</code>.
+          <div className="text-[10px] uppercase tracking-[0.18em] mb-1.5" style={{ color: "var(--t3)" }}>Teacher Settings</div>
+          <h1 className="text-2xl font-bold flex items-center gap-2.5" style={{ color: "var(--t1)" }}>
+            <span className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(124,58,237,0.2)" }}>
+              <Tv size={16} style={{ color: "#a78bfa" }} />
+            </span>
+            Board Settings
+          </h1>
+          <p className="text-sm mt-1.5 max-w-lg" style={{ color: "var(--t3)" }}>
+            Manage everything displayed on the classroom TV. Students see a read-only view at <code className="text-xs px-1 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.08)" }}>/board</code>.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -107,139 +143,262 @@ export default function TeacherBoardSettings() {
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <a href={boardUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border cursor-pointer transition-colors"
-            style={{ color: "var(--text-1)", background: "var(--surface-1)", borderColor: "var(--border-md)", borderRadius: "var(--r-md)" }}>
-            <Tv size={13}/> Preview on Board <ExternalLink size={11}/>
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all"
+            style={{
+              color: "var(--t1)",
+              background: "rgba(255,255,255,0.04)",
+              borderColor: "rgba(255,255,255,0.1)",
+            }}>
+            <Tv size={13} /> Open board <ExternalLink size={11} />
           </a>
         </div>
       </header>
 
-      {/* Settings row */}
-      <section className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <CalendarDays size={16}/> <h2 className="font-semibold text-base">Day & Specialist</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold" style={{ color: "var(--text-3)" }}>Today's rotation day</span>
-            <select value={(board.settings.current_specials_day || "A").toUpperCase()}
-              onChange={e => saveSetting("current_specials_day", e.target.value)}
-              className="input text-sm">
-              {DAY_LETTERS.map(d => <option key={d} value={d}>Day {d}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5 md:col-span-2">
-            <span className="text-xs font-semibold" style={{ color: "var(--text-3)" }}>11 AM specialist in room</span>
-            <input value={board.settings.specialist_name || ""}
-              onChange={e => saveSetting("specialist_name", e.target.value)}
-              placeholder="e.g. Ms. Rivera (Library)"
-              className="input text-sm"/>
-          </label>
-        </div>
-      </section>
-
-      <section className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Music size={16}/> <h2 className="font-semibold text-base">Ambient Music & Background</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold" style={{ color: "var(--text-3)" }}>Playlist</span>
-            <select value={board.settings.music_playlist_id || ""}
-              onChange={e => saveSetting("music_playlist_id", e.target.value)}
-              className="input text-sm">
-              {MUSIC_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold" style={{ color: "var(--text-3)" }}>Background image URL</span>
-            <input value={board.settings.background_image_url || ""}
-              onChange={e => saveSetting("background_image_url", e.target.value)}
-              placeholder="https://… (leave blank for sunset gradient)"
-              className="input text-sm"/>
-          </label>
-        </div>
-      </section>
-
-      {/* Stars + Levels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <section className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Star size={16}/> <h2 className="font-semibold text-base">Behavior Stars</h2>
-            <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>5 = McDonald's · auto-reset</span>
+      {/* ── Row 1: Day/Specialist + Music ────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Day & Specialist */}
+        <section className="rounded-2xl border p-5"
+          style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-2 mb-5">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(99,102,241,0.15)" }}>
+              <CalendarDays size={14} style={{ color: "#818cf8" }} />
+            </span>
+            <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Day &amp; Specialist</h2>
           </div>
-          <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+          <div className="space-y-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Today's rotation day</span>
+              <div className="flex gap-1.5">
+                {DAY_LETTERS.map(d => {
+                  const active = (board.settings.current_specials_day || "A").toUpperCase() === d;
+                  return (
+                    <button key={d}
+                      onClick={() => saveSetting("current_specials_day", d)}
+                      className="flex-1 py-2 rounded-xl text-sm font-bold border transition-all"
+                      style={{
+                        background: active ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                        borderColor: active ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)",
+                        color: active ? "#818cf8" : "var(--t3)",
+                        boxShadow: active ? "0 0 12px rgba(99,102,241,0.2)" : "none",
+                      }}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>11 AM specialist in room</span>
+              <input
+                value={board.settings.specialist_name || ""}
+                onChange={e => saveSetting("specialist_name", e.target.value)}
+                placeholder="e.g. Ms. Rivera (Library)"
+                className="input text-sm"
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* Music & Background */}
+        <section className="rounded-2xl border p-5"
+          style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-2 mb-5">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(168,85,247,0.15)" }}>
+              <Music size={14} style={{ color: "#c084fc" }} />
+            </span>
+            <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Music &amp; Background</h2>
+          </div>
+          <div className="space-y-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Ambient playlist</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {MUSIC_PRESETS.map(p => {
+                  const active = currentMusicId === p.id;
+                  return (
+                    <button key={p.id}
+                      onClick={() => saveSetting("music_playlist_id", p.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all"
+                      style={{
+                        background: active ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.03)",
+                        borderColor: active ? "rgba(168,85,247,0.35)" : "rgba(255,255,255,0.07)",
+                        color: active ? "#c084fc" : "var(--t3)",
+                      }}>
+                      {p.id ? MUSIC_ICONS[p.id] : "—"} {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Background image URL</span>
+              <input
+                value={board.settings.background_image_url || ""}
+                onChange={e => saveSetting("background_image_url", e.target.value)}
+                placeholder="https://… (leave blank for default gradient)"
+                className="input text-sm"
+              />
+            </label>
+          </div>
+        </section>
+      </div>
+
+      {/* ── Row 2: Stars + Levels ─────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* Behavior Stars */}
+        <section className="rounded-2xl border p-5"
+          style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(245,158,11,0.15)" }}>
+              <Star size={14} style={{ color: "#fbbf24" }} />
+            </span>
+            <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Behavior Stars</h2>
+            <span className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(245,158,11,0.1)", color: "#fbbf24" }}>
+              5 stars = reward
+            </span>
+          </div>
+          <p className="text-[11px] mb-4" style={{ color: "var(--t3)" }}>Reaching 5 stars fires the McDonald's reward and auto-resets.</p>
+
+          <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
             {board.students.map(s => {
               const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
               return (
-                <div key={s.id} className="rounded-xl p-2.5 flex items-center gap-3"
-                  style={{ background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: "1px solid var(--border)" }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden"
+                <div key={s.id}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    borderColor: "rgba(255,255,255,0.06)",
+                  }}>
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-base shrink-0 overflow-hidden"
                     style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.2))" }}>
                     {s.avatar_url
                       ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
-                      : <span>{(s.name || "?")[0]}</span>}
+                      : <span className="text-sm font-bold">{(s.name || "?")[0]}</span>}
                   </div>
+
+                  {/* Name + stars */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{s.name}</div>
+                    <div className="font-semibold text-sm truncate" style={{ color: "var(--t1)" }}>{s.name}</div>
                     <div className="flex items-center gap-0.5 mt-0.5">
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} style={{ fontSize: 13, opacity: i < stars ? 1 : 0.25, filter: i < stars ? "none" : "grayscale(1)" }}>⭐</span>
+                      {Array.from({ length: 5 }, (_, idx) => (
+                        <span key={idx} style={{
+                          fontSize: 12,
+                          opacity: idx < stars ? 1 : 0.2,
+                          filter: idx < stars ? "drop-shadow(0 0 3px rgba(245,158,11,0.6))" : "grayscale(1)",
+                        }}>
+                          ⭐
+                        </span>
                       ))}
+                      <span className="ml-1 text-[10px] font-bold tabular-nums" style={{ color: "var(--t3)" }}>
+                        {stars}/5
+                      </span>
                     </div>
                   </div>
+
+                  {/* Reward badge */}
                   {s.reward_count > 0 && (
-                    <div className="text-xs px-2 py-1 rounded-full font-bold"
-                      style={{ background: "rgba(245,158,11,0.2)", color: dk ? "#fcd34d" : "#b45309" }}>
-                      🏆 {s.reward_count}
+                    <div className="text-[10px] px-2 py-1 rounded-full font-bold shrink-0"
+                      style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}>
+                      x{s.reward_count}
                     </div>
                   )}
-                  <div className="flex gap-1">
-                    <button onClick={() => bumpStars(s, -1)} className="w-8 h-8 rounded-lg font-bold text-sm hover:scale-110 transition"
-                      style={{ background: "rgba(239,68,68,0.18)", color: "#dc2626" }}>−</button>
-                    <button onClick={() => bumpStars(s, 1)} className="w-8 h-8 rounded-lg font-bold text-sm hover:scale-110 transition"
-                      style={{ background: "rgba(34,197,94,0.18)", color: "#16a34a" }}>+</button>
+
+                  {/* Controls */}
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      onClick={() => bumpStars(s, -1)}
+                      className="w-8 h-8 rounded-lg font-bold text-sm hover:scale-105 transition-transform"
+                      style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}
+                      title="Remove star">
+                      −
+                    </button>
+                    <button
+                      onClick={() => bumpStars(s, 1)}
+                      className="w-8 h-8 rounded-lg font-bold text-sm hover:scale-105 transition-transform"
+                      style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}
+                      title="Add star">
+                      +
+                    </button>
                   </div>
                 </div>
               );
             })}
             {board.students.length === 0 && (
-              <div className="text-sm py-8 text-center" style={{ color: "var(--text-3)" }}>
+              <div className="text-sm py-10 text-center" style={{ color: "var(--t3)" }}>
                 {loading ? "Loading…" : "No students in this class yet."}
               </div>
             )}
           </div>
         </section>
 
-        <section className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <ArrowUp size={16}/> <h2 className="font-semibold text-base">Independence Levels</h2>
-            <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>1 = most support · 5 = full independence</span>
+        {/* Independence Levels */}
+        <section className="rounded-2xl border p-5"
+          style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(16,185,129,0.15)" }}>
+              <ArrowUp size={14} style={{ color: "#34d399" }} />
+            </span>
+            <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Independence Levels</h2>
           </div>
+          <p className="text-[11px] mb-4" style={{ color: "var(--t3)" }}>1 = most support — 5 = full independence. Shown on student dashboards.</p>
+
           <div className="space-y-2">
-            {[1,2,3,4,5].map(level => {
+            {[1, 2, 3, 4, 5].map(level => {
               const atLevel = board.students.filter(s => (s.level || 1) === level);
+              const lc = LEVEL_COLORS[level];
               return (
-                <div key={level} className="rounded-xl p-3"
-                  style={{ background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid var(--border)" }}>
+                <div key={level} className="rounded-xl border p-3"
+                  style={{
+                    background: atLevel.length > 0 ? lc.bg : "rgba(255,255,255,0.02)",
+                    borderColor: atLevel.length > 0 ? lc.border : "rgba(255,255,255,0.06)",
+                  }}>
                   <div className="flex items-center gap-3">
-                    <div className="font-bold text-lg w-10 flex-shrink-0"
-                      style={{ color: level >= 4 ? "#16a34a" : level >= 2 ? "#d97706" : "#dc2626" }}>L{level}</div>
-                    <div className="flex-1 flex flex-wrap gap-1.5 min-h-[38px]">
+                    {/* Level badge */}
+                    <div className="shrink-0 w-12">
+                      <div className="text-base font-extrabold leading-none" style={{ color: lc.text }}>L{level}</div>
+                      <div className="text-[9px] font-medium mt-0.5" style={{ color: lc.text, opacity: 0.7 }}>
+                        {LEVEL_LABELS[level]}
+                      </div>
+                    </div>
+
+                    {/* Student chips */}
+                    <div className="flex-1 flex flex-wrap gap-1.5 min-h-[32px] items-center">
                       {atLevel.map(s => (
-                        <div key={s.id} className="group flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold"
-                          style={{ background: "rgba(139,92,246,0.15)", color: "var(--text-1)" }}>
+                        <div key={s.id}
+                          className="group flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border"
+                          style={{
+                            background: lc.bg,
+                            borderColor: lc.border,
+                            color: "var(--t1)",
+                          }}>
                           {s.avatar_url
-                            ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                            : <span className="opacity-60">{(s.name || "?")[0]}</span>}
-                          <span className="truncate max-w-[110px]">{s.name}</span>
-                          <button onClick={() => setLevel(s, level - 1)} disabled={level <= 1}
-                            className="opacity-60 hover:opacity-100 disabled:opacity-20" title="Level down"><ArrowDown size={12}/></button>
-                          <button onClick={() => setLevel(s, level + 1)} disabled={level >= 5}
-                            className="opacity-60 hover:opacity-100 disabled:opacity-20" title="Level up"><ArrowUp size={12}/></button>
+                            ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                            : <span className="text-[10px]" style={{ color: lc.text }}>{(s.name || "?")[0]}</span>}
+                          <span className="truncate max-w-[90px]">{s.name}</span>
+                          <button
+                            onClick={() => setLevel(s, level - 1)}
+                            disabled={level <= 1}
+                            className="opacity-40 hover:opacity-100 disabled:opacity-10 transition-opacity"
+                            title="Level down">
+                            <ArrowDown size={11} />
+                          </button>
+                          <button
+                            onClick={() => setLevel(s, level + 1)}
+                            disabled={level >= 5}
+                            className="opacity-40 hover:opacity-100 disabled:opacity-10 transition-opacity"
+                            title="Level up">
+                            <ArrowUp size={11} />
+                          </button>
                         </div>
                       ))}
-                      {atLevel.length === 0 && <span className="opacity-40 text-xs self-center">— empty —</span>}
+                      {atLevel.length === 0 && (
+                        <span className="text-[11px]" style={{ color: "var(--t3)", opacity: 0.5 }}>Empty</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -249,34 +408,64 @@ export default function TeacherBoardSettings() {
         </section>
       </div>
 
-      {/* Paper-only students (printable worksheets instead of digital) */}
-      <section className="card p-5">
+      {/* ── Paper-only Students ───────────────────────────────────────── */}
+      <section className="rounded-2xl border p-5 mb-4"
+        style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
         <div className="flex items-center gap-2 mb-1">
-          <h2 className="font-semibold text-base">Paper-only Students</h2>
-          <span className="text-xs ml-auto" style={{ color: "var(--text-3)" }}>Check to hide digital assignments — use 🖨 Print on each assignment instead.</span>
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: "rgba(59,130,246,0.15)" }}>
+            <Printer size={14} style={{ color: "#60a5fa" }} />
+          </span>
+          <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Paper-only Students</h2>
         </div>
-        <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>Students flagged here won't see assignments in their dashboard. Print from the Assignments page.</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <p className="text-[11px] mb-4" style={{ color: "var(--t3)" }}>
+          Flagged students won't see digital assignments — print worksheets from the Assignments page instead.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {board.students.map(s => (
             <label key={s.id}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-all"
               style={{
-                border: "1px solid var(--border)",
-                background: s.paper_only ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "var(--surface-1)",
+                border: "1px solid",
+                borderColor: s.paper_only ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.07)",
+                background: s.paper_only ? "rgba(59,130,246,0.1)" : "rgba(255,255,255,0.03)",
               }}>
-              <input type="checkbox" checked={!!s.paper_only} onChange={() => togglePaperOnly(s)} />
-              <span className="truncate text-sm font-semibold">{s.avatar_emoji || "🙂"} {s.name}</span>
-              {!!s.paper_only && <span className="ml-auto text-[10px] font-bold" style={{ color: "var(--accent)" }}>🖨 PAPER</span>}
+              <input
+                type="checkbox"
+                checked={!!s.paper_only}
+                onChange={() => togglePaperOnly(s)}
+                className="w-4 h-4 rounded"
+              />
+              <span className="truncate text-sm font-semibold flex-1" style={{ color: "var(--t1)" }}>
+                {s.avatar_emoji || "🙂"} {s.name}
+              </span>
+              {!!s.paper_only && (
+                <span className="text-[9px] font-bold shrink-0 px-1.5 py-0.5 rounded"
+                  style={{ background: "rgba(59,130,246,0.2)", color: "#60a5fa" }}>
+                  PAPER
+                </span>
+              )}
             </label>
           ))}
-          {board.students.length === 0 && <span className="text-xs opacity-60">No students in this class.</span>}
+          {board.students.length === 0 && (
+            <span className="text-xs col-span-full" style={{ color: "var(--t3)" }}>No students in this class.</span>
+          )}
         </div>
       </section>
 
-      {/* Resource Schedules */}
-      <section className="card p-5">
-        <h2 className="font-semibold text-base mb-3">STAR Student Schedules</h2>
-        <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>Per-student resource pullouts. Rows display on the board exactly as entered.</p>
+      {/* ── STAR Student Schedules ────────────────────────────────────── */}
+      <section className="rounded-2xl border p-5 mb-4"
+        style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: "rgba(245,158,11,0.15)" }}>
+            <Users size={14} style={{ color: "#fbbf24" }} />
+          </span>
+          <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>STAR Student Schedules</h2>
+        </div>
+        <p className="text-[11px] mb-5" style={{ color: "var(--t3)" }}>
+          Per-student resource pullout schedules. Rows display on the board exactly as entered.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {board.students.map(s => (
             <ScheduleEditor
@@ -292,10 +481,19 @@ export default function TeacherBoardSettings() {
         </div>
       </section>
 
-      {/* Specials Rotation */}
-      <section className="card p-5">
-        <h2 className="font-semibold text-base mb-3">Specials Rotation</h2>
-        <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>Grades 3–5 × Days A–F. Current day highlighted on the board.</p>
+      {/* ── Specials Rotation ─────────────────────────────────────────── */}
+      <section className="rounded-2xl border p-5"
+        style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.07)" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: "rgba(99,102,241,0.15)" }}>
+            <CalendarDays size={14} style={{ color: "#818cf8" }} />
+          </span>
+          <h2 className="font-semibold text-sm" style={{ color: "var(--t1)" }}>Specials Rotation</h2>
+        </div>
+        <p className="text-[11px] mb-5" style={{ color: "var(--t3)" }}>
+          Grades 3–5 across Days A–F. The current day is highlighted on the board.
+        </p>
         <SpecialsEditor
           specials={board.specials}
           currentDay={(board.settings.current_specials_day || "A").toUpperCase()}
@@ -309,14 +507,15 @@ export default function TeacherBoardSettings() {
   );
 }
 
-// ── Editors ─────────────────────────────────────────────────────
+// ── ScheduleEditor ────────────────────────────────────────────────────────────
 
 function ScheduleEditor({ student, initial, onSaved }: { student: any; initial: any[]; onSaved: (rows: any[]) => void }) {
   const [rows, setRows] = useState<any[]>(() => initial.map(r => ({ ...r })));
+  const [collapsed, setCollapsed] = useState(initial.length === 0);
   useEffect(() => { setRows(initial.map(r => ({ ...r }))); }, [student.id, initial.length]);
 
   const update = (i: number, patch: any) => setRows(rs => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-  const add = () => setRows(rs => [...rs, { activity: "", start_time: "", end_time: "", classroom: "", active_days: "Mon,Tue,Wed,Thu,Fri" }]);
+  const add = () => { setRows(rs => [...rs, { activity: "", start_time: "", end_time: "", classroom: "", active_days: "Mon,Tue,Wed,Thu,Fri" }]); setCollapsed(false); };
   const remove = (i: number) => setRows(rs => rs.filter((_, idx) => idx !== i));
   const save = async () => {
     const clean = rows.filter(r => (r.activity || "").trim());
@@ -327,35 +526,76 @@ function ScheduleEditor({ student, initial, onSaved }: { student: any; initial: 
   };
 
   return (
-    <div className="rounded-xl p-3" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-bold text-sm">{student.name}</div>
-        <div className="flex gap-1">
-          <button onClick={add} className="text-xs px-2 py-1 rounded-md hover:opacity-80" style={{ background: "var(--surface-2)" }} title="Add row"><Plus size={12}/></button>
-          <button onClick={save} className="text-xs px-2 py-1 rounded-md font-bold" style={{ background: "rgba(139,92,246,0.2)", color: "var(--accent)" }}>Save</button>
+    <div className="rounded-xl border overflow-hidden"
+      style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.08)" }}>
+      {/* Header row */}
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left hover:bg-white/[0.02] transition-colors">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 overflow-hidden"
+          style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.2))" }}>
+          {student.avatar_url
+            ? <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
+            : <span className="font-bold text-xs" style={{ color: "#a78bfa" }}>{(student.name || "?")[0]}</span>}
         </div>
-      </div>
-      {rows.length === 0 ? (
-        <div className="text-xs italic py-2" style={{ color: "var(--text-3)" }}>No rows yet. Click + to add.</div>
-      ) : (
-        <div className="space-y-1.5">
-          {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1fr_60px_60px_1fr_auto] gap-1 items-center">
-              <input value={r.activity || ""} onChange={e => update(i, { activity: e.target.value })} placeholder="Activity" className="input text-xs py-1"/>
-              <input value={r.start_time || ""} onChange={e => update(i, { start_time: e.target.value })} placeholder="09:00" className="input text-xs py-1 font-mono"/>
-              <input value={r.end_time || ""} onChange={e => update(i, { end_time: e.target.value })} placeholder="09:30" className="input text-xs py-1 font-mono"/>
-              <input value={r.classroom || ""} onChange={e => update(i, { classroom: e.target.value })} placeholder="Room" className="input text-xs py-1"/>
-              <button onClick={() => remove(i)} className="text-xs opacity-60 hover:opacity-100 px-1" title="Remove"><Trash2 size={12}/></button>
+        <span className="font-semibold text-sm flex-1" style={{ color: "var(--t1)" }}>{student.name}</span>
+        {rows.length > 0 && (
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(124,58,237,0.15)", color: "#a78bfa" }}>
+            {rows.length} row{rows.length !== 1 ? "s" : ""}
+          </span>
+        )}
+        {collapsed ? <ChevronDown size={14} style={{ color: "var(--t3)" }} /> : <ChevronUp size={14} style={{ color: "var(--t3)" }} />}
+      </button>
+
+      {/* Expanded body */}
+      {!collapsed && (
+        <div className="border-t px-3.5 py-3" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          {rows.length === 0 ? (
+            <div className="text-xs italic py-2 text-center" style={{ color: "var(--t3)" }}>No rows yet.</div>
+          ) : (
+            <div className="space-y-2 mb-3">
+              {rows.map((r, i) => (
+                <div key={i} className="grid grid-cols-[1fr_60px_60px_80px_auto] gap-1.5 items-center">
+                  <input value={r.activity || ""} onChange={e => update(i, { activity: e.target.value })}
+                    placeholder="Activity" className="input text-xs" />
+                  <input value={r.start_time || ""} onChange={e => update(i, { start_time: e.target.value })}
+                    placeholder="9:00" className="input text-xs font-mono" />
+                  <input value={r.end_time || ""} onChange={e => update(i, { end_time: e.target.value })}
+                    placeholder="9:30" className="input text-xs font-mono" />
+                  <input value={r.classroom || ""} onChange={e => update(i, { classroom: e.target.value })}
+                    placeholder="Room" className="input text-xs" />
+                  <button onClick={() => remove(i)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                    style={{ color: "#f87171" }}
+                    title="Remove">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          <div className="flex justify-end gap-2">
+            <button onClick={add}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors"
+              style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.1)", color: "var(--t2)" }}>
+              <Plus size={11} /> Add row
+            </button>
+            <button onClick={save}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg font-bold transition-colors"
+              style={{ background: "rgba(124,58,237,0.2)", color: "#a78bfa" }}>
+              Save
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+// ── SpecialsEditor ────────────────────────────────────────────────────────────
+
 function SpecialsEditor({ specials, currentDay, onSaved }: { specials: any[]; currentDay: string; onSaved: (grade: number, rows: any[]) => void }) {
-  // Draft state keyed by "grade:day"
   const [draft, setDraft] = useState<Record<string, { activity: string; classroom: string }>>(() => {
     const d: Record<string, { activity: string; classroom: string }> = {};
     for (const r of specials) {
@@ -363,6 +603,7 @@ function SpecialsEditor({ specials, currentDay, onSaved }: { specials: any[]; cu
     }
     return d;
   });
+
   useEffect(() => {
     const d: Record<string, { activity: string; classroom: string }> = {};
     for (const r of specials) {
@@ -385,39 +626,63 @@ function SpecialsEditor({ specials, currentDay, onSaved }: { specials: any[]; cu
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+      <table className="w-full text-xs border-collapse">
         <thead>
-          <tr className="uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-            <th className="text-left font-medium pb-2 pr-2">Grade</th>
-            {DAY_LETTERS.map(d => (
-              <th key={d} className={`text-center font-medium pb-2 px-1 ${d === currentDay ? "text-amber-600 dark:text-amber-400" : ""}`}>
-                {d}{d === currentDay ? " ●" : ""}
-              </th>
-            ))}
-            <th />
+          <tr style={{ background: "rgba(255,255,255,0.03)" }}>
+            <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wide w-16"
+              style={{ color: "var(--t3)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              Grade
+            </th>
+            {DAY_LETTERS.map(d => {
+              const isToday = d === currentDay;
+              return (
+                <th key={d}
+                  className="text-center px-2 py-2.5 font-bold text-[11px] uppercase tracking-wide"
+                  style={{
+                    color: isToday ? "#fbbf24" : "var(--t3)",
+                    borderBottom: "1px solid rgba(255,255,255,0.07)",
+                    background: isToday ? "rgba(245,158,11,0.07)" : "transparent",
+                  }}>
+                  Day {d}
+                  {isToday && (
+                    <span className="block text-[8px] font-bold mt-0.5" style={{ color: "#fbbf24" }}>TODAY</span>
+                  )}
+                </th>
+              );
+            })}
+            <th className="w-16" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }} />
           </tr>
         </thead>
         <tbody>
-          {GRADES.map(grade => (
-            <tr key={grade} className="border-t" style={{ borderColor: "var(--border)" }}>
-              <td className="py-2 pr-2 font-bold">{grade}</td>
+          {GRADES.map((grade, gi) => (
+            <tr key={grade} style={{ borderTop: gi > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <td className="px-4 py-2">
+                <span className="font-extrabold text-sm" style={{ color: "var(--t1)" }}>Gr {grade}</span>
+              </td>
               {DAY_LETTERS.map(day => {
                 const key = `${grade}:${day}`;
                 const d = draft[key] || { activity: "", classroom: "" };
+                const isToday = day === currentDay;
                 return (
-                  <td key={day} className="p-0.5">
+                  <td key={day} className="p-1.5" style={{ background: isToday ? "rgba(245,158,11,0.04)" : "transparent" }}>
                     <input
                       value={d.activity}
                       onChange={e => setDraft(x => ({ ...x, [key]: { ...d, activity: e.target.value } }))}
                       placeholder="—"
-                      className="input text-[11px] py-1 text-center w-full"
+                      className="input text-[11px] py-1.5 text-center w-full"
+                      style={{ minWidth: 80 }}
                     />
                   </td>
                 );
               })}
-              <td className="pl-2">
-                <button onClick={() => saveGrade(grade)} className="text-[10px] px-2 py-1 rounded font-bold" style={{ background: "rgba(139,92,246,0.2)", color: "var(--accent)" }}>Save</button>
+              <td className="px-2 py-1.5">
+                <button
+                  onClick={() => saveGrade(grade)}
+                  className="text-[11px] px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-colors"
+                  style={{ background: "rgba(124,58,237,0.2)", color: "#a78bfa" }}>
+                  Save
+                </button>
               </td>
             </tr>
           ))}
