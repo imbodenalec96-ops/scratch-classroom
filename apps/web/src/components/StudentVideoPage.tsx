@@ -21,14 +21,13 @@ export default function StudentVideoPage() {
   }, []);
 
   useEffect(() => {
-    if (!unlocked) { setLoading(false); return; }
     (async () => {
       try {
         const vids = await api.getAllYouTubeLibrary().catch(() => [] as any[]);
         setVideos(vids);
       } finally { setLoading(false); }
     })();
-  }, [unlocked]);
+  }, []);
 
   const ANIM = `
     @keyframes svpFade { from{opacity:0} to{opacity:1} }
@@ -78,16 +77,7 @@ export default function StudentVideoPage() {
 
       {/* Body */}
       <div style={{ padding: "20px 16px" }}>
-        {!unlocked ? (
-          <div style={{
-            textAlign: "center", padding: "80px 20px",
-            animation: "svpFade 0.4s ease",
-          }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
-            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Videos are locked</div>
-            <div style={{ fontSize: 14, opacity: 0.5 }}>Finish your work or take a break to unlock the video library.</div>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 80 }}>
             <div style={{
               width: 36, height: 36,
