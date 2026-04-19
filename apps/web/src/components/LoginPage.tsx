@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { Sun, Moon, ArrowRight } from "lucide-react";
@@ -7,7 +7,9 @@ import { api } from "../lib/api.ts";
 
 export default function LoginPage() {
   const { user, login, loginAsStudent, register } = useAuth();
-  if (user) return <Navigate to="/" replace />;
+  const location = useLocation();
+  const from = (location.state as any)?.from || "/";
+  if (user) return <Navigate to={from} replace />;
 
   const [mode, setMode] = useState<"student" | "signin" | "register">("student");
   const isRegister = mode === "register";
