@@ -314,15 +314,14 @@ export default function ClassroomBoard() {
             <div className="space-y-2.5">
               {[5, 4, 3, 2, 1].map(level => {
                 const atLevel = board.students.filter(s => (s.level || 1) === level);
-                const colors = [
-                  "", // placeholder for index 0
-                  { bg: "rgba(239,68,68,0.18)", border: "rgba(239,68,68,0.35)", text: "#fca5a5", label: "L1 · Max Support" },
-                  { bg: "rgba(251,146,60,0.18)", border: "rgba(251,146,60,0.35)", text: "#fdba74", label: "L2 · Some Support" },
-                  { bg: "rgba(245,158,11,0.2)",  border: "rgba(245,158,11,0.38)", text: "#fcd34d", label: "L3 · Growing" },
-                  { bg: "rgba(34,197,94,0.18)",  border: "rgba(34,197,94,0.35)",  text: "#86efac", label: "L4 · Independent" },
-                  { bg: "rgba(16,185,129,0.22)", border: "rgba(16,185,129,0.45)", text: "#6ee7b7", label: "L5 · Full Mastery" },
-                ];
-                const c = colors[level] || colors[3];
+                const LEVEL_COLORS: Record<number, { bg: string; border: string; text: string; label: string }> = {
+                  1: { bg: "rgba(239,68,68,0.18)", border: "rgba(239,68,68,0.35)", text: "#fca5a5", label: "L1 · Max Support" },
+                  2: { bg: "rgba(251,146,60,0.18)", border: "rgba(251,146,60,0.35)", text: "#fdba74", label: "L2 · Some Support" },
+                  3: { bg: "rgba(245,158,11,0.2)",  border: "rgba(245,158,11,0.38)", text: "#fcd34d", label: "L3 · Growing" },
+                  4: { bg: "rgba(34,197,94,0.18)",  border: "rgba(34,197,94,0.35)",  text: "#86efac", label: "L4 · Independent" },
+                  5: { bg: "rgba(16,185,129,0.22)", border: "rgba(16,185,129,0.45)", text: "#6ee7b7", label: "L5 · Full Mastery" },
+                };
+                const c = LEVEL_COLORS[level] ?? LEVEL_COLORS[3];
                 return (
                   <div key={level} className="rounded-xl p-3 flex items-center gap-3" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
                     <div className="text-xs font-bold w-28 flex-shrink-0" style={{ color: c.text }}>{c.label}</div>
