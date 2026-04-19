@@ -7,27 +7,58 @@ import {
   Users, GraduationCap, BookOpen, School, Eye,
   LockOpen, Youtube, BarChart3, Trophy,
   ClipboardList, Monitor, HelpCircle, CheckSquare,
-  Download, AlertTriangle, Tv, CircleDot,
+  Download, AlertTriangle, Tv, CircleDot, ArrowRight,
+  UserPlus, LogIn, Sparkles,
 } from "lucide-react";
 
 const ANIM = `
   @keyframes ad-fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
   @keyframes ad-shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+  @keyframes ad-dot-pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.55;transform:scale(0.7);} }
 `;
+
+/* ─── stat card accent colours ─── */
+const STAT_COLORS = {
+  Classes:    { top: "#8b5cf6", glow: "rgba(139,92,246,0.25)", grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)" },
+  Teachers:   { top: "#14b8a6", glow: "rgba(20,184,166,0.25)",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)" },
+  Students:   { top: "#3b82f6", glow: "rgba(59,130,246,0.25)",  grad: "linear-gradient(135deg,#3b82f6,#2563eb)" },
+  "YT Pending":{ top: "#ef4444", glow: "rgba(239,68,68,0.25)",   grad: "linear-gradient(135deg,#ef4444,#dc2626)" },
+} as const;
+
+/* ─── synthetic recent activity types ─── */
+type ActivityItem = { icon: React.ElementType; color: string; label: string; sub: string; time: string };
+
+function buildActivity(
+  students: any[],
+  teachers: any[],
+  youtubePending: number,
+): ActivityItem[] {
+  const items: ActivityItem[] = [];
+  if (youtubePending > 0) {
+    items.push({ icon: Youtube, color: "#ef4444", label: `${youtubePending} YouTube link${youtubePending === 1 ? "" : "s"} awaiting approval`, sub: "YouTube queue", time: "Pending" });
+  }
+  students.slice(0, 3).forEach(s => {
+    items.push({ icon: UserPlus, color: "#3b82f6", label: s.name || "New student", sub: "Joined the platform", time: s.created_at ? new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recently" });
+  });
+  teachers.slice(0, 2).forEach(t => {
+    items.push({ icon: LogIn, color: "#14b8a6", label: t.name || "Teacher", sub: t.role === "admin" ? "Admin account" : "Teacher account", time: t.created_at ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recently" });
+  });
+  return items.slice(0, 6);
+}
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
 
-  const [classes, setClasses]           = useState<any[]>([]);
-  const [teachers, setTeachers]         = useState<any[]>([]);
-  const [students, setStudents]         = useState<any[]>([]);
-  const [studentsByClass, setStudentsByClass] = useState<Record<string, number>>({});
-  const [youtubePending, setYoutubePending]   = useState(0);
-  const [aiKeySet, setAiKeySet]         = useState<boolean | null>(null);
-  const [genWarnings, setGenWarnings]   = useState<any[]>([]);
-  const [showWarnings, setShowWarnings] = useState(false);
+  const [classes, setClasses]                     = useState<any[]>([]);
+  const [teachers, setTeachers]                   = useState<any[]>([]);
+  const [students, setStudents]                   = useState<any[]>([]);
+  const [studentsByClass, setStudentsByClass]     = useState<Record<string, number>>({});
+  const [youtubePending, setYoutubePending]       = useState(0);
+  const [aiKeySet, setAiKeySet]                   = useState<boolean | null>(null);
+  const [genWarnings, setGenWarnings]             = useState<any[]>([]);
+  const [showWarnings, setShowWarnings]           = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -77,23 +108,23 @@ export default function AdminDashboard() {
   const unstaffedClasses = classes.filter(c => !c.teacher_id);
   const emptyClasses     = classes.filter(c => (studentsByClass[c.id] ?? -1) === 0);
   const pendingTasks: { severity: "high"|"med"|"low"; label:string; link:string }[] = [];
-  if (aiKeySet === false)      pendingTasks.push({ severity:"high", label:"Anthropic API key not configured — AI disabled",      link:"/settings" });
-  if (youtubePending > 0)      pendingTasks.push({ severity:youtubePending>5?"high":"med", label:`${youtubePending} YouTube link${youtubePending===1?"":"s"} waiting`, link:"/youtube" });
-  if (unstaffedClasses.length) pendingTasks.push({ severity:"high", label:`${unstaffedClasses.length} class${unstaffedClasses.length===1?"":"es"} without a teacher`, link:"/admin-dashboard" });
-  if (emptyClasses.length)     pendingTasks.push({ severity:"low",  label:`${emptyClasses.length} empty class${emptyClasses.length===1?"":"es"} (no students)`, link:"/admin-dashboard" });
-  if (totalTeachers === 0)     pendingTasks.push({ severity:"high", label:"No teachers on the platform yet", link:"/admin-dashboard" });
-  if (genWarnings.length)      pendingTasks.push({ severity:"med",  label:`${genWarnings.length} off-grade task${genWarnings.length===1?"":"s"} flagged by CCSS`, link:"#gen-warnings" });
+  if (aiKeySet === false)       pendingTasks.push({ severity:"high", label:"Anthropic API key not configured — AI disabled",      link:"/settings" });
+  if (youtubePending > 0)       pendingTasks.push({ severity:youtubePending>5?"high":"med", label:`${youtubePending} YouTube link${youtubePending===1?"":"s"} waiting`, link:"/youtube" });
+  if (unstaffedClasses.length)  pendingTasks.push({ severity:"high", label:`${unstaffedClasses.length} class${unstaffedClasses.length===1?"":"es"} without a teacher`, link:"/admin-dashboard" });
+  if (emptyClasses.length)      pendingTasks.push({ severity:"low",  label:`${emptyClasses.length} empty class${emptyClasses.length===1?"":"es"} (no students)`, link:"/admin-dashboard" });
+  if (totalTeachers === 0)      pendingTasks.push({ severity:"high", label:"No teachers on the platform yet", link:"/admin-dashboard" });
+  if (genWarnings.length)       pendingTasks.push({ severity:"med",  label:`${genWarnings.length} off-grade task${genWarnings.length===1?"":"s"} flagged by CCSS`, link:"#gen-warnings" });
 
   const ADMIN_TOOLS = [
-    { path:"/monitor",         icon:Monitor,       label:"Live Monitor",   desc:"Every student",           grad:"linear-gradient(135deg,#ec4899,#f43f5e)", glow:"rgba(236,72,153,0.3)"  },
-    { path:"/class-grades",    icon:GraduationCap, label:"Class Grades",   desc:"Per-student levels",      grad:"linear-gradient(135deg,#14b8a6,#0d9488)", glow:"rgba(20,184,166,0.3)"  },
-    { path:"/assignments",     icon:ClipboardList, label:"Assignments",    desc:"Create & manage",         grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,0.3)"  },
-    { path:"/youtube",         icon:Youtube,       label:"YouTube Queue",  desc:`${youtubePending} pending`, grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,0.3)"  },
-    { path:"/analytics",       icon:BarChart3,     label:"Analytics",      desc:"School-wide reports",     grad:"linear-gradient(135deg,#f59e0b,#d97706)", glow:"rgba(245,158,11,0.3)"  },
-    { path:"/leaderboard",     icon:Trophy,        label:"Leaderboard",    desc:"Rankings",                grad:"linear-gradient(135deg,#eab308,#ca8a04)", glow:"rgba(234,179,8,0.3)"   },
-    { path:"/lesson-analytics",icon:BookOpen,      label:"Lesson Views",   desc:"Who read what",           grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,0.3)"  },
-    { path:"/grading",         icon:CheckSquare,   label:"Grading",        desc:"Review work",             grad:"linear-gradient(135deg,#10b981,#059669)", glow:"rgba(16,185,129,0.3)"  },
-    { path:"/quizzes",         icon:HelpCircle,    label:"Quizzes",        desc:"Build & grade",           grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.3)"  },
+    { path:"/monitor",          icon:Monitor,       label:"Live Monitor",   desc:"Every student",             grad:"linear-gradient(135deg,#ec4899,#f43f5e)", glow:"rgba(236,72,153,0.3)"  },
+    { path:"/class-grades",     icon:GraduationCap, label:"Class Grades",   desc:"Per-student levels",        grad:"linear-gradient(135deg,#14b8a6,#0d9488)", glow:"rgba(20,184,166,0.3)"  },
+    { path:"/assignments",      icon:ClipboardList, label:"Assignments",    desc:"Create & manage",           grad:"linear-gradient(135deg,#8b5cf6,#7c3aed)", glow:"rgba(139,92,246,0.3)"  },
+    { path:"/youtube",          icon:Youtube,       label:"YouTube Queue",  desc:`${youtubePending} pending`, grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,0.3)"   },
+    { path:"/analytics",        icon:BarChart3,     label:"Analytics",      desc:"School-wide reports",       grad:"linear-gradient(135deg,#f59e0b,#d97706)", glow:"rgba(245,158,11,0.3)"  },
+    { path:"/leaderboard",      icon:Trophy,        label:"Leaderboard",    desc:"Rankings",                  grad:"linear-gradient(135deg,#eab308,#ca8a04)", glow:"rgba(234,179,8,0.3)"   },
+    { path:"/lesson-analytics", icon:BookOpen,      label:"Lesson Views",   desc:"Who read what",             grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,0.3)"  },
+    { path:"/grading",          icon:CheckSquare,   label:"Grading",        desc:"Review work",               grad:"linear-gradient(135deg,#10b981,#059669)", glow:"rgba(16,185,129,0.3)"  },
+    { path:"/quizzes",          icon:HelpCircle,    label:"Quizzes",        desc:"Build & grade",             grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.3)"  },
   ];
 
   const hour = new Date().getHours();
@@ -106,23 +137,34 @@ export default function AdminDashboard() {
     { label:"Unstaffed classes",  ok:unstaffedClasses.length===0, okText:"Every class staffed",  failText:`${unstaffedClasses.length} unstaffed` },
   ];
 
-  const surface = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
-  const border  = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
-  const text1   = dk ? "#f1f5f9" : "#0f172a";
-  const text2   = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const surface   = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
+  const border    = dk ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
+  const text1     = dk ? "#f1f5f9" : "#0f172a";
+  const text2     = dk ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
   const cardStyle = { background:surface, border:`1px solid ${border}`, borderRadius:20, backdropFilter:"blur(16px)" } as const;
 
   const STATS = [
-    { label:"Classes",    value:classes.length,  icon:School,       grad:"linear-gradient(135deg,#8b5cf6,#6d28d9)", glow:"rgba(139,92,246,0.25)" },
-    { label:"Teachers",   value:totalTeachers,   icon:GraduationCap,grad:"linear-gradient(135deg,#14b8a6,#0d9488)", glow:"rgba(20,184,166,0.25)" },
-    { label:"Students",   value:totalStudents,   icon:Users,        grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.25)" },
-    { label:"YT Pending", value:youtubePending,  icon:Youtube,      grad:"linear-gradient(135deg,#ef4444,#dc2626)", glow:"rgba(239,68,68,0.25)"  },
+    { label:"Classes" as keyof typeof STAT_COLORS,    value:classes.length,  icon:School,        ...STAT_COLORS["Classes"]     },
+    { label:"Teachers" as keyof typeof STAT_COLORS,   value:totalTeachers,   icon:GraduationCap, ...STAT_COLORS["Teachers"]    },
+    { label:"Students" as keyof typeof STAT_COLORS,   value:totalStudents,   icon:Users,         ...STAT_COLORS["Students"]    },
+    { label:"YT Pending" as keyof typeof STAT_COLORS, value:youtubePending,  icon:Youtube,       ...STAT_COLORS["YT Pending"]  },
   ];
+
+  const activityFeed = buildActivity(students, teachers, youtubePending);
+
+  /* ─── section divider ─── */
+  const Divider = ({ label }: { label: string }) => (
+    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:text2, whiteSpace:"nowrap" }}>{label}</div>
+      <div style={{ flex:1, height:1, background:border }} />
+    </div>
+  );
 
   return (
     <div style={{ minHeight:"100vh", background:dk?"#070714":"#f0f1f8", color:text1, fontFamily:"'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
+      {/* ─── Hero header ─── */}
       <div style={{
         background: dk
           ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
@@ -172,28 +214,42 @@ export default function AdminDashboard() {
         </header>
       </div>
 
-      <div style={{ padding:"0 40px 48px", maxWidth:1280, margin:"0 auto" }}>
+      <div style={{ padding:"0 40px 56px", maxWidth:1280, margin:"0 auto" }}>
 
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:28,animation:"ad-fadeUp .5s ease .05s both" }}>
-          {STATS.map(s => (
-            <div key={s.label} style={{ ...cardStyle, padding:"22px 24px", display:"flex",alignItems:"center",gap:16 }}>
-              <div style={{
-                width:50,height:50,borderRadius:14,background:s.grad,
-                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-                boxShadow:`0 8px 24px ${s.glow}`,
+        {/* ─── Stat cards (with top accent bar) ─── */}
+        <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .05s both" }}>
+          <Divider label="Overview" />
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14 }}>
+            {STATS.map(s => (
+              <div key={s.label} style={{
+                ...cardStyle,
+                padding:"0 0 20px",
+                overflow:"hidden",
+                position:"relative",
               }}>
-                <s.icon size={22} color="white"/>
+                {/* coloured top bar */}
+                <div style={{ height:3, background:s.grad, borderRadius:"20px 20px 0 0", marginBottom:20 }} />
+                <div style={{ display:"flex",alignItems:"center",gap:14,padding:"0 22px" }}>
+                  <div style={{
+                    width:46,height:46,borderRadius:13,background:s.grad,
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                    boxShadow:`0 8px 22px ${s.glow}`,
+                  }}>
+                    <s.icon size={20} color="white"/>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.18em",color:text2,marginBottom:4 }}>{s.label}</div>
+                    <div style={{ fontSize:30,fontWeight:900,lineHeight:1,color:text1,letterSpacing:"-0.03em" }}>{s.value}</div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.18em",color:text2,marginBottom:4 }}>{s.label}</div>
-                <div style={{ fontSize:32,fontWeight:900,lineHeight:1,color:text1,letterSpacing:"-0.03em" }}>{s.value}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
+        {/* ─── Needs attention ─── */}
         {pendingTasks.length > 0 && (
-          <div style={{ ...cardStyle,padding:"18px 22px",marginBottom:28,borderLeft:"3px solid rgba(245,158,11,0.7)",animation:"ad-fadeUp .5s ease .1s both" }}>
+          <div style={{ ...cardStyle,padding:"18px 22px",marginBottom:36,borderLeft:"3px solid rgba(245,158,11,0.7)",animation:"ad-fadeUp .5s ease .1s both" }}>
             <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
               <div style={{ display:"flex",alignItems:"center",gap:9 }}>
                 <AlertTriangle size={15} style={{ color:"#fbbf24" }} />
@@ -212,9 +268,12 @@ export default function AdminDashboard() {
                     background:bg,border:`1px solid ${t.severity==="high"?"rgba(239,68,68,0.15)":t.severity==="med"?"rgba(245,158,11,0.15)":border}` }}>
                     <div style={{ width:6,height:6,borderRadius:"50%",background:color,flexShrink:0 }} />
                     <div style={{ fontSize:12,color:text1,flex:1,letterSpacing:"0.01em" }}>{t.label}</div>
-                    <span style={{ fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.12em",color,flexShrink:0 }}>
-                      {t.severity==="high"?"High":t.severity==="med"?"Med":"Low"}
-                    </span>
+                    <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                      <span style={{ fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.12em",color,flexShrink:0 }}>
+                        {t.severity==="high"?"High":t.severity==="med"?"Med":"Low"}
+                      </span>
+                      <ArrowRight size={11} style={{ color, opacity:0.6 }} />
+                    </div>
                   </div>
                 );
                 if (t.link==="#gen-warnings") {
@@ -242,136 +301,192 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <div style={{ marginBottom:28, animation:"ad-fadeUp .5s ease .14s both" }}>
-          <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:14 }}>Admin Tools</div>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(136px,1fr))",gap:10 }}>
+        {/* ─── Admin Tools ─── */}
+        <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .14s both" }}>
+          <Divider label="Admin Tools" />
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:10 }}>
             {ADMIN_TOOLS.map((t, i) => (
               <Link key={t.path} to={t.path} style={{
-                display:"flex",flexDirection:"column",gap:12,padding:"16px 14px",borderRadius:16,textDecoration:"none",
-                background:surface,border:`1px solid ${border}`,transition:"all 0.2s ease",
+                display:"flex",flexDirection:"column",gap:0,padding:0,borderRadius:16,textDecoration:"none",
+                background:surface,border:`1px solid ${border}`,transition:"all 0.2s ease",overflow:"hidden",
                 animation:"ad-fadeUp .45s ease both",animationDelay:`${i*35}ms`,
               }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform="translateY(-4px)"; (e.currentTarget as HTMLElement).style.boxShadow=`0 12px 32px ${t.glow}`; (e.currentTarget as HTMLElement).style.borderColor=`rgba(255,255,255,0.12)`; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform=""; (e.currentTarget as HTMLElement).style.boxShadow=""; (e.currentTarget as HTMLElement).style.borderColor=border; }}>
-                <div style={{ width:38,height:38,borderRadius:11,background:t.grad,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 6px 16px ${t.glow}` }}>
-                  <t.icon size={17} color="white"/>
-                </div>
-                <div>
-                  <div style={{ fontSize:12,fontWeight:700,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"0.01em" }}>{t.label}</div>
-                  <div style={{ fontSize:10,color:text2,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{t.desc}</div>
+                {/* coloured top stripe */}
+                <div style={{ height:2, background:t.grad }} />
+                <div style={{ padding:"14px 14px 16px", display:"flex", flexDirection:"column", gap:11 }}>
+                  <div style={{ width:40,height:40,borderRadius:12,background:t.grad,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 6px 16px ${t.glow}` }}>
+                    <t.icon size={18} color="white"/>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:12,fontWeight:700,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"0.01em" }}>{t.label}</div>
+                    <div style={{ fontSize:10,color:text2,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{t.desc}</div>
+                  </div>
                 </div>
               </Link>
             ))}
           </div>
         </div>
 
-        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:28,animation:"ad-fadeUp .5s ease .18s both" }}>
-          <div style={{ ...cardStyle,padding:"20px 22px" }}>
-            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
-              <div>
-                <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>All Rooms</div>
-                <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>Classrooms</div>
-              </div>
-              <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
-                {classes.length} total
-              </span>
-            </div>
-            {classes.length === 0
-              ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No classes created yet.</p>
-              : (
-                <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
-                  {classes.map(c => {
-                    const teacher = teachers.find(t => t.id === c.teacher_id);
-                    return (
-                      <div key={c.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,
-                        transition:"all 0.15s ease" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
-                        <div style={{ width:32,height:32,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#6d28d9)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0,boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
-                          {c.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
-                            {c.name}
-                            <span style={{ fontSize:9,fontFamily:"monospace",color:text2,background:dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",padding:"1px 5px",borderRadius:4 }}>{c.code}</span>
-                          </div>
-                          <div style={{ fontSize:10,color:text2,marginTop:2 }}>{teacher?.name||"No teacher"} · {studentsByClass[c.id]??"…"} students</div>
-                        </div>
-                        <Link to="/monitor" style={{ fontSize:10,fontWeight:700,color:"#a78bfa",textDecoration:"none",padding:"4px 9px",borderRadius:7,background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.2)",whiteSpace:"nowrap" }}>Monitor</Link>
-                      </div>
-                    );
-                  })}
+        {/* ─── Classrooms + People ─── */}
+        <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .18s both" }}>
+          <Divider label="Roster" />
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+            {/* Classrooms */}
+            <div style={{ ...cardStyle,padding:"20px 22px" }}>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+                <div>
+                  <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>All Rooms</div>
+                  <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>Classrooms</div>
                 </div>
-              )
-            }
-          </div>
-
-          <div style={{ ...cardStyle,padding:"20px 22px" }}>
-            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
-              <div>
-                <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>Staff</div>
-                <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>People</div>
+                <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
+                  {classes.length} total
+                </span>
               </div>
-              <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
-                {totalTeachers} teachers · {teachers.length-totalTeachers} admins
-              </span>
-            </div>
-            {teachers.length === 0
-              ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No teachers or admins yet.</p>
-              : (
-                <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
-                  {teachers.map(t => {
-                    const owns = classes.filter(c => c.teacher_id === t.id);
-                    return (
-                      <div key={t.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,transition:"all 0.15s ease" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
-                        <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,
-                          background:t.role==="admin"?"linear-gradient(135deg,#ef4444,#dc2626)":"linear-gradient(135deg,#14b8a6,#0d9488)",
-                          boxShadow:t.role==="admin"?"0 4px 12px rgba(239,68,68,0.25)":"0 4px 12px rgba(20,184,166,0.25)",
-                        }}>
-                          {t.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ minWidth:0,flex:1 }}>
-                          <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
-                            {t.name}
-                            {t.role==="admin" && <span style={{ fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:5,background:"rgba(239,68,68,0.12)",color:"#f87171",letterSpacing:"0.06em" }}>ADMIN</span>}
+              {classes.length === 0
+                ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No classes created yet.</p>
+                : (
+                  <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                    {classes.map(c => {
+                      const teacher = teachers.find(t => t.id === c.teacher_id);
+                      const sCount  = studentsByClass[c.id] ?? 0;
+                      return (
+                        <div key={c.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,
+                          transition:"all 0.15s ease" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
+                          <div style={{ width:32,height:32,borderRadius:9,background:"linear-gradient(135deg,#8b5cf6,#6d28d9)",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,flexShrink:0,boxShadow:"0 4px 12px rgba(139,92,246,0.25)" }}>
+                            {c.name?.charAt(0).toUpperCase()}
                           </div>
-                          <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2 }}>
-                            {t.email} · {owns.length>0?`Teaches ${owns.map((c:any)=>c.name).join(", ")}`:"No classes"}
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
+                              {c.name}
+                              <span style={{ fontSize:9,fontFamily:"monospace",color:text2,background:dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",padding:"1px 5px",borderRadius:4 }}>{c.code}</span>
+                            </div>
+                            <div style={{ fontSize:10,color:text2,marginTop:2,display:"flex",alignItems:"center",gap:5 }}>
+                              {teacher?.name||"No teacher"}
+                              <span style={{ opacity:0.35 }}>·</span>
+                              <span style={{ color:sCount>0?text2:"#f87171" }}>{sCount} student{sCount===1?"":"s"}</span>
+                            </div>
                           </div>
+                          <Link to="/monitor" style={{ fontSize:10,fontWeight:700,color:"#a78bfa",textDecoration:"none",padding:"4px 9px",borderRadius:7,background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.2)",whiteSpace:"nowrap" }}>Monitor</Link>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            }
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle,padding:"20px 22px",animation:"ad-fadeUp .5s ease .22s both" }}>
-          <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
-            <CircleDot size={14} style={{ color:"#34d399" }} />
-            <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2 }}>System Health</div>
-          </div>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10 }}>
-            {healthItems.map(s => {
-              const color = s.ok ? "#34d399" : s.warn ? "#fbbf24" : "#f87171";
-              const bg    = s.ok ? "rgba(52,211,153,0.07)" : s.warn ? "rgba(251,191,36,0.07)" : "rgba(248,113,113,0.07)";
-              const bdr   = s.ok ? "rgba(52,211,153,0.2)" : s.warn ? "rgba(251,191,36,0.2)" : "rgba(248,113,113,0.2)";
-              return (
-                <div key={s.label} style={{ padding:"14px 16px",borderRadius:14,background:bg,border:`1px solid ${bdr}` }}>
-                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:6 }}>
-                    <div style={{ width:7,height:7,borderRadius:"50%",background:color,flexShrink:0 }} />
-                    <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",color:text2 }}>{s.label}</div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize:12,fontWeight:700,color }}>{s.ok ? s.okText : s.failText}</div>
+                )
+              }
+            </div>
+
+            {/* People */}
+            <div style={{ ...cardStyle,padding:"20px 22px" }}>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+                <div>
+                  <div style={{ fontSize:10,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:text2,marginBottom:4 }}>Staff</div>
+                  <div style={{ fontSize:17,fontWeight:800,color:text1,letterSpacing:"-0.02em" }}>People</div>
                 </div>
-              );
-            })}
+                <span style={{ fontSize:11,padding:"4px 12px",borderRadius:20,background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",color:text2,fontWeight:700,border:`1px solid ${border}` }}>
+                  {totalTeachers} teachers · {teachers.length-totalTeachers} admins
+                </span>
+              </div>
+              {teachers.length === 0
+                ? <p style={{ fontSize:12,textAlign:"center",padding:"32px 0",color:text2 }}>No teachers or admins yet.</p>
+                : (
+                  <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                    {teachers.map(t => {
+                      const owns = classes.filter(c => c.teacher_id === t.id);
+                      return (
+                        <div key={t.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"9px 10px",borderRadius:12,border:`1px solid transparent`,transition:"all 0.15s ease" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background=dk?"rgba(255,255,255,0.035)":"rgba(0,0,0,0.025)"; (e.currentTarget as HTMLElement).style.borderColor=border; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
+                          <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800,
+                            background:t.role==="admin"?"linear-gradient(135deg,#ef4444,#dc2626)":"linear-gradient(135deg,#14b8a6,#0d9488)",
+                            boxShadow:t.role==="admin"?"0 4px 12px rgba(239,68,68,0.25)":"0 4px 12px rgba(20,184,166,0.25)",
+                          }}>
+                            {t.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ minWidth:0,flex:1 }}>
+                            <div style={{ fontSize:12,fontWeight:600,color:text1,display:"flex",alignItems:"center",gap:6 }}>
+                              {t.name}
+                              {t.role==="admin" && <span style={{ fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:5,background:"rgba(239,68,68,0.12)",color:"#f87171",letterSpacing:"0.06em" }}>ADMIN</span>}
+                            </div>
+                            <div style={{ fontSize:10,color:text2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2 }}>
+                              {t.email} · {owns.length>0?`Teaches ${owns.map((c:any)=>c.name).join(", ")}`:"No classes"}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+            </div>
           </div>
         </div>
+
+        {/* ─── System Health + Recent Activity ─── */}
+        <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .22s both" }}>
+          <Divider label="Platform" />
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+
+            {/* System Health */}
+            <div style={{ ...cardStyle,padding:"20px 22px" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
+                <CircleDot size={14} style={{ color:"#34d399", animation:"ad-dot-pulse 2.4s ease infinite" }} />
+                <div style={{ fontSize:13,fontWeight:800,letterSpacing:"-0.01em",color:text1 }}>System Health</div>
+              </div>
+              <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+                {healthItems.map(s => {
+                  const color = s.ok ? "#34d399" : s.warn ? "#fbbf24" : "#f87171";
+                  const bg    = s.ok ? "rgba(52,211,153,0.07)" : s.warn ? "rgba(251,191,36,0.07)" : "rgba(248,113,113,0.07)";
+                  const bdr   = s.ok ? "rgba(52,211,153,0.2)" : s.warn ? "rgba(251,191,36,0.2)" : "rgba(248,113,113,0.2)";
+                  return (
+                    <div key={s.label} style={{ display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,background:bg,border:`1px solid ${bdr}` }}>
+                      <div style={{ width:7,height:7,borderRadius:"50%",background:color,flexShrink:0 }} />
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",color:text2,marginBottom:2 }}>{s.label}</div>
+                        <div style={{ fontSize:12,fontWeight:700,color }}>{s.ok ? s.okText : s.failText}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recent Activity feed */}
+            <div style={{ ...cardStyle,padding:"20px 22px" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
+                <Sparkles size={14} style={{ color:"#a78bfa" }} />
+                <div style={{ fontSize:13,fontWeight:800,letterSpacing:"-0.01em",color:text1 }}>Recent Activity</div>
+              </div>
+              {activityFeed.length === 0 ? (
+                <div style={{ textAlign:"center",padding:"32px 0" }}>
+                  <div style={{ width:40,height:40,borderRadius:12,background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",border:`1px solid ${border}` }}>
+                    <Sparkles size={18} style={{ opacity:0.2 }} />
+                  </div>
+                  <p style={{ fontSize:12,color:text2,lineHeight:1.6 }}>No activity to show yet. Add students and teachers to get started.</p>
+                </div>
+              ) : (
+                <div style={{ display:"flex",flexDirection:"column",gap:2 }}>
+                  {activityFeed.map((a, i) => (
+                    <div key={i} style={{ display:"flex",alignItems:"center",gap:11,padding:"9px 0",borderBottom:i<activityFeed.length-1?`1px solid ${border}`:"none" }}>
+                      <div style={{ width:28,height:28,borderRadius:8,background:`${a.color}18`,border:`1px solid ${a.color}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                        <a.icon size={13} style={{ color:a.color }} />
+                      </div>
+                      <div style={{ flex:1,minWidth:0 }}>
+                        <div style={{ fontSize:12,fontWeight:600,color:text1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{a.label}</div>
+                        <div style={{ fontSize:10,color:text2,marginTop:1 }}>{a.sub}</div>
+                      </div>
+                      <span style={{ fontSize:10,color:text2,flexShrink:0,whiteSpace:"nowrap" }}>{a.time}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
