@@ -1514,7 +1514,7 @@ export default function StudentDashboard() {
       )}
 
       {/* YouTube Library */}
-      {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
+      {classConfig.youtubeEnabled && (
       <div style={{
         borderRadius: 16, padding: "14px",
         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",

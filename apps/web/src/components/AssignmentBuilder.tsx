@@ -477,6 +477,10 @@ export default function AssignmentBuilder() {
   const [generated, setGenerated] = useState<GeneratedAssignment | null>(null);
   const [genError, setGenError] = useState("");
 
+  // PDF → assignment import state
+  const [pdfParsing, setPdfParsing] = useState(false);
+  const [pdfErr, setPdfErr] = useState<string | null>(null);
+
   // Expanded assignment preview
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFullWeek, setShowFullWeek] = useState(false);
@@ -618,6 +622,98 @@ export default function AssignmentBuilder() {
       setGenError("Generation failed — please try again.");
     }
     setGenerating(false);
+  };
+
+  // Map the API's lowercase subject/grade to the form's capitalized dropdown
+  // values. Silent pass-through if the API already returned a display label.
+  const normalizeSubject = (s?: string): string | null => {
+    if (!s) return null;
+    const key = String(s).toLowerCase().replace(/[_\s]+/g, "_");
+    const map: Record<string, string> = {
+      math: "Math",
+      reading: "Reading",
+      writing: "Writing",
+      science: "Science",
+      social_studies: "Social Studies",
+      spelling: "Spelling",
+      sel: "SEL",
+    };
+    return map[key] || (SUBJECTS.includes(s) ? s : null);
+  };
+  const normalizeGrade = (g?: string): string | null => {
+    if (!g) return null;
+    if (GRADES.includes(g)) return g;
+    const lower = String(g).toLowerCase();
+    if (lower.includes("kinder")) return "Kindergarten";
+    const m = lower.match(/(\d+)/);
+    if (m) {
+      const n = Number(m[1]);
+      const suffix = n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th";
+      const label = `${n}${suffix} Grade`;
+      if (GRADES.includes(label)) return label;
+    }
+    return null;
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset so picking the same file twice still fires
+    setPdfParsing(true);
+    setPdfErr(null);
+    try {
+      // 1) upload — returns { id, title, attached_pdf_path, ... }
+      const uploadResult = await api.uploadPdf(file);
+      if (uploadResult?.error) throw new Error(uploadResult.error);
+      const fileId = uploadResult?.id;
+      if (!fileId) throw new Error("Upload did not return a file ID");
+
+      // 2) ask Claude to parse it into the editor's JSON shape
+      const parsed = await api.parsePdfAssignment(fileId);
+      if (parsed?.error) throw new Error(parsed.error);
+
+      // 3) populate the form
+      if (parsed?.title) setTitle(parsed.title);
+      const nSubj = normalizeSubject(parsed?.subject);
+      if (nSubj) setSubject(nSubj);
+      const nGrade = normalizeGrade(parsed?.grade);
+      if (nGrade) setGrade(nGrade);
+      if (parsed?.instructions) setInstructions(parsed.instructions);
+
+      // 4) flatten to a GeneratedAssignment so the preview + save path works.
+      // totalPoints is derived — the builder's existing save code relies on
+      // generated.sections[i].questions[j].points for rubric generation.
+      const sections: Section[] = Array.isArray(parsed?.sections)
+        ? parsed.sections.map((sec: any) => ({
+            title: sec?.title || "Section",
+            questions: Array.isArray(sec?.questions)
+              ? sec.questions.map((q: any) => ({
+                  type: (q?.type as Question["type"]) || "short_answer",
+                  text: q?.text || "",
+                  options: Array.isArray(q?.options) ? q.options : undefined,
+                  points: typeof q?.points === "number" ? q.points : 1,
+                }))
+              : [],
+          }))
+        : [];
+      const totalPoints = sections.reduce(
+        (sum, sec) => sum + sec.questions.reduce((s, q) => s + (q.points || 0), 0),
+        0
+      );
+      setGenerated({
+        title: parsed?.title || title || "Imported Worksheet",
+        subject: nSubj || subject,
+        grade: nGrade || grade,
+        instructions: parsed?.instructions || "",
+        totalPoints,
+        sections,
+      });
+      setShowForm(true);
+    } catch (err: any) {
+      setPdfErr(err?.message || "Failed to parse PDF");
+    } finally {
+      setPdfParsing(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -1412,6 +1508,21 @@ export default function AssignmentBuilder() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* PDF import card — upload a worksheet and let Claude extract questions */}
+          <div style={{ border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 12, padding: '14px', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(139,92,246,0.8)', marginBottom: 8 }}>
+              📄 Import from PDF
+            </div>
+            <p style={{ fontSize: 12, color: 'rgba(226,232,240,0.5)', marginBottom: 10 }}>
+              Upload a worksheet PDF from TPT, K12, ReadWorks, or any teaching site
+            </p>
+            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.15)', color: '#a78bfa', fontSize: 13, fontWeight: 600, border: '1px solid rgba(99,102,241,0.3)' }}>
+              <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={handlePdfUpload} disabled={pdfParsing} />
+              {pdfParsing ? '⏳ Parsing…' : '📎 Choose PDF'}
+            </label>
+            {pdfErr && <div style={{ color: '#f87171', fontSize: 11, marginTop: 6 }}>{pdfErr}</div>}
           </div>
 
           {/* AI Generate button */}

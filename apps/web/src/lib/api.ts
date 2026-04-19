@@ -209,6 +209,23 @@ export const api = {
     return res.json();
   },
 
+  // PDF → assignment pipeline
+  // uploadPdf hits a different endpoint than the generic upload (multer memory
+  // storage + base64 into assignment_files, not disk). Returns { id, ... }.
+  uploadPdf: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${BASE}/assignments/upload-pdf`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    return res.json();
+  },
+  parsePdfAssignment: (fileId: string) =>
+    request<any>("/assignments/parse-pdf", { method: "POST", body: JSON.stringify({ fileId }) }),
+
   // Class daily schedule (block-based day table; seeded for Star)
   getClassSchedule: (classId: string) => request<any[]>(`/classes/${classId}/schedule`),
 
