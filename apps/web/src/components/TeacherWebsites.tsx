@@ -158,7 +158,7 @@ export default function TeacherWebsites() {
   return (
     <div className="p-6 max-w-6xl mx-auto animate-fade-in">
       <div className="flex items-center gap-3 mb-1">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-600/20">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
           <Globe size={18} className="text-white" />
         </div>
         <div>
@@ -167,7 +167,7 @@ export default function TeacherWebsites() {
         </div>
         <button
           onClick={() => { setApproveFor({}); setApproveTitle(""); setApproveUrl(""); setApproveCategory(""); setErr(null); }}
-          className="ml-auto px-4 py-2 rounded-xl text-sm font-bold bg-sky-500 text-white hover:bg-sky-600 transition-colors cursor-pointer shadow-md shadow-sky-600/30"
+          className="ml-auto px-4 py-2 rounded-xl text-sm font-bold bg-violet-600 text-white hover:bg-violet-700 transition-colors cursor-pointer shadow-md shadow-violet-600/30"
         >
           + Add website
         </button>
@@ -183,7 +183,7 @@ export default function TeacherWebsites() {
             key={key}
             onClick={() => setTab(key as Tab)}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors cursor-pointer border-b-2
-              ${tab === key ? "border-sky-500 text-sky-400" : "border-transparent text-t3 hover:text-t2"}`}
+              ${tab === key ? "border-violet-500 text-violet-400" : "border-transparent text-t3 hover:text-t2"}`}
           >
             {icon}{label}
           </button>
@@ -274,7 +274,7 @@ export default function TeacherWebsites() {
                   key={s.id}
                   onClick={() => setSelectedStudentId(s.id)}
                   className={`w-full flex items-center gap-2 p-2 rounded-xl border text-left transition-colors cursor-pointer ${
-                    active ? "border-sky-500 bg-sky-500/15 text-sky-100"
+                    active ? "border-violet-500 bg-violet-500/15 text-violet-100"
                     : dk ? "border-white/5 bg-white/[0.02] text-white/70 hover:bg-white/[0.06]"
                     : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                   }`}
@@ -305,7 +305,7 @@ export default function TeacherWebsites() {
                           : dk ? "border-white/5 bg-white/[0.02]" : "border-gray-200 bg-white"
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center text-white flex-shrink-0 overflow-hidden">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0 overflow-hidden">
                           {w.thumbnail_url ? <img src={w.thumbnail_url} alt="" className="w-full h-full object-cover" /> : <Globe size={13} />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -374,7 +374,7 @@ export default function TeacherWebsites() {
                       onClick={() => setApproveIconEmoji(active ? "" : ic)}
                       className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-colors ${
                         active
-                          ? "bg-sky-500/30 ring-2 ring-sky-400"
+                          ? "bg-violet-500/30 ring-2 ring-violet-400"
                           : dk ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
                       }`}
                     >
