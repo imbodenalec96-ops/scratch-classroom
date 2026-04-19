@@ -14,38 +14,79 @@ const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string
   { id: "campfire", label: "Campfire", videoId: "UgHKb_7884o", emoji: "🔥" },
 ];
 
-const SUBJECT_COLORS: Record<string, string> = {
-  math:          "rgba(239,68,68,0.25)",
-  sel:           "rgba(245,158,11,0.25)",
-  coding_art_gym:"rgba(139,92,246,0.25)",
-  video_learning:"rgba(59,130,246,0.25)",
-  writing:       "rgba(16,185,129,0.25)",
-  daily_news:    "rgba(99,102,241,0.25)",
-  review:        "rgba(236,72,153,0.2)",
-  cashout:       "rgba(245,158,11,0.2)",
-  lunch:         "rgba(34,197,94,0.2)",
-  recess:        "rgba(34,197,94,0.25)",
-  calm_down:     "rgba(139,92,246,0.2)",
-  ted_talk:      "rgba(59,130,246,0.2)",
-  extra_review:  "rgba(236,72,153,0.2)",
+const GRADE_COLORS: Record<number, { from: string; to: string; border: string; text: string; glow: string }> = {
+  3: { from: "rgba(20,184,166,0.22)", to: "rgba(6,182,212,0.12)", border: "rgba(20,184,166,0.55)", text: "#5eead4", glow: "rgba(20,184,166,0.4)" },
+  4: { from: "rgba(251,146,60,0.22)", to: "rgba(245,158,11,0.12)", border: "rgba(251,146,60,0.55)", text: "#fdba74", glow: "rgba(251,146,60,0.4)" },
+  5: { from: "rgba(167,139,250,0.22)", to: "rgba(139,92,246,0.12)", border: "rgba(167,139,250,0.55)", text: "#c4b5fd", glow: "rgba(167,139,250,0.4)" },
 };
 
-const ACTIVITY_EMOJI: Record<string, string> = {
-  PE: "🏃", Gym: "🏃", Music: "🎵", Art: "🎨", Library: "📚",
-  Tech: "💻", Dance: "💃", Science: "🔬", Drama: "🎭", Spanish: "🗣",
+const BEHAVIOR_LEVELS: Record<number, { label: string; color: string; bg: string }> = {
+  1: { label: "Needs Redirection", color: "#fca5a5", bg: "rgba(239,68,68,0.25)" },
+  2: { label: "Developing",        color: "#fdba74", bg: "rgba(251,146,60,0.25)" },
+  3: { label: "On Track",          color: "#fcd34d", bg: "rgba(245,158,11,0.25)" },
+  4: { label: "Consistent",        color: "#86efac", bg: "rgba(34,197,94,0.25)" },
+  5: { label: "Role Model",        color: "#6ee7b7", bg: "rgba(16,185,129,0.28)" },
 };
-function activityEmoji(name: string) {
-  for (const [k, v] of Object.entries(ACTIVITY_EMOJI)) {
-    if (name?.toLowerCase().includes(k.toLowerCase())) return v;
-  }
+
+const ACTIVITY_EMOJI: Array<[string, string]> = [
+  ["PE", "🏃"], ["Gym", "🏃"], ["Music", "🎵"], ["Art", "🎨"], ["Library", "📚"],
+  ["Tech", "💻"], ["Dance", "💃"], ["Science", "🔬"], ["Drama", "🎭"], ["Spanish", "🗣"],
+];
+function actEmoji(name = "") {
+  for (const [k, v] of ACTIVITY_EMOJI) if (name.toLowerCase().includes(k.toLowerCase())) return v;
   return "✨";
 }
 
-const GRADE_COLORS: Record<number, { bg: string; border: string; text: string }> = {
-  3: { bg: "rgba(20,184,166,0.2)",  border: "rgba(20,184,166,0.5)",  text: "#5eead4" },
-  4: { bg: "rgba(251,146,60,0.2)",  border: "rgba(251,146,60,0.5)",  text: "#fdba74" },
-  5: { bg: "rgba(167,139,250,0.2)", border: "rgba(167,139,250,0.5)", text: "#c4b5fd" },
+const SUBJECT_ACCENT: Record<string, string> = {
+  math: "#ef4444", sel: "#f59e0b", coding_art_gym: "#a78bfa",
+  video_learning: "#3b82f6", writing: "#10b981", daily_news: "#6366f1",
+  review: "#ec4899", cashout: "#f59e0b", lunch: "#22c55e", recess: "#22c55e",
+  calm_down: "#a78bfa", ted_talk: "#3b82f6",
 };
+
+const ANIM = `
+  @keyframes starGlow {
+    0%,100% { filter: drop-shadow(0 0 4px rgba(251,191,36,.9)); }
+    50%      { filter: drop-shadow(0 0 11px rgba(251,191,36,1)) drop-shadow(0 0 22px rgba(245,158,11,.7)); }
+  }
+  @keyframes cardPulse {
+    0%,100% { box-shadow: 0 0 18px rgba(245,158,11,.3), inset 0 0 16px rgba(245,158,11,.06); }
+    50%      { box-shadow: 0 0 36px rgba(245,158,11,.55), inset 0 0 28px rgba(245,158,11,.12); }
+  }
+  @keyframes popIn {
+    from { opacity:0; transform:scale(.9) translateY(6px); }
+    to   { opacity:1; transform:scale(1)  translateY(0); }
+  }
+  @keyframes shimmer {
+    0%   { background-position:-200% center; }
+    100% { background-position: 200% center; }
+  }
+  @keyframes breathe {
+    0%,100% { transform:scale(1); opacity:.85; }
+    50%     { transform:scale(1.015); opacity:1; }
+  }
+  @keyframes rewardBounce {
+    0%,100% { transform:scale(1) rotate(0deg); }
+    30%     { transform:scale(1.25) rotate(-8deg); }
+    60%     { transform:scale(1.15) rotate(6deg); }
+  }
+  @keyframes blockBreathe {
+    0%,100% { box-shadow:0 0 25px rgba(139,92,246,.3); }
+    50%     { box-shadow:0 0 50px rgba(139,92,246,.6), 0 0 80px rgba(99,102,241,.2); }
+  }
+  @keyframes tickPulse {
+    0%,100% { opacity:1; }
+    50%     { opacity:.55; }
+  }
+  @keyframes gradShift {
+    0%,100% { background-position:0% 50%; }
+    50%     { background-position:100% 50%; }
+  }
+  @keyframes floatUp {
+    0%,100% { transform:translateY(0); }
+    50%     { transform:translateY(-3px); }
+  }
+`;
 
 export default function ClassroomBoard() {
   const [params] = useSearchParams();
@@ -71,464 +112,405 @@ export default function ClassroomBoard() {
   }, []);
 
   const toggleMusic = useCallback(() => {
-    const func = musicPlaying ? "pauseVideo" : "playVideo";
-    musicRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func, args: "" }), "*"
-    );
+    const fn = musicPlaying ? "pauseVideo" : "playVideo";
+    musicRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: fn, args: "" }), "*");
     setMusicPlaying(p => !p);
   }, [musicPlaying]);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", h);
+    return () => document.removeEventListener("fullscreenchange", h);
   }, []);
+  useEffect(() => { const iv = setInterval(() => setNow(new Date()), 15_000); return () => clearInterval(iv); }, []);
 
   useEffect(() => {
-    const iv = setInterval(() => setNow(new Date()), 15_000);
-    return () => clearInterval(iv);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.getClasses()
-      .then((cs: any[]) => {
-        if (cancelled) return;
-        if (!cs?.length) { setError("No classes available"); return; }
-        const match =
-          cs.find((c: any) => c.id === classParam) ||
-          cs.find((c: any) => String(c.name || "").toLowerCase() === classParam) ||
-          cs.find((c: any) => String(c.name || "").toLowerCase().startsWith(classParam)) ||
-          cs[0];
-        setCls(match);
-      })
-      .catch(() => { if (!cancelled) setError("Couldn't load classes"); });
-    return () => { cancelled = true; };
+    let done = false;
+    api.getClasses().then((cs: any[]) => {
+      if (done) return;
+      if (!cs?.length) { setError("No classes available"); return; }
+      setCls(cs.find(c => c.id === classParam) || cs.find(c => String(c.name).toLowerCase() === classParam) || cs[0]);
+    }).catch(() => { if (!done) setError("Couldn't load classes"); });
+    return () => { done = true; };
   }, [classParam]);
 
   useEffect(() => {
     if (!cls?.id) return;
-    let cancelled = false;
+    let done = false;
     const load = () => {
-      api.getClassSchedule(cls.id).then((rows) => { if (!cancelled) setSchedule(Array.isArray(rows) ? rows : []); }).catch(() => {});
+      api.getClassSchedule(cls.id).then(r => { if (!done) setSchedule(Array.isArray(r) ? r : []); }).catch(() => {});
       api.getBoardData(cls.id).then((d: any) => {
-        if (cancelled) return;
-        setBoard({
-          students: d?.students || [],
-          schedules: d?.schedules || [],
-          specials: d?.specials || [],
-          settings: d?.settings || {},
-        });
+        if (done) return;
+        setBoard({ students: d?.students||[], schedules: d?.schedules||[], specials: d?.specials||[], settings: d?.settings||{} });
       }).catch(() => {});
     };
     load();
     const iv = setInterval(load, 15_000);
-    return () => { cancelled = true; clearInterval(iv); };
+    return () => { done = true; clearInterval(iv); };
   }, [cls?.id]);
 
   const currentBlock = useMemo(() => findCurrentBlock(schedule, now), [schedule, now]);
   const nextBlock    = useMemo(() => findNextBlock(schedule, now), [schedule, now]);
 
   const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const dateStr = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   const dayLetter = (board.settings?.current_specials_day || "A").toUpperCase();
 
   const countdown = useMemo(() => {
     if (!currentBlock) return null;
     const [h, m] = (currentBlock.end_time || "").split(":").map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-    const end = new Date(now); end.setHours(h, m, 0, 0);
-    const diff = end.getTime() - now.getTime();
+    if (!Number.isFinite(h)) return null;
+    const diff = new Date(now).setHours(h, m, 0, 0) - now.getTime();
     if (diff <= 0) return null;
-    const mm = Math.floor(diff / 60000);
-    const ss = Math.floor((diff % 60000) / 1000);
-    return `${mm}:${String(ss).padStart(2, "0")}`;
+    const mm = Math.floor(diff / 60000), ss = Math.floor((diff % 60000) / 1000);
+    return { str: `${mm}:${String(ss).padStart(2, "0")}`, urgent: mm < 2 };
   }, [currentBlock, now]);
 
   if (error) return <div className="min-h-screen flex items-center justify-center bg-black text-red-400 text-2xl">{error}</div>;
-  if (!cls)  return <div className="min-h-screen flex items-center justify-center bg-black text-white/60 text-2xl">Loading classroom board…</div>;
+  if (!cls)  return <div className="min-h-screen flex items-center justify-center bg-black text-white/60 text-2xl">Loading…</div>;
 
   const bgUrl = board.settings?.background_image_url;
-  const bg = bgUrl || "linear-gradient(135deg, #0f0821 0%, #1e1035 30%, #2d1b4e 60%, #12082a 100%)";
-  const musicId = board.settings?.music_playlist_id || "";
-  const musicPreset = MUSIC_PRESETS.find(p => p.id === musicId);
+  const bg = "linear-gradient(135deg, #0b0520 0%, #14082e 40%, #0d1a3a 70%, #0a0520 100%)";
+  const musicPreset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
+  const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#8b5cf6";
 
-  const glass = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(10px)" } as const;
-  const sectionLabel = "text-[11px] uppercase tracking-[0.28em] font-semibold opacity-50 mb-1";
+  const g = (a: number) => `rgba(255,255,255,${a})`;
+  const card = { background: g(0.04), border: `1px solid ${g(0.1)}`, borderRadius: 14, backdropFilter: "blur(10px)" } as const;
 
   return (
-    <div className="min-h-screen relative" style={{
+    <div style={{
+      height: "100dvh", overflow: "hidden", display: "grid",
+      gridTemplateRows: "54px 72px 1fr 50px",
+      gap: 5, padding: "8px 10px 8px 10px",
       background: bgUrl ? `url(${bgUrl}) center/cover no-repeat fixed` : bg,
-      color: "white",
-      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      color: "white", fontFamily: "'Inter', system-ui, sans-serif",
+      position: "relative",
     }}>
-      {/* Dark overlay */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: bgUrl ? "rgba(5,3,18,0.65)" : "rgba(5,3,18,0.35)" }} />
+      <style>{ANIM}</style>
 
-      <div className="relative p-6 space-y-5 pb-28">
-        {/* ── Header ── */}
-        <div className="flex items-end justify-between gap-4 flex-wrap pb-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.3em] opacity-50 mb-1">BlockForge · Classroom</div>
-            <h1 style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}>{cls.name}</h1>
-            <div className="mt-2 text-base opacity-75">
-              {dateStr} &nbsp;·&nbsp;
-              <span className="font-mono font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(245,158,11,0.2)", color: "#fbbf24" }}>
-                Day {dayLetter}
-              </span>
-            </div>
-          </div>
-          <div className="text-right flex flex-col items-end gap-2">
-            <div style={{ fontSize: 52, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 8, padding: "5px 12px", fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer" }}
-            >
-              {isFullscreen ? "✕ Exit" : "⛶ Fullscreen"}
-            </button>
-          </div>
+      {/* Dark tint */}
+      <div style={{ position: "absolute", inset: 0, background: bgUrl ? "rgba(4,2,16,.7)" : "rgba(4,2,16,.2)", pointerEvents: "none", zIndex: 0 }} />
+
+      {/* ── ROW 1: Header ── */}
+      <header style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 5 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+          <h1 style={{
+            fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: 0,
+            background: "linear-gradient(90deg,#e0c3fc,#a78bfa,#c4b5fd)",
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            animation: "gradShift 4s linear infinite",
+          }}>{cls.name}</h1>
+          <span style={{ fontSize: 12, opacity: 0.5, fontWeight: 600 }}>{dateStr}</span>
+          <span style={{
+            fontSize: 13, fontWeight: 800, padding: "2px 10px", borderRadius: 8,
+            background: "rgba(245,158,11,.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,.4)",
+          }}>Day {dayLetter}</span>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {musicPreset && (
+            <button onClick={toggleMusic} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "4px 12px",
+              borderRadius: 10, border: `1px solid ${g(0.18)}`, background: g(0.08),
+              color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600,
+            }}>
+              <span>{musicPreset.emoji}</span>
+              <span style={{ opacity: 0.8 }}>{musicPreset.label}</span>
+              <span style={{ fontSize: 16 }}>{musicPlaying ? "⏸" : "▶"}</span>
+            </button>
+          )}
+          <div style={{ fontSize: 32, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>{timeStr}</div>
+          <button onClick={toggleFullscreen} style={{
+            padding: "4px 10px", borderRadius: 8, border: `1px solid ${g(0.18)}`,
+            background: g(0.08), color: g(0.7), cursor: "pointer", fontSize: 11, fontWeight: 600,
+          }}>{isFullscreen ? "✕" : "⛶"}</button>
+        </div>
+      </header>
 
-        {/* ── Current Block ── */}
-        <section className="rounded-3xl p-6" style={{
-          background: currentBlock
-            ? (SUBJECT_COLORS[currentBlock.subject || ""] || "rgba(139,92,246,0.2)")
-            : "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(139,92,246,0.4)",
-          backdropFilter: "blur(10px)",
-        }}>
-          <div className={sectionLabel}>Right Now</div>
+      {/* ── ROW 2: Current Block ── */}
+      <section style={{
+        position: "relative", zIndex: 1,
+        ...card, borderRadius: 16,
+        background: `linear-gradient(135deg, ${blockAccent}33, ${blockAccent}18)`,
+        border: `1px solid ${blockAccent}55`,
+        animation: "blockBreathe 3s ease-in-out infinite",
+        display: "flex", alignItems: "center", padding: "0 18px", gap: 14,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.25em", marginBottom: 2 }}>Right Now</div>
           {currentBlock ? (
-            <div className="flex items-baseline gap-6 flex-wrap">
-              <div style={{ fontSize: 68, fontWeight: 900, letterSpacing: "-0.03em" }}>
-                {currentBlock.label || currentBlock.subject}
-              </div>
-              <div className="opacity-70 text-2xl font-mono">{currentBlock.start_time}–{currentBlock.end_time}</div>
-              {countdown && (
-                <div className="px-5 py-2 rounded-2xl text-2xl font-bold font-mono" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                  ⏱ {countdown}
-                </div>
-              )}
-              {currentBlock.is_break && (
-                <div className="px-4 py-2 rounded-full text-base font-bold" style={{ background: "rgba(34,197,94,0.25)", color: "#86efac", border: "1px solid rgba(34,197,94,0.35)" }}>☕ Break</div>
-              )}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.02em" }}>{currentBlock.label || currentBlock.subject}</span>
+              <span style={{ fontSize: 13, opacity: 0.6, fontFamily: "monospace" }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
+              {currentBlock.is_break && <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 20, background: "rgba(34,197,94,.25)", color: "#86efac" }}>☕ Break</span>}
+              {nextBlock && <span style={{ fontSize: 12, opacity: 0.5 }}>→ {nextBlock.block.label} <span style={{ fontFamily: "monospace" }}>{nextBlock.block.start_time}</span></span>}
             </div>
           ) : (
-            <div style={{ fontSize: 40, fontWeight: 800, opacity: 0.5 }}>No active block</div>
+            <span style={{ fontSize: 22, opacity: 0.45, fontWeight: 700 }}>No active block</span>
           )}
-          {nextBlock && (
-            <div className="mt-3 text-sm opacity-65">
-              Up next: <span className="font-semibold">{nextBlock.block.label || nextBlock.block.subject}</span>
-              <span className="font-mono ml-2 opacity-80">{nextBlock.block.start_time}</span>
-            </div>
-          )}
-        </section>
-
-        {/* ── Specialist ── */}
-        {board.settings?.specialist_name && (
-          <section className="rounded-2xl px-6 py-4 flex items-center gap-4" style={{
-            background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,191,36,0.07))",
-            border: "1px solid rgba(245,158,11,0.28)",
-            backdropFilter: "blur(8px)",
-          }}>
-            <div className="text-3xl">🕚</div>
-            <div>
-              <div className={sectionLabel}>11:00 AM · Specialist in Room</div>
-              <div style={{ fontSize: 26, fontWeight: 800 }}>{board.settings.specialist_name}</div>
-            </div>
-          </section>
-        )}
-
-        {/* ── Behavior Stars + Independence Levels ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-          {/* Behavior Stars */}
-          <section className="rounded-2xl p-5" style={glass}>
-            <div className="flex items-baseline gap-3 mb-4">
-              <div className={sectionLabel}>⭐ Behavior Stars</div>
-              <div className="text-[11px] opacity-40">5 = McDonald's · resets</div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {board.students.map(s => {
-                const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
-                const isFull = stars >= 5;
-                const isHigh = stars >= 3;
-                return (
-                  <div key={s.id} className="rounded-2xl p-4 flex flex-col items-center gap-2 text-center" style={{
-                    background: isFull
-                      ? "linear-gradient(135deg, rgba(245,158,11,0.4), rgba(234,179,8,0.22))"
-                      : isHigh
-                      ? "linear-gradient(135deg, rgba(139,92,246,0.28), rgba(99,102,241,0.16))"
-                      : "rgba(255,255,255,0.05)",
-                    border: isFull
-                      ? "1px solid rgba(245,158,11,0.65)"
-                      : isHigh
-                      ? "1px solid rgba(139,92,246,0.45)"
-                      : "1px solid rgba(255,255,255,0.1)",
-                    boxShadow: isFull ? "0 0 24px rgba(245,158,11,0.3)" : "none",
-                  }}>
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0 overflow-hidden" style={{
-                      background: isFull
-                        ? "linear-gradient(135deg, rgba(245,158,11,0.55), rgba(234,179,8,0.38))"
-                        : "linear-gradient(135deg, rgba(139,92,246,0.55), rgba(99,102,241,0.42))",
-                      border: "2.5px solid rgba(255,255,255,0.2)",
-                    }}>
-                      {s.avatar_url
-                        ? <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <span style={{ fontSize: 22 }}>{(s.name || "?")[0].toUpperCase()}</span>}
-                    </div>
-                    <div className="font-bold text-sm leading-tight">{s.name}</div>
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} style={{
-                          fontSize: 20,
-                          opacity: i < stars ? 1 : 0.13,
-                          filter: i < stars ? "drop-shadow(0 0 6px rgba(251,191,36,1))" : "grayscale(1) brightness(0.35)",
-                        }}>⭐</span>
-                      ))}
-                    </div>
-                    <div className="w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)", height: 5 }}>
-                      <div className="h-full rounded-full transition-all duration-700" style={{
-                        width: `${(stars / 5) * 100}%`,
-                        background: isFull ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)" : isHigh ? "#a78bfa" : "#818cf8",
-                      }} />
-                    </div>
-                    {s.reward_count > 0 && (
-                      <div className="text-[11px] px-2.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(245,158,11,0.3)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.45)" }}>
-                        🏆 {s.reward_count}× earned
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {board.students.length === 0 && (
-                <div className="col-span-2 text-sm opacity-40 py-8 text-center">No students in this class yet.</div>
-              )}
-            </div>
-          </section>
-
-          {/* Independence Levels */}
-          <section className="rounded-2xl p-5" style={glass}>
-            <div className={sectionLabel + " mb-4"}>🎯 Independence Levels</div>
-            <div className="space-y-2.5">
-              {[5, 4, 3, 2, 1].map(level => {
-                const atLevel = board.students.filter(s => (s.level || 1) === level);
-                const LEVEL_COLORS: Record<number, { bg: string; border: string; text: string; label: string }> = {
-                  1: { bg: "rgba(239,68,68,0.18)", border: "rgba(239,68,68,0.35)", text: "#fca5a5", label: "L1 · Max Support" },
-                  2: { bg: "rgba(251,146,60,0.18)", border: "rgba(251,146,60,0.35)", text: "#fdba74", label: "L2 · Some Support" },
-                  3: { bg: "rgba(245,158,11,0.2)",  border: "rgba(245,158,11,0.38)", text: "#fcd34d", label: "L3 · Growing" },
-                  4: { bg: "rgba(34,197,94,0.18)",  border: "rgba(34,197,94,0.35)",  text: "#86efac", label: "L4 · Independent" },
-                  5: { bg: "rgba(16,185,129,0.22)", border: "rgba(16,185,129,0.45)", text: "#6ee7b7", label: "L5 · Full Mastery" },
-                };
-                const c = LEVEL_COLORS[level] ?? LEVEL_COLORS[3];
-                return (
-                  <div key={level} className="rounded-xl p-3 flex items-center gap-3" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
-                    <div className="text-xs font-bold w-28 flex-shrink-0" style={{ color: c.text }}>{c.label}</div>
-                    <div className="flex-1 flex flex-wrap gap-1.5 min-h-[28px]">
-                      {atLevel.map(s => (
-                        <div key={s.id} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)" }}>
-                          {s.avatar_url
-                            ? <img src={s.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                            : <span style={{ fontSize: 10, opacity: 0.7 }}>{(s.name || "?")[0]}</span>}
-                          {s.name}
-                        </div>
-                      ))}
-                      {atLevel.length === 0 && <span className="text-xs opacity-25 self-center italic">empty</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </div>
-
-        {/* ── STAR Student Schedules ── */}
-        {board.students.some(s => board.schedules.some((r: any) => r.student_id === s.id)) && (
-          <section className="rounded-2xl p-5" style={glass}>
-            <div className={sectionLabel + " mb-4"}>📅 STAR Student Resource Schedules</div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {board.students.map(s => {
-                const rows = board.schedules.filter((r: any) => r.student_id === s.id);
-                if (rows.length === 0) return null;
-                return (
-                  <div key={s.id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                    <div className="font-bold text-sm mb-2.5 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0" style={{ background: "rgba(139,92,246,0.45)" }}>
-                        {s.avatar_url
-                          ? <img src={s.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                          : (s.name || "?")[0]}
-                      </div>
-                      {s.name}
-                    </div>
-                    <div className="space-y-1.5">
-                      {rows.map((r: any) => (
-                        <div key={r.id} className="rounded-lg px-2.5 py-1.5 flex items-center gap-2" style={{ background: "rgba(99,102,241,0.18)", border: "1px solid rgba(99,102,241,0.25)" }}>
-                          <div className="text-xs font-semibold flex-1 truncate">{r.activity}</div>
-                          <div className="text-[10px] font-mono opacity-70 flex-shrink-0">{r.start_time}–{r.end_time}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* ── Specials Today ── */}
-        <section className="rounded-2xl p-5" style={glass}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={sectionLabel}>✨ Specials Today</div>
-            <div className="text-xs px-2.5 py-1 rounded-lg font-bold" style={{ background: "rgba(245,158,11,0.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.35)" }}>
-              Day {dayLetter}
-            </div>
+        {countdown && (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            padding: "6px 18px", borderRadius: 14,
+            background: countdown.urgent ? "rgba(239,68,68,.25)" : "rgba(0,0,0,.35)",
+            border: `1px solid ${countdown.urgent ? "rgba(239,68,68,.5)" : g(0.12)}`,
+            animation: countdown.urgent ? "tickPulse 1s ease-in-out infinite" : undefined,
+          }}>
+            <div style={{ fontSize: 10, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.2em" }}>Ends in</div>
+            <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "monospace", color: countdown.urgent ? "#fca5a5" : "white" }}>{countdown.str}</div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {GRADES.map(grade => {
-              const studentsInGrade = board.students.filter((s: any) => s.specials_grade === grade);
-              if (studentsInGrade.length === 0) return null;
-              const activity = board.specials.find((r: any) => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
-              const gc = GRADE_COLORS[grade];
+        )}
+        {board.settings?.specialist_name && (
+          <div style={{ padding: "6px 14px", borderRadius: 12, background: "rgba(245,158,11,.18)", border: "1px solid rgba(245,158,11,.35)", textAlign: "center" }}>
+            <div style={{ fontSize: 10, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.2em" }}>11AM Specialist</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#fbbf24" }}>{board.settings.specialist_name}</div>
+          </div>
+        )}
+      </section>
+
+      {/* ── ROW 3: Main content ── */}
+      <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "55% 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
+
+        {/* LEFT: Behavior Stars */}
+        <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>⭐ Behavior Stars</div>
+            <div style={{ fontSize: 11, opacity: 0.35 }}>5 = McDonald's</div>
+          </div>
+          <div style={{
+            flex: 1, overflow: "hidden", minHeight: 0,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateRows: "repeat(2, 1fr)",
+            gap: 6,
+          }}>
+            {board.students.map((s, idx) => {
+              const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
+              const lv = s.level || 1;
+              const isFull = stars >= 5;
+              const isHigh = stars >= 3;
+              const lc = BEHAVIOR_LEVELS[lv];
               return (
-                <div key={grade} className="rounded-2xl p-4" style={{ background: gc.bg, border: `1px solid ${gc.border}` }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="text-xs font-bold" style={{ color: gc.text }}>{grade}th Grade</div>
-                    {activity ? (
-                      <div className="flex items-center gap-1.5 text-sm font-bold px-3 py-1 rounded-xl" style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
-                        <span>{activityEmoji(activity)}</span>
-                        <span>{activity}</span>
-                      </div>
-                    ) : (
-                      <div className="text-xs opacity-35 italic">not set</div>
-                    )}
+                <div key={s.id} style={{
+                  borderRadius: 14, padding: "10px 8px", display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: 5, textAlign: "center",
+                  background: isFull
+                    ? "linear-gradient(145deg, rgba(245,158,11,.42), rgba(234,179,8,.24))"
+                    : isHigh
+                    ? "linear-gradient(145deg, rgba(139,92,246,.28), rgba(99,102,241,.16))"
+                    : g(0.05),
+                  border: isFull ? "1px solid rgba(245,158,11,.7)" : isHigh ? "1px solid rgba(139,92,246,.5)" : `1px solid ${g(0.09)}`,
+                  animation: isFull ? `cardPulse 2.5s ease-in-out infinite, popIn .4s ease ${idx * 0.05}s both` : `popIn .4s ease ${idx * 0.05}s both`,
+                  overflow: "hidden",
+                }}>
+                  {/* Avatar */}
+                  <div style={{
+                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 18, fontWeight: 800,
+                    background: isFull
+                      ? "linear-gradient(135deg, rgba(245,158,11,.6), rgba(234,179,8,.45))"
+                      : "linear-gradient(135deg, rgba(139,92,246,.55), rgba(99,102,241,.4))",
+                    border: `2px solid ${isFull ? "rgba(245,158,11,.6)" : g(0.18)}`,
+                    boxShadow: isFull ? "0 0 14px rgba(245,158,11,.4)" : "none",
+                  }}>
+                    {s.avatar_url ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.name || "?")[0].toUpperCase()}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {studentsInGrade.map((s: any) => (
-                      <div key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.95)" }}>
-                        {s.avatar_url
-                          ? <img src={s.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          : <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}>{(s.name || "?")[0]}</span>}
-                        {s.name}
-                      </div>
+
+                  {/* Name */}
+                  <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>{s.name}</div>
+
+                  {/* Stars */}
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span key={i} style={{
+                        fontSize: 17,
+                        opacity: i < stars ? 1 : 0.12,
+                        filter: i < stars ? undefined : "grayscale(1) brightness(.3)",
+                        animation: i < stars && isFull ? "starGlow 2s ease-in-out infinite" : undefined,
+                        animationDelay: isFull ? `${i * 0.15}s` : undefined,
+                      }}>⭐</span>
                     ))}
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ width: "80%", height: 4, borderRadius: 4, background: g(0.1), overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 4, transition: "width .6s ease",
+                      width: `${(stars / 5) * 100}%`,
+                      background: isFull ? "linear-gradient(90deg,#f59e0b,#fbbf24,#fef08a)" : isHigh ? "#a78bfa" : "#818cf8",
+                    }} />
+                  </div>
+
+                  {/* Level badge + reward */}
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: lc.bg, color: lc.color, fontWeight: 700 }}>L{lv}</div>
+                    {s.reward_count > 0 && (
+                      <div style={{
+                        fontSize: 10, padding: "1px 7px", borderRadius: 20,
+                        background: "rgba(245,158,11,.3)", color: "#fcd34d", fontWeight: 700, border: "1px solid rgba(245,158,11,.4)",
+                        animation: "rewardBounce 1.5s ease-in-out infinite",
+                      }}>🏆 {s.reward_count}×</div>
+                    )}
                   </div>
                 </div>
               );
             })}
-            {/* Students with no grade set */}
-            {board.students.filter((s: any) => !s.specials_grade).length > 0 && (
-              <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <div className="text-xs font-bold opacity-40 mb-3">Grade TBD</div>
-                <div className="flex flex-wrap gap-2">
-                  {board.students.filter((s: any) => !s.specials_grade).map((s: any) => (
-                    <div key={s.id} className="px-3 py-1.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,0.08)", opacity: 0.65 }}>
-                      {s.name}
-                    </div>
-                  ))}
-                </div>
+            {board.students.length === 0 && (
+              <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35, fontSize: 14 }}>
+                No students in this class yet.
               </div>
             )}
           </div>
         </section>
 
-        {/* ── Specials Rotation ── */}
-        <section className="rounded-2xl p-5" style={glass}>
-          <div className={sectionLabel + " mb-4"}>🗓 Specials Rotation — All Days</div>
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ borderCollapse: "separate", borderSpacing: "0 6px" }}>
-              <thead>
-                <tr>
-                  <th className="text-left pb-2 pr-3 text-xs opacity-50 font-semibold uppercase tracking-wider w-20">Grade</th>
-                  {DAY_LETTERS.map(d => (
-                    <th key={d} className="pb-2 px-2 text-xs font-bold uppercase tracking-wide text-center" style={{
-                      color: d === dayLetter ? "#fbbf24" : "rgba(255,255,255,0.45)",
-                      fontSize: d === dayLetter ? 13 : 11,
-                    }}>
-                      {d}{d === dayLetter ? " ●" : ""}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {GRADES.map(grade => {
-                  const gc = GRADE_COLORS[grade];
-                  return (
-                    <tr key={grade}>
-                      <td className="pr-3 py-1">
-                        <div className="text-sm font-bold px-2 py-1 rounded-lg inline-block" style={{ color: gc.text, background: gc.bg, border: `1px solid ${gc.border}` }}>
-                          {grade}th
-                        </div>
-                      </td>
-                      {DAY_LETTERS.map(day => {
-                        const c = board.specials.find((r: any) => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
-                        const isToday = day === dayLetter;
-                        return (
-                          <td key={day} className="px-1 py-1">
-                            <div className="text-xs font-semibold text-center px-2 py-2 rounded-xl truncate" style={{
-                              background: isToday
-                                ? (c ? gc.bg : "rgba(255,255,255,0.04)")
-                                : "rgba(255,255,255,0.04)",
-                              border: isToday ? `1px solid ${gc.border}` : "1px solid rgba(255,255,255,0.07)",
-                              color: isToday ? gc.text : "rgba(255,255,255,0.65)",
-                              minWidth: 72,
-                            }}>
-                              {c?.activity
-                                ? <>{activityEmoji(c.activity)} {c.activity}</>
-                                : <span style={{ opacity: 0.25 }}>—</span>}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}
+        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
 
-        <div className="pt-2 text-center text-[11px] opacity-30 uppercase tracking-[0.25em]">
-          BlockForge · auto-refreshes every 15 seconds
+          {/* Specials Today */}
+          <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em" }}>✨ Specials Today</div>
+              <div style={{ fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 8, background: "rgba(245,158,11,.22)", color: "#fbbf24", border: "1px solid rgba(245,158,11,.38)" }}>Day {dayLetter}</div>
+            </div>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+              {GRADES.map(grade => {
+                const students = board.students.filter(s => s.specials_grade === grade);
+                if (students.length === 0) return null;
+                const act = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
+                const gc = GRADE_COLORS[grade];
+                return (
+                  <div key={grade} style={{
+                    flex: 1, borderRadius: 12, padding: "7px 10px",
+                    background: `linear-gradient(135deg, ${gc.from}, ${gc.to})`,
+                    border: `1px solid ${gc.border}`,
+                    display: "flex", alignItems: "center", gap: 10, overflow: "hidden",
+                    animation: `popIn .45s ease ${(grade - 3) * 0.08}s both`,
+                  }}>
+                    <div style={{ flexShrink: 0, textAlign: "center", minWidth: 38 }}>
+                      <div style={{ fontSize: 18, lineHeight: 1 }}>{actEmoji(act || "")}</div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: gc.text }}>{grade}th</div>
+                    </div>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {act || <span style={{ opacity: 0.35, fontStyle: "italic" }}>not set</span>}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
+                        {students.map(s => (
+                          <span key={s.id} style={{
+                            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+                            background: "rgba(255,255,255,.13)", color: "rgba(255,255,255,.9)",
+                          }}>{s.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {board.students.filter(s => !s.specials_grade).length > 0 && (
+                <div style={{ borderRadius: 12, padding: "6px 10px", background: g(0.04), border: `1px solid ${g(0.1)}`, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 10, opacity: 0.4, flexShrink: 0 }}>TBD</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                    {board.students.filter(s => !s.specials_grade).map(s => (
+                      <span key={s.id} style={{ fontSize: 11, padding: "1px 7px", borderRadius: 20, background: g(0.08), opacity: 0.6 }}>{s.name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Specials Rotation */}
+          <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.28em", marginBottom: 8, flexShrink: 0 }}>🗓 Specials Rotation</div>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 4 }}>
+              {/* Day header */}
+              <div style={{ display: "grid", gridTemplateColumns: "40px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
+                <div />
+                {DAY_LETTERS.map(d => (
+                  <div key={d} style={{
+                    textAlign: "center", fontSize: 11, fontWeight: 800,
+                    padding: "3px 4px", borderRadius: 8,
+                    background: d === dayLetter ? "rgba(245,158,11,.25)" : g(0.06),
+                    color: d === dayLetter ? "#fbbf24" : g(0.45),
+                    border: d === dayLetter ? "1px solid rgba(245,158,11,.4)" : `1px solid ${g(0.06)}`,
+                  }}>
+                    {d}{d === dayLetter ? "●" : ""}
+                  </div>
+                ))}
+              </div>
+              {/* Grade rows */}
+              {GRADES.map(grade => {
+                const gc = GRADE_COLORS[grade];
+                return (
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "40px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 800, borderRadius: 8,
+                      color: gc.text, background: gc.from, border: `1px solid ${gc.border}`,
+                    }}>{grade}th</div>
+                    {DAY_LETTERS.map(day => {
+                      const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
+                      const isToday = day === dayLetter;
+                      return (
+                        <div key={day} style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 10, fontWeight: 600, textAlign: "center", borderRadius: 8, padding: "2px 3px",
+                          background: isToday ? gc.from : g(0.04),
+                          border: isToday ? `1px solid ${gc.border}` : `1px solid ${g(0.07)}`,
+                          color: isToday ? gc.text : g(0.65),
+                          overflow: "hidden",
+                          boxShadow: isToday && c ? `0 0 8px ${gc.glow}` : "none",
+                        }}>
+                          {c?.activity
+                            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", padding: "0 2px" }}>{actEmoji(c.activity)} {c.activity}</span>
+                            : <span style={{ opacity: 0.2 }}>—</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </div>
       </div>
 
-      {/* ── Floating Music Player ── */}
+      {/* ── ROW 4: Behavior Levels strip ── */}
+      <section style={{
+        position: "relative", zIndex: 1,
+        ...card, borderRadius: 12,
+        display: "flex", alignItems: "center", gap: 8, padding: "0 12px", overflow: "hidden", flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.25em", flexShrink: 0 }}>Behavior Levels</div>
+        <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", overflow: "hidden" }}>
+          {[5, 4, 3, 2, 1].map(lv => {
+            const at = board.students.filter(s => (s.level || 1) === lv);
+            if (at.length === 0) return null;
+            const lc = BEHAVIOR_LEVELS[lv];
+            return (
+              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: lc.bg, color: lc.color }}>{lc.label}</div>
+                {at.map(s => (
+                  <div key={s.id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: g(0.1), color: g(0.85) }}>{s.name}</div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Music iframe */}
       {musicPreset && (
-        <>
-          <iframe
-            ref={musicRef}
-            title="ambient-music"
-            width="1" height="1"
-            style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
-            src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=1&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1`}
-            allow="autoplay"
-          />
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl z-50" style={{
-            background: "rgba(15,8,33,0.85)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            backdropFilter: "blur(16px)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-          }}>
-            <span style={{ fontSize: 20 }}>{musicPreset.emoji}</span>
-            <span className="text-sm font-semibold opacity-80">{musicPreset.label}</span>
-            <button
-              onClick={toggleMusic}
-              title={musicPlaying ? "Pause music" : "Play music"}
-              className="flex items-center justify-center rounded-xl font-bold transition-all hover:scale-105"
-              style={{
-                width: 36, height: 36,
-                background: musicPlaying ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.12)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "white",
-                cursor: "pointer",
-                fontSize: 16,
-              }}
-            >
-              {musicPlaying ? "⏸" : "▶"}
-            </button>
-          </div>
-        </>
+        <iframe
+          ref={musicRef}
+          title="ambient-music"
+          width="1" height="1"
+          style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
+          src={`https://www.youtube-nocookie.com/embed/${musicPreset.videoId}?autoplay=1&loop=1&playlist=${musicPreset.videoId}&enablejsapi=1`}
+          allow="autoplay"
+        />
       )}
     </div>
   );
