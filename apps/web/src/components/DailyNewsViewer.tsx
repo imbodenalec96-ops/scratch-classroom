@@ -1,6 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
+import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
+
+/** Mirror of the generic schedule-block content shape — local copy to avoid
+ *  importing teacher-only code into the student bundle. Supports per-day
+ *  newsUrl overrides (`byDay: { Mon: { newsUrl } }`). */
+type NewsBlockDay = { newsUrl?: string };
+const DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function resolveTodaysBlockNewsUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw);
+    const today = DAY_LETTERS[new Date().getDay()];
+    const dayVal: NewsBlockDay = (p?.byDay && typeof p.byDay === "object" && p.byDay[today]) || {};
+    const url =
+      (typeof dayVal.newsUrl === "string" && dayVal.newsUrl) ||
+      (typeof p?.newsUrl === "string" && p.newsUrl) ||
+      "";
+    return url || null;
+  } catch { return null; }
+}
 
 // URL → embeddable iframe URL (or image / youtube).
 // Returns { kind, src } describing how to render it.
@@ -54,13 +75,31 @@ export default function DailyNewsViewer() {
     return () => { cancelled = true; clearInterval(iv); };
   }, [classId, data?.todays_file_url]);
 
+  // If the active schedule block has a per-day newsUrl (or a root-level
+  // default), prefer it over the legacy teacher-paste `todays_file_url`. The
+  // schedule editor is the newer home for this content — the legacy flow
+  // still works for teachers who haven't migrated.
+  const currentBlock = useCurrentBlock(classId);
+  const blockNewsUrl = useMemo(
+    () => resolveTodaysBlockNewsUrl(currentBlock?.content_source),
+    [currentBlock?.content_source]
+  );
+
   if (loading) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center text-t3">Loading Daily News…</div>
     );
   }
 
-  if (!data?.todays_file_url) {
+  // Resolve the URL to show: schedule-block override wins, then the legacy
+  // paste flow, then "nothing posted yet".
+  const resolvedUrl = blockNewsUrl || data?.todays_file_url || null;
+  const resolvedTitle = blockNewsUrl
+    ? (data?.todays_file_title || "Daily News")
+    : (data?.todays_file_title || "Daily News");
+  const resolvedSetAt = blockNewsUrl ? null : data?.todays_file_set_at;
+
+  if (!resolvedUrl) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-6 text-center">
         <div className="text-7xl mb-5" aria-hidden>📰</div>
@@ -76,26 +115,40 @@ export default function DailyNewsViewer() {
     );
   }
 
-  const embed = embedForUrl(data.todays_file_url);
+  const embed = embedForUrl(resolvedUrl);
 
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col">
       <div className="px-4 py-2 border-b flex items-center gap-3" style={{ borderColor: "var(--border, rgba(255,255,255,0.08))" }}>
         <span className="text-2xl" aria-hidden>📰</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-t1 truncate">{data.todays_file_title || "Daily News"}</div>
+          <div className="text-sm font-bold text-t1 truncate">{resolvedTitle}</div>
           <div className="text-xs text-t3 truncate">
-            Posted {data.todays_file_set_at ? new Date(data.todays_file_set_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "today"}
+            {blockNewsUrl
+              ? "From today's schedule block"
+              : `Posted ${resolvedSetAt ? new Date(resolvedSetAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "today"}`}
           </div>
         </div>
+        {blockNewsUrl && (
+          <a
+            href={resolvedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold px-2.5 py-1 rounded-md border"
+            style={{ borderColor: "rgba(255,255,255,0.12)", color: "var(--t2)" }}
+            title="Open in a new tab"
+          >
+            Open ↗
+          </a>
+        )}
       </div>
       <div className="flex-1 relative bg-white">
         {embed.kind === "image" ? (
-          <img src={embed.src} alt={data.todays_file_title || "Daily News"} className="w-full h-full object-contain" />
+          <img src={embed.src} alt={resolvedTitle} className="w-full h-full object-contain" />
         ) : (
           <iframe
             src={embed.src}
-            title={data.todays_file_title || "Daily News"}
+            title={resolvedTitle}
             className="w-full h-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen

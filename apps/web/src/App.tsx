@@ -31,9 +31,10 @@ import StudentWebsites from "./components/StudentWebsites.tsx";
 import TeacherSchedule from "./components/TeacherSchedule.tsx";
 import WebsiteViewer from "./components/WebsiteViewer.tsx";
 import {
-  VideoLearningPage, TedTalkPage, DismissalPage, CashoutPage,
+  VideoLearningPage, TedTalkPage, DismissalPage,
   AssignmentTodayPage, SELPage,
 } from "./components/BlockPlaceholder.tsx";
+import CashoutPage from "./components/CashoutPage.tsx";
 import DailyNewsViewer from "./components/DailyNewsViewer.tsx";
 import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
@@ -42,6 +43,7 @@ import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
 import ClassroomBoard from "./components/ClassroomBoard.tsx";
 import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
+import TeacherStore from "./components/TeacherStore.tsx";
 import StudentVideoPage from "./components/StudentVideoPage.tsx";
 import PrintAssignment from "./components/PrintAssignment.tsx";
 
@@ -162,6 +164,7 @@ export default function App() {
             <Route path="teacher/websites" element={<TeacherWebsites />} />
             <Route path="teacher/schedule" element={<TeacherSchedule />} />
             <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
+            <Route path="teacher/store" element={<TeacherStore />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />

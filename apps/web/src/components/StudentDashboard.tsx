@@ -1122,6 +1122,20 @@ export default function StudentDashboard() {
     return () => { cancelled = true; clearInterval(iv); };
   }, [user?.role]);
 
+  // Classroom-store points (ClassDojo-style). Separate from behavior stars —
+  // cumulative teacher-awarded currency students spend at /cashout.
+  const [dojoPoints, setDojoPoints] = useState<number | null>(null);
+  useEffect(() => {
+    if (user?.role !== "student") return;
+    let cancelled = false;
+    const load = () => api.getMyBalance()
+      .then(d => { if (!cancelled) setDojoPoints(d?.dojo_points ?? 0); })
+      .catch(() => {});
+    load();
+    const iv = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [user?.role]);
+
   // Avatar emoji (persisted to server)
   const [avatarEmoji, setAvatarEmoji] = useState<string>((user as any)?.avatarEmoji || "");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
@@ -1583,6 +1597,35 @@ export default function StudentDashboard() {
             <div style={{ fontSize: 16, fontWeight: 800 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
           </div>
         </div>
+
+        {/* ── Points chip (ClassDojo-style currency; tap for store) ── */}
+        {dojoPoints != null && (
+          <Link
+            to="/cashout"
+            style={{
+              marginTop: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              borderRadius: 999,
+              textDecoration: "none",
+              background: "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(217,119,6,0.08))",
+              border: "1px solid rgba(245,158,11,0.3)",
+              color: "#fbbf24",
+              boxShadow: "0 1px 10px rgba(245,158,11,0.1)",
+              animation: "dbSlide .45s ease both",
+            }}
+            aria-label="Classroom store"
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 13 }}>
+              <span style={{ fontSize: 16 }}>🪙</span>
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>{dojoPoints}</span>
+              <span style={{ fontWeight: 600, opacity: 0.85 }}>points</span>
+            </span>
+            <span style={{ fontSize: 11, opacity: 0.75, fontWeight: 700 }}>Spend at store →</span>
+          </Link>
+        )}
 
         {/* ── Current Block Banner ── */}
         {blockInfo.state === "current" && !(blockInfo as any).block.is_break && (

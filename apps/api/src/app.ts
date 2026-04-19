@@ -33,6 +33,7 @@ import gradesRoutes from "./routes/grades.js";
 import websitesRoutes from "./routes/websites.js";
 import dailyNewsRoutes from "./routes/daily-news.js";
 import boardRoutes from "./routes/board.js";
+import storeRoutes from "./routes/store.js";
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use("/api/grades", authMiddleware, gradesRoutes);
 app.use("/api/websites", authMiddleware, websitesRoutes);
 app.use("/api/classes", authMiddleware, dailyNewsRoutes);
 app.use("/api/board", authMiddleware, boardRoutes);
+app.use("/api/store", authMiddleware, storeRoutes);
 
 // File upload endpoint
 app.post("/api/upload", authMiddleware, upload.single("file"), (req, res) => {
