@@ -245,12 +245,12 @@ Return JSON: {"prompt":"...","hint":"... (includes CCSS code)"}`;
     const correction = `CORRECTION: The previous draft was off-grade — ${firstReason}. Regenerate at exactly ${gLabel}. Stay strictly within the CCSS anchor above.`;
     const retry = await callOnce(correction);
     const check2 = validateTask(subject, grade, retry.prompt, retry.hint);
-    if (check2.ok) {
-      result = retry;
-    } else {
+    if (!check2.ok) {
       warnings.push(`retry-still-off: ${check2.reason}`);
       // Prefer retry output over bad first pass even if still flagged
       result = retry.prompt ? retry : result;
+    } else {
+      result = retry;
     }
   }
 
