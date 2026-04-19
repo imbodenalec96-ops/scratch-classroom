@@ -1987,10 +1987,6 @@ export default function StudentDashboard() {
 
       </div>{/* end max-width wrapper */}
 
-      {/* Mascot corner badge */}
-      <div className="fixed bottom-5 right-5 z-40 pointer-events-none select-none" aria-hidden="true">
-        <Mascot state={mascotCelebrating ? "cheer" : "idle"} />
-      </div>
     </div>
   );
 }

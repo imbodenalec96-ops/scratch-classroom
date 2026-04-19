@@ -71,7 +71,11 @@ export default function Layout() {
     REVOKE_FREETIME: () => {
       studentFreetimeStore.setRevoked(Date.now() + 60_000);
       studentMessageStore.setMessage("Free time ended — back to work 📚");
-      navigate("/assignments");
+      // Don't yank students off approved website pages — let them finish browsing
+      const onWebsite = location.pathname.startsWith("/websites") ||
+        location.pathname.startsWith("/app/") ||
+        location.pathname.startsWith("/go/");
+      if (!onWebsite) navigate("/assignments");
     },
     END_BREAK: () => {
       // Clear the localStorage break state so isOnBreak() flips false and the
