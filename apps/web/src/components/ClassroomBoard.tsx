@@ -564,28 +564,16 @@ export default function ClassroomBoard() {
         </section>
 
         {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}
-        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 5, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Specials Today — hero cards */}
+          {/* Specials Today — "On Today" editorial feature */}
           <section style={{
+            ...card,
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
-            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(160deg, rgba(15,10,35,0.95), rgba(8,4,20,0.98))",
-            padding: "10px 10px 8px",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+            padding: "10px 14px",
           }}>
-            {/* Header row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7, flexShrink: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)" }}>NOW IN SESSION</div>
-              <div style={{
-                fontSize: 13, fontWeight: 900, padding: "2px 10px", borderRadius: 10,
-                background: "linear-gradient(135deg, rgba(245,158,11,0.35), rgba(251,191,36,0.2))",
-                color: "#fde68a", border: "1px solid rgba(245,158,11,0.6)",
-                boxShadow: "0 0 10px rgba(245,158,11,0.25)",
-              }}>DAY {dayLetter}</div>
-            </div>
-            {/* Grade hero cards */}
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            <SectionLabel n="02" title="On Today" kicker={`Day ${dayLetter}`} />
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               {GRADES.map((grade, gi) => {
                 const students = board.students.filter(s => s.specials_grade === grade);
                 if (students.length === 0) return null;
@@ -594,36 +582,47 @@ export default function ClassroomBoard() {
                 const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 10, overflow: "hidden",
+                    flex: 1, borderRadius: 3, overflow: "hidden",
                     display: "flex", alignItems: "stretch",
+                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(13,19,33,0.1) 80%)`,
                     border: `1px solid ${gc.border}`,
-                    boxShadow: `0 0 12px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
-                    animation: `popIn .4s ease ${gi * 0.07}s both`,
+                    borderLeft: `4px solid ${gc.text}`,
+                    animation: `fadeUp .5s ease ${gi * 0.06}s both`,
                   }}>
-                    {/* Left accent */}
+                    {/* Grade motif — bold, all-caps masthead letter */}
                     <div style={{
-                      width: 34, flexShrink: 0, display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: 2,
-                      background: `linear-gradient(180deg, ${gc.from.replace("0.22", "0.55")}, ${gc.to.replace("0.12", "0.3")})`,
+                      width: 48, flexShrink: 0, display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: 0,
                       borderRight: `1px solid ${gc.border}`,
+                      background: "rgba(7,8,15,0.35)",
                     }}>
-                      <div style={{ fontSize: 20, lineHeight: 1 }}>{emoji}</div>
-                      <div style={{ fontSize: 9, fontWeight: 900, color: gc.text, letterSpacing: "0.05em" }}>{grade}TH</div>
+                      <div style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</div>
+                      <div style={{
+                        fontFamily: serif, fontStyle: "italic",
+                        fontSize: 10, fontWeight: 600, color: gc.text,
+                        letterSpacing: "0.1em", marginTop: 2,
+                      }}>{gc.motif}</div>
                     </div>
-                    {/* Right content */}
+                    {/* Activity + roster */}
                     <div style={{
-                      flex: 1, padding: "5px 8px", display: "flex", flexDirection: "column", justifyContent: "center",
-                      background: `linear-gradient(135deg, ${gc.from.replace("0.22", "0.15")}, rgba(0,0,0,0))`,
+                      flex: 1, padding: "6px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3,
+                      minWidth: 0,
                     }}>
-                      <div style={{ fontSize: 13, fontWeight: 900, color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
-                        {act || <span style={{ opacity: 0.3, fontStyle: "italic", fontWeight: 500 }}>not set</span>}
+                      <div style={{
+                        fontFamily: serif, fontSize: 16, fontWeight: 600,
+                        color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        lineHeight: 1.1, letterSpacing: "-0.01em",
+                      }}>
+                        {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
-                        {students.map(s => (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
+                        {students.map((s, si) => (
                           <span key={s.id} style={{
-                            fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 20,
-                            background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.8)",
-                            border: "1px solid rgba(255,255,255,0.08)",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: 10, fontWeight: 500, padding: "1px 6px",
+                            color: "rgba(245,241,232,0.78)",
+                            borderRight: si < students.length - 1 ? `1px solid ${g(0.15)}` : "none",
+                            letterSpacing: "0.01em",
                           }}>{s.name}</span>
                         ))}
                       </div>
@@ -633,13 +632,20 @@ export default function ClassroomBoard() {
               })}
               {board.students.filter(s => !s.specials_grade).length > 0 && (
                 <div style={{
-                  borderRadius: 10, padding: "5px 8px", display: "flex", alignItems: "center", gap: 8,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                  borderRadius: 3, padding: "4px 10px", display: "flex", alignItems: "center", gap: 10,
+                  background: "rgba(255,255,255,0.02)", border: `1px dashed ${g(0.1)}`,
                 }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em" }}>TBD</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                    {board.students.filter(s => !s.specials_grade).map(s => (
-                      <span key={s.id} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }}>{s.name}</span>
+                  <div style={{
+                    fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
+                    color: "rgba(245,241,232,0.3)", letterSpacing: "0.16em", textTransform: "uppercase",
+                  }}>unassigned</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                    {board.students.filter(s => !s.specials_grade).map((s, si, arr) => (
+                      <span key={s.id} style={{
+                        fontSize: 10, padding: "0 5px",
+                        color: "rgba(245,241,232,0.4)",
+                        borderRight: si < arr.length - 1 ? `1px solid ${g(0.1)}` : "none",
+                      }}>{s.name}</span>
                     ))}
                   </div>
                 </div>
@@ -647,34 +653,43 @@ export default function ClassroomBoard() {
             </div>
           </section>
 
-          {/* Specials Rotation — week-at-a-glance */}
+          {/* Specials Rotation — "The Cycle" week-at-a-glance, newspaper grid */}
           <section style={{
+            ...card,
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
-            borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(160deg, rgba(12,8,28,0.97), rgba(6,4,18,0.99))",
-            padding: "10px 10px 8px",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+            padding: "10px 14px",
           }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.25em", color: "rgba(255,255,255,0.35)", marginBottom: 8, flexShrink: 0 }}>WEEK SCHEDULE</div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-              {/* Day header */}
-              <div style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flexShrink: 0 }}>
+            <SectionLabel n="03" title="The Cycle" kicker="A–F rotation" />
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+              {/* Day header row */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flexShrink: 0,
+                borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 4,
+              }}>
                 <div />
                 {DAY_LETTERS.map(d => {
                   const isToday = d === dayLetter;
                   return (
                     <div key={d} style={{
-                      textAlign: "center", fontSize: 14, fontWeight: 900,
-                      padding: "6px 2px", borderRadius: 9,
-                      background: isToday
-                        ? "linear-gradient(135deg, rgba(245,158,11,0.5), rgba(251,191,36,0.3))"
-                        : "rgba(255,255,255,0.05)",
-                      color: isToday ? "#fde68a" : "rgba(255,255,255,0.35)",
-                      border: isToday ? "1.5px solid rgba(245,158,11,0.7)" : "1px solid rgba(255,255,255,0.07)",
-                      boxShadow: isToday ? "0 0 16px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.15)" : "none",
+                      textAlign: "center",
+                      fontFamily: serif, fontSize: 15,
+                      fontWeight: isToday ? 600 : 500,
+                      fontStyle: isToday ? "normal" : "italic",
+                      padding: "3px 2px", borderRadius: 2,
+                      background: isToday ? "rgba(217,119,6,0.22)" : "transparent",
+                      color: isToday ? "#fbbf24" : "rgba(245,241,232,0.35)",
+                      border: isToday ? "1px solid rgba(217,119,6,0.55)" : "1px solid transparent",
                       letterSpacing: "0.04em",
+                      position: "relative",
                     }}>
-                      {d}{isToday ? " ★" : ""}
+                      {d}
+                      {isToday && (
+                        <span style={{
+                          position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)",
+                          width: 5, height: 5, borderRadius: "50%",
+                          background: "#d97706",
+                        }} />
+                      )}
                     </div>
                   );
                 })}
@@ -683,43 +698,47 @@ export default function ClassroomBoard() {
               {GRADES.map(grade => {
                 const gc = GRADE_COLORS[grade];
                 return (
-                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
-                    {/* Grade label */}
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
+                    {/* Grade motif cell */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 900, borderRadius: 9,
+                      fontFamily: serif, fontStyle: "italic",
+                      fontSize: 15, fontWeight: 600, borderRadius: 2,
                       color: gc.text,
-                      background: `linear-gradient(135deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.25")})`,
-                      border: `1.5px solid ${gc.border}`,
-                      boxShadow: `0 0 8px ${gc.glow}`,
-                    }}>{grade}th</div>
+                      background: `linear-gradient(180deg, ${gc.from}, rgba(13,19,33,0.2))`,
+                      border: `1px solid ${gc.border}`,
+                      borderLeft: `3px solid ${gc.text}`,
+                    }}>{grade}</div>
                     {DAY_LETTERS.map(day => {
                       const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
                       const isToday = day === dayLetter;
                       return (
                         <div key={day} style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          textAlign: "center", borderRadius: 9, padding: "4px 2px",
-                          background: isToday
-                            ? `linear-gradient(160deg, ${gc.from.replace("0.22","0.5")}, ${gc.to.replace("0.12","0.28")})`
-                            : "rgba(255,255,255,0.03)",
-                          border: isToday ? `1.5px solid ${gc.border}` : "1px solid rgba(255,255,255,0.06)",
-                          boxShadow: isToday && c ? `0 0 10px ${gc.glow}, inset 0 1px 0 rgba(255,255,255,0.1)` : "none",
-                          gap: 2, overflow: "hidden",
+                          textAlign: "center", borderRadius: 2, padding: "3px 2px",
+                          background: isToday && c ? `${gc.from}` : "rgba(255,255,255,0.015)",
+                          border: isToday
+                            ? `1px solid ${gc.border}`
+                            : `1px solid ${g(0.05)}`,
+                          gap: 1, overflow: "hidden",
+                          minHeight: 0,
                         }}>
                           {c?.activity ? (
                             <>
-                              <span style={{ fontSize: 16, lineHeight: 1 }}>{actEmoji(c.activity)}</span>
+                              <span style={{ fontSize: 15, lineHeight: 1, opacity: isToday ? 1 : 0.75 }}>{actEmoji(c.activity)}</span>
                               <span style={{
-                                fontSize: 12, fontWeight: 900, lineHeight: 1.15,
+                                fontFamily: serif,
+                                fontSize: 11,
+                                fontWeight: isToday ? 600 : 500,
+                                fontStyle: isToday ? "normal" : "italic",
+                                lineHeight: 1.1,
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 maxWidth: "100%", padding: "0 3px",
-                                color: isToday ? gc.text : "rgba(255,255,255,0.65)",
-                                textShadow: isToday ? `0 0 8px ${gc.glow}` : "none",
+                                color: isToday ? gc.text : "rgba(245,241,232,0.55)",
                               }}>{c.activity}</span>
                             </>
                           ) : (
-                            <span style={{ opacity: 0.12, fontSize: 14 }}>✦</span>
+                            <span style={{ opacity: 0.18, fontSize: 12, color: gc.text }}>·</span>
                           )}
                         </div>
                       );
@@ -732,24 +751,43 @@ export default function ClassroomBoard() {
         </div>
       </div>
 
-      {/* ── ROW 4: Behavior Levels strip ── */}
+      {/* ── ROW 4: "The Ledger" — Behavior Levels strip ── */}
       <section style={{
         position: "relative", zIndex: 1,
-        ...card, borderRadius: 12,
-        display: "flex", alignItems: "center", gap: 8, padding: "0 12px", overflow: "hidden", flexShrink: 0,
-        animation: "pulseRing 2.5s ease-in-out infinite",
+        ...card, borderRadius: 3,
+        display: "flex", alignItems: "center", gap: 14, padding: "0 16px",
+        overflow: "hidden", flexShrink: 0,
+        borderTop: `1px solid ${g(0.12)}`,
       }}>
-        <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.25em", flexShrink: 0 }}>Behavior Levels</div>
-        <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", overflow: "hidden" }}>
+        <div style={{
+          fontFamily: serif, fontStyle: "italic", fontSize: 12, fontWeight: 600,
+          color: "rgba(217,119,6,0.85)", letterSpacing: "0.16em", textTransform: "uppercase",
+          flexShrink: 0, borderRight: `1px solid ${g(0.12)}`, paddingRight: 14,
+        }}>№ 04 · The Ledger</div>
+        <div style={{ flex: 1, display: "flex", gap: 16, alignItems: "center", overflow: "hidden" }}>
           {[5, 4, 3, 2, 1].map(lv => {
             const at = board.students.filter(s => (s.level || 1) === lv);
             if (at.length === 0) return null;
             const lc = BEHAVIOR_LEVELS[lv];
             return (
-              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: lc.bg, color: lc.color }}>{lc.label}</div>
-                {at.map(s => (
-                  <div key={s.id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: g(0.1), color: g(0.85) }}>{s.name}</div>
+              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <div style={{
+                  fontFamily: serif, fontStyle: "italic",
+                  fontSize: 12, fontWeight: 600,
+                  padding: "1px 9px 2px", borderRadius: 2,
+                  background: lc.bg, color: lc.color,
+                  borderLeft: `2px solid ${lc.color}`,
+                  letterSpacing: "0.02em",
+                }}>Lv {lv}</div>
+                {at.map((s, si) => (
+                  <span key={s.id} style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 12, fontWeight: 500,
+                    color: "rgba(245,241,232,0.82)",
+                    letterSpacing: "0.01em",
+                    paddingRight: si < at.length - 1 ? 6 : 0,
+                    borderRight: si < at.length - 1 ? `1px solid ${g(0.1)}` : "none",
+                  }}>{s.name}</span>
                 ))}
               </div>
             );
