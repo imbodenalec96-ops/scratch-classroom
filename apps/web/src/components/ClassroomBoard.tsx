@@ -318,10 +318,10 @@ export default function ClassroomBoard() {
           <div style={{
             overflowY: "auto", flex: 1,
             display: "grid",
-            gridTemplateColumns: `repeat(auto-fill, minmax(90px, 1fr))`,
-            gridAutoRows: "auto",
-            alignContent: "start",
-            gap: 5,
+            gridTemplateColumns: `repeat(auto-fill, minmax(130px, 1fr))`,
+            gridAutoRows: "minmax(min-content, 1fr)",
+            alignContent: "stretch",
+            gap: 6,
           }}>
             {board.students.map((s, idx) => {
               const stars = Math.max(0, Math.min(5, s.behavior_stars || 0));
@@ -350,12 +350,12 @@ export default function ClassroomBoard() {
                   }} />
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "8px 5px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ flex: 1, padding: "10px 6px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
                     {/* Avatar */}
                     <div style={{
-                      width: 46, height: 46, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 58, height: 58, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 16, fontWeight: 900, color: "white",
+                      fontSize: 20, fontWeight: 900, color: "white",
                       background: isFull
                         ? "linear-gradient(135deg, #f59e0b, #d97706)"
                         : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
@@ -369,7 +369,7 @@ export default function ClassroomBoard() {
                     </div>
 
                     {/* Name */}
-                    <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
                       {s.name}
                     </div>
 
