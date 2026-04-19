@@ -458,6 +458,9 @@ export default function AssignmentBuilder() {
   // Direct-assign: roster of students in the selected class + the checked set.
   const [classStudents, setClassStudents] = useState<any[]>([]);
   const [targetStudentIds, setTargetStudentIds] = useState<string[]>([]);
+  // Group / center assignment — picked members become the group.
+  const [isGroup, setIsGroup] = useState<boolean>(false);
+  const [groupName, setGroupName] = useState<string>("");
 
   // Rich customization (Feature 28 — same fields as Edit modal)
   const [customQuestionCount, setCustomQuestionCount] = useState<number | "">("");
@@ -648,7 +651,14 @@ export default function AssignmentBuilder() {
     if (customLearningObjective) customization.learningObjective = customLearningObjective;
     if (customFocusKeywords) customization.focusKeywords = customFocusKeywords;
     if (customTeacherNotes) customization.teacherNotes = customTeacherNotes;
-    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization });
+    // Group / center: if checked and students are picked, flag the assignment
+    // as a group assignment so members see a shared-notes pane.
+    const groupPayload: any = {};
+    if (isGroup && targetMode === "students" && targetStudentIds.length > 0) {
+      groupPayload.isGroup = true;
+      groupPayload.groupName = groupName.trim() || "Group";
+    }
+    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
     setShowForm(false);
     setGenerated(null);
     setTitle(""); setInstructions(""); setDueDate("");
@@ -656,6 +666,7 @@ export default function AssignmentBuilder() {
     setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
     setShowAdvanced(false);
     setTargetMode("all"); setTargetStudentIds([]);
+    setIsGroup(false); setGroupName("");
     loadAssignments(classId);
   };
 
@@ -1239,6 +1250,23 @@ export default function AssignmentBuilder() {
                 )}
                 <div className="text-[11px] mt-2" style={{ color: "var(--text-3)" }}>
                   Only the checked students will see this assignment in their pending list. Grade targeting is ignored when direct-assigning.
+                </div>
+
+                {/* Group / center toggle — turns the picked students into a
+                    shared-work group with a collaborative notes pane. */}
+                <div className="mt-3 p-3 rounded-lg border" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: "var(--text-1)" }}>
+                    <input type="checkbox" checked={isGroup} onChange={(e) => setIsGroup(e.target.checked)} />
+                    👥 Group / Center assignment
+                  </label>
+                  <div className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+                    Members see a shared group name and a collaborative notes pane alongside the assignment.
+                  </div>
+                  {isGroup && (
+                    <input value={groupName} onChange={(e) => setGroupName(e.target.value)}
+                      placeholder={'e.g. "Reading Circle A" or "Math Center"'}
+                      className="input text-sm mt-2 w-full" />
+                  )}
                 </div>
               </div>
             )}

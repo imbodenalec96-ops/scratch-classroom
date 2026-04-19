@@ -379,6 +379,12 @@ export const api = {
   getMyStars: () => request<{ stars: number; rewards: number }>(`/board/me/stars`),
 
   // ── Paper-only students (printable worksheets flow) ──
+  // ── Group / center shared notes ──
+  getGroupNotes: (assignmentId: string) =>
+    request<{ content: string; updated_at: string | null; updated_by: string | null }>(`/assignments/${assignmentId}/group-notes`),
+  saveGroupNotes: (assignmentId: string, content: string) =>
+    request<any>(`/assignments/${assignmentId}/group-notes`, { method: "PUT", body: JSON.stringify({ content }) }),
+
   setStudentPaperOnly: (studentId: string, paperOnly: boolean) =>
     request<any>(`/students/${studentId}/paper-only`, {
       method: "PUT",

@@ -39,11 +39,25 @@ async function ensureGradeCols() {
       "ALTER TABLE assignments ADD COLUMN source TEXT",
       "ALTER TABLE assignments ADD COLUMN source_url TEXT",
       "ALTER TABLE assignments ADD COLUMN attached_pdf_path TEXT",
+      // Group / center assignments — members reuse target_student_ids.
+      // is_group=1 means the target students work together; UI shows shared notes.
+      "ALTER TABLE assignments ADD COLUMN is_group INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE assignments ADD COLUMN group_name TEXT",
     ]) {
       try { await db.exec(col); } catch { /* column already exists */ }
     }
     // Storage for imported/uploaded PDFs (base64 in TEXT — works on both
     // Neon pg and the sqlite compat shim, survives Vercel's read-only FS)
+    // Shared notes for group / center assignments — one row per assignment.
+    // Every group member reads and writes the same `content` field.
+    try {
+      await db.exec(`CREATE TABLE IF NOT EXISTS group_notes (
+        assignment_id TEXT PRIMARY KEY,
+        content TEXT NOT NULL DEFAULT '',
+        updated_at TEXT,
+        updated_by TEXT
+      )`);
+    } catch {}
     try {
       await db.exec(`CREATE TABLE IF NOT EXISTS assignment_files (
         id TEXT PRIMARY KEY,
@@ -156,6 +170,7 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
     targetStudentIds,
     teacherNotes, questionCount, estimatedMinutes, focusKeywords,
     learningObjective, hintsAllowed, questionType,
+    isGroup, groupName,
   } = req.body;
   const id = crypto.randomUUID();
   await ensureGradeCols();
@@ -176,8 +191,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
         target_grade_min, target_grade_max, target_subject,
         teacher_notes, question_count, estimated_minutes,
         focus_keywords, learning_objective, hints_allowed, question_type,
-        target_student_ids
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        target_student_ids, is_group, group_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []),
       starterProjectId, content ?? null, scheduledDate ?? null,
@@ -190,6 +205,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
       hintsAllowed != null ? (hintsAllowed ? 1 : 0) : 1,
       questionType || null,
       tStudents,
+      isGroup ? 1 : 0,
+      groupName || null,
     );
   } catch (e: any) {
     console.error('assignment insert error:', e?.message);
@@ -204,6 +221,57 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id) as any;
   row.rubric = JSON.parse(row.rubric || "[]");
   res.json(row);
+});
+
+// ── Group / center shared notes ─────────────────────────────────
+// Any group member (student in target_student_ids) OR teacher/admin can read/write.
+// Notes are a single text blob per assignment — simple enough to sync via
+// short-interval polling without needing websockets.
+async function canAccessGroupNotes(req: AuthRequest, assignmentId: string): Promise<{ ok: boolean; reason?: string; assignment?: any }> {
+  const role = req.user?.role;
+  const userId = req.user?.id;
+  if (!userId) return { ok: false, reason: "auth required" };
+  const a: any = await db.prepare("SELECT id, is_group, target_student_ids FROM assignments WHERE id = ?").get(assignmentId);
+  if (!a) return { ok: false, reason: "not found" };
+  if (!Number(a.is_group)) return { ok: false, reason: "not a group assignment" };
+  if (role === "teacher" || role === "admin") return { ok: true, assignment: a };
+  let ids: string[] = [];
+  try { const p = JSON.parse(a.target_student_ids || "[]"); if (Array.isArray(p)) ids = p; } catch {}
+  if (!ids.includes(userId)) return { ok: false, reason: "not a member of this group" };
+  return { ok: true, assignment: a };
+}
+
+router.get("/:id/group-notes", async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  const check = await canAccessGroupNotes(req, req.params.id);
+  if (!check.ok) return res.status(403).json({ error: check.reason });
+  try {
+    const row: any = await db.prepare("SELECT content, updated_at, updated_by FROM group_notes WHERE assignment_id = ?").get(req.params.id);
+    res.json({ content: row?.content ?? "", updated_at: row?.updated_at ?? null, updated_by: row?.updated_by ?? null });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "notes read failed" });
+  }
+});
+
+router.put("/:id/group-notes", async (req: AuthRequest, res: Response) => {
+  await ensureGradeCols();
+  const check = await canAccessGroupNotes(req, req.params.id);
+  if (!check.ok) return res.status(403).json({ error: check.reason });
+  const content = String(req.body?.content ?? "").slice(0, 10000);
+  const now = new Date().toISOString();
+  try {
+    const upd = await db.prepare(
+      "UPDATE group_notes SET content = ?, updated_at = ?, updated_by = ? WHERE assignment_id = ?"
+    ).run(content, now, req.user!.id, req.params.id);
+    if (!upd.changes) {
+      await db.prepare(
+        "INSERT INTO group_notes (assignment_id, content, updated_at, updated_by) VALUES (?, ?, ?, ?)"
+      ).run(req.params.id, content, now, req.user!.id);
+    }
+    res.json({ content, updated_at: now, updated_by: req.user!.id });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "notes save failed" });
+  }
 });
 
 // Class settings table — per-class defaults for the mega-button

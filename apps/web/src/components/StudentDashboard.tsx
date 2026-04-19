@@ -384,6 +384,69 @@ function ProgressDots({ total, current, answers }: { total: number; current: num
   );
 }
 
+/* ── Group / center shared notes ──
+   Every member of a group assignment sees this panel. They all read and write
+   the same `content` blob; we poll every 5s to pick up teammates' edits. */
+function GroupNotesPanel({ assignmentId, groupName, dk }: { assignmentId: string; groupName: string; dk: boolean }) {
+  const [content, setContent] = useState<string>("");
+  const [remoteUpdatedAt, setRemoteUpdatedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const editing = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const r = await api.getGroupNotes(assignmentId);
+        if (cancelled) return;
+        // Don't clobber the student's in-progress edit
+        if (!editing.current && r.content !== content) setContent(r.content || "");
+        setRemoteUpdatedAt(r.updated_at);
+      } catch {}
+    };
+    pull();
+    const iv = setInterval(pull, 5000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [assignmentId]);
+
+  const save = async (value: string) => {
+    setSaving(true);
+    try { await api.saveGroupNotes(assignmentId, value); setRemoteUpdatedAt(new Date().toISOString()); } catch {}
+    setSaving(false);
+  };
+
+  // Debounced save while typing
+  const saveTimer = useRef<any>(null);
+  const handleChange = (v: string) => {
+    editing.current = true;
+    setContent(v);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { editing.current = false; save(v); }, 700);
+  };
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: dk ? "rgba(139,92,246,0.08)" : "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.25)" }}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">👥</span>
+        <div className="font-bold" style={{ color: dk ? "#e9d5ff" : "#6d28d9" }}>Group: {groupName}</div>
+        <div className="ml-auto text-[10px] uppercase tracking-wider" style={{ color: dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }}>
+          {saving ? "Saving…" : remoteUpdatedAt ? "Saved" : "Shared notes"}
+        </div>
+      </div>
+      <textarea value={content} onChange={(e) => handleChange(e.target.value)}
+        placeholder="Share ideas, answers, or notes with your group. Everyone in the group sees the same thing."
+        rows={3}
+        className="w-full text-sm px-3 py-2 rounded-lg resize-y"
+        style={{
+          background: dk ? "rgba(0,0,0,0.25)" : "white",
+          color: dk ? "white" : "#111827",
+          border: "1px solid rgba(139,92,246,0.3)",
+        }}
+      />
+    </div>
+  );
+}
+
 /* ── Interactive Assignment Worker ── */
 function WorkScreen({
   assignment, parsed, dk, onComplete, onBreak, questionsAnswered, setQuestionsAnswered,
@@ -516,6 +579,11 @@ function WorkScreen({
       )}
 
       <div className={`mx-auto px-6 py-12 space-y-7 ${showBreakBanner ? "pt-20" : ""}`} style={{ maxWidth: 720 }}>
+
+        {/* ── Group / center banner — shared notes across members ── */}
+        {assignment?.is_group ? (
+          <GroupNotesPanel assignmentId={assignment.id} groupName={assignment.group_name || "Group"} dk={dk} />
+        ) : null}
 
         {/* ── Editorial header: exit + subject eyebrow + progress strip ── */}
         <div className="animate-slide-up" style={{ animationDelay: "0ms" }}>
