@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 import { api } from "../lib/api.ts";
 
 export default function WebsiteViewer() {
@@ -9,6 +9,11 @@ export default function WebsiteViewer() {
   const [site, setSite] = useState<any>(null);
   const [err, setErr] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iframeBlocked, setIframeBlocked] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const blockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isPwa = typeof navigator !== "undefined" && Boolean((navigator as any).standalone);
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -27,7 +32,13 @@ export default function WebsiteViewer() {
   useEffect(() => {
     if (!websiteId) return;
     api.getMyWebsite(websiteId)
-      .then(setSite)
+      .then(data => {
+        setSite(data);
+        if (isPwa && data?.url) {
+          // In PWA mode navigate directly — no iframe blocking issues, history preserved
+          window.location.href = data.url;
+        }
+      })
       .catch((e: any) => {
         const status = e?.status ?? e?.response?.status;
         setErr(status === 404
@@ -35,6 +46,29 @@ export default function WebsiteViewer() {
           : "Something went wrong loading this site. Try refreshing or go back.");
       });
   }, [websiteId]);
+
+  // Detect iframe block: if `load` fires but content is cross-origin blocked,
+  // the iframe stays empty. Start a timer; if the iframe src doesn't change
+  // within 4s we assume it's blocked and show the fallback.
+  const handleIframeLoad = useCallback(() => {
+    if (blockTimerRef.current) clearTimeout(blockTimerRef.current);
+    try {
+      // If we can access contentDocument the site loaded (same-origin or allowed)
+      const doc = iframeRef.current?.contentDocument;
+      if (!doc || doc.location.href === "about:blank") {
+        setIframeBlocked(true);
+      }
+    } catch {
+      // SecurityError = cross-origin = site loaded successfully in iframe
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!site || isPwa) return;
+    // Fallback: if iframe hasn't loaded meaningfully in 5s, show "open directly" prompt
+    blockTimerRef.current = setTimeout(() => setIframeBlocked(true), 5000);
+    return () => { if (blockTimerRef.current) clearTimeout(blockTimerRef.current); };
+  }, [site, isPwa]);
 
   if (err) {
     return (
@@ -49,10 +83,10 @@ export default function WebsiteViewer() {
     );
   }
 
-  if (!site) {
+  if (!site || isPwa) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
-        <div className="text-t3">Loading…</div>
+        <div className="text-t3">{isPwa ? "Opening…" : "Loading…"}</div>
       </div>
     );
   }
@@ -67,24 +101,53 @@ export default function WebsiteViewer() {
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-t1 truncate">{site.title}</div>
         </div>
+        <a
+          href={site.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5 text-t2 text-sm font-medium"
+          title="Open in new tab"
+        >
+          <ExternalLink size={16} /> Open
+        </a>
         <button
           onClick={toggleFullscreen}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5 text-t2 text-sm font-medium"
           title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
         >
           {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          {isFullscreen ? "Exit" : "Fullscreen"}
         </button>
       </div>
 
       {/* Iframe */}
       <div className="flex-1 relative bg-white">
+        {iframeBlocked && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-center p-8"
+            style={{ background: "var(--bg)" }}
+          >
+            <div className="text-5xl">🔒</div>
+            <div className="font-bold text-t1 text-lg">{site.title} can't be previewed here</div>
+            <div className="text-t3 text-sm max-w-xs">
+              This site blocks embedding for security. Tap below to open it directly.
+            </div>
+            <a
+              href={site.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm"
+            >
+              <ExternalLink size={16} /> Open {site.title}
+            </a>
+          </div>
+        )}
         <iframe
+          ref={iframeRef}
           src={site.url}
           title={site.title}
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-          referrerPolicy="no-referrer"
+          onLoad={handleIframeLoad}
+          allow="accelerometer; camera; encrypted-media; fullscreen; gamepad; geolocation; gyroscope; microphone; payment"
         />
       </div>
     </div>

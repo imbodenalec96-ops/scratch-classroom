@@ -148,7 +148,19 @@ export function LearningAppTile({
     el.style.boxShadow = style.boxShadow as string;
   };
 
+  // In PWA standalone mode (no address bar), navigate directly to the site URL
+  // so sites load without iframe X-Frame-Options/CSP blocking.
+  const isPwa = typeof navigator !== "undefined" && Boolean((navigator as any).standalone);
+
   if (asLink && app.id) {
+    if (isPwa && app.url) {
+      return (
+        <a href={app.url} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave} onClick={onClick}>
+          {content}
+          {footer}
+        </a>
+      );
+    }
     return (
       <Link to={`/app/${app.id}`} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave} onClick={onClick}>
         {content}
