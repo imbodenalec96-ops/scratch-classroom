@@ -41,16 +41,15 @@ export default function TeacherWebsites() {
   }, [user, navigate]);
 
   const reload = async () => {
-    try {
-      const [p, l, c] = await Promise.all([
-        api.getPendingWebsiteRequests().catch(() => []),
-        api.getWebsiteLibrary().catch(() => []),
-        api.getClasses().catch(() => []),
-      ]);
-      setPending(p || []);
-      setLibrary(l || []);
-      setClasses(c || []);
-    } catch (e: any) { setErr(e?.message || "Failed to load"); }
+    // Use null as sentinel — if a fetch fails, keep existing state instead of wiping it
+    const [p, l, c] = await Promise.all([
+      api.getPendingWebsiteRequests().catch(() => null),
+      api.getWebsiteLibrary().catch(() => null),
+      api.getClasses().catch(() => null),
+    ]);
+    if (p !== null) setPending(p as any[]);
+    if (l !== null) setLibrary(l as any[]);
+    if (c !== null) setClasses(c as any[]);
   };
 
   useEffect(() => {
