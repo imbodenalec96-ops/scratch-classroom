@@ -113,8 +113,9 @@ export default function Leaderboard() {
         {!loading && entries.map((entry, i) => {
           const isMe = entry.user_id === user?.id;
           const rc = rankColor(i);
+          const behaviorStars = Math.max(0, Math.min(5, entry.behavior_stars || 0));
           const mainStat = tab === "stars"
-            ? { value: (entry.points || 0).toLocaleString(), label: "pts", sub: `Level ${entry.level || 1}` }
+            ? { value: behaviorStars, label: "stars", sub: `${(entry.points || 0).toLocaleString()} pts · Lv${entry.level || 1}` }
             : { value: String(entry.completed || 0), label: "done", sub: `${entry.total_assigned || 0} assigned` };
 
           return (
@@ -176,15 +177,31 @@ export default function Leaderboard() {
 
               {/* Stat */}
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{
-                  fontSize: 22, fontWeight: 900, fontVariantNumeric: "tabular-nums",
-                  color: i === 0 ? "#fbbf24" : text1,
-                }}>
-                  {mainStat.value}
-                </div>
-                <div style={{ fontSize: 10, color: text2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  {mainStat.label}
-                </div>
+                {tab === "stars" ? (
+                  <>
+                    <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", marginBottom: 3 }}>
+                      {Array.from({ length: 5 }, (_, si) => (
+                        <span key={si} style={{
+                          fontSize: 16, lineHeight: 1,
+                          opacity: si < behaviorStars ? 1 : 0.15,
+                          filter: si < behaviorStars ? (i === 0 ? "drop-shadow(0 0 4px rgba(251,191,36,0.8))" : "none") : "grayscale(1)",
+                        }}>⭐</span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, color: text2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      {mainStat.sub}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 22, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: i === 0 ? "#fbbf24" : text1 }}>
+                      {mainStat.value}
+                    </div>
+                    <div style={{ fontSize: 10, color: text2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      {mainStat.label}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Badges (stars tab only) */}

@@ -164,6 +164,19 @@ router.post("/approve", requireRole("teacher", "admin"), async (req: AuthRequest
     await db.prepare(
       `UPDATE website_requests SET status = 'approved', teacher_note = ? WHERE id = ?`
     ).run(`website:${id}`, requestId);
+    // Auto-grant to the student who made the request
+    const req_row = await db.prepare(`SELECT student_id FROM website_requests WHERE id = ?`).get(requestId) as any;
+    if (req_row?.student_id) {
+      const grantExists = await db.prepare(
+        `SELECT id FROM student_approved_websites WHERE student_id = ? AND approved_website_id = ?`
+      ).get(req_row.student_id, id) as any;
+      if (!grantExists) {
+        const grantId = crypto.randomUUID();
+        await db.prepare(
+          `INSERT INTO student_approved_websites (id, student_id, approved_website_id, granted_by) VALUES (?, ?, ?, ?)`
+        ).run(grantId, req_row.student_id, id, req.user!.id);
+      }
+    }
   }
 
   const row = await db.prepare("SELECT * FROM approved_websites WHERE id = ?").get(id);
