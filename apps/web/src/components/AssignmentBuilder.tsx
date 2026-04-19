@@ -480,6 +480,7 @@ export default function AssignmentBuilder() {
   // PDF → assignment import state
   const [pdfParsing, setPdfParsing] = useState(false);
   const [pdfErr, setPdfErr] = useState<string | null>(null);
+  const [pdfSourceAssignmentId, setPdfSourceAssignmentId] = useState<string | null>(null);
 
   // Expanded assignment preview
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -663,10 +664,11 @@ export default function AssignmentBuilder() {
     setPdfErr(null);
     try {
       // 1) upload — returns { id, title, attached_pdf_path, ... }
-      const uploadResult = await api.uploadPdf(file);
+      const uploadResult = await api.uploadPdf(file, classId);
       if (uploadResult?.error) throw new Error(uploadResult.error);
       const fileId = uploadResult?.id;
       if (!fileId) throw new Error("Upload did not return a file ID");
+      setPdfSourceAssignmentId(fileId);
 
       // 2) ask Claude to parse it into the editor's JSON shape
       const parsed = await api.parsePdfAssignment(fileId);
@@ -754,9 +756,16 @@ export default function AssignmentBuilder() {
       groupPayload.isGroup = true;
       groupPayload.groupName = groupName.trim() || "Group";
     }
-    await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
+    if (pdfSourceAssignmentId) {
+      // Update the existing assignment that was created during PDF upload
+      // (avoids a duplicate entry — the source already has attached_pdf_path + class_id)
+      await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
+    } else {
+      await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload });
+    }
     setShowForm(false);
     setGenerated(null);
+    setPdfSourceAssignmentId(null);
     setTitle(""); setInstructions(""); setDueDate("");
     setCustomQuestionCount(""); setCustomEstimatedMinutes(""); setCustomQuestionType("");
     setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
@@ -984,7 +993,7 @@ export default function AssignmentBuilder() {
             <button onClick={() => setShowImport(true)} className="btn-secondary gap-1.5 text-xs">
               📄 Import (TPT / PDF)
             </button>
-            <button onClick={() => { setShowForm(!showForm); setGenerated(null); setGenError(""); }} className="btn-primary gap-2">
+            <button onClick={() => { setShowForm(!showForm); setGenerated(null); setGenError(""); setPdfSourceAssignmentId(null); }} className="btn-primary gap-2">
               {showForm ? <X size={14}/> : <Plus size={14}/>}
               {showForm ? "Cancel" : "New Assignment"}
             </button>

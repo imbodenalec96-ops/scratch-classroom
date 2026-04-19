@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
@@ -909,6 +909,7 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
+  const navigate = useNavigate();
 
   const [phase, setPhase] = useState<Phase>('welcome');
   // Reactive unlock state — students get dashboard access when on a 10-min
@@ -963,13 +964,24 @@ export default function StudentDashboard() {
   }, []);
   const classConfig = useClassConfig();
 
-  // Reload YouTube library whenever class list is available (covers break + dashboard states)
+  // Reload YouTube library from ALL classes (merged) so we never miss videos
   useEffect(() => {
     if (classes.length === 0) return;
-    api.getYouTubeLibrary(classes[0].id).then(setYoutubeLibrary).catch(() => {});
-    const iv = setInterval(() => {
-      api.getYouTubeLibrary(classes[0].id).then(setYoutubeLibrary).catch(() => {});
-    }, 60_000);
+    const loadAll = async () => {
+      const results = await Promise.all(
+        classes.map(c => api.getYouTubeLibrary(c.id).catch(() => [] as any[]))
+      );
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const arr of results) {
+        for (const v of arr) {
+          if (!seen.has(v.id)) { seen.add(v.id); merged.push(v); }
+        }
+      }
+      setYoutubeLibrary(merged);
+    };
+    loadAll();
+    const iv = setInterval(loadAll, 60_000);
     return () => clearInterval(iv);
   }, [classes]);
 
@@ -1523,87 +1535,53 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* YouTube Library */}
-      {classConfig.youtubeEnabled && (
-      <div style={{
-        borderRadius: 16, padding: "14px",
-        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        animation: "dbSlide .5s ease .3s both",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>📺 Video Library</span>
-          <span style={{
-            fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
-            background: "rgba(239,68,68,.2)", color: "#f87171",
+      {/* YouTube Library nav card — only during free time or break */}
+      {(unlocked || isOnBreak()) && classConfig.youtubeEnabled && (
+        <button
+          onClick={() => navigate("/student/videos")}
+          style={{
+            width: "100%", padding: 0, background: "none", border: "none", cursor: "pointer",
+            borderRadius: 16, overflow: "hidden",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
+            transition: "transform 0.15s, box-shadow 0.15s",
+            animation: "dbSlide .5s ease .3s both",
+            touchAction: "manipulation",
+            textAlign: "left",
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 36px rgba(139,92,246,0.35)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.transform = "";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.35)";
+          }}
+        >
+          <div style={{
+            background: "linear-gradient(135deg, rgba(139,92,246,0.25) 0%, rgba(59,130,246,0.18) 60%, rgba(239,68,68,0.12) 100%)",
+            border: "1px solid rgba(139,92,246,0.3)",
+            borderRadius: 16,
+            padding: "16px 18px",
+            display: "flex", alignItems: "center", gap: 14,
           }}>
-            {youtubeLibrary.length} {youtubeLibrary.length === 1 ? "video" : "videos"}
-          </span>
-        </div>
-
-        {/* Playing inline */}
-        {playingLibVideo && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ position:"relative", paddingTop:"56.25%", borderRadius:12, overflow:"hidden" }}>
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${playingLibVideo.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
-                title={playingLibVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
-                style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
-              />
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+              background: "linear-gradient(135deg, #7c3aed, #2563eb)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 26,
+              boxShadow: "0 4px 16px rgba(124,58,237,0.45)",
+            }}>📺</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: "rgba(255,255,255,0.95)" }}>Video Library</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                {youtubeLibrary.length > 0
+                  ? `${youtubeLibrary.length} ${youtubeLibrary.length === 1 ? "video" : "videos"} ready to watch`
+                  : "Browse your teacher's picks"}
+              </div>
             </div>
-            <button onClick={() => setPlayingLibVideo(null)} style={{
-              marginTop: 8, fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 20, cursor: "pointer",
-              background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", border: "none",
-            }}>
-              ✕ Close video
-            </button>
+            <div style={{ fontSize: 18, opacity: 0.4, flexShrink: 0 }}>›</div>
           </div>
-        )}
-
-        {/* Grid of videos OR empty state */}
-        {youtubeLibrary.length > 0 ? (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
-            {youtubeLibrary.map((v: any) => (
-              <button
-                key={v.id}
-                onClick={async () => {
-                  setPlayingLibVideo({ videoId: v.video_id, title: v.title });
-                  if (user?.id) api.pickLibraryVideo(v.id, user.id).catch(() => {});
-                }}
-                style={{
-                  textAlign:"left", padding:0, background:"none", border:"none", cursor:"pointer",
-                  borderRadius:12, overflow:"hidden",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
-                  transition:"transform 0.15s, box-shadow 0.15s",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px) scale(1.03)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-              >
-                <div style={{ position:"relative", overflow:"hidden" }}>
-                  <img src={v.thumbnail_url || `https://img.youtube.com/vi/${v.video_id}/mqdefault.jpg`} alt={v.title} style={{ width:"100%", aspectRatio:"16/9", objectFit:"cover", display:"block" }} />
-                </div>
-                <div style={{ padding:"8px 10px", background:"rgba(255,255,255,0.07)" }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,.85)", lineHeight:1.3, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" as any }}>{v.title}</div>
-                  {v.category && <div style={{ fontSize:9, fontWeight:600, marginTop:3, color:"#f87171", textTransform:"uppercase", letterSpacing:"0.05em" }}>{v.category}</div>}
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div style={{ textAlign:"center", padding:"24px 16px", opacity: 0.4 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📼</div>
-            <p style={{ fontSize: 12 }}>No videos yet — ask your teacher!</p>
-          </div>
-        )}
-
-        {/* Request a video */}
-        {unlocked && !isOnBreak() && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-            <YouTubeRequestForm dk={true} userId={user?.id} onSent={() => {}} />
-          </div>
-        )}
-      </div>
+        </button>
       )}
 
       {/* Learning Apps */}

@@ -77,6 +77,19 @@ export default function MonitorPanel() {
       const s = await api.getStudents(cid);
       setStudents(s);
       await buildActivity(cid, s);
+      // Load stored snapshots from REST (students POST here; WS is real-time supplement)
+      try {
+        const snaps = await api.getClassSnapshots(cid);
+        if (Array.isArray(snaps)) {
+          setScreenshots(prev => {
+            const next = { ...prev };
+            for (const snap of snaps) {
+              if (snap.userId && snap.data) next[snap.userId] = snap.data;
+            }
+            return next;
+          });
+        }
+      } catch {}
     } catch {
       setStudents([]);
       setActivity({});
@@ -375,13 +388,24 @@ export default function MonitorPanel() {
                   background: dk ? "#07071a" : "#f1f5f9",
                 }}>
                   {screenshots[s.id] ? (
-                    <img src={screenshots[s.id]} alt={`${s.name}'s screen`} className="w-full h-full object-cover" />
+                    <img
+                      src={screenshots[s.id]}
+                      alt={`${s.name}'s screen`}
+                      className="w-full h-full"
+                      style={{ objectFit: "contain", imageRendering: "auto", background: "#07071a" }}
+                    />
                   ) : projectPreviews[s.id] ? (
-                    <img src={projectPreviews[s.id]} alt={`${s.name}'s project`} className="w-full h-full object-contain p-3 opacity-90" />
+                    <img
+                      src={projectPreviews[s.id]}
+                      alt={`${s.name}'s project`}
+                      className="w-full h-full"
+                      style={{ objectFit: "contain", padding: 12, opacity: 0.9 }}
+                    />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                       <Monitor size={32} style={{ color: "var(--text-3)", opacity: 0.35 }} />
-                      <span style={{ color: "var(--text-3)", fontSize: 11, opacity: 0.5 }}>No screen data</span>
+                      <span style={{ color: "var(--text-3)", fontSize: 11, opacity: 0.5 }}>Waiting for screenshot…</span>
+                      <span style={{ color: "var(--text-3)", fontSize: 10, opacity: 0.3 }}>Updates every 6s when active</span>
                     </div>
                   )}
 

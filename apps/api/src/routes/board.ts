@@ -47,6 +47,15 @@ async function ensureBoardSchema() {
         value TEXT
       )
     `);
+    // Backfill specials_grade for known Star students by name — runs once per process
+    const gradeByName: Record<string, number> = {
+      ryan: 5, jaida: 5, rayden: 4, zoey: 3, aiden: 3, kaleb: 5, anna: 3, ameer: 4,
+    };
+    for (const [name, grade] of Object.entries(gradeByName)) {
+      try {
+        await db.prepare(`UPDATE users SET specials_grade = ? WHERE LOWER(name) = ? AND role = 'student'`).run(grade, name);
+      } catch { /* ignore */ }
+    }
   } catch (e) { console.error("ensureBoardSchema:", e); }
   schemaReady = true;
 }

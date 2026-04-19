@@ -350,12 +350,12 @@ export default function ClassroomBoard() {
                   }} />
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "4px 3px 3px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <div style={{ flex: 1, padding: "8px 5px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                     {/* Avatar */}
                     <div style={{
-                      width: 36, height: 36, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 46, height: 46, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 900, color: "white",
+                      fontSize: 16, fontWeight: 900, color: "white",
                       background: isFull
                         ? "linear-gradient(135deg, #f59e0b, #d97706)"
                         : `linear-gradient(135deg, ${lc.color}88, ${lc.color}44)`,
@@ -369,15 +369,15 @@ export default function ClassroomBoard() {
                     </div>
 
                     {/* Name */}
-                    <div style={{ fontSize: 11, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>
                       {s.name}
                     </div>
 
                     {/* Stars */}
-                    <div style={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: 2, justifyContent: "center", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "3px 6px" }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 13,
+                          fontSize: 18,
                           lineHeight: 1,
                           opacity: i < stars ? 1 : 0.13,
                           filter: i < stars ? (isFull ? "drop-shadow(0 0 4px rgba(251,191,36,0.9))" : "none") : "grayscale(1) brightness(.25)",
@@ -413,7 +413,7 @@ export default function ClassroomBoard() {
                     {/* Level badge */}
                     <div style={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
                       <div style={{
-                        fontSize: 9, width: 18, height: 18, borderRadius: "50%",
+                        fontSize: 10, width: 22, height: 22, borderRadius: "50%",
                         background: lc.bg, color: lc.color, fontWeight: 900,
                         border: `1px solid ${lc.color}55`,
                         display: "flex", alignItems: "center", justifyContent: "center",
