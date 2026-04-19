@@ -31,6 +31,7 @@ async function ensureTables() {
         url TEXT NOT NULL,
         category TEXT,
         thumbnail_url TEXT,
+        icon_emoji TEXT,
         added_by TEXT,
         added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
@@ -44,8 +45,7 @@ async function ensureTables() {
         granted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Additive columns for existing DBs — ignore "already exists" errors so
-    // the migration is idempotent across pg and sqlite.
+    // Additive migration for existing DBs that predate icon_emoji
     try { await db.exec(`ALTER TABLE approved_websites ADD COLUMN icon_emoji TEXT`); } catch {}
   } catch (e) {
     console.error("[websites] migration error:", e);
@@ -174,53 +174,59 @@ router.get("/classes/:classId/requests", requireRole("teacher", "admin"), async 
 // If requestId is provided, its status becomes 'approved' and it links to
 // the new library entry via teacher_note (kept simple: stringified refs).
 router.post("/approve", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  const { requestId, title, url, category, classId, thumbnailUrl, iconEmoji } = req.body || {};
-  const cleanTitle = String(title || "").trim();
-  const cleanUrl = String(url || "").trim();
-  if (!cleanTitle || !cleanUrl) return res.status(400).json({ error: "title and url required" });
-  // Light URL validation — require http/https scheme. Don't try to vet
-  // content here; the teacher has already reviewed it.
-  if (!/^https?:\/\//i.test(cleanUrl)) return res.status(400).json({ error: "url must start with http:// or https://" });
+  try {
+    await ensureTables();
+    const { requestId, title, url, category, classId, thumbnailUrl, iconEmoji } = req.body || {};
+    const cleanTitle = String(title || "").trim();
+    const cleanUrl = String(url || "").trim();
+    if (!cleanTitle || !cleanUrl) return res.status(400).json({ error: "title and url required" });
+    if (!/^https?:\/\//i.test(cleanUrl)) return res.status(400).json({ error: "url must start with http:// or https://" });
 
-  const id = crypto.randomUUID();
-  await db.prepare(
-    `INSERT INTO approved_websites (id, class_id, title, url, category, thumbnail_url, icon_emoji, added_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, classId || null, cleanTitle, cleanUrl, category || null, thumbnailUrl || null, iconEmoji || null, req.user!.id);
-
-  if (requestId) {
+    const id = crypto.randomUUID();
     await db.prepare(
-      `UPDATE website_requests SET status = 'approved', teacher_note = ? WHERE id = ?`
-    ).run(`website:${id}`, requestId);
-    // Auto-grant to the student who made the request
-    const req_row = await db.prepare(`SELECT student_id FROM website_requests WHERE id = ?`).get(requestId) as any;
-    if (req_row?.student_id) {
-      const grantExists = await db.prepare(
-        `SELECT id FROM student_approved_websites WHERE student_id = ? AND approved_website_id = ?`
-      ).get(req_row.student_id, id) as any;
-      if (!grantExists) {
-        const grantId = crypto.randomUUID();
-        await db.prepare(
-          `INSERT INTO student_approved_websites (id, student_id, approved_website_id, granted_by) VALUES (?, ?, ?, ?)`
-        ).run(grantId, req_row.student_id, id, req.user!.id);
+      `INSERT INTO approved_websites (id, class_id, title, url, category, thumbnail_url, icon_emoji, added_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, classId || null, cleanTitle, cleanUrl, category || null, thumbnailUrl || null, iconEmoji || null, req.user!.id);
+
+    if (requestId) {
+      await db.prepare(
+        `UPDATE website_requests SET status = 'approved', teacher_note = ? WHERE id = ?`
+      ).run(`website:${id}`, requestId);
+      const req_row = await db.prepare(`SELECT student_id FROM website_requests WHERE id = ?`).get(requestId) as any;
+      if (req_row?.student_id) {
+        const grantExists = await db.prepare(
+          `SELECT id FROM student_approved_websites WHERE student_id = ? AND approved_website_id = ?`
+        ).get(req_row.student_id, id) as any;
+        if (!grantExists) {
+          const grantId = crypto.randomUUID();
+          await db.prepare(
+            `INSERT INTO student_approved_websites (id, student_id, approved_website_id, granted_by) VALUES (?, ?, ?, ?)`
+          ).run(grantId, req_row.student_id, id, req.user!.id);
+        }
       }
     }
-  }
 
-  const row = await db.prepare("SELECT * FROM approved_websites WHERE id = ?").get(id);
-  res.json(row);
+    const row = await db.prepare("SELECT * FROM approved_websites WHERE id = ?").get(id);
+    res.json(row);
+  } catch (e: any) {
+    console.error("[websites/approve]", e);
+    res.status(500).json({ error: e?.message || "Failed to add website" });
+  }
 });
 
 // ── Teacher/admin: deny a request ──────────────────────────────────
 router.post("/deny", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  const { requestId, note } = req.body || {};
-  if (!requestId) return res.status(400).json({ error: "requestId required" });
-  await db.prepare(
-    `UPDATE website_requests SET status = 'denied', teacher_note = ? WHERE id = ?`
-  ).run(String(note || ""), requestId);
-  res.json({ ok: true });
+  try {
+    await ensureTables();
+    const { requestId, note } = req.body || {};
+    if (!requestId) return res.status(400).json({ error: "requestId required" });
+    await db.prepare(
+      `UPDATE website_requests SET status = 'denied', teacher_note = ? WHERE id = ?`
+    ).run(String(note || ""), requestId);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Failed to deny request" });
+  }
 });
 
 // ── Teacher/admin: library (list approved websites) ─────────────────
@@ -237,12 +243,14 @@ router.get("/library", requireRole("teacher", "admin"), async (req: AuthRequest,
 
 // ── Teacher/admin: delete a library entry ──────────────────────────
 router.delete("/library/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
-  await ensureTables();
-  // Cascade-delete any grants that reference this website so students don't
-  // end up with broken tiles pointing at nothing.
-  await db.prepare("DELETE FROM student_approved_websites WHERE approved_website_id = ?").run(req.params.id);
-  await db.prepare("DELETE FROM approved_websites WHERE id = ?").run(req.params.id);
-  res.json({ ok: true });
+  try {
+    await ensureTables();
+    await db.prepare("DELETE FROM student_approved_websites WHERE approved_website_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM approved_websites WHERE id = ?").run(req.params.id);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Failed to delete website" });
+  }
 });
 
 // ── Teacher/admin: grant a website to a student ────────────────────
