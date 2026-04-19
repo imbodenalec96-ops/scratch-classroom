@@ -1122,15 +1122,40 @@ async function seedStarStudents() {
     // specials_grade column — safe to re-run (fails silently if already exists)
     try { await db.exec("ALTER TABLE users ADD COLUMN specials_grade INTEGER"); } catch {}
 
-    // Get teacher for the class (fall back to any admin if seed teacher missing)
-    const teacher: any = await db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").get(STAR_TEACHER_ID)
-      ?? await db.prepare("SELECT id FROM users WHERE role IN ('teacher','admin') LIMIT 1").get();
-    const teacherId = teacher?.id ?? null;
+    // If a "Star" class already exists, use it rather than creating a duplicate seed class.
+    // This prevents a stale fake class from shadowing the real production class.
+    const existingStar: any = await db.prepare(
+      "SELECT id FROM classes WHERE name = 'Star' ORDER BY created_at ASC LIMIT 1"
+    ).get();
 
-    await db.prepare(
-      `INSERT INTO classes (id, name, teacher_id, code) VALUES (?, 'Star', ?, 'STAR01') ON CONFLICT DO NOTHING`
-    ).run(STAR_CLASS_ID, teacherId);
+    let starClassId: string;
+    if (existingStar?.id) {
+      starClassId = existingStar.id;
+      console.log("[star-seed] Using existing Star class:", starClassId);
+    } else {
+      // No Star class at all — create one.
+      const teacher: any = await db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").get(STAR_TEACHER_ID)
+        ?? await db.prepare("SELECT id FROM users WHERE role IN ('teacher','admin') LIMIT 1").get();
+      const teacherId = teacher?.id ?? null;
+      await db.prepare(
+        `INSERT INTO classes (id, name, teacher_id, code) VALUES (?, 'Star', ?, 'STAR01') ON CONFLICT DO NOTHING`
+      ).run(STAR_CLASS_ID, teacherId);
+      starClassId = STAR_CLASS_ID;
+      console.log("[star-seed] Created new Star class:", starClassId);
+    }
 
+    // Backfill specials_grade on any existing students whose names match the roster.
+    // This covers real production students created manually (not via the seed).
+    for (const s of STAR_STUDENTS_SEED) {
+      if (s.specials_grade != null) {
+        await db.prepare(
+          `UPDATE users SET specials_grade = ? WHERE LOWER(name) = LOWER(?) AND specials_grade IS NULL AND role = 'student'`
+        ).run(s.specials_grade, s.name);
+      }
+    }
+
+    // On fresh SQLite (local dev), create the placeholder seed students and link them.
+    // On Postgres (production) the real students already exist and the INSERT will no-op.
     const bcrypt = await import("bcrypt");
     const hash = await bcrypt.default.hash("star1234", 10);
 
@@ -1138,18 +1163,12 @@ async function seedStarStudents() {
       await db.prepare(
         `INSERT INTO users (id, email, password_hash, name, role, specials_grade) VALUES (?, ?, ?, ?, 'student', ?) ON CONFLICT DO NOTHING`
       ).run(s.id, s.email, hash, s.name, s.specials_grade ?? null);
-      // Backfill specials_grade if it wasn't set on a prior seed run
-      if (s.specials_grade != null) {
-        await db.prepare(
-          `UPDATE users SET specials_grade = ? WHERE id = ? AND specials_grade IS NULL`
-        ).run(s.specials_grade, s.id);
-      }
       await db.prepare(
         `INSERT INTO class_members (user_id, class_id) VALUES (?, ?) ON CONFLICT DO NOTHING`
-      ).run(s.id, STAR_CLASS_ID);
+      ).run(s.id, starClassId);
     }
     starStudentSeedRan = true;
-    console.log("[star-seed] Star class + students seeded");
+    console.log("[star-seed] Done. Star class:", starClassId);
   } catch (e) {
     console.error("[star-seed] error:", e);
   }
