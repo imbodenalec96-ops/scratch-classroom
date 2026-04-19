@@ -528,7 +528,7 @@ router.get("/:id/assignments", requireRole("teacher", "admin"), async (req: Auth
              s.id AS submission_id,
              s.submitted_at, s.grade AS numeric_grade, s.feedback,
              s.auto_grade_result,
-             s.human_grade_pass, s.human_grade_feedback,
+             s.human_grade_pass, s.human_grade_score, s.human_grade_feedback,
              s.graded_by, s.graded_at
         FROM assignments a
    LEFT JOIN submissions s
@@ -583,6 +583,7 @@ router.get("/:id/assignments", requireRole("teacher", "admin"), async (req: Auth
           r.human_grade_pass === null || r.human_grade_pass === undefined
             ? null
             : Number(r.human_grade_pass) === 1,
+        human_grade_score: r.human_grade_score ?? null,
         human_grade_feedback: r.human_grade_feedback,
         graded_by: r.graded_by,
         graded_at: r.graded_at,

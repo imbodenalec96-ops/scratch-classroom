@@ -222,6 +222,7 @@ export async function ensureHumanGradeCols() {
     "ALTER TABLE submissions ADD COLUMN human_grade_feedback TEXT",
     "ALTER TABLE submissions ADD COLUMN graded_by TEXT",
     "ALTER TABLE submissions ADD COLUMN graded_at TEXT",
+    "ALTER TABLE submissions ADD COLUMN human_grade_score INTEGER", // 0-100 numeric
   ]) {
     try { await db.exec(col); } catch { /* column already exists */ }
   }

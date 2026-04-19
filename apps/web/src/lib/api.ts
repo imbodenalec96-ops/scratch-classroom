@@ -160,10 +160,10 @@ export const api = {
     request<any>(`/classes/${classId}/daily-news`, { method: "POST", body: JSON.stringify(body) }),
   getStudentAssignments: (studentId: string, scope: "today" | "week" | "all" = "week") =>
     request<any[]>(`/students/${studentId}/assignments?scope=${scope}`),
-  humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string) =>
+  humanGradeAssignment: (assignmentId: string, studentId: string, passed: boolean, feedback?: string, score?: number) =>
     request<{ ok: boolean; submission: any }>(`/assignments/${assignmentId}/grade`, {
       method: "POST",
-      body: JSON.stringify({ studentId, passed, feedback: feedback ?? null }),
+      body: JSON.stringify({ studentId, passed, feedback: feedback ?? null, score: score ?? null }),
     }),
 
   // Quizzes
