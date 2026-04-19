@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { isAccessAllowed } from "./lib/workUnlock.ts";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
@@ -74,8 +74,9 @@ function AppLoader() {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <AppLoader />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return <>{children}</>;
 }
 
@@ -157,6 +158,7 @@ export default function App() {
             <Route path="teacher/gradebook" element={<GradebookStudentPicker />} />
             <Route path="teacher/gradebook/:studentId" element={<TeacherGradebook />} />
             <Route path="websites" element={<StudentWebsites />} />
+            <Route path="go/apps" element={<StudentWebsites />} />
             <Route path="teacher/websites" element={<TeacherWebsites />} />
             <Route path="teacher/schedule" element={<TeacherSchedule />} />
             <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
