@@ -80,6 +80,8 @@ export function useBlockLockdown(
       p === target ||
       p === "/student" ||
       p === "/" ||
+      p === "/assignments" ||
+      p.startsWith("/assignments/") ||
       p.startsWith(target + "/");
     if (belongs) return;
 
