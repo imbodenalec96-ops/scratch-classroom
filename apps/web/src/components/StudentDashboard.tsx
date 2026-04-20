@@ -713,6 +713,17 @@ function WorkScreen({
               borderRadius: 20,
               boxShadow: `0 4px 16px rgba(24,23,30,0.05)`,
             }}>
+              {/* Reading passage / context — shown above the question */}
+              {q.q.context && (
+                <div className="rounded-xl p-4" style={{
+                  background: "#f8f6ff",
+                  border: "1px solid #e0d8ff",
+                  borderLeft: `3px solid ${starfall.accent}`,
+                }}>
+                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: starfall.accent }}>Read this story</div>
+                  <p style={{ color: "#2d2a3e", fontSize: "clamp(0.95rem, 1.5vw, 1.05rem)", lineHeight: 1.7 }}>{q.q.context}</p>
+                </div>
+              )}
               {/* Question text — Fraunces serif, typewriter reveal, tap-to-listen */}
               <div className="flex items-start gap-3">
                 <p className="font-display leading-[1.3] flex-1" style={{ color: "#1A1915", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
