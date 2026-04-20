@@ -1427,9 +1427,10 @@ export default function StudentDashboard() {
   return (
     <div style={{
       minHeight: "100dvh",
-      background: "linear-gradient(135deg, #0b0520 0%, #14082e 40%, #0d1a3a 70%, #0a0520 100%)",
+      background: "#0f1628",
+      backgroundImage: "radial-gradient(circle at 15% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(circle at 95% 30%, rgba(245,158,11,0.08), transparent 55%)",
       color: "white",
-      fontFamily: "'Inter', system-ui, sans-serif",
+      fontFamily: "'Baloo 2', 'Inter', system-ui, sans-serif",
       paddingBottom: 80,
       position: "relative",
     }}>
@@ -1511,43 +1512,39 @@ export default function StudentDashboard() {
 
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px" }}>
 
-        {/* ── Header: Avatar + Name ── */}
+        {/* ── Header: big friendly greeting with avatar ── */}
         <header style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "20px 0 16px", borderBottom: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", alignItems: "center", gap: 16,
+          padding: "24px 4px 18px",
           animation: "dbPop .4s ease both",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={() => setShowAvatarPicker(true)}
-              title="Change your avatar"
-              style={{
-                width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
-                background: avatarEmoji ? "rgba(139,92,246,0.25)" : "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                border: "2.5px solid rgba(139,92,246,0.55)",
-                boxShadow: "0 0 16px rgba(139,92,246,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: avatarEmoji ? 28 : 20, fontWeight: 900, color: "white",
-                cursor: "pointer", transition: "transform 0.2s",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.1)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-            >
-              {avatarEmoji || firstName[0].toUpperCase()}
-            </button>
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 2 }}>
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.1 }}>
-                {unlocked ? `🎉 Free time, ${firstName}!` : `Hey, ${firstName}! 👋`}
-              </div>
-            </div>
-          </div>
           <button
             onClick={() => setShowAvatarPicker(true)}
-            style={{ fontSize: 11, padding: "6px 12px", borderRadius: 20, background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.35)", color: "#c4b5fd", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
-          >✏️ Avatar</button>
+            title="Change your avatar"
+            style={{
+              width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
+              background: avatarEmoji
+                ? "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(79,70,229,0.25))"
+                : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              border: "3px solid rgba(255,255,255,0.15)",
+              boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: avatarEmoji ? 40 : 28, fontWeight: 900, color: "white",
+              cursor: "pointer", transition: "transform 0.18s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.06)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+          >
+            {avatarEmoji || firstName[0].toUpperCase()}
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 4, fontWeight: 700 }}>
+              {new Date().toLocaleDateString("en-US", { weekday: "long" })}
+            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, margin: 0, letterSpacing: "-0.02em" }}>
+              {unlocked ? `Free time, ${firstName}! 🎉` : `Hi, ${firstName}!`}
+            </h1>
+          </div>
         </header>
 
         {/* ── Stats row: Points (big) + Stars (compact) — one clean line ── */}
@@ -1648,7 +1645,18 @@ export default function StudentDashboard() {
                   📅 Today's Schedule
                 </div>
                 <button
-                  onClick={() => { try { if ("caches" in window) caches.keys().then(ks => Promise.all(ks.map((k) => caches.delete(k)))).finally(() => window.location.reload()); else window.location.reload(); } catch { window.location.reload(); } }}
+                  onClick={() => {
+                    try {
+                      const w: any = window;
+                      if (w.caches && typeof w.caches.keys === "function") {
+                        w.caches.keys()
+                          .then((ks: string[]) => Promise.all(ks.map((k) => w.caches.delete(k))))
+                          .finally(() => w.location.reload());
+                      } else {
+                        w.location.reload();
+                      }
+                    } catch { window.location.reload(); }
+                  }}
                   style={{
                     fontSize: 10, padding: "4px 10px", borderRadius: 999,
                     background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
