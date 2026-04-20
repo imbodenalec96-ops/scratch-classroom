@@ -1763,7 +1763,10 @@ export default function StudentDashboard() {
             { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
             { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",   grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
             { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",  grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
-            { to: "/cashout",     icon: "🪙", label: "Store",       desc: dojoPoints != null ? `${dojoPoints} pts` : "Cashout", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
+            // Store only visible during the cashout block
+            ...((blockInfo.state === "current" && (blockInfo as any).block?.subject?.toLowerCase() === "cashout") ? [
+              { to: "/cashout", icon: "🪙", label: "Store", desc: dojoPoints != null ? `${dojoPoints} pts` : "Spend points", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
+            ] as Tile[] : []),
             // Free-time only — Websites, Videos, Arcade, Projects
             ...(unlocked ? ([
               { to: "/websites", icon: "🌐", label: "Websites", desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },

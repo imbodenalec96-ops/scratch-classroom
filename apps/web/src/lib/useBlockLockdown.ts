@@ -60,6 +60,22 @@ export function useBlockLockdown(
     const target = subjectToRoute(current);
     if (!target) return; // Unknown subject mapping → don't trap them.
 
+    // Don't lock to a content block that has no content configured — student
+    // may already be working on something else and we shouldn't interrupt them.
+    const alwaysLock = new Set(["cashout", "dismissal", "daily_news", "sel", "video_learning", "ted_talk"]);
+    const subj = (current.subject || "").toLowerCase();
+    if (!alwaysLock.has(subj)) {
+      let hasContent = false;
+      try {
+        const cs = current.content_source;
+        if (cs && cs !== "{}") {
+          const parsed = typeof cs === "string" ? JSON.parse(cs) : cs;
+          hasContent = parsed && Object.keys(parsed).length > 0;
+        }
+      } catch { hasContent = false; }
+      if (!hasContent) return;
+    }
+
     const p = location.pathname;
     // A path "belongs" to the block if it's the exact target, a sub-route
     // (e.g. /assignment/today/math/foo), or the bare dashboard/root while

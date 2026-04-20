@@ -118,6 +118,26 @@ export function useBlockAutoNav(enabled: boolean, classId: string | null | undef
     }
 
     const route = subjectToRoute(current);
-    if (route) navigate(route);
+    if (!route) return;
+
+    // For academic blocks (not breaks, cashout, dismissal, daily_news, sel),
+    // only push the student if the block actually has content configured.
+    // If content_source is null/empty/empty-object, leave them where they are —
+    // don't yank them off an assignment they're already working on.
+    const alwaysPush = new Set(["cashout", "dismissal", "daily_news", "sel", "video_learning", "ted_talk"]);
+    const subj = (current.subject || "").toLowerCase();
+    if (!alwaysPush.has(subj)) {
+      let hasContent = false;
+      try {
+        const cs = current.content_source;
+        if (cs && cs !== "{}") {
+          const parsed = typeof cs === "string" ? JSON.parse(cs) : cs;
+          hasContent = parsed && Object.keys(parsed).length > 0;
+        }
+      } catch { hasContent = false; }
+      if (!hasContent) return;
+    }
+
+    navigate(route);
   }, [enabled, current?.id, navigate]);
 }
