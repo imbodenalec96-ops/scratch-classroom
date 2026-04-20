@@ -1002,7 +1002,7 @@ function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any;
 
 /* ── Dashboard (shown after work is done) ── */
 export default function StudentDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
   const navigate = useNavigate();
@@ -1774,6 +1774,8 @@ export default function StudentDashboard() {
               { to: "/arcade",   icon: "🎮", label: "Arcade",   desc: "31 games",         grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
               { to: "/projects", icon: "💻", label: "Projects", desc: "2D · 3D · Unity",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
             ] as Tile[]) : []),
+            // Sign out button
+            { onClick: logout, icon: "🚪", label: "Sign Out", desc: "Logout", grad: "linear-gradient(135deg,#6b7280,#4b5563)", glow: "rgba(107,114,128,0.35)" },
           ];
           return (
             <div style={{ marginTop: 18, marginBottom: 18, animation: "dbSlide .45s ease both" }}>
