@@ -50,7 +50,7 @@ export interface StudentCommandHandlers {
   [commandType: string]: StudentCommandHandler;
 }
 
-const POLL_INTERVAL_MS = 3_000;
+const POLL_INTERVAL_MS = 500; // Poll every 500ms for near-instant lock/disconnect responses
 
 export function useStudentCommands(
   enabled: boolean,
