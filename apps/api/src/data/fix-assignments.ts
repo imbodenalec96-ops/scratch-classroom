@@ -58,7 +58,7 @@ function fixSpellingAssignments(classId: string, teacherId: string) {
   const spellingContent = {
     title: "Spelling Practice",
     subject: "Spelling",
-    grade: "3rd Grade",
+    grade: "2nd-3rd Grade",
     instructions: "Choose the correctly spelled word for each sentence.",
     totalPoints: 50,
     sections: [
@@ -148,8 +148,8 @@ function fixSpellingAssignments(classId: string, teacherId: string) {
     if (existing?.id) {
       // Update existing
       db.prepare(
-        "UPDATE assignments SET content = ?, updated_at = ? WHERE id = ?"
-      ).run(contentStr, now, existing.id);
+        "UPDATE assignments SET content = ?, target_grade_min = ?, target_grade_max = ?, updated_at = ? WHERE id = ?"
+      ).run(contentStr, 1, 4, now, existing.id);
       console.log(`✓ Fixed existing spelling assignment: ${existing.id}`);
     } else {
       // Create new
@@ -162,7 +162,7 @@ function fixSpellingAssignments(classId: string, teacherId: string) {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, classId, teacherId, "Spelling Practice", "Practice spelling common words",
-        contentStr, "spelling", 2, 4, today, now
+        contentStr, "spelling", 1, 4, today, now
       );
       console.log(`✓ Created new spelling assignment: ${id}`);
     }
@@ -178,7 +178,7 @@ function fixFractionAssignments(classId: string, teacherId: string) {
   const fractionContent = {
     title: "Fractions - Basic Concepts",
     subject: "Math",
-    grade: "3rd Grade",
+    grade: "1st-4th Grade",
     instructions: "Answer questions about basic fractions. Use the pictures to help.",
     totalPoints: 100,
     sections: [
@@ -266,10 +266,10 @@ function fixFractionAssignments(classId: string, teacherId: string) {
     ).get(classId) as any;
 
     if (existing?.id) {
-      // Update existing - set to lower grade (2-3 instead of 4-5)
+      // Update existing - set to wider grade range (1-4 for all students)
       db.prepare(
         "UPDATE assignments SET content = ?, target_grade_min = ?, target_grade_max = ?, updated_at = ? WHERE id = ?"
-      ).run(contentStr, 2, 3, now, existing.id);
+      ).run(contentStr, 1, 4, now, existing.id);
       console.log(`✓ Fixed existing fraction assignment: ${existing.id}`);
     } else {
       // Create new
@@ -282,7 +282,7 @@ function fixFractionAssignments(classId: string, teacherId: string) {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, classId, teacherId, "Fractions - Basic Concepts", "Learn basic fractions with examples",
-        contentStr, "math", 2, 3, today, now
+        contentStr, "math", 1, 4, today, now
       );
       console.log(`✓ Created new fraction assignment: ${id}`);
     }
@@ -299,13 +299,13 @@ function createAdditionalAssignments(classId: string, teacherId: string) {
     {
       title: "Reading Comprehension - Adventure Story",
       subject: "Reading",
-      grade: "3rd Grade",
-      targetGradeMin: 2,
-      targetGradeMax: 4,
+      grade: "1st-5th Grade",
+      targetGradeMin: 1,
+      targetGradeMax: 5,
       content: {
         title: "Adventure in the Forest",
         subject: "Reading",
-        grade: "3rd Grade",
+        grade: "1st-5th Grade",
         instructions: "Read the story and answer the questions.",
         totalPoints: 80,
         sections: [
@@ -366,13 +366,13 @@ function createAdditionalAssignments(classId: string, teacherId: string) {
     {
       title: "Grammar Practice - Verbs and Adjectives",
       subject: "Writing",
-      grade: "3rd Grade",
-      targetGradeMin: 2,
-      targetGradeMax: 4,
+      grade: "1st-5th Grade",
+      targetGradeMin: 1,
+      targetGradeMax: 5,
       content: {
         title: "Grammar Practice",
         subject: "Writing",
-        grade: "3rd Grade",
+        grade: "1st-5th Grade",
         instructions: "Answer questions about grammar and sentence structure.",
         totalPoints: 80,
         sections: [
@@ -436,13 +436,13 @@ function createAdditionalAssignments(classId: string, teacherId: string) {
     {
       title: "Science - Plants and Flowers",
       subject: "Reading",
-      grade: "3rd Grade",
-      targetGradeMin: 2,
-      targetGradeMax: 4,
+      grade: "1st-5th Grade",
+      targetGradeMin: 1,
+      targetGradeMax: 5,
       content: {
         title: "Plants and Flowers",
         subject: "Science",
-        grade: "3rd Grade",
+        grade: "1st-5th Grade",
         instructions: "Learn about how plants grow and flowers bloom.",
         totalPoints: 80,
         sections: [
