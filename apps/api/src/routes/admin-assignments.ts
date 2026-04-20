@@ -55,13 +55,31 @@ function createSELContent(): string {
   return JSON.stringify({ sections: [{ title: "SEL", q: [{ type: "sa", text: "Q1" }] }] });
 }
 
+// POST /admin/ensure-star-class
+router.post("/ensure-star-class", async (req, res) => {
+  try {
+    const check = await db.prepare("SELECT id FROM classes WHERE id = ?").get(STAR_CLASS);
+    if (check) {
+      return res.json({ exists: true });
+    }
+
+    // Create Star class without teacher reference
+    await db
+      .prepare(
+        `INSERT INTO classes (id, name, code) VALUES (?, ?, ?)`
+      )
+      .run(STAR_CLASS, "Star Class", "STAR");
+
+    res.json({ created: true });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // POST /admin/reset-star-assignments
 router.post("/reset-star-assignments", async (req, res) => {
   try {
     console.log("🔄 Starting Star class assignment reset...");
-
-    // Note: Star class should exist in the database
-    // If it doesn't, this will fail with a foreign key error - check the classes table
 
     // Delete existing assignments for Star class on this date
     await db.prepare("DELETE FROM assignments WHERE class_id = ? AND scheduled_date = ?").run(STAR_CLASS, TODAY);
