@@ -1521,136 +1521,75 @@ export default function StudentDashboard() {
           >✏️ Avatar</button>
         </header>
 
-        {/* ── Quick Nav: all pages from old sidebar ── */}
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 0 4px", scrollbarWidth: "none", animation: "dbSlide .35s ease both" }}>
-          {[
-            { label: "Assignments", icon: "📝", to: "/assignments" },
-            { label: "Lessons",     icon: "📖", to: "/lessons" },
-            { label: "Websites",    icon: "🌐", to: "/websites" },
-            { label: "Videos",      icon: "📺", to: "/student/videos" },
-            { label: "Leaderboard", icon: "🏆", to: "/leaderboard" },
-            { label: "Achievements",icon: "🎖️", to: "/achievements" },
-            ...(unlocked ? [
-              { label: "Arcade",    icon: "🎮", to: "/arcade" },
-              { label: "Projects",  icon: "💻", to: "/projects" },
-            ] : []),
-          ].map(item => (
-            <Link key={item.to} to={item.to} style={{ textDecoration: "none", flexShrink: 0 }}>
-              <div style={{
-                padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap",
-                display: "flex", alignItems: "center", gap: 6,
-                transition: "background .15s, color .15s",
+        {/* ── Stats row: Points (big) + Stars (compact) — one clean line ── */}
+        <div style={{ marginTop: 14, display: "flex", gap: 10, animation: "dbSlide .4s ease both" }}>
+          {/* Points — clickable → store. Biggest visual element. */}
+          {dojoPoints != null && (
+            <Link
+              to="/cashout"
+              style={{
+                flex: 2,
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "16px 18px", borderRadius: 18,
+                textDecoration: "none",
+                background: "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(217,119,6,0.08))",
+                border: "1px solid rgba(245,158,11,0.35)",
+                boxShadow: "0 2px 14px rgba(245,158,11,0.12)",
+                color: "white",
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.3)"; (e.currentTarget as HTMLElement).style.color = "#c4b5fd"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.75)"; }}
-              >{item.icon} {item.label}</div>
+              aria-label="Your points — tap to visit the store"
+            >
+              <span style={{ fontSize: 34 }}>🪙</span>
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontSize: 26, fontWeight: 900, color: "#fbbf24", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                  {dojoPoints}
+                </span>
+                <span style={{ fontSize: 12, opacity: 0.8, marginTop: 3, fontWeight: 700 }}>
+                  points · tap to shop →
+                </span>
+              </span>
             </Link>
-          ))}
-        </div>
-
-        {/* ── Stars & Stats ── */}
-        <div style={{ marginTop: 16, display: "flex", gap: 10, animation: "dbSlide .4s ease both" }}>
-          {/* Stars — wider card, SVG stars instead of emoji */}
+          )}
+          {/* Stars — simple, amber when they've earned rewards */}
           <div style={{
-            flex: 2, borderRadius: 14, padding: "14px 16px",
-            background: starsCount >= 4
+            flex: 1, borderRadius: 18, padding: "12px 14px",
+            background: myStars.rewards > 0
               ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
               : "rgba(255,255,255,0.05)",
-            border: starsCount >= 4
-              ? "1px solid rgba(245,158,11,0.35)"
-              : "1px solid rgba(255,255,255,0.08)",
+            border: myStars.rewards > 0 ? "1px solid rgba(245,158,11,0.3)" : "1px solid rgba(255,255,255,0.08)",
+            display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
           }}>
-            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 8 }}>Behavior Stars</div>
-            <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+            <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
               {Array.from({ length: 5 }, (_, i) => (
-                <svg key={i} width="20" height="20" viewBox="0 0 24 24"
+                <svg key={i} width="17" height="17" viewBox="0 0 24 24"
                   fill={i < starsCount ? "#fbbf24" : "none"}
                   stroke={i < starsCount ? "#f59e0b" : "rgba(255,255,255,0.18)"}
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ filter: i < starsCount && starsCount >= 5 ? "drop-shadow(0 0 4px rgba(251,191,36,0.7))" : "none", transition: "all 0.3s" }}
-                >
+                  strokeWidth="2" strokeLinejoin="round">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               ))}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: starsCount >= 4 ? "#fbbf24" : "rgba(255,255,255,0.55)" }}>
-              {starsCount}<span style={{ fontWeight: 400, opacity: 0.6 }}> / 5</span>
-              {starsCount >= 5 && <span style={{ marginLeft: 8, fontSize: 11, color: "#fcd34d" }}>Reward earned!</span>}
-            </div>
-          </div>
-
-          {/* Rank */}
-          <div style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Rank</div>
-            <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>
-              {myRank <= 3 && myRank > 0 ? ["🥇","🥈","🥉"][myRank - 1] : "🏅"}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{myRank > 0 ? `#${myRank}` : "—"}</div>
-          </div>
-
-          {/* Awards — trophies earned by filling 5 behavior stars */}
-          <div
-            style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center",
-              background: myStars.rewards > 0
-                ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
-                : "rgba(255,255,255,0.05)",
-              border: myStars.rewards > 0 ? "1px solid rgba(245,158,11,0.35)" : "1px solid rgba(255,255,255,0.08)" }}
-            title="Awards earned: fill 5 stars to earn 1 award"
-          >
-            <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Awards</div>
-            <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>🏆</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: myStars.rewards > 0 ? "#fbbf24" : undefined }}>
-              {myStars.rewards || 0}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+              {myStars.rewards > 0 ? `🏆 ${myStars.rewards} reward${myStars.rewards === 1 ? "" : "s"}` : `${starsCount} / 5 stars`}
             </div>
           </div>
         </div>
 
-        {/* ── Points chip (ClassDojo-style currency; tap for store) ── */}
-        {dojoPoints != null && (
-          <Link
-            to="/cashout"
-            style={{
-              marginTop: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 14px",
-              borderRadius: 999,
-              textDecoration: "none",
-              background: "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(217,119,6,0.08))",
-              border: "1px solid rgba(245,158,11,0.3)",
-              color: "#fbbf24",
-              boxShadow: "0 1px 10px rgba(245,158,11,0.1)",
-              animation: "dbSlide .45s ease both",
-            }}
-            aria-label="Classroom store"
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 13 }}>
-              <span style={{ fontSize: 16 }}>🪙</span>
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>{dojoPoints}</span>
-              <span style={{ fontWeight: 600, opacity: 0.85 }}>points</span>
-            </span>
-            <span style={{ fontSize: 11, opacity: 0.75, fontWeight: 700 }}>Spend at store →</span>
-          </Link>
-        )}
-
-        {/* ── Current Block Banner ── */}
+        {/* ── Right Now strip — one tidy line when a block is live ── */}
         {blockInfo.state === "current" && !(blockInfo as any).block.is_break && (
           <div style={{
-            marginTop: 12, borderRadius: 12, padding: "10px 14px",
-            background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-            display: "flex", alignItems: "center", gap: 10, animation: "dbSlide .4s ease both",
+            marginTop: 10, borderRadius: 12, padding: "8px 12px",
+            background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)",
+            display: "flex", alignItems: "center", gap: 8, fontSize: 12, animation: "dbSlide .4s ease both",
           }}>
-            <div style={{ fontSize: 16 }}>
-              {({"math":"🔢","reading":"📖","writing":"✏️","spelling":"🔤","sel":"💛","daily_news":"📰","science":"🔬","social_studies":"🌎"} as Record<string,string>)[(blockInfo as any).block.subject] || "📚"}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.85)" }}>Now: {(blockInfo as any).block.label}</div>
-              <div style={{ fontSize: 10, opacity: 0.5 }}>{(blockInfo as any).block.start_time} – {(blockInfo as any).block.end_time}</div>
-            </div>
-            <div style={{ fontSize: 10, padding: "3px 9px", borderRadius: 20, background: "rgba(139,92,246,0.3)", color: "#c4b5fd", fontWeight: 700 }}>IN SESSION</div>
+            <span style={{ fontSize: 14 }}>
+              {({"math":"🔢","reading":"📖","writing":"✏️","spelling":"🔤","sel":"💛","daily_news":"📰","science":"🔬","social_studies":"🌎","video_learning":"📺"} as Record<string,string>)[(blockInfo as any).block.subject] || "📚"}
+            </span>
+            <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>Now:</span>
+            <span style={{ flex: 1, color: "rgba(255,255,255,0.75)" }}>{(blockInfo as any).block.label}</span>
+            <span style={{ fontSize: 10, opacity: 0.55, fontFamily: "ui-monospace, Menlo, monospace" }}>
+              until {(blockInfo as any).block.end_time}
+            </span>
           </div>
         )}
 
