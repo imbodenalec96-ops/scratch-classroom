@@ -168,30 +168,9 @@ export default function Layout() {
   // workDoneDate flag.
   const effectiveAccess = accessAllowed || scheduledBreakActive || (codingArtGymBlock && workDone);
 
-  // Takeover = either (a) the current block forces content-only mode, or
-  // (b) coding/art/gym active but today's work isn't done, or
-  // (c) no block info and access isn't allowed.
-  // Scheduled breaks never trigger takeover — they grant freedom.
-  const takeover = isStudent && !scheduledBreakActive && (blockLockdown || codingArtGymLockdown || (!currentBlock && !accessAllowed));
-
-  // Redirect: when locked down, bounce any off-route navigation to the
-  // block's target route (or /student if unknown). Only students, only when
-  // the teacher hasn't recently pushed them elsewhere (5-min grace handled in
-  // useBlockAutoNav).
-  useEffect(() => {
-    if (!takeover) return;
-    const p = location.pathname;
-    // Coding/Art/Gym lockdown (work not done) redirects to assignments,
-    // not to /coding — they have to finish first.
-    const target = codingArtGymLockdown ? "/student" : (blockRoute || "/student");
-    // Allow the target route and its /student fallback while loading.
-    const allowed =
-      p === target ||
-      p === "/student" ||
-      p === "/" ||
-      p.startsWith(target + "/");
-    if (!allowed) navigate(target, { replace: true });
-  }, [takeover, blockRoute, location.pathname, navigate, codingArtGymLockdown]);
+  // Takeover/redirect DISABLED per Alec — students navigate freely. The
+  // schedule/board is display-only; it does not bounce kids between routes.
+  const takeover = false;
 
   if (!user) return null;
   const navItems = getNavItems(user.role, effectiveAccess);
