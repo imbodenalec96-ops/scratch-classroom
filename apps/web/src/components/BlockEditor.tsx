@@ -853,11 +853,13 @@ const MemoDraggableStack = React.memo(DraggableStack, (prev, next) => {
 function PaletteBlock({
   def,
   onDragStart,
+  onPointerDown,
   isFavorite,
   onToggleFavorite,
 }: {
   def: BlockDef;
   onDragStart: (e: React.DragEvent, def: BlockDef) => void;
+  onPointerDown?: (e: React.PointerEvent, def: BlockDef) => void;
   isFavorite?: boolean;
   onToggleFavorite?: (type: string) => void;
 }) {
@@ -869,6 +871,7 @@ function PaletteBlock({
       <div
         draggable
         onDragStart={(e) => onDragStart(e, def)}
+        onPointerDown={onPointerDown ? (e) => onPointerDown(e, def) : undefined}
         className="cursor-grab active:cursor-grabbing hover:brightness-110"
         style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
       >
@@ -1227,6 +1230,156 @@ export default function BlockEditor({
     setReplaceTarget(null);
   }, []);
 
+  /* ── Palette touch/pointer drag (iPad support) ── */
+  const handlePalettePointerDown = useCallback(
+    (e: React.PointerEvent, def: BlockDef) => {
+      // Only activate for touch/pen — mouse already handled by HTML5 drag API
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      setPaletteDragDef(def);
+
+      // Create a floating ghost that follows the finger
+      const ghost = document.createElement("div");
+      ghost.style.cssText =
+        "position:fixed;z-index:9999;pointer-events:none;padding:6px 14px;border-radius:8px;color:#fff;font-size:13px;font-weight:700;white-space:nowrap;opacity:0.88;transform:translate(-50%,-50%);box-shadow:0 4px 16px rgba(0,0,0,0.35);";
+      ghost.style.backgroundColor = def.color;
+      ghost.textContent = def.label.replace(/\([A-Z_]+\)/g, "___");
+      ghost.style.left = e.clientX + "px";
+      ghost.style.top = e.clientY + "px";
+      document.body.appendChild(ghost);
+
+      const handleMove = (me: PointerEvent) => {
+        if (me.pointerId !== e.pointerId) return;
+        ghost.style.left = me.clientX + "px";
+        ghost.style.top = me.clientY + "px";
+
+        // Live snap highlighting — reuse same logic as handleDragOver
+        const ws = workspaceRef.current;
+        if (!ws) return;
+        const rect = ws.getBoundingClientRect();
+        if (me.clientX < rect.left || me.clientX > rect.right || me.clientY < rect.top || me.clientY > rect.bottom) {
+          setSnapTarget(null);
+          setReplaceTarget(null);
+          return;
+        }
+        const mx = me.clientX - rect.left + ws.scrollLeft;
+        const my = me.clientY - rect.top + ws.scrollTop;
+
+        let replaceCandidate: { id: string; dist: number } | null = null;
+        for (const b of blocks) {
+          const bd = getBlockDef(b.type);
+          if (bd?.shape === "reporter" || bd?.shape === "boolean") continue;
+          const pos = getBlockAbsolutePos(b.id, blocks);
+          const bw = 180;
+          if (mx >= pos.x && mx <= pos.x + bw && my >= pos.y && my <= pos.y + BLOCK_H) {
+            const cx = pos.x + bw / 2;
+            const cy = pos.y + BLOCK_H / 2;
+            const dist = Math.sqrt((mx - cx) ** 2 + (my - cy) ** 2);
+            if (!replaceCandidate || dist < replaceCandidate.dist) replaceCandidate = { id: b.id, dist };
+          }
+        }
+        if (replaceCandidate) { setReplaceTarget(replaceCandidate.id); setSnapTarget(null); return; }
+        setReplaceTarget(null);
+
+        let best: { id: string; dist: number } | null = null;
+        for (const b of blocks) {
+          const bd = getBlockDef(b.type);
+          if (bd?.shape === "reporter" || bd?.shape === "boolean") continue;
+          if (b.parent) continue;
+          const sh = stackHeight(b.id, blocks);
+          const bx = b.x || 0;
+          const by = (b.y || 0) + sh;
+          const dist = Math.sqrt((mx - bx) ** 2 + (my - by) ** 2);
+          if (dist < SNAP_RADIUS && (!best || dist < best.dist)) best = { id: b.id, dist };
+        }
+        setSnapTarget(best?.id ?? null);
+      };
+
+      const handleUp = (me: PointerEvent) => {
+        if (me.pointerId !== e.pointerId) return;
+        ghost.remove();
+        document.removeEventListener("pointermove", handleMove);
+        document.removeEventListener("pointerup", handleUp);
+        document.removeEventListener("pointercancel", handleUp);
+
+        const ws = workspaceRef.current;
+        if (!ws) { setPaletteDragDef(null); setSnapTarget(null); setReplaceTarget(null); return; }
+
+        const rect = ws.getBoundingClientRect();
+        // Only drop if finger is over the workspace
+        if (me.clientX < rect.left || me.clientX > rect.right || me.clientY < rect.top || me.clientY > rect.bottom) {
+          setPaletteDragDef(null);
+          setSnapTarget(null);
+          setReplaceTarget(null);
+          return;
+        }
+
+        const x = me.clientX - rect.left + ws.scrollLeft;
+        const y = me.clientY - rect.top + ws.scrollTop;
+
+        // Re-read snapTarget / replaceTarget from closure snapshots captured at drop time
+        // We use functional state updates to guarantee latest values
+        setSnapTarget((currentSnap) => {
+          setReplaceTarget((currentReplace) => {
+            const newBlock: Block = {
+              id: uid(),
+              type: def.type,
+              category: def.category,
+              inputs: Object.fromEntries(
+                (def.inputs || []).map((inp) => [
+                  inp.name,
+                  { type: "value" as const, value: inp.default },
+                ])
+              ),
+              x,
+              y,
+            };
+
+            if (currentReplace) {
+              const target = blocks.find((b) => b.id === currentReplace);
+              if (target) {
+                newBlock.parent = target.parent;
+                newBlock.x = target.x;
+                newBlock.y = target.y;
+                const updated = blocks
+                  .filter((b) => b.id !== currentReplace)
+                  .map((b) => (b.parent === currentReplace ? { ...b, parent: newBlock.id } : b));
+                onChange([...updated, newBlock]);
+                setPaletteDragDef(null);
+                return null;
+              }
+            }
+
+            if (currentSnap) {
+              let tail = currentSnap;
+              while (true) {
+                const kids = getChildren(tail, blocks);
+                if (kids.length === 0) break;
+                tail = kids[kids.length - 1].id;
+              }
+              newBlock.parent = tail;
+              delete (newBlock as any).x;
+              delete (newBlock as any).y;
+            }
+
+            onChange([...blocks, newBlock]);
+            setPaletteDragDef(null);
+            return null;
+          });
+          return null;
+        });
+      };
+
+      document.addEventListener("pointermove", handleMove);
+      document.addEventListener("pointerup", handleUp);
+      document.addEventListener("pointercancel", handleUp);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blocks, onChange, workspaceRef]
+  );
+
   /* ── Block movement ── */
   const handleBlockMove = useCallback(
     (id: string, x: number, y: number) => {
@@ -1507,6 +1660,7 @@ export default function BlockEditor({
                   key={def.type}
                   def={def}
                   onDragStart={handlePaletteDragStart}
+                  onPointerDown={handlePalettePointerDown}
                   isFavorite={favoriteTypes.includes(def.type)}
                   onToggleFavorite={selectedCategory === "game" || def.category === "game" ? toggleFavorite : undefined}
                 />
