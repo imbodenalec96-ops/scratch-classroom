@@ -587,8 +587,64 @@ export default function ClassroomBoard() {
           })()}
         </section>
 
-        {/* RIGHT: Specials Today (top) + Specials Rotation (bottom) */}
-        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
+        {/* RIGHT: Point Leaders (top) + Specials Today (mid) + Specials Rotation (bottom) */}
+        <div style={{ display: "grid", gridTemplateRows: "0.7fr 1fr 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
+
+          {/* Point Leaders — top 3 by dojo_points, ClassDojo-style */}
+          <section style={{
+            ...card,
+            display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
+            padding: "10px 14px",
+          }}>
+            <SectionLabel n="02" title="Point Leaders" kicker="Top 3 this week" />
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, justifyContent: "center" }}>
+              {(() => {
+                const ranked = [...board.students]
+                  .filter(s => typeof s.dojo_points === "number")
+                  .sort((a, b) => (b.dojo_points || 0) - (a.dojo_points || 0))
+                  .slice(0, 3);
+                if (!ranked.length) {
+                  return <div style={{ fontSize: 13, color: "rgba(245,241,232,0.4)", textAlign: "center", fontStyle: "italic", fontFamily: serif }}>No points awarded yet.</div>;
+                }
+                const medals = ["🥇", "🥈", "🥉"];
+                const accents = ["#fbbf24", "#cbd5e1", "#fb923c"];
+                return ranked.map((s, i) => (
+                  <div key={s.id} style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "5px 8px", borderRadius: 3,
+                    background: i === 0 ? "rgba(217,119,6,0.1)" : "transparent",
+                    borderLeft: `3px solid ${accents[i]}`,
+                  }}>
+                    <div style={{ fontSize: 18, flexShrink: 0, width: 22 }}>{medals[i]}</div>
+                    <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                      <div style={{
+                        fontFamily: serif,
+                        fontSize: i === 0 ? 20 : 17,
+                        fontWeight: i === 0 ? 600 : 500,
+                        fontStyle: i === 0 ? "italic" : "normal",
+                        color: "#f5f1e8",
+                        lineHeight: 1.1,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {(s.name || "?").split(" ")[0]}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: i === 0 ? 22 : 18,
+                      fontWeight: 800,
+                      color: accents[i],
+                      fontVariantNumeric: "tabular-nums",
+                      display: "flex", alignItems: "center", gap: 4,
+                    }}>
+                      {s.dojo_points || 0}
+                      <span style={{ fontSize: 12, opacity: 0.75 }}>🪙</span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </section>
 
           {/* Specials Today — "On Today" editorial feature */}
           <section style={{
@@ -596,7 +652,7 @@ export default function ClassroomBoard() {
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
             padding: "10px 14px",
           }}>
-            <SectionLabel n="02" title="On Today" kicker={`Day ${dayLetter}`} />
+            <SectionLabel n="03" title="On Today" kicker={`Day ${dayLetter}`} />
             <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               {GRADES.map((grade, gi) => {
                 const students = board.students.filter(s => s.specials_grade === grade);
@@ -683,7 +739,7 @@ export default function ClassroomBoard() {
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
             padding: "10px 14px",
           }}>
-            <SectionLabel n="03" title="The Cycle" kicker="A–F rotation" />
+            <SectionLabel n="04" title="The Cycle" kicker="A–F rotation" />
             <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
               {/* Day header row */}
               <div style={{
