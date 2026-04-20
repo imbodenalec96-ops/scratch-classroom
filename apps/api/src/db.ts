@@ -33,9 +33,15 @@ if (process.env.DATABASE_URL) {
   pg.default.types.setTypeParser(3802, (val: string) => val); // jsonb
   pg.default.types.setTypeParser(114, (val: string) => val);  // json
 
+  // Serverless-safe pool settings: Vercel spins up many function instances
+  // under load, each with its own pool. Keep per-instance connections low and
+  // idle timeouts short so Neon doesn't run out of slots / memory.
   const pool = new pg.default.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+    max: process.env.VERCEL ? 1 : 10,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
   });
 
   db = {
