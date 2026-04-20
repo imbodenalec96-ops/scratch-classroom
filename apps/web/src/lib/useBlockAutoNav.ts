@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCurrentBlock, type ScheduleBlock } from "./useCurrentBlock.ts";
 import { chooseBreak, isOnBreak } from "./breakSystem.ts";
+import { isAccessAllowed } from "./workUnlock.ts";
 
 const TEACHER_NAV_KEY = "blockforge:teacher-nav-at";
 const TEACHER_NAV_GRACE_MS = 5 * 60 * 1000;
@@ -38,6 +39,43 @@ export function teacherRecentlyPushed(): boolean {
     const ts = Number(raw);
     if (!Number.isFinite(ts)) return false;
     return Date.now() - ts < TEACHER_NAV_GRACE_MS;
+  } catch { return false; }
+}
+
+/**
+ * Does this block have any teacher-set content for a student? Returns false
+ * when the `content_source` is empty / missing — in that case we DON'T want
+ * to force-navigate kids to a placeholder page. Academic blocks only; breaks
+ * and coding_art_gym follow their own rules.
+ *
+ * "Has content" = any of: assignmentId, videoUrl, newsUrl, assignmentUrl
+ * (SEL), or a per-day / per-grade / per-student override that covers this
+ * kid. Cheap shallow check — deep resolver lives in BlockPlaceholder.
+ */
+export function blockHasContent(block: ScheduleBlock, studentId?: string | null, grade?: number | null): boolean {
+  const raw = block.content_source;
+  if (!raw) return false;
+  try {
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object") return false;
+    // Root-level assignment / media on the block itself.
+    if (p.assignmentId || p.videoUrl || p.newsUrl || p.assignmentUrl) return true;
+    // Per-student override for THIS student.
+    if (studentId && p.byStudent && typeof p.byStudent === "object" && p.byStudent[studentId]) return true;
+    // Per-grade override for THIS student.
+    if (grade != null && p.byGrade && typeof p.byGrade === "object" && p.byGrade[String(grade)]) return true;
+    // Per-day override covering today.
+    if (p.byDay && typeof p.byDay === "object") {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const today = dayNames[new Date().getDay()];
+      const day = (p.byDay as any)[today];
+      if (day && typeof day === "object") {
+        if (day.assignmentId || day.videoUrl || day.newsUrl) return true;
+        if (studentId && day.byStudent && day.byStudent[studentId]) return true;
+        if (grade != null && day.byGrade && day.byGrade[String(grade)]) return true;
+      }
+    }
+    return false;
   } catch { return false; }
 }
 
@@ -65,11 +103,21 @@ export function subjectToRoute(block: ScheduleBlock): string | null {
   }
 }
 
+const ACADEMIC_SUBJECTS = new Set([
+  "math", "reading", "writing", "spelling", "sel", "daily_news",
+  "review", "extra_review", "video_learning", "ted_talk",
+]);
+
 /**
  * Mount in Layout / PublicLayout for authenticated students. Fires once per
  * block transition. `enabled` lets the caller gate on `user?.role === 'student'`.
  */
-export function useBlockAutoNav(enabled: boolean, classId: string | null | undefined): void {
+export function useBlockAutoNav(
+  enabled: boolean,
+  classId: string | null | undefined,
+  studentId?: string | null,
+  grade?: number | null,
+): void {
   const navigate = useNavigate();
   const current = useCurrentBlock(enabled ? classId : null);
   const lastBlockIdRef = useRef<string | null>(null);
@@ -100,6 +148,15 @@ export function useBlockAutoNav(enabled: boolean, classId: string | null | undef
     lastBlockIdRef.current = current.id;
     try { sessionStorage.setItem("blockforge:last-auto-nav-block", current.id); } catch {}
 
+    // Student already has free time (completed work / teacher-granted) — leave
+    // them wherever they are; don't interrupt with a block transition push.
+    if (isAccessAllowed()) return;
+
+    // Academic block with no content set → don't pull the student away from
+    // what they're doing. Only push when there's something to show them.
+    const subj = (current.subject || "").toLowerCase();
+    if (!current.is_break && ACADEMIC_SUBJECTS.has(subj) && !blockHasContent(current, studentId, grade)) return;
+
     // Break blocks → trigger the scheduled break UI (10-min timer) and land
     // them on /student where BreakChoiceModal + break banner live.
     if (current.is_break) {
@@ -118,26 +175,6 @@ export function useBlockAutoNav(enabled: boolean, classId: string | null | undef
     }
 
     const route = subjectToRoute(current);
-    if (!route) return;
-
-    // For academic blocks (not breaks, cashout, dismissal, daily_news, sel),
-    // only push the student if the block actually has content configured.
-    // If content_source is null/empty/empty-object, leave them where they are —
-    // don't yank them off an assignment they're already working on.
-    const alwaysPush = new Set(["cashout", "dismissal", "daily_news", "sel", "video_learning", "ted_talk"]);
-    const subj = (current.subject || "").toLowerCase();
-    if (!alwaysPush.has(subj)) {
-      let hasContent = false;
-      try {
-        const cs = current.content_source;
-        if (cs && cs !== "{}") {
-          const parsed = typeof cs === "string" ? JSON.parse(cs) : cs;
-          hasContent = parsed && Object.keys(parsed).length > 0;
-        }
-      } catch { hasContent = false; }
-      if (!hasContent) return;
-    }
-
-    navigate(route);
-  }, [enabled, current?.id, navigate]);
+    if (route) navigate(route);
+  }, [enabled, current?.id, navigate, studentId, grade]);
 }
