@@ -1758,16 +1758,18 @@ export default function StudentDashboard() {
         {(() => {
           type Tile = { to?: string; onClick?: () => void; icon: string; label: string; desc: string; grad: string; glow: string };
           const TILES: Tile[] = [
-            { to: "/assignments", icon: "📝", label: "Assignments", desc: "Work to do",                grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.35)" },
-            { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",             grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
-            { to: "/websites",    icon: "🌐", label: "Websites",    desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },
-            ...(classConfig.youtubeEnabled ? [{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: "linear-gradient(135deg,#ef4444,#dc2626)", glow: "rgba(239,68,68,0.35)" }] as Tile[] : []),
-            { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",                grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
-            { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",               grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
+            // Always visible — the schoolwork core
+            { to: "/assignments", icon: "📝", label: "Assignments", desc: "Work to do",   grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.35)" },
+            { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
+            { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",   grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
+            { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",  grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
             { to: "/cashout",     icon: "🪙", label: "Store",       desc: dojoPoints != null ? `${dojoPoints} pts` : "Cashout", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
+            // Free-time only — Websites, Videos, Arcade, Projects
             ...(unlocked ? ([
-              { to: "/arcade",    icon: "🎮", label: "Arcade",      desc: "31 games",                  grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
-              { to: "/projects",  icon: "💻", label: "Projects",    desc: "2D · 3D · Unity",           grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
+              { to: "/websites", icon: "🌐", label: "Websites", desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },
+              ...(classConfig.youtubeEnabled ? [{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: "linear-gradient(135deg,#ef4444,#dc2626)", glow: "rgba(239,68,68,0.35)" }] as Tile[] : []),
+              { to: "/arcade",   icon: "🎮", label: "Arcade",   desc: "31 games",         grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
+              { to: "/projects", icon: "💻", label: "Projects", desc: "2D · 3D · Unity",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
             ] as Tile[]) : []),
           ];
           return (
