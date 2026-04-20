@@ -1070,6 +1070,35 @@ export default function StudentDashboard() {
   const classConfig = useClassConfig();
   const blockInfo = useBlockInfo(classes[0]?.id ?? null);
 
+  // Student-visible schedule: today's blocks with times so Alec's kids
+  // can see "oh, math is at 9:40"
+  const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
+  useEffect(() => {
+    const cid = classes[0]?.id;
+    if (!cid) { setTodaySchedule([]); return; }
+    let cancelled = false;
+    const load = () => {
+      api.getClassSchedule(cid)
+        .then((rows: any[]) => {
+          if (cancelled) return;
+          const dowIdx = new Date().getDay(); // 0=Sun..6=Sat
+          const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const today = dayNames[dowIdx];
+          const filtered = (Array.isArray(rows) ? rows : [])
+            .filter((b: any) => {
+              const ad = String(b.active_days || "").split(",").map((s: string) => s.trim());
+              return !ad.length || !ad[0] || ad.includes(today);
+            })
+            .sort((a: any, b: any) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+          setTodaySchedule(filtered);
+        })
+        .catch(() => { if (!cancelled) setTodaySchedule([]); });
+    };
+    load();
+    const iv = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [classes]);
+
   // Reload YouTube library from ALL classes (merged) so we never miss videos
   useEffect(() => {
     if (classes.length === 0) return;
@@ -1593,10 +1622,98 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ── TODAY section label ── */}
-        <div style={{ marginTop: 22, marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
-          📅 Today
-        </div>
+        {/* ── Today's Schedule — time column so students can see WHEN things happen ── */}
+        {todaySchedule.length > 0 && (() => {
+          const nowHHMM = (() => {
+            const d = new Date();
+            return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          })();
+          const fmt = (t: string) => {
+            if (!t) return "";
+            const [h, m] = t.split(":").map(Number);
+            const ampm = h >= 12 ? "pm" : "am";
+            return `${((h % 12) || 12)}:${String(m).padStart(2, "0")} ${ampm}`;
+          };
+          const SUBJECT_EMOJI: Record<string, string> = {
+            math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛",
+            daily_news: "📰", science: "🔬", social_studies: "🌎",
+            video_learning: "📺", ted_talk: "🎤", review: "🔁", extra_review: "🔁",
+            coding_art_gym: "🎨", cashout: "🏪", dismissal: "👋",
+            recess: "🏃", lunch: "🥪", calm_down: "🌿",
+          };
+          return (
+            <div style={{ marginTop: 22, marginBottom: 10, animation: "dbSlide .4s ease both" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
+                  📅 Today's Schedule
+                </div>
+                <button
+                  onClick={() => { try { if ("caches" in window) caches.keys().then(ks => Promise.all(ks.map((k) => caches.delete(k)))).finally(() => window.location.reload()); else window.location.reload(); } catch { window.location.reload(); } }}
+                  style={{
+                    fontSize: 10, padding: "4px 10px", borderRadius: 999,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: 700,
+                  }}
+                  title="Reload the page and clear caches"
+                >↻ Refresh</button>
+              </div>
+              <div style={{
+                borderRadius: 16, padding: "6px 4px", overflow: "hidden",
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+              }}>
+                {todaySchedule.map((b: any, idx: number) => {
+                  const isLive = b.start_time && b.end_time && b.start_time <= nowHHMM && nowHHMM < b.end_time;
+                  const isPast = b.end_time && b.end_time <= nowHHMM;
+                  const subjectKey = b.is_break ? (b.break_type || "lunch") : (b.subject || "");
+                  const emoji = SUBJECT_EMOJI[subjectKey] || "📘";
+                  return (
+                    <div key={b.id || idx} style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "10px 14px", borderRadius: 12,
+                      background: isLive ? "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(124,58,237,0.05))" : "transparent",
+                      border: isLive ? "1px solid rgba(139,92,246,0.4)" : "1px solid transparent",
+                      opacity: isPast && !isLive ? 0.38 : 1,
+                      marginBottom: 2,
+                      transition: "background .2s",
+                    }}>
+                      <div style={{
+                        width: 84, flexShrink: 0, textAlign: "right",
+                        fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                        color: isLive ? "#c4b5fd" : "rgba(255,255,255,0.6)",
+                        fontFamily: "ui-monospace, Menlo, monospace",
+                      }}>
+                        {fmt(b.start_time)}
+                      </div>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 18,
+                        background: isLive ? "rgba(139,92,246,0.28)" : "rgba(255,255,255,0.05)",
+                      }}>
+                        {emoji}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {b.label || "—"}
+                        </div>
+                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>
+                          until {fmt(b.end_time)}
+                        </div>
+                      </div>
+                      {isLive && (
+                        <span style={{
+                          fontSize: 9, padding: "3px 8px", borderRadius: 999,
+                          background: "rgba(139,92,246,0.35)", color: "#c4b5fd", fontWeight: 800,
+                          letterSpacing: "0.06em", flexShrink: 0,
+                        }}>NOW</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Assignment tile */}
         <div
