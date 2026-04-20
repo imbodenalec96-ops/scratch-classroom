@@ -177,6 +177,27 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
     try { await api.broadcastStudentVideo(student.id, url); showFlash("Video broadcast sent"); setBroadcastUrl(""); setBroadcastOpen(false); } catch (e: any) { showFlash(e.message, false); }
   };
   const handleEndBroadcast = async () => { try { await api.endStudentBroadcast(student.id); showFlash("Video ended"); } catch (e: any) { showFlash(e.message, false); } };
+  const handlePullOff = async () => {
+    // Quick destination picker. Teachers can type anything (Calm Room, Office,
+    // Gen Ed…) — it's a free-text label + a duration.
+    const label = prompt("Where's " + student.name + " going? (Calm Room, Office, Gen Ed…)");
+    if (!label || !label.trim()) return;
+    const durRaw = prompt("For how many minutes?", "15");
+    const duration = Math.max(1, Math.min(120, Math.trunc(Number(durRaw) || 15)));
+    const reason = prompt("Optional reason (visible to student + audit log):") || undefined;
+    try {
+      await api.createScheduleOverride(classId, {
+        studentId: student.id,
+        destination: label.trim().toLowerCase().replace(/\s+/g, "_"),
+        destinationLabel: label.trim(),
+        durationMinutes: duration,
+        reason,
+      });
+      showFlash(`${student.name} pulled off for ${duration}m`);
+    } catch (e: any) {
+      showFlash(e?.message || "Override failed", false);
+    }
+  };
   const handleEndBreak = async () => {
     if (!confirm(`End ${student.name}'s break early?`)) return;
     try { await Promise.allSettled([api.endStudentBreak(student.id), api.endBreak(student.id)]); showFlash("Break ended"); } catch (e: any) { showFlash(e.message, false); }
@@ -493,6 +514,7 @@ export default function StudentDrawer({ open, onClose, student, classId, presenc
               </div>
 
               <CtrlBtn onClick={handleKick} icon={<Navigation size={13} />} label="Kick to Dashboard" variant="warning" fullWidth />
+              <CtrlBtn onClick={handlePullOff} icon={<span style={{ fontSize: 13 }}>🚶</span>} label="Pull off block (Calm Room / Office…)" variant="warning" fullWidth />
             </div>
           </section>
 

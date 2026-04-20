@@ -463,4 +463,38 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ delta, reason }),
     }),
+
+  // Schedule extras — skips, per-student overrides, today-only edits
+  getScheduleExtras: (classId: string, date?: string) =>
+    request<{ date: string; skips: any[]; dailyOverrides: any[]; activeOverrides: any[] }>(
+      `/classes/${classId}/schedule-extras${date ? `?date=${encodeURIComponent(date)}` : ""}`,
+    ),
+  createScheduleOverride: (classId: string, data: {
+    studentId: string; originalBlockId?: string; destination: string;
+    destinationLabel?: string; durationMinutes?: number; endsAt?: string; reason?: string;
+  }) => request<any>(`/classes/${classId}/schedule-override`, { method: "POST", body: JSON.stringify(data) }),
+  cancelScheduleOverride: (classId: string, overrideId: string) =>
+    request<{ ok: boolean }>(`/classes/${classId}/schedule-override/${overrideId}`, { method: "DELETE" }),
+  skipBlock: (classId: string, blockId: string, date?: string, reason?: string) =>
+    request<any>(`/classes/${classId}/schedule-skip`, {
+      method: "POST",
+      body: JSON.stringify({ blockId, date, reason }),
+    }),
+  unskipBlock: (classId: string, blockId: string, date?: string) =>
+    request<{ ok: boolean }>(
+      `/classes/${classId}/schedule-skip/${blockId}${date ? `?date=${encodeURIComponent(date)}` : ""}`,
+      { method: "DELETE" },
+    ),
+  createTodayOverride: (classId: string, data: {
+    originalBlockId?: string; label: string; subject?: string | null; startTime: string; endTime: string;
+    isBreak?: boolean; breakType?: string | null; contentSource?: string | null; orderIndex?: number; date?: string;
+  }) => request<any>(`/classes/${classId}/schedule/today`, { method: "POST", body: JSON.stringify(data) }),
+  updateTodayOverride: (classId: string, overrideId: string, patch: any) =>
+    request<any>(`/classes/${classId}/schedule/today/${overrideId}`, { method: "PUT", body: JSON.stringify(patch) }),
+  deleteTodayOverride: (classId: string, overrideId: string) =>
+    request<{ ok: boolean }>(`/classes/${classId}/schedule/today/${overrideId}`, { method: "DELETE" }),
+  updateScheduleBlock: (classId: string, blockId: string, patch: any) =>
+    request<any>(`/classes/${classId}/schedule/${blockId}`, { method: "PUT", body: JSON.stringify(patch) }),
+  getMyActiveOverride: (studentId: string) =>
+    request<any>(`/students/${studentId}/schedule-override/active`),
 };

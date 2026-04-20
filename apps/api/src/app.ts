@@ -22,6 +22,7 @@ import leaderboardRoutes from "./routes/leaderboard.js";
 import userRoutes from "./routes/users.js";
 import aiRoutes from "./routes/ai.js";
 import studentRoutes from "./routes/students.js";
+import { scheduleExtrasClassRoutes, scheduleExtrasStudentRoutes } from "./routes/schedule-extras.js";
 import taskRoutes from "./routes/tasks.js";
 import breakRoutes from "./routes/breaks.js";
 import worksheetRoutes from "./routes/worksheets.js";
@@ -69,6 +70,7 @@ app.use("/api/auth", authRoutes);
 
 // Protected routes
 app.use("/api/classes", authMiddleware, classRoutes);
+app.use("/api/classes", authMiddleware, scheduleExtrasClassRoutes);
 app.use("/api/projects", authMiddleware, projectRoutes);
 // Public PDF-serving route (iframes can't send auth headers). Assignment
 // IDs are UUIDs, so this endpoint is not practically enumerable.
@@ -82,6 +84,7 @@ app.use("/api/leaderboard", authMiddleware, leaderboardRoutes);
 app.use("/api/users", authMiddleware, userRoutes);
 app.use("/api/ai", authMiddleware, aiRoutes);
 app.use("/api/students", authMiddleware, studentRoutes);
+app.use("/api/students", authMiddleware, scheduleExtrasStudentRoutes);
 app.use("/api/tasks", authMiddleware, taskRoutes);
 app.use("/api/breaks", authMiddleware, breakRoutes);
 app.use("/api/worksheets", authMiddleware, worksheetRoutes);
