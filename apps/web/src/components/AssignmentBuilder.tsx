@@ -40,6 +40,8 @@ interface Question {
   options?: string[];
   points: number;
   lines?: number;
+  correctIndex?: number;  // For multiple choice: 0-based index of correct answer
+  correctAnswer?: string; // For short answer / fill blank (optional — teacher grading if missing)
 }
 interface Section { title: string; questions: Question[]; }
 interface GeneratedAssignment {
@@ -148,6 +150,34 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
   );
 }
 
+/* ── Helper: Check if answer is correct ────────────────────────── */
+function isAnswerCorrect(question: Question, answer: string): boolean {
+  if (!answer || !answer.trim()) return false;
+
+  if (question.type === "multiple_choice" && question.options) {
+    // Multiple choice: compare to correct option
+    const ci = question.correctIndex;
+    if (ci === undefined || ci === null) return false; // No answer key
+    const correctOpt = question.options[ci as number];
+    if (!correctOpt) return false;
+
+    // Normalize: strip "A. ", "B. " etc for comparison
+    const normalize = (s: string) => String(s || "").replace(/^[A-D]\.\s*/i, "").trim().toLowerCase();
+    return normalize(answer) === normalize(correctOpt);
+  }
+
+  // Short answer / fill blank: require matching correctAnswer (if provided)
+  // If no answer key, we can't validate, so treat as unanswered
+  if (question.correctAnswer) {
+    const normalize = (s: string) => String(s || "").trim().toLowerCase();
+    return normalize(answer) === normalize(question.correctAnswer);
+  }
+
+  // No correctAnswer defined — teacher will grade manually
+  // For UX, allow moving forward if they've typed something
+  return answer.trim().length > 0;
+}
+
 /* ── Student Interactive Assignment View ─────────────────────── */
 function StudentAssignmentView({ dk }: { dk: boolean }) {
   const { user } = useAuth();
@@ -161,6 +191,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [submitting, setSubmitting] = useState(false);
   const [classId, setClassId] = useState<string | null>(null);
   const [todayList, setTodayList] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<string>("");
   const currentBlock = useCurrentBlock(classId);
 
   // Flatten all questions from all sections into a single array
@@ -245,7 +276,27 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   };
 
   const handleNext = () => {
-    if (currentQ < total - 1) setCurrentQ(currentQ + 1);
+    if (currentQ < total - 1) {
+      // Check if current answer is correct before advancing
+      const q = allQuestions[currentQ]?.q;
+      const currentAnswer = answers[currentQ] ?? "";
+
+      if (!isAnswerCorrect(q, currentAnswer)) {
+        // Answer is wrong or unanswered — show feedback
+        if (!currentAnswer || !currentAnswer.trim()) {
+          setFeedback("Please answer the question before continuing.");
+        } else {
+          setFeedback("That answer is not quite right. Try again!");
+        }
+        // Clear feedback after 3 seconds
+        setTimeout(() => setFeedback(""), 3000);
+        return;
+      }
+
+      // Answer is correct — clear feedback and advance
+      setFeedback("");
+      setCurrentQ(currentQ + 1);
+    }
   };
 
   const handlePrev = () => {
@@ -515,6 +566,17 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               className="input w-full text-sm"
             />
           )}
+        </div>
+      )}
+
+      {/* Feedback message */}
+      {feedback && (
+        <div className={`p-4 rounded-xl border-2 text-sm font-semibold animate-pulse transition-all
+          ${feedback.includes("not quite right") || feedback.includes("not quite right")
+            ? dk ? "border-red-500/50 bg-red-500/10 text-red-300" : "border-red-300 bg-red-50 text-red-700"
+            : dk ? "border-amber-500/50 bg-amber-500/10 text-amber-300" : "border-amber-300 bg-amber-50 text-amber-700"
+          }`}>
+          {feedback}
         </div>
       )}
 
