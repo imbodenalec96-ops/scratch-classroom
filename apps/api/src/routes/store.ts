@@ -168,20 +168,29 @@ router.post("/redeem", async (req: AuthRequest, res: Response) => {
     // (for testing + sanity). Students can only redeem while their class's
     // current schedule block has subject='cashout'.
     if (role === "student") {
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-      const dayLetters = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-      const today = dayLetters[now.getDay()];
+      // Use client's local-time claim. Server runs in UTC on Vercel, so
+      // computing hhmm from `new Date()` would be wrong timezone. Client
+      // sends { nowHHMM, today } in the body — we validate shape + trust.
+      const nowHHMM = typeof req.body?.nowHHMM === "string" && /^\d{2}:\d{2}$/.test(req.body.nowHHMM)
+        ? req.body.nowHHMM : null;
+      const today = typeof req.body?.today === "string" && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(req.body.today)
+        ? req.body.today : null;
+      if (!nowHHMM || !today) {
+        return res.status(400).json({ error: "client time required" });
+      }
+      // NB: class_schedule.class_id is TEXT, class_members.class_id is UUID —
+      // cast so Postgres can JOIN. Without the cast, the query throws
+      // 'operator does not exist: uuid = text' and the whole endpoint errors.
       const cashoutRow: any = await db.prepare(
         `SELECT cs.subject, cs.start_time, cs.end_time, cs.active_days
            FROM class_schedule cs
-           JOIN class_members cm ON cm.class_id = cs.class_id
-          WHERE cm.user_id = ?
+           JOIN class_members cm ON cm.class_id::text = cs.class_id
+          WHERE cm.user_id = ?::uuid
             AND cs.subject = 'cashout'
             AND cs.start_time <= ?
             AND cs.end_time > ?
           LIMIT 1`
-      ).get(userId, hhmm, hhmm);
+      ).get(userId, nowHHMM, nowHHMM);
       const active = cashoutRow && (
         !cashoutRow.active_days ||
         String(cashoutRow.active_days).toLowerCase().includes(today.toLowerCase())

@@ -125,7 +125,7 @@ export default function Leaderboard() {
           Leaderboard
         </h1>
         <p style={{ fontSize: 13, color: text2, margin: 0 }}>
-          {tab === "stars" ? "Top students by stars earned" : "Top students by assignments completed"}
+          {tab === "stars" ? "Top students by class points" : "Top students by assignments completed"}
         </p>
 
         {/* Tabs */}
@@ -145,7 +145,7 @@ export default function Leaderboard() {
               color: tab === t ? (dk ? "#c4b5fd" : "#7c3aed") : text2,
               boxShadow: tab === t ? (dk ? "0 2px 12px rgba(124,58,237,0.3)" : "0 1px 6px rgba(0,0,0,0.12)") : "none",
             }}>
-              {t === "stars" ? "⭐ Stars & Points" : "✅ Assignments"}
+              {t === "stars" ? "🪙 Class Points" : "✅ Assignments"}
             </button>
           ))}
         </div>
@@ -273,12 +273,10 @@ export default function Leaderboard() {
                         lineHeight: 1,
                       }}>
                         <span>{stat.primary as number}</span>
-                        <span style={{ fontSize: isFirst ? 22 : 18 }}>⭐</span>
+                        <span style={{ fontSize: isFirst ? 22 : 18 }}>🪙</span>
                       </div>
                       <div style={{ fontSize: 10, color: text2, marginTop: 2 }}>
-                        {Math.floor((stat.primary as number) / 5) > 0
-                          ? `${Math.floor((stat.primary as number) / 5)} McDonald's set${Math.floor((stat.primary as number) / 5) !== 1 ? "s" : ""}`
-                          : ""}
+                        {(stat.primary as number) === 1 ? "point" : "points"}
                       </div>
                     </div>
                   ) : (
@@ -399,7 +397,7 @@ export default function Leaderboard() {
                         color: "#fbbf24",
                       }}>
                         <span>{stat.primary as number}</span>
-                        <span style={{ fontSize: 16 }}>⭐</span>
+                        <span style={{ fontSize: 16 }}>🪙</span>
                       </div>
                     ) : (
                       <div style={{ fontSize: 20, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: text1 }}>

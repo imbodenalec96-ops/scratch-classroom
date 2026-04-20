@@ -119,7 +119,7 @@ export default function TeacherBoardSettings() {
       {rewardFlash && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-8 py-4 rounded-2xl shadow-2xl font-bold text-lg"
           style={{ background: "linear-gradient(135deg, #f59e0b, #dc2626)", color: "white", boxShadow: "0 0 60px rgba(245,158,11,0.6)" }}>
-          {rewardFlash} earned McDonald's!
+          {rewardFlash} earned a reward! 🏆
         </div>
       )}
 
@@ -260,7 +260,7 @@ export default function TeacherBoardSettings() {
               5 stars = reward
             </span>
           </div>
-          <p className="text-[11px] mb-4" style={{ color: "var(--t3)" }}>Reaching 5 stars fires the McDonald's reward and auto-resets.</p>
+          <p className="text-[11px] mb-4" style={{ color: "var(--t3)" }}>Reaching 5 stars fires a reward (🏆) and auto-resets stars to zero.</p>
 
           <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
             {board.students.map(s => {

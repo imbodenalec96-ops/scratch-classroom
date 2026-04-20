@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   getBreakState, shouldOfferBreak, chooseBreak, chooseFullWork,
   isOnBreak, breakSecondsRemaining, setBreakState,
 } from "../lib/breakSystem.ts";
 import { clearWorkUnlock } from "../lib/workUnlock.ts";
+import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
 
 const CSS = `
 @keyframes bcmFadeIn {
@@ -57,9 +58,18 @@ export default function BreakChoiceModal() {
   const [hoverA, setHoverA] = useState(false);
   const [hoverB, setHoverB] = useState(false);
 
+  // Subscribe to free-time state. When a teacher grants free time we skip
+  // the break-choice prompt entirely — student's already in free mode.
+  const freetime = useSyncExternalStore(
+    studentFreetimeStore.subscribe,
+    studentFreetimeStore.getSnapshot,
+    studentFreetimeStore.getSnapshot,
+  );
+
   useEffect(() => {
     const tick = () => {
-      setOffered(shouldOfferBreak());
+      // Suppress break prompt when free time is active
+      setOffered(freetime.granted ? false : shouldOfferBreak());
       setOnBreak(isOnBreak());
       setSecLeft(breakSecondsRemaining());
     };
@@ -67,7 +77,7 @@ export default function BreakChoiceModal() {
     const iv = setInterval(tick, 1000);
     window.addEventListener("breakstate-change", tick);
     return () => { clearInterval(iv); window.removeEventListener("breakstate-change", tick); };
-  }, []);
+  }, [freetime.granted]);
 
   // Teacher force-end break
   useEffect(() => {

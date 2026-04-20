@@ -429,11 +429,18 @@ export const api = {
   // Balance is backed by users.dojo_points — NOT board_user_data.reward_count.
   getMyBalance: () => request<{ dojo_points: number }>(`/store/me/balance`),
   getStoreItems: () => request<Array<{ id: string; name: string; emoji: string | null; price: number; stock: number | null; enabled: number }>>(`/store/items`),
-  redeemStoreItem: (itemId: string) =>
-    request<{ ok: boolean; dojo_points: number; item: { id: string; name: string; price: number } }>(`/store/redeem`, {
+  redeemStoreItem: (itemId: string) => {
+    // Send local time so the server can gate on the cashout block —
+    // Vercel runs in UTC and the schedule stores times in the class's
+    // local timezone.
+    const d = new Date();
+    const nowHHMM = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const today = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return request<{ ok: boolean; dojo_points: number; item: { id: string; name: string; price: number } }>(`/store/redeem`, {
       method: "POST",
-      body: JSON.stringify({ itemId }),
-    }),
+      body: JSON.stringify({ itemId, nowHHMM, today }),
+    });
+  },
   getStoreTransactions: (studentId?: string) =>
     request<any[]>(`/store/transactions${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ""}`),
   getStoreClassTransactions: (classId: string) =>
