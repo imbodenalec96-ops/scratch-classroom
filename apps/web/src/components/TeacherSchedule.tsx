@@ -110,8 +110,10 @@ export interface BlockContentDay {
   assignmentId?: string;
   videoUrl?: string;
   newsUrl?: string;
-  /** Per-grade assignment overrides. Keys are grade numbers as strings: "3", "4", "5". */
+  /** Per-grade assignment overrides. Keys are grade numbers as strings. */
   byGrade?: Partial<Record<string, string>>;
+  /** Per-student assignment overrides. Keys are user ids. Beats byGrade. */
+  byStudent?: Partial<Record<string, string>>;
 }
 
 export interface BlockContent extends BlockContentDay {
@@ -132,6 +134,14 @@ function sanitizeDayContent(raw: any): BlockContentDay {
         if (typeof v === "string" && v) bg[k] = v;
       }
       if (Object.keys(bg).length) out.byGrade = bg;
+    }
+    if (raw.byStudent && typeof raw.byStudent === "object") {
+      const bs: Record<string, string> = {};
+      for (const k of Object.keys(raw.byStudent)) {
+        const v = (raw.byStudent as any)[k];
+        if (typeof v === "string" && v) bs[k] = v;
+      }
+      if (Object.keys(bs).length) out.byStudent = bs;
     }
   }
   return out;
@@ -169,16 +179,21 @@ function trimmedByGrade(raw?: Partial<Record<string, string>>): Record<string, s
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Same shape as byGrade but keyed by student id. */
+const trimmedByStudent = trimmedByGrade;
+
 export function buildBlockContent(next: BlockContent): string | null {
   const obj: Record<string, any> = {};
   const aId = trimmedOrUndef(next.assignmentId);
   const vUrl = trimmedOrUndef(next.videoUrl);
   const nUrl = trimmedOrUndef(next.newsUrl);
   const rootByGrade = trimmedByGrade(next.byGrade);
+  const rootByStudent = trimmedByStudent(next.byStudent);
   if (aId) obj.assignmentId = aId;
   if (vUrl) obj.videoUrl = vUrl;
   if (nUrl) obj.newsUrl = nUrl;
   if (rootByGrade) obj.byGrade = rootByGrade;
+  if (rootByStudent) obj.byStudent = rootByStudent;
   if (next.byDay) {
     const byDay: Record<string, BlockContentDay> = {};
     for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
@@ -188,10 +203,12 @@ export function buildBlockContent(next: BlockContent): string | null {
       const dV = trimmedOrUndef(raw.videoUrl);
       const dN = trimmedOrUndef(raw.newsUrl);
       const dByGrade = trimmedByGrade(raw.byGrade);
+      const dByStudent = trimmedByStudent(raw.byStudent);
       if (dA) day.assignmentId = dA;
       if (dV) day.videoUrl = dV;
       if (dN) day.newsUrl = dN;
       if (dByGrade) day.byGrade = dByGrade;
+      if (dByStudent) day.byStudent = dByStudent;
       if (Object.keys(day).length) byDay[d] = day;
     }
     if (Object.keys(byDay).length) obj.byDay = byDay;
@@ -248,6 +265,9 @@ export default function TeacherSchedule() {
   const [classId, setClassId] = useState<string>("");
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+  // Per-block UI expansion for the advanced "per day" editor
+  const [showAdvancedFor, setShowAdvancedFor] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -277,11 +297,14 @@ export default function TeacherSchedule() {
   // assignment dropdown below. Silent failure keeps the schedule usable even
   // if /assignments 500s.
   useEffect(() => {
-    if (!classId) { setAssignments([]); return; }
+    if (!classId) { setAssignments([]); setClassStudents([]); return; }
     let cancelled = false;
     api.getAssignments(classId)
       .then((rows: any[]) => { if (!cancelled) setAssignments(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (!cancelled) setAssignments([]); });
+    api.getStudents(classId)
+      .then((rows: any[]) => { if (!cancelled) setClassStudents(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setClassStudents([]); });
     return () => { cancelled = true; };
   }, [classId]);
 
@@ -767,50 +790,64 @@ export default function TeacherSchedule() {
                                 </label>
                               </div>
 
-                              {/* Per-grade pickers — one per grade (3rd/4th/5th).
-                                  When set, a student's grade picks their assignment
-                                  instead of the "Same for every day" default. */}
-                              <div className="mb-3 pt-2 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
-                                <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
-                                  Per grade (overrides default — use for mixed-grade classes)
+                              {/* Per-student pickers — one per student in the class.
+                                  Simpler than abstract grade levels: just pick the
+                                  specific assignment for each kid. Empty = use default. */}
+                              {classStudents.length > 0 && (
+                                <div className="mb-3 pt-2 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
+                                  <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
+                                    Per student (overrides default — leave blank to use default)
+                                  </div>
+                                  <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+                                    {classStudents.map((stu: any) => {
+                                      const byStudent = blockContent.byStudent || {};
+                                      const stuVal = byStudent[stu.id] || "";
+                                      return (
+                                        <label key={stu.id} className="flex flex-col gap-1">
+                                          <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: color.text }}>
+                                            <span style={{ fontSize: 12 }}>{stu.avatar_emoji || "👤"}</span>
+                                            {stu.name}
+                                          </span>
+                                          <select
+                                            value={stuVal}
+                                            onChange={(e) => {
+                                              const nextByStudent = { ...byStudent };
+                                              if (e.target.value) nextByStudent[stu.id] = e.target.value;
+                                              else delete nextByStudent[stu.id];
+                                              updateBlock(i, {
+                                                content_source: buildBlockContent({
+                                                  ...blockContent,
+                                                  byStudent: Object.keys(nextByStudent).length ? nextByStudent : undefined,
+                                                }),
+                                              });
+                                            }}
+                                            className="input text-[11px] py-1 px-1.5"
+                                            title={`${stu.name}'s assignment`}
+                                          >
+                                            {renderAssignmentOptions()}
+                                            {stuVal && !assignmentOptions.some((a: any) => a.id === stuVal) && (
+                                              <option value={stuVal}>(saved: {stuVal.slice(0, 6)}…)</option>
+                                            )}
+                                          </select>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-                                  {["3", "4", "5"].map((g) => {
-                                    const byGrade = blockContent.byGrade || {};
-                                    const gradeVal = byGrade[g] || "";
-                                    return (
-                                      <label key={g} className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold" style={{ color: color.text }}>
-                                          {g}{g === "3" ? "rd" : "th"} grade
-                                        </span>
-                                        <select
-                                          value={gradeVal}
-                                          onChange={(e) => {
-                                            const nextByGrade = { ...byGrade };
-                                            if (e.target.value) nextByGrade[g] = e.target.value;
-                                            else delete nextByGrade[g];
-                                            updateBlock(i, {
-                                              content_source: buildBlockContent({
-                                                ...blockContent,
-                                                byGrade: Object.keys(nextByGrade).length ? nextByGrade : undefined,
-                                              }),
-                                            });
-                                          }}
-                                          className="input text-[11px] py-1 px-1.5"
-                                          title={`Grade ${g} assignment`}
-                                        >
-                                          {renderAssignmentOptions()}
-                                          {gradeVal && !assignmentOptions.some((a: any) => a.id === gradeVal) && (
-                                            <option value={gradeVal}>(saved: {gradeVal.slice(0, 6)}…)</option>
-                                          )}
-                                        </select>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                              )}
+
+                              {/* Advanced toggle — hides per-day complexity */}
+                              <button
+                                type="button"
+                                onClick={() => setShowAdvancedFor(prev => ({ ...prev, [i]: !prev[i] }))}
+                                className="text-[10px] font-semibold underline mb-2"
+                                style={{ color: "var(--t3)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                              >
+                                {showAdvancedFor[i] ? "▾ Hide advanced options" : "▸ Show advanced options (per day)"}
+                              </button>
 
                               {/* Per-day mini-pickers — one per active day. */}
+                              {showAdvancedFor[i] && (
                               <div className="mb-1">
                                 <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
                                   Per day (overrides default)
@@ -857,6 +894,7 @@ export default function TeacherSchedule() {
                                   )}
                                 </div>
                               </div>
+                              )}
 
                               {/* Daily News URL — default + per-day. Only visible
                                   for daily_news blocks. */}

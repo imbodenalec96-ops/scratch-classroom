@@ -316,7 +316,7 @@ router.post("/points/class/:classId/adjust", requireRole("teacher", "admin"), as
       await db.prepare(
         `INSERT INTO store_transactions (id, student_id, item_id, item_name, price, kind, delta, reason, actor_id)
          VALUES (?, ?, NULL, ?, 0, 'adjust', ?, ?, ?)`
-      ).run(randomUUID(), s.id, delta >= 0 ? "Whole-class reward" : "Whole-class penalty", 0, delta, reason, req.user?.id ?? null);
+      ).run(randomUUID(), s.id, delta >= 0 ? "Whole-class reward" : "Whole-class penalty", delta, reason, req.user?.id ?? null);
       updated++;
     }
     res.json({ updated });
