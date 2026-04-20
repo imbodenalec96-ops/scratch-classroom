@@ -155,13 +155,42 @@ router.get("/transactions/class/:classId", requireRole("teacher", "admin"), asyn
 // ─────────────────────────────────────────────────────────────────────────
 
 // Atomically decrement `users.dojo_points` and log the purchase. Refuses if
-// balance would go negative or stock is exhausted.
+// balance would go negative, stock is exhausted, or the student's class isn't
+// currently in the cashout block.
 router.post("/redeem", async (req: AuthRequest, res: Response) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: "auth required" });
+  const role = req.user?.role;
   const itemId = String(req.body?.itemId || "").trim();
   if (!itemId) return res.status(400).json({ error: "itemId required" });
   try {
+    // Server-side cashout-window enforcement. Teachers/admins can always redeem
+    // (for testing + sanity). Students can only redeem while their class's
+    // current schedule block has subject='cashout'.
+    if (role === "student") {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      const dayLetters = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      const today = dayLetters[now.getDay()];
+      const cashoutRow: any = await db.prepare(
+        `SELECT cs.subject, cs.start_time, cs.end_time, cs.active_days
+           FROM class_schedule cs
+           JOIN class_members cm ON cm.class_id = cs.class_id
+          WHERE cm.user_id = ?
+            AND cs.subject = 'cashout'
+            AND cs.start_time <= ?
+            AND cs.end_time > ?
+          LIMIT 1`
+      ).get(userId, hhmm, hhmm);
+      const active = cashoutRow && (
+        !cashoutRow.active_days ||
+        String(cashoutRow.active_days).toLowerCase().includes(today.toLowerCase())
+      );
+      if (!active) {
+        return res.status(423).json({ error: "The store is closed right now. It opens during the cashout block on your schedule." });
+      }
+    }
+
     const item: any = await db.prepare(
       `SELECT id, name, price, stock, enabled FROM store_items WHERE id = ?`
     ).get(itemId);

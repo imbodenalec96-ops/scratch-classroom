@@ -85,10 +85,14 @@ export default function Leaderboard() {
 
   function getStat(entry: any) {
     if (tab === "stars") {
-      const behaviorStars = entry.behavior_stars || 0;
+      // Primary metric is ClassDojo-style dojo_points (cumulative cashout
+      // currency). Secondary shows behavior stars + rewards earned.
+      const pts = entry.dojo_points || 0;
+      const stars = entry.behavior_stars || 0;
+      const rewards = entry.reward_count || 0;
       return {
-        primary: behaviorStars,
-        secondary: `${(entry.points || 0).toLocaleString()} pts · Lv${entry.level || 1}`,
+        primary: pts,
+        secondary: `${stars}⭐ · ${rewards}🏆`,
         pct: null,
       };
     }

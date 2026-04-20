@@ -23,9 +23,14 @@ async function ensureBoardUserData() {
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {
     await ensureBoardUserData();
+    // NB: board_user_data.user_id is TEXT while users.id is UUID — cast to
+    // avoid 'operator does not exist: text = uuid'. Sort by dojo_points
+    // (ClassDojo-style cumulative points) — that's what teachers/students
+    // actually track. Tiebreak with reward_count, then behavior_stars.
     const rows = await db.prepare(
       `SELECT
-         u.id AS user_id, u.name,
+         u.id AS user_id, u.name, u.avatar_emoji,
+         COALESCE(u.dojo_points, 0) AS dojo_points,
          COALESCE(l.points, 0)   AS points,
          COALESCE(l.level, 1)    AS level,
          COALESCE(l.badges, '[]') AS badges,
@@ -33,9 +38,11 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
          COALESCE(bd.reward_count, 0)   AS reward_count
        FROM users u
        LEFT JOIN leaderboard l  ON l.user_id  = u.id
-       LEFT JOIN board_user_data bd ON bd.user_id = u.id
+       LEFT JOIN board_user_data bd ON bd.user_id = u.id::text
        WHERE u.role = 'student'
-       ORDER BY COALESCE(bd.behavior_stars, 0) DESC, COALESCE(l.points, 0) DESC
+       ORDER BY COALESCE(u.dojo_points, 0) DESC,
+                COALESCE(bd.reward_count, 0) DESC,
+                COALESCE(bd.behavior_stars, 0) DESC
        LIMIT 50`
     ).all() as any[];
     rows.forEach((r) => { r.badges = JSON.parse(r.badges || "[]"); });
