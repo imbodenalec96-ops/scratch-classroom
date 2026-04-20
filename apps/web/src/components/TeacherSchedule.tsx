@@ -110,6 +110,8 @@ export interface BlockContentDay {
   assignmentId?: string;
   videoUrl?: string;
   newsUrl?: string;
+  /** Per-grade assignment overrides. Keys are grade numbers as strings: "3", "4", "5". */
+  byGrade?: Partial<Record<string, string>>;
 }
 
 export interface BlockContent extends BlockContentDay {
@@ -123,6 +125,14 @@ function sanitizeDayContent(raw: any): BlockContentDay {
     if (typeof raw.assignmentId === "string" && raw.assignmentId) out.assignmentId = raw.assignmentId;
     if (typeof raw.videoUrl === "string" && raw.videoUrl) out.videoUrl = raw.videoUrl;
     if (typeof raw.newsUrl === "string" && raw.newsUrl) out.newsUrl = raw.newsUrl;
+    if (raw.byGrade && typeof raw.byGrade === "object") {
+      const bg: Record<string, string> = {};
+      for (const k of Object.keys(raw.byGrade)) {
+        const v = (raw.byGrade as any)[k];
+        if (typeof v === "string" && v) bg[k] = v;
+      }
+      if (Object.keys(bg).length) out.byGrade = bg;
+    }
   }
   return out;
 }
@@ -149,14 +159,26 @@ function trimmedOrUndef(s?: string): string | undefined {
   return v ? v : undefined;
 }
 
+function trimmedByGrade(raw?: Partial<Record<string, string>>): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(raw)) {
+    const v = trimmedOrUndef((raw as any)[k]);
+    if (v) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function buildBlockContent(next: BlockContent): string | null {
   const obj: Record<string, any> = {};
   const aId = trimmedOrUndef(next.assignmentId);
   const vUrl = trimmedOrUndef(next.videoUrl);
   const nUrl = trimmedOrUndef(next.newsUrl);
+  const rootByGrade = trimmedByGrade(next.byGrade);
   if (aId) obj.assignmentId = aId;
   if (vUrl) obj.videoUrl = vUrl;
   if (nUrl) obj.newsUrl = nUrl;
+  if (rootByGrade) obj.byGrade = rootByGrade;
   if (next.byDay) {
     const byDay: Record<string, BlockContentDay> = {};
     for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
@@ -165,9 +187,11 @@ export function buildBlockContent(next: BlockContent): string | null {
       const dA = trimmedOrUndef(raw.assignmentId);
       const dV = trimmedOrUndef(raw.videoUrl);
       const dN = trimmedOrUndef(raw.newsUrl);
+      const dByGrade = trimmedByGrade(raw.byGrade);
       if (dA) day.assignmentId = dA;
       if (dV) day.videoUrl = dV;
       if (dN) day.newsUrl = dN;
+      if (dByGrade) day.byGrade = dByGrade;
       if (Object.keys(day).length) byDay[d] = day;
     }
     if (Object.keys(byDay).length) obj.byDay = byDay;
@@ -741,6 +765,49 @@ export default function TeacherSchedule() {
                                     )}
                                   </select>
                                 </label>
+                              </div>
+
+                              {/* Per-grade pickers — one per grade (3rd/4th/5th).
+                                  When set, a student's grade picks their assignment
+                                  instead of the "Same for every day" default. */}
+                              <div className="mb-3 pt-2 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
+                                <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
+                                  Per grade (overrides default — use for mixed-grade classes)
+                                </div>
+                                <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+                                  {["3", "4", "5"].map((g) => {
+                                    const byGrade = blockContent.byGrade || {};
+                                    const gradeVal = byGrade[g] || "";
+                                    return (
+                                      <label key={g} className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold" style={{ color: color.text }}>
+                                          {g}{g === "3" ? "rd" : "th"} grade
+                                        </span>
+                                        <select
+                                          value={gradeVal}
+                                          onChange={(e) => {
+                                            const nextByGrade = { ...byGrade };
+                                            if (e.target.value) nextByGrade[g] = e.target.value;
+                                            else delete nextByGrade[g];
+                                            updateBlock(i, {
+                                              content_source: buildBlockContent({
+                                                ...blockContent,
+                                                byGrade: Object.keys(nextByGrade).length ? nextByGrade : undefined,
+                                              }),
+                                            });
+                                          }}
+                                          className="input text-[11px] py-1 px-1.5"
+                                          title={`Grade ${g} assignment`}
+                                        >
+                                          {renderAssignmentOptions()}
+                                          {gradeVal && !assignmentOptions.some((a: any) => a.id === gradeVal) && (
+                                            <option value={gradeVal}>(saved: {gradeVal.slice(0, 6)}…)</option>
+                                          )}
+                                        </select>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
                               </div>
 
                               {/* Per-day mini-pickers — one per active day. */}
