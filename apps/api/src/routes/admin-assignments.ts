@@ -60,17 +60,8 @@ router.post("/reset-star-assignments", async (req, res) => {
   try {
     console.log("🔄 Starting Star class assignment reset...");
 
-    // Ensure Star class exists
-    const classCheck = await db.prepare("SELECT id FROM classes WHERE id = ?").get(STAR_CLASS);
-    if (!classCheck) {
-      console.log("📝 Creating Star class...");
-      await db
-        .prepare(
-          `INSERT INTO classes (id, teacher_id, name, code, created_at)
-           VALUES (?, ?, ?, ?, ?)`
-        )
-        .run(STAR_CLASS, TEACHER, "Star Class", "STAR", new Date().toISOString());
-    }
+    // Note: Star class should exist in the database
+    // If it doesn't, this will fail with a foreign key error - check the classes table
 
     // Delete existing assignments for Star class on this date
     await db.prepare("DELETE FROM assignments WHERE class_id = ? AND scheduled_date = ?").run(STAR_CLASS, TODAY);
