@@ -286,8 +286,8 @@ router.post("/reset-star-assignments", async (req, res) => {
       await db
         .prepare(
           `INSERT INTO assignments
-           (id, class_id, teacher_id, title, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, due_date, published, created_at, content)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, class_id, teacher_id, title, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, due_date, created_at, content)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           a.id,
@@ -300,7 +300,6 @@ router.post("/reset-star-assignments", async (req, res) => {
           JSON.stringify(a.targetStudents),
           TODAY,
           `${TODAY} ${a.subject === "reading" ? "09:30:00" : a.subject === "math" ? "11:00:00" : a.subject === "writing" ? "13:30:00" : "14:30:00"}`,
-          1, // published
           new Date().toISOString(),
           a.content
         );
