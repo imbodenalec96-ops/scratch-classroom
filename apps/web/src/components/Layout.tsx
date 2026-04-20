@@ -134,11 +134,12 @@ export default function Layout() {
     return () => { cancelled = true; };
   }, [isStudent, user?.id]);
   const studentGrade = isStudent ? ((user as any)?.specialsGrade ?? null) : null;
-  useBlockAutoNav(isStudent, studentClassId, user?.id ?? null, studentGrade);
-  // Stay-put enforcement: if the student wanders off the current block's page,
-  // bounce them back. Respects the same teacher-override grace window and the
-  // freetime/break/coding_art_gym exceptions that useBlockAutoNav respects.
-  useBlockLockdown(isStudent, studentClassId, user?.id ?? null, studentGrade);
+  // Auto-push + stay-put lockdown are DISABLED per Alec — students freely
+  // navigate their own dashboard and work through today's assignments at their
+  // own pace. Hooks preserved but passed `enabled=false` so the schedule still
+  // drives the board/strip UI without forcibly moving the student.
+  useBlockAutoNav(false, studentClassId, user?.id ?? null, studentGrade);
+  useBlockLockdown(false, studentClassId, user?.id ?? null, studentGrade);
   // Pull-off-block overlay: when the teacher parks a student somewhere else
   // (Calm Room, Office, Gen Ed…) we show a full-screen banner they can't
   // dismiss until the override's ends_at passes.

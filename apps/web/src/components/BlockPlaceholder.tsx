@@ -281,12 +281,7 @@ export function AssignmentTodayPage() {
     return assignments.find((a: any) => a?.id === blockContent.assignmentId) || null;
   }, [blockContent.assignmentId, assignments]);
 
-  // If the schedule block has an assignment attached, auto-push the student
-  // straight into the doer. Don't require a click — the block *is* the signal.
-  // The doer (StudentAssignmentView) fetches the assignment by id on its own.
-  if (blockContent.assignmentId && user?.role === "student") {
-    return <Navigate to={`/assignments?id=${encodeURIComponent(blockContent.assignmentId)}`} replace />;
-  }
+  // No auto-push — students pick what to work on from their dashboard.
 
   if (selectedAssignment) {
     return (

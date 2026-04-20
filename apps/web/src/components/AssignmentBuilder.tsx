@@ -160,6 +160,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [classId, setClassId] = useState<string | null>(null);
+  const [todayList, setTodayList] = useState<any[]>([]);
   const currentBlock = useCurrentBlock(classId);
 
   // Flatten all questions from all sections into a single array
@@ -182,8 +183,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setAssignment(null); setParsed(null); setTodayList([]);
       try {
-        // 0) Explicit ?id=<uuid> wins — used by "Start assignment →" links from block pages.
+        // Explicit ?id=<uuid> wins — student picked a specific assignment.
         const explicitId = new URLSearchParams(window.location.search).get("id");
         if (explicitId) {
           try {
@@ -196,35 +198,29 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             }
           } catch {}
         }
-        // 1) Prefer the current schedule block's assignment (per-student → per-grade → per-day → root).
+        // No id → show the full list of TODAY's assignments so the student
+        // can pick any one and work through them at their own pace.
+        const cls = classes.length ? classes : await api.getClasses();
+        const today = new Date().toISOString().slice(0, 10);
         const grade = (user as any)?.specialsGrade ?? null;
-        const blockAssignmentId = resolveBlockAssignmentId(
-          currentBlock?.content_source,
-          grade,
-          user?.id ?? null,
-        );
-        if (blockAssignmentId) {
+        const all: any[] = [];
+        for (const c of cls) {
           try {
-            const a = await api.getAssignment(blockAssignmentId);
-            if (a) {
-              setAssignment(a);
-              if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
-              setLoading(false);
-              return;
+            const rows = await api.getAssignments(c.id);
+            for (const a of rows || []) {
+              if (a?.scheduled_date !== today) continue;
+              // Respect per-grade targeting when set on the assignment row.
+              const gMin = a.target_grade_min, gMax = a.target_grade_max;
+              if ((gMin != null || gMax != null) && grade != null) {
+                const n = Number(grade);
+                if (gMin != null && n < Number(gMin)) continue;
+                if (gMax != null && n > Number(gMax)) continue;
+              }
+              all.push(a);
             }
           } catch {}
         }
-        // 2) Fallback: class-wide "today's assignment" across all of the student's classes.
-        const cls = classes.length ? classes : await api.getClasses();
-        for (const c of cls) {
-          const today = await api.getTodayAssignment(c.id);
-          if (today && today.length > 0) {
-            const a = today[0];
-            setAssignment(a);
-            if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
-            break;
-          }
-        }
+        setTodayList(all);
       } catch {}
       setLoading(false);
     };
@@ -314,14 +310,77 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     );
   }
 
-  if (!assignment || !parsed || allQuestions.length === 0) {
+  if (!assignment) {
+    // No specific assignment selected — render the full list of today's work.
+    if (todayList.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+          <div className="text-6xl">🎉</div>
+          <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>No assignments today!</h2>
+          <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>
+            {classes.length === 0 ? "Join a class to receive assignments." : "Check back with your teacher — nothing scheduled for today."}
+          </p>
+        </div>
+      );
+    }
+    const SUBJECT_EMOJI: Record<string, string> = {
+      math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛", science: "🔬",
+    };
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-5">
+          <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${dk ? "text-violet-400" : "text-violet-600"}`}>
+            📅 {todayName}'s Assignments
+          </div>
+          <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>
+            Pick any one to work on
+          </h1>
+          <p className={`text-sm mt-0.5 ${dk ? "text-white/50" : "text-gray-600"}`}>
+            {todayList.length} assignment{todayList.length === 1 ? "" : "s"} for today
+          </p>
+        </div>
+        <div className="grid gap-3">
+          {todayList.map((a) => {
+            const emoji = SUBJECT_EMOJI[(a.target_subject || "").toLowerCase()] || "📘";
+            return (
+              <a
+                key={a.id}
+                href={`/assignments?id=${encodeURIComponent(a.id)}`}
+                className="card p-4 flex items-center gap-4 hover:opacity-90 transition-opacity"
+                style={{ textDecoration: "none", borderLeft: "3px solid var(--accent)" }}
+              >
+                <div className="text-3xl">{emoji}</div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-bold ${dk ? "text-white" : "text-gray-900"}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {a.title}
+                  </div>
+                  {a.description && (
+                    <div className={`text-xs mt-0.5 ${dk ? "text-white/50" : "text-gray-500"}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.description}
+                    </div>
+                  )}
+                  <div className={`text-[11px] mt-1 font-semibold uppercase tracking-wider ${dk ? "text-violet-400" : "text-violet-600"}`}>
+                    {a.target_subject || "Assignment"}
+                    {a.estimated_minutes ? ` · ~${a.estimated_minutes} min` : ""}
+                  </div>
+                </div>
+                <div className={`text-sm font-semibold ${dk ? "text-violet-400" : "text-violet-600"}`}>
+                  Open →
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (!parsed || allQuestions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
         <div className="text-6xl">🎉</div>
-        <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>No assignment today!</h2>
-        <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>
-          {classes.length === 0 ? "Join a class to receive assignments." : "Check back with your teacher — nothing scheduled for today."}
-        </p>
+        <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>All set!</h2>
+        <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>This assignment has no questions configured yet.</p>
       </div>
     );
   }
