@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ShoppingBag, Coins, Trophy, Loader2 } from "lucide-react";
+import { ShoppingBag, Coins, Trophy, Loader2, Lock } from "lucide-react";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
+import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
 
 // ClassDojo-style classroom store. Students spend `users.dojo_points`
 // (teacher-awarded) on catalog items the teacher has configured.
@@ -36,6 +37,19 @@ export function CashoutPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Look up the student's class so we can check the current schedule block.
+  // Students can only spend during the cashout block; teachers/admins bypass.
+  const [classId, setClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user || user.role !== "student") return;
+    api.getClasses()
+      .then((cs: any[]) => setClassId((cs || [])[0]?.id ?? null))
+      .catch(() => setClassId(null));
+  }, [user?.id, user?.role]);
+  const currentBlock = useCurrentBlock(classId);
+  const isStoreOpen =
+    user?.role !== "student" ||
+    (currentBlock?.subject || "").toLowerCase() === "cashout";
 
   const load = async () => {
     try {
@@ -66,6 +80,10 @@ export function CashoutPage() {
 
   const redeem = async (it: StoreItem) => {
     if (busy) return;
+    if (!isStoreOpen) {
+      showFlash("err", "Store is closed — wait for cashout time.");
+      return;
+    }
     if (balance < it.price) {
       showFlash("err", `You need ${it.price - balance} more pts for ${it.name}`);
       return;
@@ -105,6 +123,30 @@ export function CashoutPage() {
           }}
         >
           {flash.text}
+        </div>
+      )}
+
+      {/* Store-closed banner: student landed here outside the cashout block */}
+      {!isStoreOpen && (
+        <div
+          className="mb-6 p-5 rounded-2xl flex items-center gap-4"
+          style={{
+            background: "linear-gradient(135deg, rgba(244,63,94,0.14), rgba(190,18,60,0.08))",
+            border: "1px solid rgba(244,63,94,0.35)",
+          }}
+        >
+          <div
+            className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(244,63,94,0.2)", color: "#fb7185" }}
+          >
+            <Lock size={22} />
+          </div>
+          <div>
+            <div className="font-bold text-t1">The store is closed right now</div>
+            <div className="text-sm text-t3 mt-0.5">
+              You can spend your points during <b>Cashout</b> time on your schedule. Come back then!
+            </div>
+          </div>
         </div>
       )}
 
@@ -149,7 +191,7 @@ export function CashoutPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
           {items.map(it => {
-            const canAfford = balance >= it.price;
+            const canAfford = balance >= it.price && isStoreOpen;
             const outOfStock = it.stock != null && it.stock <= 0;
             const disabled = !canAfford || outOfStock || busy === it.id;
             return (

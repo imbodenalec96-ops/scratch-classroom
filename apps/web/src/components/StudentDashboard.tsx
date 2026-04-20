@@ -1590,11 +1590,20 @@ export default function StudentDashboard() {
             <div style={{ fontSize: 16, fontWeight: 800 }}>{myRank > 0 ? `#${myRank}` : "—"}</div>
           </div>
 
-          {/* Awards */}
-          <div style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {/* Awards — trophies earned by filling 5 behavior stars */}
+          <div
+            style={{ flex: 1, borderRadius: 14, padding: "14px 10px", textAlign: "center",
+              background: myStars.rewards > 0
+                ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
+                : "rgba(255,255,255,0.05)",
+              border: myStars.rewards > 0 ? "1px solid rgba(245,158,11,0.35)" : "1px solid rgba(255,255,255,0.08)" }}
+            title="Awards earned: fill 5 stars to earn 1 award"
+          >
             <div style={{ fontSize: 9, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Awards</div>
             <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 4 }}>🏆</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{myStars.rewards > 0 ? myStars.rewards : badgeCount || "—"}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: myStars.rewards > 0 ? "#fbbf24" : undefined }}>
+              {myStars.rewards || 0}
+            </div>
           </div>
         </div>
 
