@@ -70,6 +70,7 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
   try {
     const students = await db.prepare(
       `SELECT u.id, u.name, u.avatar_url, u.avatar_emoji, u.specials_grade,
+              COALESCE(u.dojo_points, 0)      AS dojo_points,
               COALESCE(bd.behavior_stars, 0) AS behavior_stars,
               COALESCE(bd.reward_count, 0)    AS reward_count,
               COALESCE(bd.level, 1)           AS level
