@@ -208,6 +208,18 @@ router.post("/reset-star-assignments", async (req, res) => {
   try {
     console.log("🔄 Starting Star class assignment reset...");
 
+    // Ensure Star class exists
+    const classCheck = await db.prepare("SELECT id FROM classes WHERE id = ?").get(STAR_CLASS);
+    if (!classCheck) {
+      console.log("📝 Creating Star class...");
+      await db
+        .prepare(
+          `INSERT INTO classes (id, teacher_id, name, description, created_at)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .run(STAR_CLASS, TEACHER, "Star Class", "Grade-targeted reading, math, and writing assignments", new Date().toISOString());
+    }
+
     // Delete existing assignments for Star class on this date
     await db.prepare("DELETE FROM assignments WHERE class_id = ? AND scheduled_date = ?").run(STAR_CLASS, TODAY);
 
