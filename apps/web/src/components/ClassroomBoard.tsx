@@ -2,6 +2,27 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
+import { getSocket } from "../lib/ws.ts";
+
+const VIDEO_SUBJECTS = new Set(["sel", "video_learning", "ted_talk", "daily_news"]);
+
+function extractYouTubeId(url: string): string | null {
+  if (!url) return null;
+  if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return url.trim();
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function getBlockVideoUrl(block: ScheduleBlock | null | undefined, dayName: string): string | null {
+  if (!block?.content_source) return null;
+  try {
+    const cs = JSON.parse(block.content_source);
+    const dayUrl = cs?.byDay?.[dayName]?.videoUrl;
+    if (dayUrl) return dayUrl;
+    if (cs?.videoUrl) return cs.videoUrl;
+  } catch {}
+  return null;
+}
 
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
@@ -86,6 +107,20 @@ export default function ClassroomBoard() {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicLoaded, setMusicLoaded] = useState(false);
   const musicRef = useRef<HTMLIFrameElement>(null);
+  const [boardVideo, setBoardVideo] = useState<{ videoId: string; title: string; url?: string } | null>(null);
+  const [boardMuted, setBoardMuted] = useState(true);
+  const boardIframeRef = useRef<HTMLIFrameElement>(null);
+  const boardVideoIdRef = useRef<string | null>(null);
+  const lastBlockRef = useRef<string | null>(null);
+
+  // Scale the board to fill any viewport while preserving the 1920×1080 design
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const update = () => setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -117,6 +152,53 @@ export default function ClassroomBoard() {
     return () => document.removeEventListener("fullscreenchange", h);
   }, []);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 15_000); return () => clearInterval(iv); }, []);
+
+  // Auto-unmute after YouTube signals ready; 3s fallback
+  useEffect(() => {
+    if (!boardVideo?.videoId || boardVideo.videoId === boardVideoIdRef.current) return;
+    boardVideoIdRef.current = boardVideo.videoId;
+    setBoardMuted(true);
+
+    let unmuted = false;
+    const doUnmute = () => {
+      if (unmuted) return;
+      unmuted = true;
+      const f = (cmd: string) => boardIframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func: cmd, args: [] }), "*"
+      );
+      f("unMute"); f("playVideo");
+      setBoardMuted(false);
+    };
+
+    const onMessage = (e: MessageEvent) => {
+      try {
+        const d = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+        if (d?.event === "onReady" || d?.event === "infoDelivery") doUnmute();
+      } catch {}
+    };
+    window.addEventListener("message", onMessage);
+    const fallback = setTimeout(doUnmute, 3000);
+    return () => { window.removeEventListener("message", onMessage); clearTimeout(fallback); };
+  }, [boardVideo?.videoId]);
+
+  // Listen for manually-broadcast videos from the teacher panel
+  useEffect(() => {
+    if (!cls?.id) return;
+    const socket = getSocket();
+    socket.emit("join:class", cls.id);
+    const onVideo = (data: any) => {
+      if (data.classId !== cls.id) return;
+      const id = extractYouTubeId(data.url || data.videoId || "");
+      if (id) setBoardVideo({ videoId: id, title: data.title || "Class Video", url: data.url });
+    };
+    const onStop = (data: any) => {
+      if (data?.classId && data.classId !== cls.id) return;
+      setBoardVideo(null);
+    };
+    socket.on("class:video", onVideo);
+    socket.on("class:video:stop", onStop);
+    return () => { socket.off("class:video", onVideo); socket.off("class:video:stop", onStop); };
+  }, [cls?.id]);
 
   // Prevent any scroll bleed from the parent page
   useEffect(() => {
@@ -157,6 +239,61 @@ export default function ClassroomBoard() {
   const currentBlock = useMemo(() => findCurrentBlock(schedule, now), [schedule, now]);
   const nextBlock    = useMemo(() => findNextBlock(schedule, now), [schedule, now]);
 
+  // Poll HTTP for active video (WS is unavailable on Vercel serverless)
+  useEffect(() => {
+    if (!cls?.id) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const row = await api.getClassVideo(cls.id);
+        if (!alive) return;
+        if (row?.video_id) {
+          const vid = row.video_id;
+          setBoardVideo(v => {
+            if (v?.videoId === vid) return v;
+            return { videoId: vid, title: row.video_title || "Class Video" };
+          });
+        } else {
+          setBoardVideo(v => { if (v) boardVideoIdRef.current = null; return v ? null : v; });
+        }
+      } catch {}
+    };
+    poll();
+    const iv = setInterval(poll, 3000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [cls?.id]);
+
+  // Auto-broadcast when a video block goes live; stop when it ends
+  useEffect(() => {
+    if (!cls?.id || !currentBlock) return;
+    const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][now.getDay()];
+    const subj = currentBlock.subject || "";
+    const isVideoBlock = VIDEO_SUBJECTS.has(subj);
+    const blockKey = (currentBlock.id || String(currentBlock.block_number)) + "_" + dayName;
+
+    if (isVideoBlock && lastBlockRef.current !== blockKey) {
+      const url = getBlockVideoUrl(currentBlock, dayName);
+      const videoId = url ? extractYouTubeId(url) : null;
+      lastBlockRef.current = blockKey;
+      if (videoId) {
+        const title = currentBlock.label || subj;
+        setBoardVideo({ videoId, title, url: url || undefined });
+        const socket = getSocket();
+        socket.emit("class:video", { classId: cls.id, videoId, url, title });
+        api.shareClassVideo(cls.id, videoId, title).catch(() => {});
+        if (url) api.broadcastClassVideo(cls.id, url).catch(() => {});
+      }
+    } else if (!isVideoBlock && lastBlockRef.current) {
+      lastBlockRef.current = null;
+      setBoardVideo(null);
+      const socket = getSocket();
+      socket.emit("class:video:stop", { classId: cls.id });
+      api.stopClassVideo(cls.id).catch(() => {});
+      api.endClassBroadcast(cls.id).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cls?.id, currentBlock?.id, currentBlock?.block_number, now.getDay()]);
+
   const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   const dayLetter = (board.settings?.current_specials_day || "A").toUpperCase();
@@ -173,6 +310,61 @@ export default function ClassroomBoard() {
 
   if (error) return <div className="min-h-screen flex items-center justify-center bg-black text-red-400 text-2xl">{error}</div>;
   if (!cls)  return <div className="min-h-screen flex items-center justify-center bg-black text-white/60 text-2xl">Loading…</div>;
+
+  // ── Full-screen video takeover ────────────────────────────────────────────
+  if (boardVideo) {
+    const origin = encodeURIComponent(window.location.origin);
+    const src = `https://www.youtube-nocookie.com/embed/${boardVideo.videoId}?autoplay=1&mute=1&enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&playsinline=1`;
+    const stopAll = () => {
+      setBoardVideo(null);
+      setBoardMuted(true);
+      boardVideoIdRef.current = null;
+      lastBlockRef.current = null;
+      const s = getSocket();
+      s.emit("class:video:stop", { classId: cls.id });
+      api.stopClassVideo(cls.id).catch(() => {});
+      api.endClassBroadcast(cls.id).catch(() => {});
+    };
+    const toggleMute = () => {
+      const cmd = boardMuted ? "unMute" : "mute";
+      boardIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      setBoardMuted(m => !m);
+    };
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 9999, display: "flex", flexDirection: "column" }}>
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, zIndex: 1, height: 48,
+          background: "rgba(0,0,0,0.9)", borderBottom: "1px solid rgba(255,255,255,0.07)",
+          padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 8px #ef4444" }} />
+            <span style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{boardVideo.title}</span>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Broadcasting to all devices</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={toggleMute} style={{
+              background: boardMuted ? "rgba(234,179,8,0.2)" : "rgba(255,255,255,0.1)",
+              border: `1px solid ${boardMuted ? "rgba(234,179,8,0.5)" : "rgba(255,255,255,0.15)"}`,
+              color: boardMuted ? "#fbbf24" : "#fff", borderRadius: 6, padding: "4px 14px", cursor: "pointer", fontSize: 12,
+            }}>{boardMuted ? "🔇 Unmute" : "🔊 Mute"}</button>
+            <button onClick={stopAll} style={{
+              background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)",
+              color: "#fff", borderRadius: 6, padding: "4px 14px", cursor: "pointer", fontSize: 12,
+            }}>✕ End</button>
+          </div>
+        </div>
+        <iframe
+          ref={boardIframeRef}
+          src={src}
+          style={{ position: "absolute", top: 48, left: 0, right: 0, bottom: 0, width: "100%", height: "calc(100% - 48px)", border: "none" }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          title={boardVideo.title}
+          allowFullScreen
+        />
+      </div>
+    );
+  }
 
   const bgUrl = board.settings?.background_image_url;
   // Editorial deep-night background — ink navy with a whisper of warmth,
@@ -194,11 +386,11 @@ export default function ClassroomBoard() {
       flexDirection: align === "right" ? "row-reverse" : "row",
     }}>
       <span style={{
-        fontFamily: serif, fontSize: 11, fontWeight: 600, fontStyle: "italic",
+        fontFamily: serif, fontSize: 12, fontWeight: 600, fontStyle: "italic",
         color: "rgba(217,119,6,0.9)", letterSpacing: "0.02em",
       }}>№ {n}</span>
       <span style={{
-        fontFamily: serif, fontSize: 14, fontWeight: 600, letterSpacing: "0.18em",
+        fontFamily: serif, fontSize: 16, fontWeight: 600, letterSpacing: "0.18em",
         textTransform: "uppercase", color: "rgba(255,255,255,0.88)",
       }}>{title}</span>
       {kicker && (
@@ -219,11 +411,20 @@ export default function ClassroomBoard() {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 999,
+      overflow: "hidden",
+      background: bgUrl ? `url(${bgUrl}) center/cover no-repeat` : bg,
+    }}>
+    <div style={{
+      position: "absolute",
+      top: "50%", left: "50%",
+      width: 1920, height: 1080,
+      transform: `translate(-50%, -50%) scale(${scale})`,
+      transformOrigin: "center center",
       overflow: "hidden", display: "grid",
-      gridTemplateRows: "62px 82px 1fr 50px",
-      gap: 6, padding: "10px 14px 10px 14px",
-      background: bgUrl ? `url(${bgUrl}) center/cover no-repeat fixed` : bg,
+      gridTemplateRows: "72px 96px 1fr 56px",
+      gap: 8, padding: "12px 16px 12px 16px",
       color: "white", fontFamily: "'Inter', system-ui, sans-serif",
+      background: bgUrl ? `url(${bgUrl}) center/cover no-repeat` : bg,
     }}>
       <style>{ANIM}</style>
 
@@ -261,12 +462,12 @@ export default function ClassroomBoard() {
         {/* Left: class identity */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <h1 style={{
-            fontFamily: serif, fontSize: 38, fontWeight: 500, fontStyle: "italic",
+            fontFamily: serif, fontSize: 44, fontWeight: 500, fontStyle: "italic",
             letterSpacing: "-0.015em", margin: 0, color: "#f5f1e8",
             lineHeight: 1,
           }}>{cls.name}</h1>
           <span style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 13,
+            fontFamily: serif, fontStyle: "italic", fontSize: 15,
             color: "rgba(245,241,232,0.45)", letterSpacing: "0.01em",
           }}>— {dateStr}</span>
         </div>
@@ -278,11 +479,11 @@ export default function ClassroomBoard() {
           borderLeft: `1px solid ${g(0.1)}`, borderRight: `1px solid ${g(0.1)}`,
         }}>
           <span style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 9, fontWeight: 500,
+            fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
             color: "rgba(217,119,6,0.85)", letterSpacing: "0.28em", textTransform: "uppercase",
           }}>Cycle Day</span>
           <span style={{
-            fontFamily: serif, fontSize: 32, fontWeight: 600, lineHeight: 1,
+            fontFamily: serif, fontSize: 38, fontWeight: 600, lineHeight: 1,
             color: "#fbbf24", letterSpacing: "-0.02em",
           }}>{dayLetter}</span>
         </div>
@@ -304,7 +505,7 @@ export default function ClassroomBoard() {
             </button>
           )}
           <div style={{
-            fontFamily: mono, fontSize: 30, fontWeight: 500,
+            fontFamily: mono, fontSize: 36, fontWeight: 500,
             fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
             color: "#f5f1e8",
           }}>{timeStr}</div>
@@ -334,11 +535,11 @@ export default function ClassroomBoard() {
           {currentBlock ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
               <span style={{
-                fontFamily: serif, fontSize: 30, fontWeight: 600,
+                fontFamily: serif, fontSize: 36, fontWeight: 600,
                 letterSpacing: "-0.02em", color: "#f5f1e8", lineHeight: 1,
               }}>{currentBlock.label || currentBlock.subject}</span>
               <span style={{
-                fontFamily: mono, fontSize: 13, color: "rgba(245,241,232,0.55)",
+                fontFamily: mono, fontSize: 15, color: "rgba(245,241,232,0.55)",
                 fontVariantNumeric: "tabular-nums",
               }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
               {currentBlock.is_break && (
@@ -377,7 +578,7 @@ export default function ClassroomBoard() {
               textTransform: "uppercase", letterSpacing: "0.22em",
             }}>ends in</div>
             <div style={{
-              fontFamily: mono, fontSize: 26, fontWeight: 500,
+              fontFamily: mono, fontSize: 30, fontWeight: 500,
               color: countdown.urgent ? "#fca5a5" : "#f5f1e8",
               fontVariantNumeric: "tabular-nums",
             }}>{countdown.str}</div>
@@ -395,7 +596,7 @@ export default function ClassroomBoard() {
               fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
               color: "rgba(217,119,6,0.9)",
               textTransform: "uppercase", letterSpacing: "0.22em",
-            }}>11 o'clock specialist</div>
+            }}>11 O'Clock Specialist</div>
             <div style={{
               fontFamily: serif, fontSize: 16, fontWeight: 600,
               color: "#fbbf24", letterSpacing: "-0.01em",
@@ -405,14 +606,14 @@ export default function ClassroomBoard() {
       </section>
 
       {/* ── ROW 3: Main content ── */}
-      <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "55% 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
+      <div style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "62% 1fr", gap: 10, overflow: "hidden", minHeight: 0 }}>
 
         {/* LEFT: Behavior Stars — "The Roster" */}
         <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 14px" }}>
           <SectionLabel n="01" title="The Roster" kicker="Five stars earns a reward" />
           {(() => {
             const n = board.students.length || 1;
-            const cols = n <= 4 ? 2 : n <= 9 ? 3 : n <= 16 ? 4 : 5;
+            const cols = n <= 4 ? 2 : n <= 8 ? 4 : n <= 12 ? 4 : n <= 16 ? 4 : 5;
             const rows = Math.ceil(n / cols);
             return (
           <div style={{
@@ -462,12 +663,12 @@ export default function ClassroomBoard() {
                   }}>lv.{lv}</div>
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "10px 8px 10px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                  <div style={{ flex: 1, padding: "12px 8px 10px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, justifyContent: "center" }}>
                     {/* Avatar — flat disc, no inner glow soup */}
                     <div style={{
-                      width: 66, height: 66, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      width: 74, height: 74, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontFamily: serif, fontSize: s.avatar_emoji ? 34 : 28, fontWeight: 600, color: "#0d1321",
+                      fontFamily: serif, fontSize: s.avatar_emoji ? 38 : 32, fontWeight: 600, color: "#0d1321",
                       background: isFull
                         ? "radial-gradient(circle at 35% 30%, #fde68a 0%, #d97706 85%)"
                         : `radial-gradient(circle at 35% 30%, ${lc.color} 0%, ${lc.color}aa 85%)`,
@@ -485,7 +686,7 @@ export default function ClassroomBoard() {
 
                     {/* Name — serif, italic when full (they're the featured story) */}
                     <div style={{
-                      fontFamily: serif, fontSize: 17,
+                      fontFamily: serif, fontSize: 20,
                       fontWeight: isFull ? 600 : 500,
                       fontStyle: isFull ? "italic" : "normal",
                       lineHeight: 1.05, letterSpacing: "-0.01em",
@@ -502,7 +703,7 @@ export default function ClassroomBoard() {
                     }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 20, lineHeight: 1,
+                          fontSize: 22, lineHeight: 1,
                           opacity: i < stars ? 1 : 0.18,
                           filter: i < stars
                             ? (isFull
@@ -524,7 +725,7 @@ export default function ClassroomBoard() {
                         padding: "3px 10px", borderRadius: 999,
                         background: "linear-gradient(135deg, rgba(217,119,6,0.22), rgba(251,191,36,0.12))",
                         border: "1px solid rgba(251,191,36,0.45)",
-                        fontSize: 13, fontWeight: 700,
+                        fontSize: 14, fontWeight: 700,
                         color: "#fde68a",
                         letterSpacing: "0.01em",
                         boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
@@ -535,11 +736,7 @@ export default function ClassroomBoard() {
                       </div>
                     )}
 
-                    {/* Schedule pills with times so the teacher knows exactly when
-                        each student leaves for Resource / Gen Ed / Specials.
-                        Format: "9:10a  🎯 Resource". Compact monospace for the
-                        time, activity label on the right, tile takes full card
-                        width. Shows up to 3 upcoming entries. */}
+                    {/* Next schedule entry — most imminent upcoming activity */}
                     {(() => {
                       const formatTimeShort = (t: string) => {
                         if (!t) return "";
@@ -550,45 +747,40 @@ export default function ClassroomBoard() {
                         const h12 = ((h % 12) || 12);
                         return `${h12}:${(m || "00").padStart(2, "0")}${ampm}`;
                       };
-                      const studentSchedules = board.schedules
+                      const nowHHMM = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+                      const all = board.schedules
                         .filter((sc: any) => sc.student_id === s.id)
-                        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time))
-                        .slice(0, 3);
-                      return studentSchedules.length > 0 ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", width: "100%", padding: "0 4px", marginTop: 2 }}>
-                          {studentSchedules.map((sc: any, i: number) => {
-                            const act = String(sc.activity || "").trim();
-                            return (
-                              <div key={i} style={{
-                                display: "flex", alignItems: "center", gap: 6,
-                                fontSize: 11, padding: "3px 7px", borderRadius: 3,
-                                background: "rgba(42,111,106,0.2)",
-                                border: "1px solid rgba(42,111,106,0.35)",
-                                borderLeft: "2px solid #2a6f6a",
-                                fontFamily: "'Inter', sans-serif",
-                                textAlign: "left",
-                              }}>
-                                <span style={{
-                                  fontFamily: "ui-monospace, Menlo, monospace",
-                                  fontSize: 10, fontWeight: 700,
-                                  color: "#94e0d4",
-                                  flexShrink: 0,
-                                  fontVariantNumeric: "tabular-nums",
-                                }}>
-                                  {formatTimeShort(sc.start_time)}
-                                </span>
-                                <span style={{ opacity: 0.7, fontSize: 11, flexShrink: 0 }}>{actEmoji(act)}</span>
-                                <span style={{
-                                  color: "#c9ece3", fontWeight: 600, flex: 1, minWidth: 0,
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                }}>
-                                  {act}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
+                      const sc = all.find((sc: any) => sc.start_time >= nowHHMM) || all[all.length - 1];
+                      if (!sc) return null;
+                      const act = String(sc.activity || "").trim();
+                      return (
+                        <div style={{ padding: "0 4px", marginTop: 2 }}>
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: 10, padding: "2px 5px", borderRadius: 3,
+                            background: "rgba(42,111,106,0.2)",
+                            border: "1px solid rgba(42,111,106,0.35)",
+                            borderLeft: "2px solid #2a6f6a",
+                          }}>
+                            <span style={{
+                              fontFamily: "ui-monospace, Menlo, monospace",
+                              fontSize: 9, fontWeight: 700,
+                              color: "#94e0d4", flexShrink: 0,
+                              fontVariantNumeric: "tabular-nums",
+                            }}>
+                              {formatTimeShort(sc.start_time)}
+                            </span>
+                            <span style={{ opacity: 0.7, fontSize: 10, flexShrink: 0 }}>{actEmoji(act)}</span>
+                            <span style={{
+                              color: "#c9ece3", fontWeight: 600, flex: 1, minWidth: 0,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10,
+                            }}>
+                              {act}
+                            </span>
+                          </div>
                         </div>
-                      ) : null;
+                      );
                     })()}
 
                     {/* Reward tally — restrained, serif italic */}
@@ -619,60 +811,63 @@ export default function ClassroomBoard() {
         </section>
 
         {/* RIGHT: Point Leaders (top) + Specials Today (mid) + Specials Rotation (bottom) */}
-        <div style={{ display: "grid", gridTemplateRows: "0.7fr 1fr 1fr", gap: 8, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr 1.1fr", gap: 10, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Point Leaders — top 3 by dojo_points, ClassDojo-style */}
+          {/* Point Leaders — top 3 by dojo_points, always 3 slots */}
           <section style={{
             ...card,
             display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0,
             padding: "10px 14px",
           }}>
             <SectionLabel n="02" title="Point Leaders" kicker="Top 3 this week" />
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, justifyContent: "center" }}>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 5, justifyContent: "center" }}>
               {(() => {
-                const ranked = [...board.students]
-                  .filter(s => typeof s.dojo_points === "number")
-                  .sort((a, b) => (b.dojo_points || 0) - (a.dojo_points || 0))
-                  .slice(0, 3);
-                if (!ranked.length) {
-                  return <div style={{ fontSize: 13, color: "rgba(245,241,232,0.4)", textAlign: "center", fontStyle: "italic", fontFamily: serif }}>No points awarded yet.</div>;
-                }
+                const withPts = [...board.students]
+                  .filter(s => s.dojo_points != null && s.dojo_points > 0)
+                  .sort((a, b) => (b.dojo_points || 0) - (a.dojo_points || 0));
                 const medals = ["🥇", "🥈", "🥉"];
                 const accents = ["#fbbf24", "#cbd5e1", "#fb923c"];
-                return ranked.map((s, i) => (
-                  <div key={s.id} style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "5px 8px", borderRadius: 3,
-                    background: i === 0 ? "rgba(217,119,6,0.1)" : "transparent",
-                    borderLeft: `3px solid ${accents[i]}`,
-                  }}>
-                    <div style={{ fontSize: 18, flexShrink: 0, width: 22 }}>{medals[i]}</div>
-                    <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                      <div style={{
-                        fontFamily: serif,
-                        fontSize: i === 0 ? 20 : 17,
-                        fontWeight: i === 0 ? 600 : 500,
-                        fontStyle: i === 0 ? "italic" : "normal",
-                        color: "#f5f1e8",
-                        lineHeight: 1.1,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        {(s.name || "?").split(" ")[0]}
-                      </div>
-                    </div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif",
-                      fontSize: i === 0 ? 22 : 18,
-                      fontWeight: 800,
-                      color: accents[i],
-                      fontVariantNumeric: "tabular-nums",
-                      display: "flex", alignItems: "center", gap: 4,
+                return [0, 1, 2].map(i => {
+                  const s = withPts[i];
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 12px", borderRadius: 4,
+                      background: i === 0 ? "rgba(217,119,6,0.12)" : "rgba(255,255,255,0.025)",
+                      borderLeft: `3px solid ${s ? accents[i] : "rgba(255,255,255,0.08)"}`,
+                      flex: 1, minHeight: 0,
                     }}>
-                      {s.dojo_points || 0}
-                      <span style={{ fontSize: 12, opacity: 0.75 }}>🪙</span>
+                      <div style={{ fontSize: 24, flexShrink: 0, width: 30, opacity: s ? 1 : 0.25 }}>{medals[i]}</div>
+                      <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                        <div style={{
+                          fontFamily: serif,
+                          fontSize: i === 0 ? 28 : 22,
+                          fontWeight: i === 0 ? 700 : 500,
+                          fontStyle: i === 0 ? "italic" : "normal",
+                          color: s ? "#f5f1e8" : "rgba(245,241,232,0.2)",
+                          lineHeight: 1.05,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {s ? (s.name || "?").split(" ")[0] : "—"}
+                        </div>
+                      </div>
+                      {s && (
+                        <div style={{
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: i === 0 ? 30 : 24,
+                          fontWeight: 800,
+                          color: accents[i],
+                          fontVariantNumeric: "tabular-nums",
+                          display: "flex", alignItems: "center", gap: 4,
+                          flexShrink: 0,
+                        }}>
+                          {s.dojo_points}
+                          <span style={{ fontSize: 16, opacity: 0.8 }}>🪙</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           </section>
@@ -686,56 +881,50 @@ export default function ClassroomBoard() {
             <SectionLabel n="03" title="On Today" kicker={`Day ${dayLetter}`} />
             <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               {GRADES.map((grade, gi) => {
-                const students = board.students.filter(s => s.specials_grade === grade);
+                const students = board.students.filter(s => Number(s.specials_grade) === grade);
                 if (students.length === 0) return null;
                 const act = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === dayLetter)?.activity;
                 const gc = GRADE_COLORS[grade];
                 const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 3, overflow: "hidden",
+                    flex: 1, borderRadius: 4, overflow: "hidden",
                     display: "flex", alignItems: "stretch",
-                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(13,19,33,0.1) 80%)`,
+                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(13,19,33,0.06) 85%)`,
                     border: `1px solid ${gc.border}`,
-                    borderLeft: `4px solid ${gc.text}`,
                     animation: `fadeUp .5s ease ${gi * 0.06}s both`,
                   }}>
-                    {/* Grade motif — bold, all-caps masthead letter */}
+                    {/* Emoji + grade badge */}
                     <div style={{
-                      width: 48, flexShrink: 0, display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: 0,
+                      width: 60, flexShrink: 0, display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: 3,
                       borderRight: `1px solid ${gc.border}`,
-                      background: "rgba(7,8,15,0.35)",
+                      background: "rgba(7,8,15,0.30)",
                     }}>
                       <div style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</div>
                       <div style={{
                         fontFamily: serif, fontStyle: "italic",
-                        fontSize: 10, fontWeight: 600, color: gc.text,
-                        letterSpacing: "0.1em", marginTop: 2,
+                        fontSize: 13, fontWeight: 700, color: gc.text,
+                        letterSpacing: "0.05em",
                       }}>{gc.motif}</div>
                     </div>
                     {/* Activity + roster */}
                     <div style={{
-                      flex: 1, padding: "6px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3,
+                      flex: 1, padding: "8px 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4,
                       minWidth: 0,
                     }}>
                       <div style={{
-                        fontFamily: serif, fontSize: 16, fontWeight: 600,
+                        fontFamily: serif, fontSize: 22, fontWeight: 700,
                         color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        lineHeight: 1.1, letterSpacing: "-0.01em",
+                        lineHeight: 1.05, letterSpacing: "-0.01em",
                       }}>
                         {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
-                        {students.map((s, si) => (
-                          <span key={s.id} style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: 10, fontWeight: 500, padding: "1px 6px",
-                            color: "rgba(245,241,232,0.78)",
-                            borderRight: si < students.length - 1 ? `1px solid ${g(0.15)}` : "none",
-                            letterSpacing: "0.01em",
-                          }}>{s.name}</span>
-                        ))}
+                      <div style={{
+                        fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 400,
+                        color: "rgba(245,241,232,0.65)", letterSpacing: "0.01em",
+                      }}>
+                        {students.map(s => (s.name || "?").split(" ")[0]).join("  ·  ")}
                       </div>
                     </div>
                   </div>
@@ -743,21 +932,15 @@ export default function ClassroomBoard() {
               })}
               {board.students.filter(s => !s.specials_grade).length > 0 && (
                 <div style={{
-                  borderRadius: 3, padding: "4px 10px", display: "flex", alignItems: "center", gap: 10,
+                  borderRadius: 3, padding: "5px 12px", display: "flex", alignItems: "center", gap: 10,
                   background: "rgba(255,255,255,0.02)", border: `1px dashed ${g(0.1)}`,
                 }}>
                   <div style={{
-                    fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-                    color: "rgba(245,241,232,0.3)", letterSpacing: "0.16em", textTransform: "uppercase",
+                    fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 500,
+                    color: "rgba(245,241,232,0.3)", letterSpacing: "0.16em", textTransform: "uppercase", flexShrink: 0,
                   }}>unassigned</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                    {board.students.filter(s => !s.specials_grade).map((s, si, arr) => (
-                      <span key={s.id} style={{
-                        fontSize: 10, padding: "0 5px",
-                        color: "rgba(245,241,232,0.4)",
-                        borderRight: si < arr.length - 1 ? `1px solid ${g(0.1)}` : "none",
-                      }}>{s.name}</span>
-                    ))}
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "rgba(245,241,232,0.4)" }}>
+                    {board.students.filter(s => !s.specials_grade).map(s => (s.name || "?").split(" ")[0]).join("  ·  ")}
                   </div>
                 </div>
               )}
@@ -771,11 +954,10 @@ export default function ClassroomBoard() {
             padding: "10px 14px",
           }}>
             <SectionLabel n="04" title="The Cycle" kicker="A–F rotation" />
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
               {/* Day header row */}
               <div style={{
-                display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flexShrink: 0,
-                borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 4,
+                display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 4, flexShrink: 0,
               }}>
                 <div />
                 {DAY_LETTERS.map(d => {
@@ -783,24 +965,16 @@ export default function ClassroomBoard() {
                   return (
                     <div key={d} style={{
                       textAlign: "center",
-                      fontFamily: serif, fontSize: 15,
-                      fontWeight: isToday ? 600 : 500,
+                      fontFamily: serif, fontSize: 20,
+                      fontWeight: isToday ? 700 : 500,
                       fontStyle: isToday ? "normal" : "italic",
-                      padding: "3px 2px", borderRadius: 2,
-                      background: isToday ? "rgba(217,119,6,0.22)" : "transparent",
-                      color: isToday ? "#fbbf24" : "rgba(245,241,232,0.35)",
-                      border: isToday ? "1px solid rgba(217,119,6,0.55)" : "1px solid transparent",
+                      padding: "5px 2px", borderRadius: 4,
+                      background: isToday ? "rgba(217,119,6,0.75)" : "transparent",
+                      color: isToday ? "#fff" : "rgba(245,241,232,0.35)",
+                      border: isToday ? "1px solid #d97706" : "1px solid transparent",
                       letterSpacing: "0.04em",
-                      position: "relative",
                     }}>
                       {d}
-                      {isToday && (
-                        <span style={{
-                          position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)",
-                          width: 5, height: 5, borderRadius: "50%",
-                          background: "#d97706",
-                        }} />
-                      )}
                     </div>
                   );
                 })}
@@ -809,16 +983,15 @@ export default function ClassroomBoard() {
               {GRADES.map(grade => {
                 const gc = GRADE_COLORS[grade];
                 return (
-                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "42px repeat(6, 1fr)", gap: 3, flex: 1, minHeight: 0 }}>
-                    {/* Grade motif cell */}
+                  <div key={grade} style={{ display: "grid", gridTemplateColumns: "38px repeat(6, 1fr)", gap: 4, flex: 1, minHeight: 0 }}>
+                    {/* Grade label cell */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontFamily: serif, fontStyle: "italic",
-                      fontSize: 15, fontWeight: 600, borderRadius: 2,
+                      fontSize: 18, fontWeight: 700, borderRadius: 4,
                       color: gc.text,
                       background: `linear-gradient(180deg, ${gc.from}, rgba(13,19,33,0.2))`,
                       border: `1px solid ${gc.border}`,
-                      borderLeft: `3px solid ${gc.text}`,
                     }}>{grade}</div>
                     {DAY_LETTERS.map(day => {
                       const c = board.specials.find(r => Number(r.grade) === grade && String(r.day_letter).toUpperCase() === day);
@@ -826,30 +999,28 @@ export default function ClassroomBoard() {
                       return (
                         <div key={day} style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          textAlign: "center", borderRadius: 2, padding: "3px 2px",
-                          background: isToday && c ? `${gc.from}` : "rgba(255,255,255,0.015)",
-                          border: isToday
-                            ? `1px solid ${gc.border}`
-                            : `1px solid ${g(0.05)}`,
-                          gap: 1, overflow: "hidden",
-                          minHeight: 0,
+                          textAlign: "center", borderRadius: 4, padding: "4px 2px",
+                          background: isToday ? `linear-gradient(160deg, rgba(217,119,6,0.55) 0%, rgba(217,119,6,0.25) 100%)` : "rgba(255,255,255,0.018)",
+                          border: isToday ? `1px solid rgba(217,119,6,0.7)` : `1px solid ${g(0.06)}`,
+                          gap: 2, overflow: "hidden", minHeight: 0,
+                          boxShadow: isToday ? "inset 0 0 12px rgba(217,119,6,0.18)" : "none",
                         }}>
                           {c?.activity ? (
                             <>
-                              <span style={{ fontSize: 15, lineHeight: 1, opacity: isToday ? 1 : 0.75 }}>{actEmoji(c.activity)}</span>
+                              <span style={{ fontSize: 18, lineHeight: 1, opacity: isToday ? 1 : 0.6 }}>{actEmoji(c.activity)}</span>
                               <span style={{
                                 fontFamily: serif,
                                 fontSize: 11,
-                                fontWeight: isToday ? 600 : 500,
-                                fontStyle: isToday ? "normal" : "italic",
-                                lineHeight: 1.1,
+                                fontWeight: isToday ? 600 : 400,
+                                fontStyle: "italic",
+                                lineHeight: 1.15,
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                maxWidth: "100%", padding: "0 3px",
-                                color: isToday ? gc.text : "rgba(245,241,232,0.55)",
+                                maxWidth: "100%", padding: "0 2px",
+                                color: isToday ? "#fde68a" : "rgba(245,241,232,0.45)",
                               }}>{c.activity}</span>
                             </>
                           ) : (
-                            <span style={{ opacity: 0.18, fontSize: 12, color: gc.text }}>·</span>
+                            <span style={{ opacity: 0.15, fontSize: 14 }}>·</span>
                           )}
                         </div>
                       );
@@ -871,7 +1042,7 @@ export default function ClassroomBoard() {
         borderTop: `1px solid ${g(0.12)}`,
       }}>
         <div style={{
-          fontFamily: serif, fontStyle: "italic", fontSize: 12, fontWeight: 600,
+          fontFamily: serif, fontStyle: "italic", fontSize: 13, fontWeight: 600,
           color: "rgba(217,119,6,0.85)", letterSpacing: "0.16em", textTransform: "uppercase",
           flexShrink: 0, borderRight: `1px solid ${g(0.12)}`, paddingRight: 14,
         }}>№ 04 · The Ledger</div>
@@ -884,8 +1055,8 @@ export default function ClassroomBoard() {
               <div key={lv} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                 <div style={{
                   fontFamily: serif, fontStyle: "italic",
-                  fontSize: 12, fontWeight: 600,
-                  padding: "1px 9px 2px", borderRadius: 2,
+                  fontSize: 13, fontWeight: 600,
+                  padding: "2px 10px 2px", borderRadius: 2,
                   background: lc.bg, color: lc.color,
                   borderLeft: `2px solid ${lc.color}`,
                   letterSpacing: "0.02em",
@@ -893,7 +1064,7 @@ export default function ClassroomBoard() {
                 {at.map((s, si) => (
                   <span key={s.id} style={{
                     fontFamily: "'Inter', sans-serif",
-                    fontSize: 12, fontWeight: 500,
+                    fontSize: 13, fontWeight: 500,
                     color: "rgba(245,241,232,0.82)",
                     letterSpacing: "0.01em",
                     paddingRight: si < at.length - 1 ? 6 : 0,
@@ -912,11 +1083,12 @@ export default function ClassroomBoard() {
           ref={musicRef}
           title="ambient-music"
           width="1" height="1"
-          style={{ position: "fixed", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
+          style={{ position: "absolute", bottom: 0, right: 0, opacity: 0.01, pointerEvents: "none" }}
           src="about:blank"
           allow="autoplay"
         />
       )}
+    </div>
     </div>
   );
 }

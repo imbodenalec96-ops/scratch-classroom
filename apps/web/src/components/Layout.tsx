@@ -133,11 +133,12 @@ export default function Layout() {
       .catch(() => { if (!cancelled) setStudentClassId(null); });
     return () => { cancelled = true; };
   }, [isStudent, user?.id]);
-  useBlockAutoNav(isStudent, studentClassId);
+  const studentGrade = isStudent ? ((user as any)?.specialsGrade ?? null) : null;
+  useBlockAutoNav(isStudent, studentClassId, user?.id ?? null, studentGrade);
   // Stay-put enforcement: if the student wanders off the current block's page,
   // bounce them back. Respects the same teacher-override grace window and the
   // freetime/break/coding_art_gym exceptions that useBlockAutoNav respects.
-  useBlockLockdown(isStudent, studentClassId);
+  useBlockLockdown(isStudent, studentClassId, user?.id ?? null, studentGrade);
   // Pull-off-block overlay: when the teacher parks a student somewhere else
   // (Calm Room, Office, Gen Ed…) we show a full-screen banner they can't
   // dismiss until the override's ends_at passes.
