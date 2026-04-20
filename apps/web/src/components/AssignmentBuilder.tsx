@@ -183,6 +183,19 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     const load = async () => {
       setLoading(true);
       try {
+        // 0) Explicit ?id=<uuid> wins — used by "Start assignment →" links from block pages.
+        const explicitId = new URLSearchParams(window.location.search).get("id");
+        if (explicitId) {
+          try {
+            const a = await api.getAssignment(explicitId);
+            if (a) {
+              setAssignment(a);
+              if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+              setLoading(false);
+              return;
+            }
+          } catch {}
+        }
         // 1) Prefer the current schedule block's assignment (per-student → per-grade → per-day → root).
         const grade = (user as any)?.specialsGrade ?? null;
         const blockAssignmentId = resolveBlockAssignmentId(

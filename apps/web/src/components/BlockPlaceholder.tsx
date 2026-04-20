@@ -274,7 +274,7 @@ export function AssignmentTodayPage() {
           <p className="text-base text-t2 max-w-lg mb-6">{selectedAssignment.description}</p>
         )}
         <Link
-          to="/assignments"
+          to={`/assignments?id=${encodeURIComponent(selectedAssignment.id)}`}
           className="rounded-2xl border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/15 px-6 py-3 text-sm font-bold text-violet-300 transition-colors"
         >
           Start assignment →
