@@ -234,14 +234,33 @@ export function AssignmentTodayPage() {
       .catch(() => setClassId(null));
   }, [user?.id]);
 
-  const currentBlock = useCurrentBlock(classId);
+  // Find the schedule block whose subject matches the URL. A student can
+  // navigate to /assignment/today/math at any time of day (e.g. during SEL),
+  // so we CANNOT rely on useCurrentBlock here — it'd read whatever block is
+  // currently ringing instead of the one the URL actually asked for.
+  const [subjectBlock, setSubjectBlock] = useState<any>(null);
+  useEffect(() => {
+    if (!classId || !subject) { setSubjectBlock(null); return; }
+    let cancelled = false;
+    api.getClassSchedule(classId)
+      .then((rows: any[]) => {
+        if (cancelled) return;
+        const match = (rows || []).find((b: any) =>
+          (b.subject || "").toLowerCase() === subject.toLowerCase()
+        ) || null;
+        setSubjectBlock(match);
+      })
+      .catch(() => { if (!cancelled) setSubjectBlock(null); });
+    return () => { cancelled = true; };
+  }, [classId, subject]);
+
   // Per-student override (teacher-assigned in schedule editor) beats per-grade;
   // per-grade comes from users.specials_grade on /api/auth/me.
   const studentGrade = (user as any)?.specialsGrade ?? null;
   const studentId = user?.id ?? null;
   const blockContent = useMemo(
-    () => resolveBlockContentForToday(currentBlock?.content_source, studentGrade, studentId),
-    [currentBlock?.content_source, studentGrade, studentId],
+    () => resolveBlockContentForToday(subjectBlock?.content_source, studentGrade, studentId),
+    [subjectBlock?.content_source, studentGrade, studentId],
   );
 
   // Teachers/admins previewing get a summary card (so they can see which
