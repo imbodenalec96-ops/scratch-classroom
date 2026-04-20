@@ -808,7 +808,105 @@ function WorkScreen({
                     );
                   })}
                 </div>
-              ) : (() => {
+              ) : q.q.type === "draw" ? (() => {
+                /* ── Finger-drawing canvas for tracing/writing ── */
+                const canvasRef = React.useRef<HTMLCanvasElement>(null);
+                const drawing = React.useRef(false);
+                const lastPos = React.useRef<{x:number,y:number}|null>(null);
+
+                const getPos = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+                  const canvas = canvasRef.current!;
+                  const rect = canvas.getBoundingClientRect();
+                  const scaleX = canvas.width / rect.width;
+                  const scaleY = canvas.height / rect.height;
+                  if ('touches' in e) {
+                    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+                  }
+                  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+                };
+
+                const startDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+                  e.preventDefault();
+                  drawing.current = true;
+                  lastPos.current = getPos(e as any);
+                };
+
+                const draw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+                  e.preventDefault();
+                  if (!drawing.current || !canvasRef.current) return;
+                  const ctx = canvasRef.current.getContext('2d')!;
+                  const pos = getPos(e as any);
+                  ctx.beginPath();
+                  ctx.moveTo(lastPos.current!.x, lastPos.current!.y);
+                  ctx.lineTo(pos.x, pos.y);
+                  ctx.strokeStyle = '#5B4FE8';
+                  ctx.lineWidth = 6;
+                  ctx.lineCap = 'round';
+                  ctx.lineJoin = 'round';
+                  ctx.stroke();
+                  lastPos.current = pos;
+                  // Save drawing as data URL answer
+                  handleSelect(canvasRef.current.toDataURL());
+                };
+
+                const stopDraw = () => { drawing.current = false; lastPos.current = null; };
+
+                const clearCanvas = () => {
+                  const canvas = canvasRef.current;
+                  if (!canvas) return;
+                  const ctx = canvas.getContext('2d')!;
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  // Draw guide lines
+                  ctx.strokeStyle = '#e8e4ff';
+                  ctx.lineWidth = 1;
+                  for (let y = 80; y < canvas.height; y += 80) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+                  }
+                  handleSelect('');
+                };
+
+                // Draw guide lines on mount
+                React.useEffect(() => {
+                  const canvas = canvasRef.current;
+                  if (!canvas) return;
+                  const ctx = canvas.getContext('2d')!;
+                  ctx.strokeStyle = '#e8e4ff';
+                  ctx.lineWidth = 1;
+                  for (let y = 80; y < canvas.height; y += 80) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+                  }
+                }, [cardKey]);
+
+                return (
+                  <div className="space-y-3">
+                    <div className="text-[12px] font-semibold" style={{ color: starfall.accent }}>
+                      ✏️ Use your finger to write on the canvas below
+                    </div>
+                    <canvas
+                      ref={canvasRef}
+                      width={800} height={320}
+                      style={{
+                        width: '100%', height: 200,
+                        borderRadius: 16,
+                        border: `2px solid ${starfall.accent}44`,
+                        background: '#faf9ff',
+                        touchAction: 'none',
+                        cursor: 'crosshair',
+                        display: 'block',
+                      }}
+                      onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                      onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+                    />
+                    <button
+                      onClick={clearCanvas}
+                      className="text-[12px] font-semibold px-4 py-2 rounded-xl transition-colors"
+                      style={{ background: `${starfall.accent}14`, color: starfall.accent, border: `1px solid ${starfall.accent}33` }}
+                    >
+                      🗑 Clear and try again
+                    </button>
+                  </div>
+                );
+              })() : (() => {
                 /* ── Fallback input for anything that isn't MC: short_answer,
                    fill_blank, computation, undefined, etc. Math subject →
                    numeric keypad. Enter advances/submits. ── */
