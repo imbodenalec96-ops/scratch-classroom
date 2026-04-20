@@ -1723,62 +1723,111 @@ export default function StudentDashboard() {
           );
         })()}
 
-        {/* Assignment tile */}
-        <div
-          onClick={() => { if (pendingAssignment && parsedAssignment) setPhase('working'); else if (pendingAssignment) setPhase('working'); }}
-          style={{
-            borderRadius: 16, padding: "18px 20px", marginBottom: 10, cursor: pendingAssignment ? "pointer" : "default",
-            background: pendingAssignment
-              ? "linear-gradient(135deg, rgba(139,92,246,0.35), rgba(99,102,241,0.2))"
-              : "rgba(255,255,255,0.04)",
-            border: pendingAssignment
-              ? "1px solid rgba(139,92,246,0.55)"
-              : "1px solid rgba(255,255,255,0.08)",
-            display: "flex", alignItems: "center", gap: 16,
-            animation: "dbSlide .4s ease both",
-            transition: "transform .15s",
-          }}
-          onMouseEnter={e => { if (pendingAssignment) (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-        >
-          <div style={{
-            width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-            background: pendingAssignment ? "rgba(139,92,246,0.4)" : "rgba(255,255,255,0.06)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-          }}>📝</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 900 }}>{pendingAssignment ? pendingAssignment.title : "No assignment right now"}</div>
-            <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>
-              {pendingAssignment ? "Tap to start →" : "You're all caught up!"}
-            </div>
-          </div>
-          {pendingAssignment && <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>}
-        </div>
-
-        {/* Lessons tile */}
-        <Link to="/lessons" style={{ textDecoration: "none", display: "block" }}>
-          <div style={{
-            borderRadius: 16, padding: "18px 20px", marginBottom: 10,
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-            display: "flex", alignItems: "center", gap: 16,
-            animation: "dbSlide .45s ease both",
-            transition: "transform .15s",
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+        {/* Today's assignment — prominent hero when there's one to do */}
+        {pendingAssignment && (
+          <div
+            onClick={() => { setPhase('working'); }}
+            style={{
+              borderRadius: 20, padding: "20px 22px", marginBottom: 14, cursor: "pointer",
+              background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.22))",
+              border: "1px solid rgba(139,92,246,0.55)",
+              display: "flex", alignItems: "center", gap: 18,
+              animation: "dbSlide .4s ease both",
+              transition: "transform .15s",
+              boxShadow: "0 8px 28px rgba(139,92,246,0.25)",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
           >
             <div style={{
-              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-              background: "rgba(59,130,246,0.25)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-            }}>📖</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>Lessons</div>
-              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>Review what your teacher has shared</div>
+              width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+              boxShadow: "0 8px 20px rgba(139,92,246,0.4)",
+            }}>📝</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", opacity: 0.7, marginBottom: 3 }}>Today's Assignment</div>
+              <div style={{ fontSize: 16, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pendingAssignment.title}</div>
+              <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>Tap to start →</div>
             </div>
-            <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
+            <div style={{ fontSize: 22, opacity: 0.7 }}>›</div>
           </div>
-        </Link>
+        )}
+
+        {/* ── Menu — admin-dashboard-style tile grid with circle icons ── */}
+        {(() => {
+          type Tile = { to?: string; onClick?: () => void; icon: string; label: string; desc: string; grad: string; glow: string };
+          const TILES: Tile[] = [
+            { to: "/assignments", icon: "📝", label: "Assignments", desc: "Work to do",                grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.35)" },
+            { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",             grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
+            { to: "/websites",    icon: "🌐", label: "Websites",    desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },
+            ...(classConfig.youtubeEnabled ? [{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: "linear-gradient(135deg,#ef4444,#dc2626)", glow: "rgba(239,68,68,0.35)" }] as Tile[] : []),
+            { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",                grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
+            { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",               grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
+            { to: "/cashout",     icon: "🪙", label: "Store",       desc: dojoPoints != null ? `${dojoPoints} pts` : "Cashout", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
+            ...(unlocked ? ([
+              { to: "/arcade",    icon: "🎮", label: "Arcade",      desc: "31 games",                  grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
+              { to: "/projects",  icon: "💻", label: "Projects",    desc: "2D · 3D · Unity",           grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
+            ] as Tile[]) : []),
+          ];
+          return (
+            <div style={{ marginTop: 18, marginBottom: 18, animation: "dbSlide .45s ease both" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+                {TILES.map((t, i) => {
+                  const inner = (
+                    <div style={{
+                      height: "100%", borderRadius: 18, overflow: "hidden",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      transition: "transform .15s, box-shadow .15s, border-color .15s",
+                      display: "flex", flexDirection: "column",
+                      animation: "dbPop .4s ease both",
+                      animationDelay: `${i * 40}ms`,
+                    }}
+                      onMouseEnter={(e) => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.transform = "translateY(-4px)";
+                        el.style.boxShadow = `0 12px 32px ${t.glow}`;
+                        el.style.borderColor = "rgba(255,255,255,0.16)";
+                      }}
+                      onMouseLeave={(e) => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.transform = "";
+                        el.style.boxShadow = "";
+                        el.style.borderColor = "rgba(255,255,255,0.08)";
+                      }}
+                    >
+                      <div style={{ height: 3, background: t.grad }} />
+                      <div style={{ padding: "16px 14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{
+                          width: 56, height: 56, borderRadius: "50%",
+                          background: t.grad,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 28, color: "white",
+                          boxShadow: `0 8px 20px ${t.glow}`,
+                        }}>
+                          {t.icon}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: "white", letterSpacing: "-0.01em" }}>{t.label}</div>
+                          <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{t.desc}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                  if (t.to) {
+                    return (
+                      <Link key={i} to={t.to} style={{ textDecoration: "none", color: "inherit" }}>{inner}</Link>
+                    );
+                  }
+                  return (
+                    <button key={i} onClick={t.onClick} style={{ background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}>{inner}</button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Quiz tiles */}
         {pendingQuizzes.length > 0 && !activeQuiz && pendingQuizzes.map(q => (
@@ -1862,94 +1911,21 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ── PLAY section — hidden entirely until free time earned ── */}
-        {unlocked && (
-          <>
-            <div style={{ marginTop: 22, marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
-              🎉 Play
+        {/* Teacher-shared video inline (shown regardless of free-time state) */}
+        {classVideo && (
+          <div style={{ marginTop: 18, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
+              <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, animation: "dbPop .4s ease both" }}>
-              {/* Arcade */}
-              <Link to="/arcade" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "20px 16px", borderRadius: 18, cursor: "pointer",
-                  background: "linear-gradient(135deg,rgba(139,92,246,.45),rgba(99,102,241,.3))",
-                  border: "1px solid rgba(139,92,246,.6)", boxShadow: "0 0 30px rgba(139,92,246,.2)",
-                  transition: "transform .15s, box-shadow .15s",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(139,92,246,.45)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px rgba(139,92,246,.2)"; }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎮</div>
-                  <div style={{ fontSize: 17, fontWeight: 900 }}>Arcade</div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>31 games</div>
-                </div>
-              </Link>
-              {/* Projects */}
-              <Link to="/projects" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "20px 16px", borderRadius: 18, cursor: "pointer",
-                  background: "linear-gradient(135deg,rgba(16,185,129,.4),rgba(5,150,105,.25))",
-                  border: "1px solid rgba(16,185,129,.55)", boxShadow: "0 0 30px rgba(16,185,129,.18)",
-                  transition: "transform .15s, box-shadow .15s",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(16,185,129,.38)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px rgba(16,185,129,.18)"; }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>💻</div>
-                  <div style={{ fontSize: 17, fontWeight: 900 }}>Projects</div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>2D · 3D · Unity</div>
-                </div>
-              </Link>
-              {/* Video Library */}
-              {classConfig.youtubeEnabled && (
-                <button onClick={() => navigate("/student/videos")} style={{
-                  padding: "20px 16px", borderRadius: 18, cursor: "pointer", textAlign: "left",
-                  background: "linear-gradient(135deg,rgba(239,68,68,.35),rgba(220,38,38,.2))",
-                  border: "1px solid rgba(239,68,68,.5)", color: "white",
-                  transition: "transform .15s", boxShadow: "0 0 24px rgba(239,68,68,.15)",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📺</div>
-                  <div style={{ fontSize: 17, fontWeight: 900 }}>Videos</div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks"}</div>
-                </button>
-              )}
-              {/* Learning Apps */}
-              <button onClick={() => navigate("/websites")} style={{
-                padding: "20px 16px", borderRadius: 18, cursor: "pointer", textAlign: "left",
-                background: "linear-gradient(135deg,rgba(99,102,241,.4),rgba(79,70,229,.25))",
-                border: "1px solid rgba(99,102,241,.55)", color: "white",
-                transition: "transform .15s", boxShadow: "0 0 24px rgba(99,102,241,.15)",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-              >
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🌐</div>
-                <div style={{ fontSize: 17, fontWeight: 900 }}>Learning Apps</div>
-                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{myWebsites.length > 0 ? `${myWebsites.length} sites` : "Websites"}</div>
-              </button>
+            <div style={{ position: "relative", paddingTop: "56.25%" }}>
+              <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
+                title={classVideo.video_title || "Class Video"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
             </div>
-
-            {/* Teacher-shared video inline */}
-            {classVideo && (
-              <div style={{ marginTop: 10, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
-                </div>
-                <div style={{ position: "relative", paddingTop: "56.25%" }}>
-                  <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
-                    title={classVideo.video_title || "Class Video"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         {/* ── LEADERBOARD ── */}
