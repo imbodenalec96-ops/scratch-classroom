@@ -214,10 +214,10 @@ router.post("/reset-star-assignments", async (req, res) => {
       console.log("📝 Creating Star class...");
       await db
         .prepare(
-          `INSERT INTO classes (id, teacher_id, name, description, created_at)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO classes (id, teacher_id, name, created_at)
+           VALUES (?, ?, ?, ?)`
         )
-        .run(STAR_CLASS, TEACHER, "Star Class", "Grade-targeted reading, math, and writing assignments", new Date().toISOString());
+        .run(STAR_CLASS, TEACHER, "Star Class", new Date().toISOString());
     }
 
     // Delete existing assignments for Star class on this date
