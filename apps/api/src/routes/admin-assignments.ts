@@ -154,18 +154,17 @@ router.post("/reset-star-assignments", async (req, res) => {
       content: createSELContent(),
     });
 
-    // Insert all assignments
+    // Insert all assignments (teacher_id can be null)
     for (const a of assignments) {
       await db
         .prepare(
           `INSERT INTO assignments
-           (id, class_id, teacher_id, title, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, due_date, created_at, content)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, class_id, title, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, due_date, created_at, content)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           a.id,
           STAR_CLASS,
-          TEACHER,
           a.title,
           a.subject,
           a.grade,
