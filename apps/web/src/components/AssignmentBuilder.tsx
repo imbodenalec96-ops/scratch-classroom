@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
@@ -180,13 +180,20 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     })();
   }, []);
 
+  // Read the ?id= ONCE on mount. Students who opened a specific assignment
+  // stay on it even when the schedule block transitions mid-work.
+  const explicitId = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
+
   useEffect(() => {
+    // If we're already showing the requested assignment (or the student is
+    // working on any loaded assignment), do NOT re-run the loader. Block
+    // boundary transitions used to re-enter this effect and wipe state,
+    // dumping the student back to the list/placeholder mid-answer.
+    if (assignment) return;
     const load = async () => {
       setLoading(true);
-      setAssignment(null); setParsed(null); setTodayList([]);
       try {
         // Explicit ?id=<uuid> wins — student picked a specific assignment.
-        const explicitId = new URLSearchParams(window.location.search).get("id");
         if (explicitId) {
           try {
             const a = await api.getAssignment(explicitId);
@@ -198,34 +205,40 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             }
           } catch {}
         }
-        // No id → show the full list of TODAY's assignments so the student
-        // can pick any one and work through them at their own pace.
+        // No id → ask the server for THIS student's pending assignments.
+        // The /pending endpoint already honors target_student_ids, student_id,
+        // grade levels, paper-only flag, and de-dupes already-submitted ones.
+        // Client-side filtering would re-implement that (badly) and show work
+        // meant for other students.
         const cls = classes.length ? classes : await api.getClasses();
         const today = new Date().toISOString().slice(0, 10);
-        const grade = (user as any)?.specialsGrade ?? null;
         const all: any[] = [];
         for (const c of cls) {
           try {
-            const rows = await api.getAssignments(c.id);
+            const rows = await api.getPendingAssignments(c.id);
             for (const a of rows || []) {
-              if (a?.scheduled_date !== today) continue;
-              // Respect per-grade targeting when set on the assignment row.
-              const gMin = a.target_grade_min, gMax = a.target_grade_max;
-              if ((gMin != null || gMax != null) && grade != null) {
-                const n = Number(grade);
-                if (gMin != null && n < Number(gMin)) continue;
-                if (gMax != null && n > Number(gMax)) continue;
-              }
-              all.push(a);
+              // Show today's work first; if none scheduled for today, fall
+              // through to anything pending (so kids aren't stuck).
+              if (a?.scheduled_date === today) all.push(a);
             }
           } catch {}
+        }
+        // If nothing scheduled for today across all classes, show ALL pending
+        // (still server-filtered), so students always have something to do.
+        if (all.length === 0) {
+          for (const c of cls) {
+            try {
+              const rows = await api.getPendingAssignments(c.id);
+              for (const a of rows || []) all.push(a);
+            } catch {}
+          }
         }
         setTodayList(all);
       } catch {}
       setLoading(false);
     };
     load();
-  }, [currentBlock?.id, classId, user?.id]);
+  }, [classId, user?.id, explicitId, assignment]);
 
   const handleSelect = (value: string) => {
     setAnswers((prev) => ({ ...prev, [currentQ]: value }));

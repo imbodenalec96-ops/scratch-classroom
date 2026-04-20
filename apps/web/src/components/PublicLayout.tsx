@@ -89,7 +89,9 @@ export default function PublicLayout() {
       .catch(() => { if (!cancelled) setStudentClassId(null); });
     return () => { cancelled = true; };
   }, [isStudent, user?.id]);
-  useBlockAutoNav(isStudent, studentClassId);
+  // Auto-push disabled per Alec — students aren't yanked between routes when
+  // the schedule block changes.
+  useBlockAutoNav(false, studentClassId);
   // Screenshot thumbnails for teacher monitor (students on public routes too)
   useScreenshotCapture(isStudent);
 

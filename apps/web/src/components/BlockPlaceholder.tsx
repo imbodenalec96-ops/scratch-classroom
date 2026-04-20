@@ -214,6 +214,7 @@ function resolveBlockContentForToday(
 export function AssignmentTodayPage() {
   const { subject } = useParams<{ subject: string }>();
   const { user } = useAuth();
+
   const map: Record<string, { emoji: string; title: string }> = {
     sel:      { emoji: "💛", title: "SEL" },
     math:     { emoji: "🔢", title: "Math" },
@@ -281,7 +282,12 @@ export function AssignmentTodayPage() {
     return assignments.find((a: any) => a?.id === blockContent.assignmentId) || null;
   }, [blockContent.assignmentId, assignments]);
 
-  // No auto-push — students pick what to work on from their dashboard.
+  // Students should never land on this page — the placeholder used to kick
+  // them out of in-progress work when the block rolled over. Send them to
+  // /assignments where their list + doer live.
+  if (user?.role === "student") {
+    return <Navigate to="/assignments" replace />;
+  }
 
   if (selectedAssignment) {
     return (
@@ -301,7 +307,7 @@ export function AssignmentTodayPage() {
           Open assignment →
         </Link>
         <Link
-          to={user?.role === "student" ? "/student" : "/"}
+          to="/"
           className="mt-6 text-sm font-semibold text-violet-400 hover:text-violet-300"
         >
           ← Back to dashboard
