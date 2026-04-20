@@ -21,7 +21,7 @@ export interface DB {
 function convertSqlForPg(sql: string): string {
   let idx = 0;
   let result = sql.replace(/\?/g, () => `$${++idx}`);
-  result = result.replace(/datetime\('now'\)/gi, "NOW()");
+  result = result.replace(/datetime\('now'\)/gi, "NOW()::text");
   return result;
 }
 
@@ -58,7 +58,7 @@ if (process.env.DATABASE_URL) {
     },
     pragma() {},
     async exec(sql: string) {
-      await pool.query(sql);
+      await pool.query(convertSqlForPg(sql));
     },
     async close() {
       await pool.end();

@@ -57,7 +57,7 @@ function youtubeEmbedUrl(url: string): string | null {
       const id = u.hostname.includes("youtu.be")
         ? u.pathname.slice(1).split("?")[0]
         : u.searchParams.get("v") ?? u.pathname.split("/").pop();
-      if (id) return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`;
     }
   } catch {}
   return null;

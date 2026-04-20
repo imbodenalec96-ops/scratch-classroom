@@ -161,7 +161,7 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div style={{ minHeight:"100vh", background:dk?"#070714":"#f0f1f8", color:text1, fontFamily:"'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight:"100vh", width:"100%", overflowX:"hidden", background:dk?"#070714":"#f0f1f8", color:text1, fontFamily:"'Inter', system-ui, sans-serif" }}>
       <style>{ANIM}</style>
 
       {/* ─── Hero header ─── */}
@@ -169,14 +169,14 @@ export default function AdminDashboard() {
         background: dk
           ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
           : "linear-gradient(160deg,#0ea5e9 0%,#3b82f6 40%,#4f46e5 100%)",
-        padding:"32px 40px 32px",
+        padding:"32px 32px 32px",
         marginBottom:32,
         position:"relative",
         overflow:"hidden",
       }}>
         <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 40%,rgba(124,58,237,0.18) 0%,transparent 65%)",pointerEvents:"none" }} />
         <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 20% 80%,rgba(59,130,246,0.1) 0%,transparent 60%)",pointerEvents:"none" }} />
-        <header style={{ maxWidth:1280, margin:"0 auto", position:"relative", animation:"ad-fadeUp .45s ease both" }}>
+        <header style={{ maxWidth:"100%", margin:"0 auto", position:"relative", animation:"ad-fadeUp .45s ease both" }}>
           <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.45)",marginBottom:10 }}>
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · Admin Portal
           </div>
@@ -214,12 +214,12 @@ export default function AdminDashboard() {
         </header>
       </div>
 
-      <div style={{ padding:"0 40px 56px", maxWidth:1280, margin:"0 auto" }}>
+      <div style={{ padding:"0 24px 56px", width:"100%", boxSizing:"border-box" }}>
 
         {/* ─── Stat cards (with top accent bar) ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .05s both" }}>
           <Divider label="Overview" />
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14 }}>
             {STATS.map(s => (
               <div key={s.label} style={{
                 ...cardStyle,
@@ -304,7 +304,7 @@ export default function AdminDashboard() {
         {/* ─── Admin Tools ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .14s both" }}>
           <Divider label="Admin Tools" />
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:10 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10 }}>
             {ADMIN_TOOLS.map((t, i) => (
               <Link key={t.path} to={t.path} style={{
                 display:"flex",flexDirection:"column",gap:0,padding:0,borderRadius:16,textDecoration:"none",
@@ -332,7 +332,7 @@ export default function AdminDashboard() {
         {/* ─── Classrooms + People ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .18s both" }}>
           <Divider label="Roster" />
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:16 }}>
             {/* Classrooms */}
             <div style={{ ...cardStyle,padding:"20px 22px" }}>
               <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
@@ -443,7 +443,7 @@ export default function AdminDashboard() {
         {/* ─── System Health + Recent Activity ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .22s both" }}>
           <Divider label="Platform" />
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:16 }}>
 
             {/* System Health */}
             <div style={{ ...cardStyle,padding:"20px 22px" }}>

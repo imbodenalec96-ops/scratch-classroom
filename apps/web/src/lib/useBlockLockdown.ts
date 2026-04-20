@@ -32,13 +32,21 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   subjectToRoute,
   teacherRecentlyPushed,
+  blockHasContent,
 } from "./useBlockAutoNav.ts";
 import { useCurrentBlock } from "./useCurrentBlock.ts";
 import { isAccessAllowed } from "./workUnlock.ts";
 
+const ACADEMIC_SUBJECTS = new Set([
+  "math", "reading", "writing", "spelling", "sel", "daily_news",
+  "review", "extra_review", "video_learning", "ted_talk",
+]);
+
 export function useBlockLockdown(
   enabled: boolean,
   classId: string | null | undefined,
+  studentId?: string | null,
+  grade?: number | null,
 ): void {
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,6 +64,9 @@ export function useBlockLockdown(
     if (current.is_break) return;
     // Exception 3 — coding/art/gym is the free-choice block.
     if ((current.subject || "").toLowerCase() === "coding_art_gym") return;
+    // No content set for this student on this block → no lockdown.
+    const subj = (current.subject || "").toLowerCase();
+    if (ACADEMIC_SUBJECTS.has(subj) && !blockHasContent(current, studentId, grade)) return;
 
     const target = subjectToRoute(current);
     if (!target) return; // Unknown subject mapping → don't trap them.
@@ -89,5 +100,5 @@ export function useBlockLockdown(
     if (belongs) return;
 
     navigate(target, { replace: true });
-  }, [enabled, current?.id, location.pathname, navigate]);
+  }, [enabled, current?.id, location.pathname, navigate, studentId, grade]);
 }

@@ -75,7 +75,7 @@ function avatarGradient(name: string): string {
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return url.trim();
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
@@ -893,8 +893,9 @@ export default function MonitorPage() {
 
           {/* ── Sidebar Controls ──────────────────────────── */}
           <div style={{
-            width: 288, flexShrink: 0,
+            width: 288, flexShrink: 0, minHeight: 0,
             display: "flex", flexDirection: "column", gap: 10,
+            overflowY: "auto", overflowX: "hidden",
           }}>
 
             {/* Lock / Unlock panel */}

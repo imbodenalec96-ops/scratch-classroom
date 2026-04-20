@@ -79,20 +79,45 @@ function getBlockColor(b: Block) {
   return { bg: "rgba(255,255,255,0.04)", text: "var(--t2)", dot: "#6b7280" };
 }
 
-function parseSelContent(raw: string | null | undefined): { videoUrl: string; assignmentUrl: string } {
-  if (!raw) return { videoUrl: "", assignmentUrl: "" };
+function parseSelContent(raw: string | null | undefined): {
+  videoUrl: string; assignmentUrl: string;
+  byDay: Partial<Record<string, { videoUrl?: string; assignmentId?: string }>>;
+} {
+  if (!raw) return { videoUrl: "", assignmentUrl: "", byDay: {} };
   try {
     const p = JSON.parse(raw);
-    return { videoUrl: p.videoUrl || "", assignmentUrl: p.assignmentUrl || "" };
-  } catch { return { videoUrl: "", assignmentUrl: "" }; }
+    const byDay: Partial<Record<string, { videoUrl?: string; assignmentId?: string }>> = {};
+    if (p.byDay && typeof p.byDay === "object") {
+      for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+        const day = (p.byDay as any)[d];
+        if (day && typeof day === "object" && (day.videoUrl || day.assignmentId)) {
+          byDay[d] = { videoUrl: day.videoUrl || "", assignmentId: day.assignmentId || "" };
+        }
+      }
+    }
+    return { videoUrl: p.videoUrl || "", assignmentUrl: p.assignmentUrl || "", byDay };
+  } catch { return { videoUrl: "", assignmentUrl: "", byDay: {} }; }
 }
 
-function buildSelContent(videoUrl: string, assignmentUrl: string): string | null {
+function buildSelContent(
+  videoUrl: string, assignmentUrl: string,
+  byDay?: Partial<Record<string, { videoUrl?: string; assignmentId?: string }>>,
+): string | null {
   const v = videoUrl.trim(); const a = assignmentUrl.trim();
-  if (!v && !a) return null;
-  const obj: Record<string, string> = {};
+  const hasDay = byDay && Object.values(byDay).some(d => d?.videoUrl?.trim() || d?.assignmentId?.trim());
+  if (!v && !a && !hasDay) return null;
+  const obj: Record<string, any> = {};
   if (v) obj.videoUrl = v;
   if (a) obj.assignmentUrl = a;
+  if (hasDay) {
+    const bd: Record<string, any> = {};
+    for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+      const dv = byDay![d]?.videoUrl?.trim();
+      const da = byDay![d]?.assignmentId?.trim();
+      if (dv || da) { bd[d] = {}; if (dv) bd[d].videoUrl = dv; if (da) bd[d].assignmentId = da; }
+    }
+    if (Object.keys(bd).length) obj.byDay = bd;
+  }
   return JSON.stringify(obj);
 }
 
@@ -1125,18 +1150,27 @@ export default function TeacherSchedule() {
                                 );
                               })()}
 
-                              {/* Advanced toggle — hides per-day complexity */}
-                              <button
-                                type="button"
-                                onClick={() => setShowAdvancedFor(prev => ({ ...prev, [i]: !prev[i] }))}
-                                className="text-[10px] font-semibold underline mb-2"
-                                style={{ color: "var(--t3)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                              >
-                                {showAdvancedFor[i] ? "▾ Hide per-day options" : "▸ Different on different days?"}
-                              </button>
+                              {/* Advanced toggle — hides per-day complexity. Auto-opens
+                                  when the block already has per-day data saved. */}
+                              {(() => {
+                                const hasPerDay = !!(blockContent.byDay && Object.keys(blockContent.byDay).length > 0);
+                                const advancedOpen = showAdvancedFor[i] !== undefined ? showAdvancedFor[i] : hasPerDay;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAdvancedFor(prev => ({ ...prev, [i]: !advancedOpen }))}
+                                    className="text-[10px] font-semibold underline mb-2"
+                                    style={{ color: "var(--t3)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                                  >
+                                    {advancedOpen
+                                      ? `▾ Hide per-day assignments${hasPerDay ? ` (${Object.keys(blockContent.byDay!).length} days set)` : ""}`
+                                      : "▸ Different assignments on different days?"}
+                                  </button>
+                                );
+                              })()}
 
                               {/* Per-day mini-pickers — one per active day. */}
-                              {showAdvancedFor[i] && (
+                              {(showAdvancedFor[i] !== undefined ? showAdvancedFor[i] : !!(blockContent.byDay && Object.keys(blockContent.byDay).length > 0)) && (
                               <div className="mb-1">
                                 <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
                                   Or set per day
@@ -1429,7 +1463,10 @@ export default function TeacherSchedule() {
                         {/* SEL content sub-row */}
                         {selContent && (() => {
                           const gen = selGenState[i] || { status: "idle" as const };
-                          const canGenerate = isValidYouTubeUrl(selContent.videoUrl) && gen.status !== "loading";
+                          // Use the first per-day URL that's valid, falling back to the default URL
+                          const anyDayUrl = Object.values(selContent.byDay).find(d => isValidYouTubeUrl(d?.videoUrl || ""))?.videoUrl || "";
+                          const activeSelVideoUrl = isValidYouTubeUrl(selContent.videoUrl) ? selContent.videoUrl : anyDayUrl;
+                          const canGenerate = isValidYouTubeUrl(activeSelVideoUrl) && gen.status !== "loading";
                           const runGenerate = async () => {
                             setSelGenState((prev) => ({ ...prev, [i]: { status: "loading" } }));
                             try {
@@ -1440,7 +1477,7 @@ export default function TeacherSchedule() {
                               // new row for the block (honoring any byDay overrides
                               // that are already present for "today").
                               const generated = await api.generateAssignmentFromVideo({
-                                videoUrl: selContent.videoUrl,
+                                videoUrl: activeSelVideoUrl,
                                 subject: "sel",
                                 questionCount: 6,
                                 title: b.label || "SEL Reflection",
@@ -1480,7 +1517,7 @@ export default function TeacherSchedule() {
                                       sections: generated.sections || [],
                                     }),
                                     targetSubject: "sel",
-                                    videoUrl: generated.videoUrl || selContent.videoUrl,
+                                    videoUrl: generated.videoUrl || activeSelVideoUrl,
                                   });
 
                               if (saved?.id) {
@@ -1496,7 +1533,7 @@ export default function TeacherSchedule() {
                                 // pointing at the newly-saved Thign assignment.
                                 const selAssignmentUrl = `/assignments/${saved.id}`;
                                 updateBlock(i, {
-                                  content_source: buildSelContent(selContent.videoUrl, selAssignmentUrl),
+                                  content_source: buildSelContent(selContent.videoUrl, selAssignmentUrl, selContent.byDay),
                                 });
                               }
                               setSelGenState((prev) => ({
@@ -1521,17 +1558,52 @@ export default function TeacherSchedule() {
                               <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#fbbf24" }}>
                                 SEL Content Links
                               </div>
+
+                              {/* Per-day video URLs — show a row for each active day */}
+                              <div className="mb-3">
+                                <div className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--t2)" }}>
+                                  Video URL — per day
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                  {DAYS.filter(d => normalizeDays(b.active_days).includes(d)).map(d => {
+                                    const dayData = selContent.byDay[d] || {};
+                                    const dayUrl = dayData.videoUrl || "";
+                                    return (
+                                      <label key={d} className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold w-8 shrink-0 text-center py-0.5 rounded"
+                                          style={{ background: "rgba(245,158,11,0.2)", color: "#fbbf24" }}>{d}</span>
+                                        <input
+                                          type="url"
+                                          placeholder="YouTube URL for this day…"
+                                          value={dayUrl}
+                                          onChange={(e) => {
+                                            const nextByDay = { ...selContent.byDay };
+                                            const cur = { ...(nextByDay[d] || {}) };
+                                            if (e.target.value.trim()) cur.videoUrl = e.target.value;
+                                            else delete cur.videoUrl;
+                                            if (Object.keys(cur).length) nextByDay[d] = cur; else delete nextByDay[d];
+                                            updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, selContent.assignmentUrl, nextByDay) });
+                                            if (selGenState[i] && selGenState[i].status !== "loading") {
+                                              setSelGenState((prev) => ({ ...prev, [i]: { status: "idle" } }));
+                                            }
+                                          }}
+                                          className="input text-xs flex-1"
+                                        />
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <label className="flex flex-col gap-1">
-                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>Video URL</span>
+                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>Fallback Video URL (all days)</span>
                                   <input
                                     type="url"
                                     placeholder="YouTube, Vimeo…"
                                     value={selContent.videoUrl}
                                     onChange={(e) => {
-                                      updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl) });
-                                      // Reset any prior success/error when the URL
-                                      // changes — keeps the feedback from looking stale.
+                                      updateBlock(i, { content_source: buildSelContent(e.target.value, selContent.assignmentUrl, selContent.byDay) });
                                       if (selGenState[i] && selGenState[i].status !== "loading") {
                                         setSelGenState((prev) => ({ ...prev, [i]: { status: "idle" } }));
                                       }
@@ -1545,7 +1617,7 @@ export default function TeacherSchedule() {
                                     type="url"
                                     placeholder="Google Form…"
                                     value={selContent.assignmentUrl}
-                                    onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value) })}
+                                    onChange={(e) => updateBlock(i, { content_source: buildSelContent(selContent.videoUrl, e.target.value, selContent.byDay) })}
                                     className="input text-xs"
                                   />
                                 </label>

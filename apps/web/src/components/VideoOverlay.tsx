@@ -5,40 +5,36 @@ import { useAuth } from "../lib/auth.tsx";
 import { api } from "../lib/api.ts";
 import { studentVideoStore } from "../lib/studentVideoStore.ts";
 
-// iOS Safari blocks autoplay in iframes that load without a prior user gesture.
-// postMessage({ playVideo }) does NOT count — gesture context doesn't cross iframe
-// boundaries. The only reliable approach: assign iframe.src SYNCHRONOUSLY inside
-// the click handler, which iOS treats as user-initiated.
+// iOS Safari cannot autoplay YouTube iframes even when muted.
+// The ONLY fix: synchronous iframe.src assignment inside a user gesture handler.
 const isIOS =
   typeof navigator !== "undefined" &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
-interface VideoState {
-  videoId: string;
-  title: string;
-  classId: string;
-}
+interface VideoState { videoId: string; title: string; classId: string; }
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return url.trim();
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
-function buildSrc(videoId: string, autoplay: boolean): string {
-  const base = `https://www.youtube-nocookie.com/embed/${videoId}`;
-  const p = `modestbranding=1&rel=0&fs=0&iv_load_policy=3&disablekb=1&playsinline=1${autoplay ? "&autoplay=1" : ""}`;
-  return `${base}?${p}`;
+function ytSrc(videoId: string, muted: boolean, autoplay = true): string {
+  const origin = encodeURIComponent(window.location.origin);
+  return `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${origin}&playsinline=1&rel=0&modestbranding=1${autoplay ? "&autoplay=1" : ""}${muted ? "&mute=1" : ""}`;
+}
+
+function sendYT(iframe: HTMLIFrameElement | null, func: string) {
+  iframe?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
 }
 
 export default function VideoOverlay() {
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoState | null>(null);
-  // iosStarted: true once the student has tapped. Tracks whether the iframe
-  // has been given an autoplay src by handleIOSTap.
-  const [iosStarted, setIosStarted] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [iosReady, setIosReady] = useState(false); // true once iOS user has tapped play
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const classIdsRef = useRef<string[]>([]);
 
@@ -48,14 +44,19 @@ export default function VideoOverlay() {
     studentVideoStore.getSnapshot,
   );
 
-  // Load class memberships for HTTP poll
+  // Load class IDs and join socket rooms
   useEffect(() => {
     if (!user || user.role !== "student") return;
     let cancelled = false;
     (async () => {
       try {
         const classes = await api.getClasses();
-        if (!cancelled) classIdsRef.current = (classes || []).map((c: any) => c.id).filter(Boolean);
+        if (!cancelled) {
+          const ids = (classes || []).map((c: any) => c.id).filter(Boolean);
+          classIdsRef.current = ids;
+          const socket = getSocket();
+          ids.forEach((id: string) => socket.emit("join:class", id));
+        }
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -72,10 +73,7 @@ export default function VideoOverlay() {
     const onStop = () => setVideo(null);
     socket.on("class:video", onVideo);
     socket.on("class:video:stop", onStop);
-    return () => {
-      socket.off("class:video", onVideo);
-      socket.off("class:video:stop", onStop);
-    };
+    return () => { socket.off("class:video", onVideo); socket.off("class:video:stop", onStop); };
   }, [user]);
 
   // HTTP poll fallback
@@ -106,20 +104,14 @@ export default function VideoOverlay() {
   const anyActive = !!(cmdVideo.videoId || video);
   useEffect(() => {
     if (!anyActive || user?.role !== "student") return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "Your teacher is broadcasting a video.";
-      return e.returnValue;
-    };
-    const onContextMenu = (e: MouseEvent) => { e.preventDefault(); };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; return ""; };
+    const onContextMenu = (e: MouseEvent) => e.preventDefault();
     const onKeyDown = (e: KeyboardEvent) => {
       const blocked = ["Escape", "F5", "F11", "Tab"];
       const metaBlocked = ["r", "w", "t", "n", "l", "d", "ArrowLeft", "ArrowRight", "[", "]"];
       if (blocked.includes(e.key)) { e.preventDefault(); e.stopPropagation(); }
       if ((e.metaKey || e.ctrlKey) && metaBlocked.includes(e.key)) { e.preventDefault(); e.stopPropagation(); }
-      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "F4")) {
-        e.preventDefault(); e.stopPropagation();
-      }
+      if (e.altKey && ["ArrowLeft", "ArrowRight", "F4"].includes(e.key)) { e.preventDefault(); e.stopPropagation(); }
     };
     const lockHistory = () => window.history.pushState(null, "", window.location.href);
     lockHistory();
@@ -128,95 +120,102 @@ export default function VideoOverlay() {
     window.addEventListener("contextmenu", onContextMenu);
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("popstate", onPopState);
-    const prevOverflow = document.body.style.overflow;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("contextmenu", onContextMenu);
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("popstate", onPopState);
-      document.body.style.overflow = prevOverflow;
+      document.body.style.overflow = prev;
     };
   }, [anyActive, user]);
 
   const activeVideoId = cmdVideo.videoId || video?.videoId || null;
   const activeTitle = video?.title || (cmdVideo.videoId ? "Class Video" : "");
 
-  // When a new broadcast starts (videoId changes), reset iOS tap state and
-  // blank the iframe so the tap-to-play screen reappears for the new video.
+  // Reset on each new video
   useEffect(() => {
-    if (!isIOS) return;
-    setIosStarted(false);
-    if (iframeRef.current) iframeRef.current.src = "about:blank";
+    if (!activeVideoId) return;
+    setMuted(true);
+    setIosReady(false);
   }, [activeVideoId]);
 
-  // iOS tap handler: assign iframe.src SYNCHRONOUSLY within the gesture.
-  // This is the only approach that satisfies Safari's autoplay policy —
-  // postMessage and state-triggered re-renders both happen too late.
+  // Non-iOS: load muted, then unmute via postMessage once player signals ready.
+  // We listen to ALL window messages (YouTube may send from sub-frames).
+  // 3s fallback fires unMute regardless.
+  useEffect(() => {
+    if (!activeVideoId || isIOS) return;
+    let done = false;
+    const doUnmute = () => {
+      if (done) return;
+      done = true;
+      sendYT(iframeRef.current, "unMute");
+      sendYT(iframeRef.current, "playVideo");
+      setMuted(false);
+    };
+    const onMsg = (e: MessageEvent) => {
+      try {
+        const d = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+        if (d?.event === "onReady" || d?.event === "infoDelivery") doUnmute();
+      } catch {}
+    };
+    window.addEventListener("message", onMsg);
+    const t = setTimeout(doUnmute, 3000);
+    return () => { window.removeEventListener("message", onMsg); clearTimeout(t); done = true; };
+  }, [activeVideoId]);
+
+  // iOS: synchronous iframe.src inside gesture is the only way to autoplay
   const handleIOSTap = useCallback(() => {
     if (!activeVideoId || !iframeRef.current) return;
-    const autoplaySrc = buildSrc(activeVideoId, true);
-    iframeRef.current.src = autoplaySrc; // ← synchronous DOM write, inside gesture
-    setIosStarted(true);                  // ← async state update keeps React in sync
+    iframeRef.current.src = ytSrc(activeVideoId, false, true); // unmuted, inside gesture
+    setIosReady(true);
+    setMuted(false);
   }, [activeVideoId]);
+
+  const toggleMute = useCallback(() => {
+    sendYT(iframeRef.current, muted ? "unMute" : "mute");
+    setMuted(m => !m);
+  }, [muted]);
 
   if (!activeVideoId || user?.role !== "student") return null;
 
-  // iOS: start with blank so the iframe doesn't load before the user taps.
-  // After tap, React re-renders with the autoplay src (matching what we already
-  // set via the ref), so React won't overwrite the playing video.
+  // iOS loads a thumbnail-only src until tapped; non-iOS loads muted autoplay
   const iframeSrc = isIOS
-    ? (iosStarted ? buildSrc(activeVideoId, true) : "about:blank")
-    : buildSrc(activeVideoId, true);
+    ? (iosReady ? ytSrc(activeVideoId, false, true) : ytSrc(activeVideoId, false, false))
+    : ytSrc(activeVideoId, true, true);
 
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: "fixed", inset: 0, zIndex: 2147483647,
-        background: "#000",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        touchAction: "none", userSelect: "none",
-      }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <div role="dialog" aria-modal="true" style={{
+      position: "fixed", inset: 0, zIndex: 2147483647, background: "#000",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      touchAction: "none", userSelect: "none",
+    }} onContextMenu={(e) => e.preventDefault()}>
+
       {/* Header */}
       <div style={{
-        position: "absolute", top: 0, left: 0, right: 0,
-        background: "rgba(0,0,0,0.9)",
-        borderBottom: "1px solid rgba(239,68,68,0.4)",
-        padding: "10px 20px",
-        display: "flex", alignItems: "center", gap: 12,
-        zIndex: 1,
+        position: "absolute", top: 0, left: 0, right: 0, zIndex: 2,
+        background: "rgba(0,0,0,0.9)", borderBottom: "1px solid rgba(239,68,68,0.4)",
+        padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: "50%",
-          background: "#ef4444", boxShadow: "0 0 8px #ef4444",
-          animation: "pulse 2s infinite",
-        }} />
-        <span style={{ color: "#fca5a5", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>
-          🔒 Broadcast by your teacher — {activeTitle || "Class Video"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 8px #ef4444", flexShrink: 0 }} />
+          <span style={{ color: "#fca5a5", fontWeight: 700, fontSize: 13 }}>🔒 {activeTitle || "Class Video"}</span>
+        </div>
+        <button onClick={toggleMute} style={{
+          background: muted ? "rgba(234,179,8,0.2)" : "rgba(255,255,255,0.08)",
+          border: `1px solid ${muted ? "rgba(234,179,8,0.5)" : "rgba(255,255,255,0.15)"}`,
+          color: muted ? "#fbbf24" : "rgba(255,255,255,0.7)",
+          borderRadius: 6, padding: "3px 12px", cursor: "pointer", fontSize: 12, flexShrink: 0,
+        }}>{muted ? "🔇 Unmute" : "🔊 Mute"}</button>
       </div>
 
-      {/* 16:9 letterboxed iframe */}
-      <div style={{
-        position: "absolute",
-        top: 48, left: 0, right: 0, bottom: 32,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 12,
-      }}>
+      {/* Video */}
+      <div style={{ position: "absolute", top: 48, left: 0, right: 0, bottom: 32, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
         <div style={{
-          position: "relative",
-          width: "100%", height: "100%",
-          maxWidth: "calc((100vh - 92px) * 16 / 9)",
-          maxHeight: "calc((100vw - 24px) * 9 / 16)",
-          aspectRatio: "16/9",
-          boxShadow: "0 0 60px rgba(0,0,0,0.8)",
-          borderRadius: 8,
-          overflow: "hidden",
+          position: "relative", width: "100%", height: "100%",
+          maxWidth: "calc((100vh - 92px) * 16 / 9)", maxHeight: "calc((100vw - 24px) * 9 / 16)",
+          aspectRatio: "16/9", boxShadow: "0 0 60px rgba(0,0,0,0.8)", borderRadius: 8, overflow: "hidden",
         }}>
           <iframe
             ref={iframeRef}
@@ -225,37 +224,18 @@ export default function VideoOverlay() {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             title={activeTitle}
           />
-
-          {/* iOS: full-screen tap-to-play overlay until the student taps */}
-          {isIOS && !iosStarted && (
-            <div
-              onClick={handleIOSTap}
-              style={{
-                position: "absolute", inset: 0,
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                background: "rgba(0,0,0,0.82)",
-                cursor: "pointer", gap: 20,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
+          {/* iOS tap-to-play: sits over the loaded (paused) iframe */}
+          {isIOS && !iosReady && (
+            <div onClick={handleIOSTap} style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.55)", cursor: "pointer", WebkitTapHighlightColor: "transparent",
+            }}>
               <div style={{
-                width: 88, height: 88, borderRadius: "50%",
-                background: "rgba(255,255,255,0.12)",
-                border: "3px solid rgba(255,255,255,0.7)",
+                width: 80, height: 80, borderRadius: "50%",
+                background: "rgba(255,255,255,0.15)", border: "3px solid rgba(255,255,255,0.8)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <svg viewBox="0 0 24 24" fill="white" width={40} height={40}>
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ color: "#fff", fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
-                  Tap to watch
-                </div>
-                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                  Your teacher is showing a video
-                </div>
+                <svg viewBox="0 0 24 24" fill="white" width={36} height={36}><path d="M8 5v14l11-7z"/></svg>
               </div>
             </div>
           )}
@@ -263,11 +243,7 @@ export default function VideoOverlay() {
       </div>
 
       {/* Footer */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        padding: "8px 20px", textAlign: "center",
-        color: "rgba(255,255,255,0.4)", fontSize: 11, letterSpacing: "0.04em",
-      }}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 20px", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
         Your teacher will return you to BlockForge when the video ends.
       </div>
     </div>,
