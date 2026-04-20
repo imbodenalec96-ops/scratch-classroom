@@ -38,7 +38,7 @@ export function embedForUrl(url: string): { kind: "slides" | "doc" | "drive" | "
   if (drive) return { kind: "drive", src: `https://drive.google.com/file/d/${drive[1]}/preview` };
   // YouTube
   const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
-  if (yt) return { kind: "youtube", src: `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&modestbranding=1` };
+  if (yt) return { kind: "youtube", src: `https://www.youtube-nocookie.com/embed/${yt[1]}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` };
   // PDF (by extension)
   if (/\.pdf($|\?)/i.test(u)) return { kind: "pdf", src: u };
   // Image (by extension)

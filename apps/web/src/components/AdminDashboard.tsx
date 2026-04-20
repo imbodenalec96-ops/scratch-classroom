@@ -169,14 +169,14 @@ export default function AdminDashboard() {
         background: dk
           ? "linear-gradient(160deg,#0d0b1e 0%,#130d2e 55%,#090f1e 100%)"
           : "linear-gradient(160deg,#0ea5e9 0%,#3b82f6 40%,#4f46e5 100%)",
-        padding:"32px 40px 32px",
+        padding:"32px 32px 32px",
         marginBottom:32,
         position:"relative",
         overflow:"hidden",
       }}>
         <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 40%,rgba(124,58,237,0.18) 0%,transparent 65%)",pointerEvents:"none" }} />
         <div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse at 20% 80%,rgba(59,130,246,0.1) 0%,transparent 60%)",pointerEvents:"none" }} />
-        <header style={{ maxWidth:1280, margin:"0 auto", position:"relative", animation:"ad-fadeUp .45s ease both" }}>
+        <header style={{ maxWidth:"100%", margin:"0 auto", position:"relative", animation:"ad-fadeUp .45s ease both" }}>
           <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.45)",marginBottom:10 }}>
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · Admin Portal
           </div>
@@ -214,12 +214,12 @@ export default function AdminDashboard() {
         </header>
       </div>
 
-      <div style={{ padding:"0 40px 56px", maxWidth:1280, margin:"0 auto" }}>
+      <div style={{ padding:"0 32px 56px", maxWidth:"100%", margin:"0 auto" }}>
 
         {/* ─── Stat cards (with top accent bar) ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .05s both" }}>
           <Divider label="Overview" />
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14 }}>
             {STATS.map(s => (
               <div key={s.label} style={{
                 ...cardStyle,
