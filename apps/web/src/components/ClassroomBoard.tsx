@@ -495,21 +495,45 @@ export default function ClassroomBoard() {
                       {firstName}
                     </div>
 
-                    {/* Stars — plain row on a thin rule, no bubble chrome */}
+                    {/* Stars — bigger, brighter, with a gentle glow on every filled star */}
                     <div style={{
-                      display: "flex", alignItems: "center", gap: 3, justifyContent: "center",
-                      padding: "2px 0",
+                      display: "flex", alignItems: "center", gap: 5, justifyContent: "center",
+                      padding: "3px 0 1px",
                     }}>
                       {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} style={{
-                          fontSize: 13, lineHeight: 1,
-                          opacity: i < stars ? 1 : 0.14,
-                          filter: i < stars ? (isFull ? "drop-shadow(0 0 4px rgba(251,191,36,.9))" : "none") : "none",
+                          fontSize: 20, lineHeight: 1,
+                          opacity: i < stars ? 1 : 0.18,
+                          filter: i < stars
+                            ? (isFull
+                                ? "drop-shadow(0 0 6px rgba(251,191,36,1)) drop-shadow(0 0 12px rgba(245,158,11,.6))"
+                                : "drop-shadow(0 0 3px rgba(251,191,36,.45))")
+                            : "none",
                           animation: i < stars && isFull ? `starGlow 2.2s ease-in-out ${i * 0.15}s infinite` : undefined,
-                          color: i < stars ? (isFull ? "#fbbf24" : "#fde68a") : "rgba(245,241,232,0.3)",
+                          color: i < stars ? (isFull ? "#fbbf24" : "#fcd34d") : "rgba(245,241,232,0.28)",
+                          transition: "all .3s ease",
                         }}>★</span>
                       ))}
                     </div>
+
+                    {/* Points — ClassDojo-style amber chip with coin icon */}
+                    {typeof s.dojo_points === "number" && (
+                      <div style={{
+                        fontFamily: "'Inter', sans-serif",
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "3px 10px", borderRadius: 999,
+                        background: "linear-gradient(135deg, rgba(217,119,6,0.22), rgba(251,191,36,0.12))",
+                        border: "1px solid rgba(251,191,36,0.45)",
+                        fontSize: 13, fontWeight: 700,
+                        color: "#fde68a",
+                        letterSpacing: "0.01em",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                      }}>
+                        <span style={{ fontSize: 12 }}>🪙</span>
+                        {s.dojo_points}
+                        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.65, marginLeft: 2 }}>pts</span>
+                      </div>
+                    )}
 
                     {/* Schedule pills — teal/brick editorial ticket style */}
                     {(() => {
