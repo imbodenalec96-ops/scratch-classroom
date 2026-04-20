@@ -270,6 +270,10 @@ export default function TeacherSchedule() {
   const [classStudents, setClassStudents] = useState<any[]>([]);
   // Per-block UI expansion for the advanced "per day" editor
   const [showAdvancedFor, setShowAdvancedFor] = useState<Record<number, boolean>>({});
+  // Per-block toggle for the "Content & overrides" section (assignments,
+  // video/news URLs, per-student overrides). Hidden by default so the
+  // primary edit form stays short.
+  const [showContentFor, setShowContentFor] = useState<Record<number, boolean>>({});
   // Today's skip list — block ids that have been cancelled just for today.
   // Keyed by block id, value is the schedule_skip row so we can DELETE to un-skip.
   const [skippedToday, setSkippedToday] = useState<Record<string, any>>({});
@@ -978,6 +982,22 @@ export default function TeacherSchedule() {
                           </div>
                         </div>
 
+                        {/* Content & Overrides — collapsible. Only rendered when
+                            the block has something content-y to configure (academic
+                            / SEL). Keeps the primary edit form short. */}
+                        {(isAcademic || b.subject === "sel") && (
+                          <button
+                            type="button"
+                            onClick={() => setShowContentFor((prev) => ({ ...prev, [i]: !prev[i] }))}
+                            className="text-[11px] font-semibold underline mb-3"
+                            style={{ color: "var(--t2)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                          >
+                            {showContentFor[i] ? "▾ Hide content & overrides" : "▸ Content & overrides (assignments, videos, per-student)"}
+                          </button>
+                        )}
+
+                        {showContentFor[i] && (<>
+
                         {/* Academic assignment picker — same storage slot as SEL
                             (`content_source`), just a different JSON shape.
                             Renders a "Same for every day" default picker on top
@@ -1545,6 +1565,8 @@ export default function TeacherSchedule() {
                             </div>
                           );
                         })()}
+
+                        </>)}
 
                         {/* Delete action */}
                         <div className="flex justify-end pt-1">
