@@ -900,8 +900,82 @@ export default function TeacherSchedule() {
 
                               {/* Video Learning URL — a single YouTube URL for this
                                   block. Students see it embedded on the /video-learning
-                                  page. Per-day overrides available via advanced toggle. */}
-                              {isVideoLearning && (
+                                  page. Per-day overrides available via advanced toggle.
+                                  Also gets a ✨ Generate button that AI-drafts a
+                                  follow-up assignment from the video transcript. */}
+                              {isVideoLearning && (() => {
+                                const vidGen = selGenState[i] || { status: "idle" as const };
+                                const currentVideoUrl = blockContent.videoUrl || "";
+                                const canGenVideo = isValidYouTubeUrl(currentVideoUrl) && vidGen.status !== "loading";
+                                const runGenVideo = async () => {
+                                  setSelGenState((prev) => ({ ...prev, [i]: { status: "loading" } }));
+                                  try {
+                                    const generated = await api.generateAssignmentFromVideo({
+                                      videoUrl: currentVideoUrl,
+                                      subject: "video_learning",
+                                      questionCount: 6,
+                                      title: b.label || "Video Learning",
+                                      grade: "K-5",
+                                    });
+                                    if (!generated) throw new Error("Empty response");
+                                    const rubric = Array.isArray(generated.sections)
+                                      ? generated.sections.flatMap((sec: any) =>
+                                          Array.isArray(sec?.questions)
+                                            ? sec.questions.map((q: any) => ({
+                                                label: String(q?.text || "Question").slice(0, 60),
+                                                maxPoints: Number(q?.points) || 1,
+                                              }))
+                                            : []
+                                        )
+                                      : [];
+                                    const saved = generated.id
+                                      ? generated
+                                      : await api.createAssignment({
+                                          classId,
+                                          title: generated.title || b.label || "Video Learning",
+                                          description: generated.instructions || "",
+                                          rubric,
+                                          content: JSON.stringify({
+                                            title: generated.title || b.label || "Video Learning",
+                                            subject: generated.subject || "video_learning",
+                                            grade: generated.grade || "K-5",
+                                            instructions: generated.instructions || "",
+                                            totalPoints: generated.totalPoints,
+                                            sections: generated.sections || [],
+                                          }),
+                                          targetSubject: "video_learning",
+                                          videoUrl: generated.videoUrl || currentVideoUrl,
+                                        });
+                                    if (saved?.id) {
+                                      try {
+                                        const rows = await api.getAssignments(classId);
+                                        if (Array.isArray(rows)) setAssignments(rows);
+                                      } catch {}
+                                      // Auto-wire the saved assignment as the block's default
+                                      updateBlock(i, {
+                                        content_source: buildBlockContent({
+                                          ...blockContent,
+                                          assignmentId: saved.id,
+                                        }),
+                                      });
+                                    }
+                                    setSelGenState((prev) => ({
+                                      ...prev,
+                                      [i]: {
+                                        status: "success",
+                                        message: saved?.id
+                                          ? `Saved "${saved.title || "Video Learning"}" and linked it.`
+                                          : "Generated — but could not persist. Check server logs.",
+                                      },
+                                    }));
+                                  } catch (err: any) {
+                                    setSelGenState((prev) => ({
+                                      ...prev,
+                                      [i]: { status: "error", message: err?.message || "Generation failed" },
+                                    }));
+                                  }
+                                };
+                                return (
                                 <div className="mt-3 pt-3 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
                                   <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
                                     📺 YouTube Video URL
@@ -913,16 +987,54 @@ export default function TeacherSchedule() {
                                     <input
                                       type="url"
                                       placeholder="https://youtube.com/watch?v=…"
-                                      value={blockContent.videoUrl || ""}
-                                      onChange={(e) => updateBlock(i, {
-                                        content_source: buildBlockContent({
-                                          ...blockContent,
-                                          videoUrl: e.target.value || undefined,
-                                        }),
-                                      })}
+                                      value={currentVideoUrl}
+                                      onChange={(e) => {
+                                        updateBlock(i, {
+                                          content_source: buildBlockContent({
+                                            ...blockContent,
+                                            videoUrl: e.target.value || undefined,
+                                          }),
+                                        });
+                                        if (selGenState[i] && selGenState[i].status !== "loading") {
+                                          setSelGenState((prev) => ({ ...prev, [i]: { status: "idle" } }));
+                                        }
+                                      }}
                                       className="input text-xs"
                                     />
                                   </label>
+
+                                  {/* ✨ Generate assignment from video */}
+                                  <div className="mb-3 flex items-center gap-2 flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={runGenVideo}
+                                      disabled={!canGenVideo}
+                                      className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                      style={{
+                                        background: "rgba(244,63,94,0.15)",
+                                        borderColor: "rgba(244,63,94,0.35)",
+                                        color: "#fb7185",
+                                      }}
+                                      title={canGenVideo ? "Generate an assignment from the video transcript" : "Paste a YouTube URL first"}
+                                    >
+                                      {vidGen.status === "loading" ? (
+                                        <Loader2 size={12} className="animate-spin" />
+                                      ) : (
+                                        <Sparkles size={12} />
+                                      )}
+                                      {vidGen.status === "loading" ? "Generating…" : "Generate assignment from video"}
+                                    </button>
+                                    {vidGen.status === "success" && (
+                                      <span className="flex items-center gap-1 text-[11px]" style={{ color: "#34d399" }}>
+                                        <CheckCircle2 size={12} /> {vidGen.message}
+                                      </span>
+                                    )}
+                                    {vidGen.status === "error" && (
+                                      <span className="flex items-center gap-1 text-[11px]" style={{ color: "#fca5a5" }}>
+                                        <AlertCircle size={12} /> {vidGen.message}
+                                      </span>
+                                    )}
+                                  </div>
                                   {showAdvancedFor[i] && (
                                     <>
                                       <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
@@ -961,7 +1073,8 @@ export default function TeacherSchedule() {
                                     </>
                                   )}
                                 </div>
-                              )}
+                                );
+                              })()}
 
                               {/* Daily News URL — default + per-day. Only visible
                                   for daily_news blocks. */}
