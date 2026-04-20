@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle, Coffee, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { Clock, Plus, Trash2, Save, RotateCcw, AlertCircle, Coffee, Sparkles, Loader2, CheckCircle2, SkipForward, Send, Pencil } from "lucide-react";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
+import { subjectToRoute } from "../lib/useBlockAutoNav.ts";
 
 type Block = {
   id?: string;
@@ -536,6 +537,183 @@ export default function TeacherSchedule() {
         </div>
       )}
 
+      {/* ── Today-at-a-glance tiles ───────────────────────────────────── */}
+      {!loading && blocks.length > 0 && (() => {
+        // DAYS = Mon..Fri; JS getDay() = 0=Sun..6=Sat. Map 1→Mon..5→Fri.
+        const dow = new Date().getDay();
+        const todayLetter = dow >= 1 && dow <= 5 ? DAYS[dow - 1] : "Mon";
+        const todaysBlocks = blocks
+          .filter((b) => {
+            const d = normalizeDays(b.active_days);
+            return d.length === 0 || d.includes(todayLetter);
+          })
+          .slice()
+          .sort((a, b) => a.start_time.localeCompare(b.start_time));
+        if (!todaysBlocks.length) return null;
+
+        const pushBlockToDashboard = async (b: Block) => {
+          if (!classId) return;
+          const route = subjectToRoute({ ...b, id: b.id || "", class_id: classId, content_source: b.content_source ?? null } as any);
+          if (!route) {
+            alert("This block doesn't have a route to push (break / dismissal / etc.).");
+            return;
+          }
+          try {
+            await api.sendClassCommand(classId, "NAVIGATE", route);
+            alert(`Pushed every student to ${route}`);
+          } catch (e: any) {
+            alert("Push failed: " + (e?.message || "unknown"));
+          }
+        };
+
+        const openBlock = (b: Block) => {
+          const idx = blocks.findIndex((x) => x === b);
+          if (idx >= 0) {
+            setExpandedIndex(idx);
+            setTimeout(() => {
+              const el = document.getElementById(`block-${idx}`);
+              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 100);
+          }
+        };
+
+        return (
+          <section className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--t3)" }}>Today · {todayLetter}</div>
+                <h2 className="text-lg font-bold mt-0.5" style={{ color: "var(--t1)" }}>At a glance</h2>
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--t3)" }}>
+                {todaysBlocks.length} block{todaysBlocks.length === 1 ? "" : "s"} · tap a tile to edit below
+              </div>
+            </div>
+            <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+              {todaysBlocks.map((b) => {
+                const isLiveTile = liveBlock === b;
+                const isSkipped = b.id ? !!skippedToday[String(b.id)] : false;
+                const color = getBlockColor(b);
+                const subjLabel = b.is_break
+                  ? (BREAK_TYPES.find((t) => t.value === (b.break_type || "regular"))?.label || "Break")
+                  : (SUBJECTS.find((s) => s.value === b.subject)?.label || b.subject || "—");
+                return (
+                  <div
+                    key={`today-${b.id}`}
+                    className="rounded-2xl border p-3.5 transition-all flex flex-col gap-2.5"
+                    style={{
+                      borderColor: isLiveTile
+                        ? "rgba(124,58,237,0.55)"
+                        : isSkipped
+                          ? "rgba(239,68,68,0.35)"
+                          : "rgba(255,255,255,0.08)",
+                      background: isLiveTile
+                        ? "linear-gradient(140deg, rgba(124,58,237,0.14), rgba(139,92,246,0.04))"
+                        : isSkipped
+                          ? "rgba(239,68,68,0.05)"
+                          : "rgba(255,255,255,0.03)",
+                      boxShadow: isLiveTile ? "0 0 32px rgba(124,58,237,0.28), 0 0 0 1px rgba(124,58,237,0.25)" : "none",
+                      opacity: isSkipped ? 0.72 : 1,
+                      animation: isLiveTile ? "tileGlow 2.5s ease-in-out infinite" : undefined,
+                      textDecoration: isSkipped ? "line-through" : "none",
+                      minHeight: 52,
+                    }}
+                  >
+                    <style>{`@keyframes tileGlow { 0%,100% { box-shadow: 0 0 32px rgba(124,58,237,0.28), 0 0 0 1px rgba(124,58,237,0.25); } 50% { box-shadow: 0 0 48px rgba(124,58,237,0.45), 0 0 0 1px rgba(124,58,237,0.5); } }`}</style>
+
+                    {/* Header row: color stripe + label + time */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-mono font-semibold tabular-nums" style={{ color: "var(--t3)" }}>
+                          {formatTime(b.start_time)} – {formatTime(b.end_time)}
+                        </div>
+                        <div className="text-[15px] font-bold mt-0.5 truncate" style={{ color: "var(--t1)" }}>
+                          {b.label || <span style={{ color: "var(--t3)" }}>Untitled</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isLiveTile && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md animate-pulse"
+                            style={{ background: "rgba(124,58,237,0.3)", color: "#c4b5fd" }}>
+                            LIVE
+                          </span>
+                        )}
+                        {isSkipped && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                            style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>
+                            SKIPPED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Subject pill */}
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color.dot }} />
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: color.bg, color: color.text }}>
+                        {subjLabel}
+                      </span>
+                    </div>
+
+                    {/* Actions row — minimum 44×44 touch targets on iPad */}
+                    <div className="grid grid-cols-3 gap-1.5 mt-1">
+                      {b.id && (
+                        <button
+                          onClick={() => toggleSkip(b)}
+                          className="flex items-center justify-center gap-1 text-[11px] font-bold rounded-lg border transition-colors"
+                          style={{
+                            minHeight: 44,
+                            background: isSkipped ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)",
+                            color: isSkipped ? "#86efac" : "#fca5a5",
+                            borderColor: isSkipped ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.25)",
+                            cursor: "pointer",
+                          }}
+                          title={isSkipped ? "Un-skip" : "Skip just for today"}
+                        >
+                          <SkipForward size={12} />
+                          <span>{isSkipped ? "Un-skip" : "Skip"}</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => pushBlockToDashboard(b)}
+                        className="flex items-center justify-center gap-1 text-[11px] font-bold rounded-lg border transition-colors"
+                        style={{
+                          minHeight: 44,
+                          background: "rgba(124,58,237,0.12)",
+                          color: "#c4b5fd",
+                          borderColor: "rgba(124,58,237,0.3)",
+                          cursor: "pointer",
+                        }}
+                        title="Push every student to this block's page now"
+                        disabled={!!b.is_break}
+                      >
+                        <Send size={12} />
+                        <span>Push</span>
+                      </button>
+                      <button
+                        onClick={() => openBlock(b)}
+                        className="flex items-center justify-center gap-1 text-[11px] font-bold rounded-lg border transition-colors"
+                        style={{
+                          minHeight: 44,
+                          background: "rgba(255,255,255,0.04)",
+                          color: "var(--t2)",
+                          borderColor: "rgba(255,255,255,0.1)",
+                          cursor: "pointer",
+                        }}
+                        title="Open the full editor for this block"
+                      >
+                        <Pencil size={12} />
+                        <span>Edit</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
+
       {loading ? (
         <div className="rounded-2xl border flex items-center justify-center py-24"
           style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
@@ -584,12 +762,14 @@ export default function TeacherSchedule() {
                 <Fragment key={i}>
                   {/* Block card */}
                   <div
+                    id={`block-${i}`}
                     className="rounded-2xl border overflow-hidden transition-all"
                     style={{
                       borderColor: isLive ? "rgba(124,58,237,0.4)" : isExpanded ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)",
                       background: isLive ? "rgba(124,58,237,0.07)" : isExpanded ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
                       boxShadow: isLive ? "0 0 0 1px rgba(124,58,237,0.2)" : "none",
                       opacity: (b.id && skippedToday[String(b.id)]) ? 0.55 : 1,
+                      scrollMarginTop: 96,
                     }}
                   >
                     {/* Collapsed summary row — click to expand */}
