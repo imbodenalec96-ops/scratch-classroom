@@ -274,6 +274,9 @@ export default function TeacherSchedule() {
   // video/news URLs, per-student overrides). Hidden by default so the
   // primary edit form stays short.
   const [showContentFor, setShowContentFor] = useState<Record<number, boolean>>({});
+  // Per-block toggle for the per-student grid inside Content & overrides.
+  // Default hidden — most blocks use one assignment for everyone.
+  const [showPerStudentFor, setShowPerStudentFor] = useState<Record<number, boolean>>({});
   // Today's skip list — block ids that have been cancelled just for today.
   // Keyed by block id, value is the schedule_skip row so we can DELETE to un-skip.
   const [skippedToday, setSkippedToday] = useState<Record<string, any>>({});
@@ -1023,13 +1026,13 @@ export default function TeacherSchedule() {
                                 {subjLabel} Assignment
                               </div>
 
-                              {/* "Same for every day" default — root-level fallback. */}
+                              {/* One assignment for the whole class — the simple case. */}
                               <div className="mb-3">
                                 <label className="flex flex-col gap-1">
-                                  <span className="text-[10px]" style={{ color: "var(--t3)" }}>
-                                    Same for every day (default)
+                                  <span className="text-[11px] font-semibold" style={{ color: "var(--t2)" }}>
+                                    Assignment
                                     {assignmentOptions.length === 0 && assignments.length > 0 && (
-                                      <span className="ml-1.5 opacity-70">(no matches for this subject — showing none)</span>
+                                      <span className="ml-1.5 opacity-60 font-normal">(no {b.subject} assignments yet)</span>
                                     )}
                                   </span>
                                   <select
@@ -1040,9 +1043,9 @@ export default function TeacherSchedule() {
                                         assignmentId: e.target.value || undefined,
                                       }),
                                     })}
-                                    className="input text-xs"
+                                    className="input text-sm"
                                   >
-                                    <option value="">— None —</option>
+                                    <option value="">— Pick one —</option>
                                     {assignmentOptions.map((a: any) => (
                                       <option key={a.id} value={a.id}>
                                         {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
@@ -1051,24 +1054,35 @@ export default function TeacherSchedule() {
                                     {blockContent.assignmentId &&
                                       !assignmentOptions.some((a: any) => a.id === blockContent.assignmentId) && (
                                       <option value={blockContent.assignmentId}>
-                                        (currently saved: {blockContent.assignmentId.slice(0, 8)}…)
+                                        (saved: {blockContent.assignmentId.slice(0, 8)}…)
                                       </option>
                                     )}
                                   </select>
                                 </label>
                               </div>
 
-                              {/* Per-student pickers — one per student in the class.
-                                  Simpler than abstract grade levels: just pick the
-                                  specific assignment for each kid. Empty = use default. */}
-                              {classStudents.length > 0 && (
-                                <div className="mb-3 pt-2 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
-                                  <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
-                                    Per student (overrides default — leave blank to use default)
-                                  </div>
-                                  <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+                              {/* Per-student overrides, collapsed by default. Auto-expand
+                                  when at least one student already has an override so
+                                  teachers never lose track of saved state. */}
+                              {classStudents.length > 0 && (() => {
+                                const byStudent = blockContent.byStudent || {};
+                                const hasAnyOverride = Object.keys(byStudent).length > 0;
+                                const shown = showPerStudentFor[i] || hasAnyOverride;
+                                return (
+                                  <div className="mb-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowPerStudentFor((prev) => ({ ...prev, [i]: !shown }))}
+                                      className="text-[11px] font-semibold underline"
+                                      style={{ color: "var(--t2)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                                    >
+                                      {shown
+                                        ? "▾ Hide per-student"
+                                        : `▸ Give a student a different assignment${hasAnyOverride ? ` (${Object.keys(byStudent).length} set)` : ""}`}
+                                    </button>
+                                    {shown && (
+                                      <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                                     {classStudents.map((stu: any) => {
-                                      const byStudent = blockContent.byStudent || {};
                                       const stuVal = byStudent[stu.id] || "";
                                       return (
                                         <label key={stu.id} className="flex flex-col gap-1">
@@ -1092,7 +1106,12 @@ export default function TeacherSchedule() {
                                             className="input text-[11px] py-1 px-1.5"
                                             title={`${stu.name}'s assignment`}
                                           >
-                                            {renderAssignmentOptions()}
+                                            <option value="">— Same as class —</option>
+                                            {assignmentOptions.map((a: any) => (
+                                              <option key={a.id} value={a.id}>
+                                                {a.title}{a.target_subject ? ` · ${a.target_subject}` : ""}
+                                              </option>
+                                            ))}
                                             {stuVal && !assignmentOptions.some((a: any) => a.id === stuVal) && (
                                               <option value={stuVal}>(saved: {stuVal.slice(0, 6)}…)</option>
                                             )}
@@ -1101,8 +1120,10 @@ export default function TeacherSchedule() {
                                       );
                                     })}
                                   </div>
-                                </div>
-                              )}
+                                    )}
+                                  </div>
+                                );
+                              })()}
 
                               {/* Advanced toggle — hides per-day complexity */}
                               <button
@@ -1111,14 +1132,14 @@ export default function TeacherSchedule() {
                                 className="text-[10px] font-semibold underline mb-2"
                                 style={{ color: "var(--t3)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
                               >
-                                {showAdvancedFor[i] ? "▾ Hide advanced options" : "▸ Show advanced options (per day)"}
+                                {showAdvancedFor[i] ? "▾ Hide per-day options" : "▸ Different on different days?"}
                               </button>
 
                               {/* Per-day mini-pickers — one per active day. */}
                               {showAdvancedFor[i] && (
                               <div className="mb-1">
                                 <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
-                                  Per day (overrides default)
+                                  Or set per day
                                 </div>
                                 <div className="grid gap-2"
                                   style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
@@ -1248,7 +1269,7 @@ export default function TeacherSchedule() {
                                   </div>
                                   <label className="flex flex-col gap-1 mb-3">
                                     <span className="text-[10px]" style={{ color: "var(--t3)" }}>
-                                      Same for every day (default)
+                                      For every day
                                     </span>
                                     <input
                                       type="url"
@@ -1304,7 +1325,7 @@ export default function TeacherSchedule() {
                                   {showAdvancedFor[i] && (
                                     <>
                                       <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
-                                        Per day (overrides default)
+                                        Or set per day
                                       </div>
                                       <div className="grid gap-2"
                                         style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
@@ -1351,7 +1372,7 @@ export default function TeacherSchedule() {
                                   </div>
                                   <label className="flex flex-col gap-1 mb-3">
                                     <span className="text-[10px]" style={{ color: "var(--t3)" }}>
-                                      Same for every day (default)
+                                      For every day
                                     </span>
                                     <input
                                       type="url"
@@ -1367,7 +1388,7 @@ export default function TeacherSchedule() {
                                     />
                                   </label>
                                   <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
-                                    Per day (overrides default)
+                                    Or set per day
                                   </div>
                                   <div className="grid gap-2"
                                     style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
