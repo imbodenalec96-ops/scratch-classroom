@@ -8,8 +8,6 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx src/data/seed.ts",
-    "seed-pg": "tsx src/data/seed-pg.ts",
-    "postbuild": "npm run seed-pg || true",
     "fix-assignments": "tsx src/data/fix-assignments.ts",
     "create-assignments": "tsx src/data/create-assignments-via-api.ts",
     "fix-all": "tsx src/data/fix-all-assignments.ts"
