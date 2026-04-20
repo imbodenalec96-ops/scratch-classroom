@@ -3,6 +3,31 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
+import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
+
+const ASSIGN_DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+function resolveBlockAssignmentId(
+  raw: string | null | undefined,
+  studentGrade?: number | null,
+  studentId?: string | null,
+): string | null {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw);
+    const today = ASSIGN_DAY_LETTERS[new Date().getDay()];
+    const day = (p?.byDay && typeof p.byDay === "object" && p.byDay[today]) || {};
+    const gk = studentGrade != null ? String(studentGrade) : null;
+    return (
+      (studentId && day.byStudent?.[studentId]) ||
+      (gk && day.byGrade?.[gk]) ||
+      day.assignmentId ||
+      (studentId && p.byStudent?.[studentId]) ||
+      (gk && p.byGrade?.[gk]) ||
+      p.assignmentId ||
+      null
+    );
+  } catch { return null; }
+}
 import {
   Sparkles, Plus, ChevronDown, ChevronUp, Printer, X, Loader2,
   BookOpen, GraduationCap, Calendar, FileText, Check,
@@ -125,6 +150,7 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
 
 /* ── Student Interactive Assignment View ─────────────────────── */
 function StudentAssignmentView({ dk }: { dk: boolean }) {
+  const { user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [assignment, setAssignment] = useState<any>(null);
   const [parsed, setParsed] = useState<any>(null);
@@ -133,6 +159,8 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [classId, setClassId] = useState<string | null>(null);
+  const currentBlock = useCurrentBlock(classId);
 
   // Flatten all questions from all sections into a single array
   const allQuestions: Array<{ q: any; sectionTitle: string }> = parsed
@@ -142,19 +170,45 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const q = allQuestions[currentQ];
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    (async () => {
       try {
         const clsList = await api.getClasses();
         setClasses(clsList);
-        for (const cls of clsList) {
-          const today = await api.getTodayAssignment(cls.id);
+        setClassId(clsList?.[0]?.id ?? null);
+      } catch {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        // 1) Prefer the current schedule block's assignment (per-student → per-grade → per-day → root).
+        const grade = (user as any)?.specialsGrade ?? null;
+        const blockAssignmentId = resolveBlockAssignmentId(
+          currentBlock?.content_source,
+          grade,
+          user?.id ?? null,
+        );
+        if (blockAssignmentId) {
+          try {
+            const a = await api.getAssignment(blockAssignmentId);
+            if (a) {
+              setAssignment(a);
+              if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+              setLoading(false);
+              return;
+            }
+          } catch {}
+        }
+        // 2) Fallback: class-wide "today's assignment" across all of the student's classes.
+        const cls = classes.length ? classes : await api.getClasses();
+        for (const c of cls) {
+          const today = await api.getTodayAssignment(c.id);
           if (today && today.length > 0) {
             const a = today[0];
             setAssignment(a);
-            if (a.content) {
-              try { setParsed(JSON.parse(a.content)); } catch {}
-            }
+            if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
             break;
           }
         }
@@ -162,7 +216,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [currentBlock?.id, classId, user?.id]);
 
   const handleSelect = (value: string) => {
     setAnswers((prev) => ({ ...prev, [currentQ]: value }));
