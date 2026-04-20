@@ -535,27 +535,58 @@ export default function ClassroomBoard() {
                       </div>
                     )}
 
-                    {/* Schedule pills — teal/brick editorial ticket style */}
+                    {/* Schedule pills with times so the teacher knows exactly when
+                        each student leaves for Resource / Gen Ed / Specials.
+                        Format: "9:10a  🎯 Resource". Compact monospace for the
+                        time, activity label on the right, tile takes full card
+                        width. Shows up to 3 upcoming entries. */}
                     {(() => {
+                      const formatTimeShort = (t: string) => {
+                        if (!t) return "";
+                        const [hRaw, m] = t.split(":").map((x) => String(x).trim());
+                        const h = Number(hRaw);
+                        if (!Number.isFinite(h)) return t;
+                        const ampm = h >= 12 ? "p" : "a";
+                        const h12 = ((h % 12) || 12);
+                        return `${h12}:${(m || "00").padStart(2, "0")}${ampm}`;
+                      };
                       const studentSchedules = board.schedules
                         .filter((sc: any) => sc.student_id === s.id)
                         .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time))
-                        .slice(0, 2);
+                        .slice(0, 3);
                       return studentSchedules.length > 0 ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", width: "100%", padding: "0 4px" }}>
-                          {studentSchedules.map((sc: any, i: number) => (
-                            <div key={i} style={{
-                              fontSize: 10, padding: "2px 6px", borderRadius: 2,
-                              background: "rgba(42,111,106,0.22)", color: "#7dd3c5",
-                              border: "1px solid rgba(42,111,106,0.4)",
-                              borderLeft: "2px solid #2a6f6a", width: "100%",
-                              fontWeight: 600, letterSpacing: "0.01em", textAlign: "left",
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                              fontFamily: "'Inter', sans-serif",
-                            }}>
-                              <span style={{ opacity: 0.8, marginRight: 4 }}>{actEmoji(sc.activity)}</span>{sc.activity}
-                            </div>
-                          ))}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", width: "100%", padding: "0 4px", marginTop: 2 }}>
+                          {studentSchedules.map((sc: any, i: number) => {
+                            const act = String(sc.activity || "").trim();
+                            return (
+                              <div key={i} style={{
+                                display: "flex", alignItems: "center", gap: 6,
+                                fontSize: 11, padding: "3px 7px", borderRadius: 3,
+                                background: "rgba(42,111,106,0.2)",
+                                border: "1px solid rgba(42,111,106,0.35)",
+                                borderLeft: "2px solid #2a6f6a",
+                                fontFamily: "'Inter', sans-serif",
+                                textAlign: "left",
+                              }}>
+                                <span style={{
+                                  fontFamily: "ui-monospace, Menlo, monospace",
+                                  fontSize: 10, fontWeight: 700,
+                                  color: "#94e0d4",
+                                  flexShrink: 0,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}>
+                                  {formatTimeShort(sc.start_time)}
+                                </span>
+                                <span style={{ opacity: 0.7, fontSize: 11, flexShrink: 0 }}>{actEmoji(act)}</span>
+                                <span style={{
+                                  color: "#c9ece3", fontWeight: 600, flex: 1, minWidth: 0,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>
+                                  {act}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : null;
                     })()}
