@@ -498,8 +498,8 @@ function WorkScreen({
   onBreak: () => void;
   questionsAnswered: number; setQuestionsAnswered: (n: number) => void;
 }) {
-  const allQuestions: Array<{ q: any; sectionTitle: string }> = parsed?.sections
-    ?.flatMap((s: any) => s.questions.map((q: any) => ({ q, sectionTitle: s.title }))) ?? [];
+  const allQuestions: Array<{ q: any; sectionTitle: string; passage?: string }> = parsed?.sections
+    ?.flatMap((s: any) => s.questions.map((q: any) => ({ q, sectionTitle: s.title, passage: s.passage }))) ?? [];
   const total = allQuestions.length;
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -684,6 +684,20 @@ function WorkScreen({
         {q && (
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] animate-slide-up" style={{ animationDelay: "90ms", color: starfall.accent }}>
             — {q.sectionTitle} —
+          </div>
+        )}
+
+        {/* ── Passage / reading text ── */}
+        {q?.passage && (
+          <div className="rounded-2xl p-6 animate-fade-in" style={{
+            background: "linear-gradient(135deg, #1e1b2e 0%, #16132a 100%)",
+            border: `1px solid ${starfall.accent}33`,
+            borderLeft: `3px solid ${starfall.accent}`,
+          }}>
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: starfall.accent }}>Read this first</div>
+            <p className="leading-relaxed" style={{ color: "#e2e0f0", fontSize: "clamp(1rem, 1.6vw, 1.15rem)", whiteSpace: "pre-wrap" }}>
+              {q.passage}
+            </p>
           </div>
         )}
 
