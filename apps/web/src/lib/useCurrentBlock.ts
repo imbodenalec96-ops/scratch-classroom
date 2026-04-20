@@ -29,12 +29,21 @@ function activeOn(b: ScheduleBlock, dayName: string): boolean {
   return days.includes(dayName);
 }
 
-/** Returns the block whose [start, end) contains `now`, or null. */
-export function findCurrentBlock(blocks: ScheduleBlock[], now: Date = new Date()): ScheduleBlock | null {
+/** Returns the block whose [start, end) contains `now`, or null.
+ *  `skippedIds` — optional set of today's skipped block ids, which are
+ *  filtered out so auto-nav/lockdown don't push students into a cancelled
+ *  block.
+ */
+export function findCurrentBlock(
+  blocks: ScheduleBlock[],
+  now: Date = new Date(),
+  skippedIds?: Set<string>,
+): ScheduleBlock | null {
   if (!blocks || blocks.length === 0) return null;
   const today = DAY_NAMES[now.getDay()];
   const mins = now.getHours() * 60 + now.getMinutes();
   for (const b of blocks) {
+    if (skippedIds && skippedIds.has(b.id)) continue;
     if (!activeOn(b, today)) continue;
     const start = toMinutes(b.start_time);
     const end = toMinutes(b.end_time);
@@ -86,26 +95,38 @@ export function findNextBlock(
  */
 export function useCurrentBlock(classId: string | null | undefined): ScheduleBlock | null {
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+  const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const [current, setCurrent] = useState<ScheduleBlock | null>(null);
 
   useEffect(() => {
-    if (!classId) { setBlocks([]); return; }
+    if (!classId) { setBlocks([]); setSkippedIds(new Set()); return; }
     let cancelled = false;
     api.getClassSchedule(classId)
       .then((rows) => { if (!cancelled) setBlocks(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (!cancelled) setBlocks([]); });
-    return () => { cancelled = true; };
+    // Poll today's skips so skip/un-skip propagate quickly (30s is fine — skip
+    // affects the next block boundary, not mid-block state).
+    const fetchExtras = () => {
+      api.getScheduleExtras(classId)
+        .then((r) => {
+          if (cancelled) return;
+          const ids = new Set<string>();
+          for (const s of r.skips || []) if (s?.block_id) ids.add(String(s.block_id));
+          setSkippedIds(ids);
+        })
+        .catch(() => { /* best-effort */ });
+    };
+    fetchExtras();
+    const iv = setInterval(fetchExtras, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
   }, [classId]);
 
   useEffect(() => {
-    const tick = () => setCurrent(findCurrentBlock(blocks));
+    const tick = () => setCurrent(findCurrentBlock(blocks, new Date(), skippedIds));
     tick();
-    // 30s cadence is fine — block boundaries align to minutes so worst-case
-    // drift is half a tick. Cheap enough that we don't try to schedule to
-    // the next boundary.
     const iv = setInterval(tick, 30_000);
     return () => clearInterval(iv);
-  }, [blocks]);
+  }, [blocks, skippedIds]);
 
   return current;
 }
@@ -125,15 +146,28 @@ export type BlockInfo =
 
 export function useBlockInfo(classId: string | null | undefined): BlockInfo {
   const [blocks, setBlocks] = useState<ScheduleBlock[] | null>(null);
+  const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    if (!classId) { setBlocks(null); return; }
+    if (!classId) { setBlocks(null); setSkippedIds(new Set()); return; }
     let cancelled = false;
     api.getClassSchedule(classId)
       .then((rows) => { if (!cancelled) setBlocks(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (!cancelled) setBlocks([]); });
-    return () => { cancelled = true; };
+    const fetchExtras = () => {
+      api.getScheduleExtras(classId)
+        .then((r) => {
+          if (cancelled) return;
+          const ids = new Set<string>();
+          for (const s of r.skips || []) if (s?.block_id) ids.add(String(s.block_id));
+          setSkippedIds(ids);
+        })
+        .catch(() => { /* best effort */ });
+    };
+    fetchExtras();
+    const iv = setInterval(fetchExtras, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
   }, [classId]);
 
   useEffect(() => {
@@ -143,7 +177,7 @@ export function useBlockInfo(classId: string | null | undefined): BlockInfo {
 
   if (!classId || blocks === null) return { state: "loading" };
   if (blocks.length === 0) return { state: "empty" };
-  const cur = findCurrentBlock(blocks);
+  const cur = findCurrentBlock(blocks, new Date(), skippedIds);
   if (cur) return { state: "current", block: cur };
   const nxt = findNextBlock(blocks);
   if (nxt) return { state: "upcoming", block: nxt.block, daysAway: nxt.daysAway };

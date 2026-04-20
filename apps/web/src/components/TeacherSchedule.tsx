@@ -269,6 +269,9 @@ export default function TeacherSchedule() {
   const [classStudents, setClassStudents] = useState<any[]>([]);
   // Per-block UI expansion for the advanced "per day" editor
   const [showAdvancedFor, setShowAdvancedFor] = useState<Record<number, boolean>>({});
+  // Today's skip list — block ids that have been cancelled just for today.
+  // Keyed by block id, value is the schedule_skip row so we can DELETE to un-skip.
+  const [skippedToday, setSkippedToday] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -306,8 +309,45 @@ export default function TeacherSchedule() {
     api.getStudents(classId)
       .then((rows: any[]) => { if (!cancelled) setClassStudents(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (!cancelled) setClassStudents([]); });
-    return () => { cancelled = true; };
+    const loadSkips = () => {
+      api.getScheduleExtras(classId)
+        .then((r) => {
+          if (cancelled) return;
+          const byId: Record<string, any> = {};
+          for (const s of r.skips || []) { if (s?.block_id) byId[String(s.block_id)] = s; }
+          setSkippedToday(byId);
+        })
+        .catch(() => { /* best effort */ });
+    };
+    loadSkips();
+    const iv = setInterval(loadSkips, 20_000);
+    return () => { cancelled = true; clearInterval(iv); };
   }, [classId]);
+
+  async function toggleSkip(block: Block) {
+    if (!block.id || !classId) return;
+    const id = String(block.id);
+    const isSkipped = !!skippedToday[id];
+    // Optimistic toggle
+    setSkippedToday((prev) => {
+      const next = { ...prev };
+      if (isSkipped) delete next[id]; else next[id] = { block_id: id, _optimistic: true };
+      return next;
+    });
+    try {
+      if (isSkipped) await api.unskipBlock(classId, id);
+      else await api.skipBlock(classId, id);
+    } catch (e: any) {
+      // Revert on failure
+      setSkippedToday((prev) => {
+        const next = { ...prev };
+        if (isSkipped) next[id] = { block_id: id };
+        else delete next[id];
+        return next;
+      });
+      alert("Couldn't toggle skip: " + (e?.message || "unknown"));
+    }
+  }
 
   useEffect(() => {
     if (!classId) return;
@@ -549,6 +589,7 @@ export default function TeacherSchedule() {
                       borderColor: isLive ? "rgba(124,58,237,0.4)" : isExpanded ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)",
                       background: isLive ? "rgba(124,58,237,0.07)" : isExpanded ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
                       boxShadow: isLive ? "0 0 0 1px rgba(124,58,237,0.2)" : "none",
+                      opacity: (b.id && skippedToday[String(b.id)]) ? 0.55 : 1,
                     }}
                   >
                     {/* Collapsed summary row — click to expand */}
@@ -605,6 +646,31 @@ export default function TeacherSchedule() {
                             style={{ background: "rgba(124,58,237,0.25)", color: "#a78bfa" }}>
                             LIVE
                           </span>
+                        )}
+
+                        {/* Skipped-today badge */}
+                        {b.id && skippedToday[String(b.id)] && (
+                          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.35)" }}>
+                            SKIPPED TODAY
+                          </span>
+                        )}
+
+                        {/* Skip/un-skip (today only) */}
+                        {b.id && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleSkip(b); }}
+                            className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md transition-all"
+                            style={{
+                              background: skippedToday[String(b.id)] ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.1)",
+                              color: skippedToday[String(b.id)] ? "#86efac" : "#fca5a5",
+                              border: skippedToday[String(b.id)] ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.25)",
+                              cursor: "pointer",
+                            }}
+                            title={skippedToday[String(b.id)] ? "Un-skip for today" : "Skip this block today only"}
+                          >
+                            {skippedToday[String(b.id)] ? "Un-skip" : "Skip Today"}
+                          </button>
                         )}
 
                         {/* Expand chevron */}

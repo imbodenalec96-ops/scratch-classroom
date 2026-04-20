@@ -7,6 +7,7 @@ import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
 import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
+import StudentOverrideOverlay from "./StudentOverrideOverlay.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
 import { useStudentCommands } from "../lib/useStudentCommands.ts";
 import { useBlockAutoNav } from "../lib/useBlockAutoNav.ts";
@@ -21,6 +22,7 @@ import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
 import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
 import { subjectToRoute } from "../lib/useBlockAutoNav.ts";
+import { useStudentOverride } from "../lib/useStudentOverride.ts";
 import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
@@ -136,6 +138,10 @@ export default function Layout() {
   // bounce them back. Respects the same teacher-override grace window and the
   // freetime/break/coding_art_gym exceptions that useBlockAutoNav respects.
   useBlockLockdown(isStudent, studentClassId);
+  // Pull-off-block overlay: when the teacher parks a student somewhere else
+  // (Calm Room, Office, Gen Ed…) we show a full-screen banner they can't
+  // dismiss until the override's ends_at passes.
+  const studentOverride = useStudentOverride(isStudent, user?.id ?? null);
 
   // Block-scoped lockdown. Subjects that imply "content mode" (single-route
   // focus, no sidebar, no escape) vs. "free" blocks (break, coding, review).
@@ -230,6 +236,7 @@ export default function Layout() {
           onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
         <BreakChoiceModal />
+        {studentOverride && <StudentOverrideOverlay override={studentOverride} />}
       </div>
     );
   }
@@ -251,6 +258,7 @@ export default function Layout() {
           onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
         <BreakChoiceModal />
+        {studentOverride && <StudentOverrideOverlay override={studentOverride} />}
       </div>
     );
   }
@@ -523,6 +531,7 @@ export default function Layout() {
 
       {/* Break system: modal + countdown banner */}
       {isStudent && <BreakChoiceModal />}
+      {isStudent && studentOverride && <StudentOverrideOverlay override={studentOverride} />}
     </div>
   );
 }
