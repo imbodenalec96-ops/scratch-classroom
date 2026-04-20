@@ -183,7 +183,7 @@ function blockToJSStatement(block: Block, map: Map<string, Block>, level: number
       code = `${ind}await playSoundUntilDone(${val(block, "SOUND")});`;
       break;
     case "sound_changevolume":
-      code = `${ind}changeVolume(${val(block, "VOLUME")});`;
+      code = `${ind}changeVolume(${val(block, "VOL")});`;
       break;
 
     // Control

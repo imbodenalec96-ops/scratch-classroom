@@ -564,18 +564,21 @@ export default function Stage2D({ sprites, stage, running, selectedSpriteId, onR
     }
   }, [sprites, draw]);
 
-  // Handle mouse events
-  const getMousePos = useCallback((e: React.MouseEvent) => {
+  // Handle pointer events (covers mouse, touch, and pen — iPad safe)
+  const getClientPos = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const scaleX = stage.width / rect.width;
     const scaleY = stage.height / rect.height;
     return {
-      x: (e.clientX - rect.left) * scaleX - stage.width / 2,
-      y: -((e.clientY - rect.top) * scaleY - stage.height / 2),
+      x: (clientX - rect.left) * scaleX - stage.width / 2,
+      y: -((clientY - rect.top) * scaleY - stage.height / 2),
     };
   }, [stage]);
+
+  // Keep legacy React.MouseEvent helpers working (used below)
+  const getMousePos = useCallback((e: React.MouseEvent) => getClientPos(e.clientX, e.clientY), [getClientPos]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const { x, y } = getMousePos(e);
@@ -622,6 +625,55 @@ export default function Stage2D({ sprites, stage, running, selectedSpriteId, onR
   }, [dragId, getMousePos, draw, onSpriteMove]);
 
   const handleMouseUp = useCallback(() => {
+    const engine = engineRef.current;
+    if (engine) engine.mouseDown = false;
+    setDragId(null);
+  }, []);
+
+  // Touch / pointer events so mouse sensing and sprite drag work on iPad
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    e.preventDefault();
+    const { x, y } = getClientPos(touch.clientX, touch.clientY);
+    const engine = engineRef.current;
+    if (engine) {
+      engine.mouseDown = true;
+      engine.mouseX = x;
+      engine.mouseY = y;
+      triggerStageClick(engine, spritesRef.current);
+    }
+    for (const sprite of [...spritesRef.current].reverse()) {
+      const rs = engine?.sprites.get(sprite.id);
+      const sx = rs?.x ?? sprite.x;
+      const sy = rs?.y ?? sprite.y;
+      const sc = rs?.scale ?? sprite.scale;
+      const size = 20 * sc;
+      if (Math.abs(x - sx) < size && Math.abs(y - sy) < size) {
+        if (running && engine) triggerSpriteClick(engine, spritesRef.current, sprite.id);
+        setDragId(sprite.id);
+        break;
+      }
+    }
+  }, [running, getClientPos]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    e.preventDefault();
+    const { x, y } = getClientPos(touch.clientX, touch.clientY);
+    const engine = engineRef.current;
+    if (engine) { engine.mouseX = x; engine.mouseY = y; }
+    if (!dragId) return;
+    onSpriteMove?.(dragId, Math.round(x), Math.round(y));
+    if (engine) {
+      const state = engine.sprites.get(dragId);
+      if (state) { state.x = x; state.y = y; }
+    }
+    draw();
+  }, [dragId, getClientPos, draw, onSpriteMove]);
+
+  const handleTouchEnd = useCallback(() => {
     const engine = engineRef.current;
     if (engine) engine.mouseDown = false;
     setDragId(null);
@@ -680,11 +732,15 @@ export default function Stage2D({ sprites, stage, running, selectedSpriteId, onR
         width={stage.width}
         height={stage.height}
         className="block w-full h-auto cursor-pointer"
-        style={{ imageRendering: "auto" }}
+        style={{ imageRendering: "auto", touchAction: "none" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       />
 
       {/* Stage controls overlay (bottom bar) */}

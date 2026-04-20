@@ -1786,19 +1786,22 @@ export function stepRuntime(engine: RuntimeEngine, sprites: Sprite[], dt: number
         case "control_repeatuntil": {
           const cond4 = evalCondition(block, state, engine);
           if (cond4) {
-            // Condition met, skip body
+            // Condition met, skip body and pop loop entry if present
             const children4 = [...thread.blockMap.values()].filter(b => b.parent === block.id);
             thread.pc += children4.length + 1;
             if (thread.loopStack.length > 0 && thread.loopStack[thread.loopStack.length - 1].blockId === block.id) {
               thread.loopStack.pop();
             }
           } else {
-            thread.loopStack.push({
-              blockId: block.id,
-              count: 0,
-              max: -1,
-              returnPc: thread.pc,
-            });
+            // Only push a new loop entry if this block isn't already on the stack
+            if (!thread.loopStack.some(e => e.blockId === block.id)) {
+              thread.loopStack.push({
+                blockId: block.id,
+                count: 0,
+                max: -1,
+                returnPc: thread.pc,
+              });
+            }
             thread.pc++;
           }
           break;
