@@ -511,7 +511,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, overflow: "auto", minWidth: 0 }} className="animate-page-enter">
+      <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minWidth: 0 }} className="animate-page-enter">
         <CurrentBlockStrip />
         <Outlet />
       </main>
