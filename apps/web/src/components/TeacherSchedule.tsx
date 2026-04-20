@@ -221,6 +221,7 @@ export function buildBlockContent(next: BlockContent): string | null {
 const ACADEMIC_ASSIGNMENT_SUBJECTS = new Set([
   "math", "reading", "writing", "spelling",
   "daily_news", "review", "extra_review",
+  "video_learning",
 ]);
 
 /** Loose YouTube URL validator — matches the patterns the server accepts. */
@@ -738,6 +739,7 @@ export default function TeacherSchedule() {
                         {isAcademic && blockContent && (() => {
                           const subjLabel = SUBJECTS.find(s => s.value === b.subject)?.label || b.subject;
                           const isDailyNews = b.subject === "daily_news";
+                          const isVideoLearning = b.subject === "video_learning";
                           const renderAssignmentOptions = () => (
                             <>
                               <option value="">— Use default —</option>
@@ -894,6 +896,71 @@ export default function TeacherSchedule() {
                                   )}
                                 </div>
                               </div>
+                              )}
+
+                              {/* Video Learning URL — a single YouTube URL for this
+                                  block. Students see it embedded on the /video-learning
+                                  page. Per-day overrides available via advanced toggle. */}
+                              {isVideoLearning && (
+                                <div className="mt-3 pt-3 border-t" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
+                                  <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "#a78bfa" }}>
+                                    📺 YouTube Video URL
+                                  </div>
+                                  <label className="flex flex-col gap-1 mb-3">
+                                    <span className="text-[10px]" style={{ color: "var(--t3)" }}>
+                                      Same for every day (default)
+                                    </span>
+                                    <input
+                                      type="url"
+                                      placeholder="https://youtube.com/watch?v=…"
+                                      value={blockContent.videoUrl || ""}
+                                      onChange={(e) => updateBlock(i, {
+                                        content_source: buildBlockContent({
+                                          ...blockContent,
+                                          videoUrl: e.target.value || undefined,
+                                        }),
+                                      })}
+                                      className="input text-xs"
+                                    />
+                                  </label>
+                                  {showAdvancedFor[i] && (
+                                    <>
+                                      <div className="text-[10px] mb-1.5" style={{ color: "var(--t3)" }}>
+                                        Per day (overrides default)
+                                      </div>
+                                      <div className="grid gap-2"
+                                        style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
+                                        {DAYS.filter((d) => days.includes(d)).map((d) => {
+                                          const dayVal = blockContent.byDay?.[d] || {};
+                                          return (
+                                            <label key={d} className="flex flex-col gap-1">
+                                              <span className="text-[10px] font-bold" style={{ color: color.text }}>{d}</span>
+                                              <input
+                                                type="url"
+                                                placeholder="URL"
+                                                value={dayVal.videoUrl || ""}
+                                                onChange={(e) => {
+                                                  const next: BlockContent = {
+                                                    ...blockContent,
+                                                    byDay: { ...(blockContent.byDay || {}) },
+                                                  };
+                                                  const cur = { ...(next.byDay![d] || {}) };
+                                                  if (e.target.value) cur.videoUrl = e.target.value;
+                                                  else delete cur.videoUrl;
+                                                  if (Object.keys(cur).length) next.byDay![d] = cur;
+                                                  else delete next.byDay![d];
+                                                  updateBlock(i, { content_source: buildBlockContent(next) });
+                                                }}
+                                                className="input text-[11px] py-1 px-1.5"
+                                                title={`${d} video URL`}
+                                              />
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               )}
 
                               {/* Daily News URL — default + per-day. Only visible
