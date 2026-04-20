@@ -71,7 +71,7 @@ router.get("/me", async (req: Request, res: Response) => {
   try {
     const jwt = await import("jsonwebtoken");
     const payload = jwt.default.verify(header.slice(7), process.env.JWT_SECRET || "dev-secret") as any;
-    const row = await db.prepare("SELECT id, email, name, role, avatar_url, avatar_emoji, created_at FROM users WHERE id = ?").get(payload.id) as any;
+    const row = await db.prepare("SELECT id, email, name, role, avatar_url, avatar_emoji, specials_grade, created_at FROM users WHERE id = ?").get(payload.id) as any;
     if (!row) return res.status(401).json({ error: "User not found" });
     res.json({
       id: row.id,
@@ -80,6 +80,7 @@ router.get("/me", async (req: Request, res: Response) => {
       role: row.role,
       avatarUrl: row.avatar_url,
       avatarEmoji: row.avatar_emoji || null,
+      specialsGrade: row.specials_grade ?? null,
       createdAt: row.created_at,
     });
   } catch {

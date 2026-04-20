@@ -124,7 +124,12 @@ export function SELPage() {
  *
  * Supports the `byDay` override shape: `{ Mon: { assignmentId, videoUrl, newsUrl } }`.
  */
-type GenericBlockDay = { assignmentId?: string; videoUrl?: string; newsUrl?: string };
+type GenericBlockDay = {
+  assignmentId?: string;
+  videoUrl?: string;
+  newsUrl?: string;
+  byGrade?: Partial<Record<string, string>>; // grade number as string key → assignmentId
+};
 type GenericBlockContent = GenericBlockDay & { byDay?: Partial<Record<string, GenericBlockDay>> };
 
 function sanitizeDay(raw: any): GenericBlockDay {
@@ -133,6 +138,14 @@ function sanitizeDay(raw: any): GenericBlockDay {
     if (typeof raw.assignmentId === "string" && raw.assignmentId) out.assignmentId = raw.assignmentId;
     if (typeof raw.videoUrl === "string" && raw.videoUrl) out.videoUrl = raw.videoUrl;
     if (typeof raw.newsUrl === "string" && raw.newsUrl) out.newsUrl = raw.newsUrl;
+    if (raw.byGrade && typeof raw.byGrade === "object") {
+      const bg: Record<string, string> = {};
+      for (const k of Object.keys(raw.byGrade)) {
+        const v = (raw.byGrade as any)[k];
+        if (typeof v === "string" && v) bg[k] = v;
+      }
+      if (Object.keys(bg).length) out.byGrade = bg;
+    }
   }
   return out;
 }
@@ -156,13 +169,30 @@ function parseGenericBlockContent(raw: string | null | undefined): GenericBlockC
 
 const DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
-/** Merge root defaults with the per-day override for "today". */
-function resolveBlockContentForToday(raw: string | null | undefined): GenericBlockDay {
+/**
+ * Merge root defaults with the per-day override for "today", then (optionally)
+ * pick the student's grade-specific assignmentId from `byGrade` when present.
+ * Resolution order for assignmentId:
+ *   1. byDay[today].byGrade[studentGrade]
+ *   2. byDay[today].assignmentId
+ *   3. root.byGrade[studentGrade]
+ *   4. root.assignmentId
+ */
+function resolveBlockContentForToday(
+  raw: string | null | undefined,
+  studentGrade?: number | null,
+): GenericBlockDay {
   const parsed = parseGenericBlockContent(raw);
   const today = DAY_LETTERS[new Date().getDay()];
   const dayOverride = parsed.byDay?.[today] || {};
+  const gradeKey = studentGrade != null ? String(studentGrade) : null;
+  const gradedAssignment =
+    (gradeKey && dayOverride.byGrade?.[gradeKey]) ||
+    dayOverride.assignmentId ||
+    (gradeKey && parsed.byGrade?.[gradeKey]) ||
+    parsed.assignmentId;
   return {
-    assignmentId: dayOverride.assignmentId ?? parsed.assignmentId,
+    assignmentId: gradedAssignment,
     videoUrl: dayOverride.videoUrl ?? parsed.videoUrl,
     newsUrl: dayOverride.newsUrl ?? parsed.newsUrl,
   };
@@ -192,9 +222,15 @@ export function AssignmentTodayPage() {
   }, [user?.id]);
 
   const currentBlock = useCurrentBlock(classId);
-  // Resolve today's effective content: per-day override (byDay[Mon|Tue|…])
-  // wins, falling back to the root defaults the teacher set as "Same for every day".
-  const blockContent = useMemo(() => resolveBlockContentForToday(currentBlock?.content_source), [currentBlock?.content_source]);
+  // Student's grade drives per-grade assignment routing. Pulled from the
+  // auth payload (`/api/auth/me` now returns specialsGrade).
+  const studentGrade = (user as any)?.specialsGrade ?? null;
+  // Resolve today's effective content: byDay[today].byGrade[studentGrade] →
+  // byDay[today].assignmentId → byGrade[studentGrade] → root.assignmentId.
+  const blockContent = useMemo(
+    () => resolveBlockContentForToday(currentBlock?.content_source, studentGrade),
+    [currentBlock?.content_source, studentGrade],
+  );
 
   // Pull the class assignment list so we can render the title/description of
   // the selected one without a second round-trip. Skip entirely when there's
