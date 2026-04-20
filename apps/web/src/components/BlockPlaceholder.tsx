@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
 import { api } from "../lib/api.ts";
@@ -244,9 +244,9 @@ export function AssignmentTodayPage() {
     [currentBlock?.content_source, studentGrade, studentId],
   );
 
-  // Pull the class assignment list so we can render the title/description of
-  // the selected one without a second round-trip. Skip entirely when there's
-  // no assignmentId — keeps this page cheap for the common case.
+  // Teachers/admins previewing get a summary card (so they can see which
+  // assignment is wired). Students auto-push below — but hooks must run in
+  // the same order on every render, so declare them first.
   const [assignments, setAssignments] = useState<any[] | null>(null);
   useEffect(() => {
     if (!classId || !blockContent.assignmentId) { setAssignments(null); return; }
@@ -261,6 +261,13 @@ export function AssignmentTodayPage() {
     if (!blockContent.assignmentId || !assignments) return null;
     return assignments.find((a: any) => a?.id === blockContent.assignmentId) || null;
   }, [blockContent.assignmentId, assignments]);
+
+  // If the schedule block has an assignment attached, auto-push the student
+  // straight into the doer. Don't require a click — the block *is* the signal.
+  // The doer (StudentAssignmentView) fetches the assignment by id on its own.
+  if (blockContent.assignmentId && user?.role === "student") {
+    return <Navigate to={`/assignments?id=${encodeURIComponent(blockContent.assignmentId)}`} replace />;
+  }
 
   if (selectedAssignment) {
     return (
@@ -277,7 +284,7 @@ export function AssignmentTodayPage() {
           to={`/assignments?id=${encodeURIComponent(selectedAssignment.id)}`}
           className="rounded-2xl border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/15 px-6 py-3 text-sm font-bold text-violet-300 transition-colors"
         >
-          Start assignment →
+          Open assignment →
         </Link>
         <Link
           to={user?.role === "student" ? "/student" : "/"}
@@ -289,7 +296,7 @@ export function AssignmentTodayPage() {
     );
   }
 
-  return <BlockPlaceholder emoji={meta.emoji} title={`Today's ${meta.title}`} subtitle="Your teacher will push today's assignment in a moment." />;
+  return <BlockPlaceholder emoji={meta.emoji} title={`Today's ${meta.title}`} subtitle="No assignment is attached to this block yet. Ask your teacher to add one." />;
 }
 
 /**
