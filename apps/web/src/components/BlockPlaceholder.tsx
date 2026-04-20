@@ -40,7 +40,6 @@ export default function BlockPlaceholder({ emoji, title, subtitle, accent = "vio
 
 // Pre-baked page variants so App.tsx stays tidy.
 export const DailyNewsPage = () => <BlockPlaceholder emoji="📰" title="Daily News" subtitle="Today's news segment." accent="sky" />;
-export const VideoLearningPage = () => <BlockPlaceholder emoji="📺" title="Video Learning" subtitle="A short lesson video is on its way." accent="rose" />;
 export const TedTalkPage = () => <BlockPlaceholder emoji="🎙️" title="TED Talk" subtitle="Big ideas, short talks." accent="amber" />;
 export const DismissalPage = () => <BlockPlaceholder emoji="👋" title="See you tomorrow!" subtitle="Great job today. Pack up and have a good afternoon." accent="emerald" />;
 export const CashoutPage = () => <BlockPlaceholder emoji="💰" title="Cashout" subtitle="Time to spend your class coins." accent="amber" />;
@@ -291,4 +290,87 @@ export function AssignmentTodayPage() {
   }
 
   return <BlockPlaceholder emoji={meta.emoji} title={`Today's ${meta.title}`} subtitle="Your teacher will push today's assignment in a moment." />;
+}
+
+/**
+ * VideoLearningPage — embeds the teacher's chosen YouTube video for this block
+ * and (optionally) surfaces a linked assignment below it.
+ */
+export function VideoLearningPage() {
+  const { user } = useAuth();
+  const [classId, setClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    api.getClasses()
+      .then((cs: any[]) => setClassId((cs || [])[0]?.id ?? null))
+      .catch(() => setClassId(null));
+  }, [user?.id]);
+  const currentBlock = useCurrentBlock(classId);
+  const studentGrade = (user as any)?.specialsGrade ?? null;
+  const studentId = user?.id ?? null;
+  const blockContent = useMemo(
+    () => resolveBlockContentForToday(currentBlock?.content_source, studentGrade, studentId),
+    [currentBlock?.content_source, studentGrade, studentId],
+  );
+
+  const [assignments, setAssignments] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!classId || !blockContent.assignmentId) { setAssignments(null); return; }
+    let cancelled = false;
+    api.getAssignments(classId)
+      .then((rows: any[]) => { if (!cancelled) setAssignments(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setAssignments([]); });
+    return () => { cancelled = true; };
+  }, [classId, blockContent.assignmentId]);
+
+  const linkedAssignment = useMemo(() => {
+    if (!blockContent.assignmentId || !assignments) return null;
+    return assignments.find((a: any) => a?.id === blockContent.assignmentId) || null;
+  }, [blockContent.assignmentId, assignments]);
+
+  const embedUrl = blockContent.videoUrl ? youtubeEmbedUrl(blockContent.videoUrl) : null;
+
+  if (!embedUrl) {
+    return <BlockPlaceholder emoji="📺" title="Video Learning" subtitle="A short lesson video is on its way." accent="rose" />;
+  }
+
+  return (
+    <div className="min-h-[80vh] px-6 py-10 max-w-3xl mx-auto">
+      <div className="text-center mb-6">
+        <div className="text-5xl mb-3">📺</div>
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-rose-400 mb-1">Video Learning</div>
+        {currentBlock?.label && <h1 className="text-2xl font-extrabold text-t1">{currentBlock.label}</h1>}
+      </div>
+      <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", marginBottom: 24 }}>
+        <iframe
+          src={embedUrl}
+          title="Video Learning"
+          style={{ width: "100%", height: "100%", border: "none" }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+      {linkedAssignment && (
+        <div className="rounded-2xl p-5 text-center" style={{ background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.25)" }}>
+          <div className="text-xs font-bold uppercase tracking-[0.15em] text-rose-300 mb-1">Follow-up Assignment</div>
+          <div className="text-lg font-bold text-t1 mb-2">{linkedAssignment.title}</div>
+          {linkedAssignment.description && (
+            <p className="text-sm text-t2 mb-4">{linkedAssignment.description}</p>
+          )}
+          <Link
+            to="/assignments"
+            className="inline-block rounded-xl px-5 py-2.5 text-sm font-bold text-white"
+            style={{ background: "linear-gradient(135deg, #f43f5e, #be123c)" }}
+          >
+            Start assignment →
+          </Link>
+        </div>
+      )}
+      <div className="text-center mt-6">
+        <Link to={user?.role === "student" ? "/student" : "/"} className="text-sm font-semibold text-rose-400 hover:text-rose-300">
+          ← Back to dashboard
+        </Link>
+      </div>
+    </div>
+  );
 }
