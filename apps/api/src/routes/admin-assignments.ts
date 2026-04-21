@@ -91,42 +91,65 @@ router.post("/ensure-star-class", async (req, res) => {
 
 // POST /admin/seed-star-assignments
 // Deletes all Star class assignments and re-seeds with full pre-made content.
-// Each assignment is targeted to the exact students who match that subject/grade.
+// Dynamically resolves real student/teacher IDs from the production DB by name.
+// Each assignment targets exact students via target_student_ids.
 // scheduled_date = NULL so assignments are always visible.
 router.post("/seed-star-assignments", async (req, res) => {
   try {
-    // Also upsert user_grade_levels so the pending filter works correctly
-    for (const [name, grades] of Object.entries(GRADE_MATRIX)) {
-      const userId = STUDENTS[name];
-      await db.prepare(
-        `INSERT INTO user_grade_levels (user_id, reading_grade, math_grade, writing_grade)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT (user_id) DO UPDATE SET
-           reading_grade = EXCLUDED.reading_grade,
-           math_grade = EXCLUDED.math_grade,
-           writing_grade = EXCLUDED.writing_grade`
-      ).run(userId, grades.reading, grades.math, grades.writing);
+    // Find teacher
+    const teacherRow: any = await db.prepare(
+      `SELECT id FROM users WHERE role IN ('teacher','admin') ORDER BY created_at LIMIT 1`
+    ).get();
+    if (!teacherRow) return res.status(500).json({ error: "No teacher found in DB" });
+    const teacherId = teacherRow.id;
+
+    // Find the Star class by name (use STAR_CLASS as fallback if it exists)
+    let classId = STAR_CLASS;
+    const starClassRow: any = await db.prepare(
+      `SELECT id FROM classes WHERE name ILIKE '%star%' ORDER BY created_at LIMIT 1`
+    ).get();
+    if (starClassRow) classId = starClassRow.id;
+
+    // Look up real student IDs from DB by first name (case-insensitive)
+    // Fall back to hardcoded IDs if not found
+    const resolvedStudents: Record<string, string> = { ...STUDENTS };
+    for (const name of Object.keys(STUDENTS)) {
+      const row: any = await db.prepare(
+        `SELECT id FROM users WHERE role = 'student' AND name ILIKE ? LIMIT 1`
+      ).get(`%${name}%`);
+      if (row) resolvedStudents[name] = row.id;
     }
 
-    // Clear existing Star class assignments
-    await db.prepare("DELETE FROM assignments WHERE class_id = ?").run(STAR_CLASS);
+    // Upsert user_grade_levels with known grades using resolved IDs
+    for (const [name, grades] of Object.entries(GRADE_MATRIX)) {
+      const userId = resolvedStudents[name];
+      try {
+        await db.prepare(
+          `INSERT INTO user_grade_levels (user_id, reading_grade, math_grade, writing_grade)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT (user_id) DO UPDATE SET
+             reading_grade = EXCLUDED.reading_grade,
+             math_grade = EXCLUDED.math_grade,
+             writing_grade = EXCLUDED.writing_grade`
+        ).run(userId, grades.reading, grades.math, grades.writing);
+      } catch { /* ignore if table doesn't exist yet */ }
+    }
+
+    // Clear existing assignments for this class
+    await db.prepare("DELETE FROM assignments WHERE class_id = ?").run(classId);
 
     const created: any[] = [];
-
-    // Reading, math, writing, spelling — per grade
-    const subjectKeys = ["reading", "math", "writing", "spelling"] as const;
     const gradeKeys = { reading: "reading", math: "math", writing: "writing", spelling: "reading" } as const;
 
-    for (const subject of subjectKeys) {
+    for (const subject of ["reading", "math", "writing", "spelling"] as const) {
       const gradeField = gradeKeys[subject];
-      // Find distinct grades that exist in this class for this subject
       const gradeSet = new Set(Object.values(GRADE_MATRIX).map(g => g[gradeField]));
       for (const grade of gradeSet) {
         const premade = CONTENT[subject]?.[grade];
         if (!premade) continue;
         const targetStudents = Object.entries(GRADE_MATRIX)
           .filter(([_, g]) => g[gradeField] === grade)
-          .map(([name]) => STUDENTS[name]);
+          .map(([name]) => resolvedStudents[name]);
         if (!targetStudents.length) continue;
 
         const id = randomUUID();
@@ -134,7 +157,7 @@ router.post("/seed-star-assignments", async (req, res) => {
           `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, rubric, hints_allowed, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1, ?)`
         ).run(
-          id, STAR_CLASS, TEACHER, premade.title, premade.description,
+          id, classId, teacherId, premade.title, premade.description,
           JSON.stringify(premade.content), subject, grade, grade,
           JSON.stringify(targetStudents),
           JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
@@ -144,21 +167,22 @@ router.post("/seed-star-assignments", async (req, res) => {
       }
     }
 
-    // SEL — class-wide
+    // SEL — all students in class
+    const allStudentIds = Object.values(resolvedStudents);
     const selId = randomUUID();
     await db.prepare(
       `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, rubric, hints_allowed, created_at)
        VALUES (?, ?, ?, ?, ?, ?, 'sel', 1, 5, ?, NULL, ?, 1, ?)`
     ).run(
-      selId, STAR_CLASS, TEACHER, SEL_CONTENT.title, SEL_CONTENT.description,
+      selId, classId, teacherId, SEL_CONTENT.title, SEL_CONTENT.description,
       JSON.stringify(SEL_CONTENT.content),
-      JSON.stringify(Object.values(STUDENTS)),
+      JSON.stringify(allStudentIds),
       JSON.stringify([{ label: "Reflection", maxPoints: 40 }]),
       new Date().toISOString()
     );
-    created.push({ subject: "sel", title: SEL_CONTENT.title, students: Object.keys(STUDENTS).length });
+    created.push({ subject: "sel", title: SEL_CONTENT.title, students: allStudentIds.length });
 
-    res.json({ success: true, created: created.length, assignments: created });
+    res.json({ success: true, classId, teacherId, created: created.length, resolvedStudents, assignments: created });
   } catch (error) {
     console.error("seed-star-assignments failed:", error);
     res.status(500).json({ error: String(error) });
