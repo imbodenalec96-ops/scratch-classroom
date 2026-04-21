@@ -884,9 +884,9 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     const todayStr = new Date().toISOString().slice(0, 10);
     const rows = await db.prepare(`
       SELECT a.* FROM assignments a
-      LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?::uuid
-      WHERE a.class_id = ?::uuid AND s.id IS NULL
-        AND (a.student_id IS NULL OR a.student_id = ?::uuid)
+      LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
+      WHERE a.class_id::text = ? AND s.id IS NULL
+        AND (a.student_id IS NULL OR a.student_id::text = ?)
         AND (
           a.scheduled_date IS NULL
           OR a.scheduled_date::date <= ?::date
@@ -898,7 +898,7 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     let studentGrades: any = null;
     try {
       studentGrades = await db.prepare(
-        "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?::uuid"
+        "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?"
       ).get(userId);
     } catch { /* grades table may not exist yet */ }
     const gradeFor = (subject: string | null): number => {
@@ -948,8 +948,8 @@ router.get("/class/:classId/debug-pending", requireRole("teacher", "admin"), asy
               a.target_subject, a.scheduled_date, a.class_id,
               s.id as submission_id
        FROM assignments a
-       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?::uuid
-       WHERE a.class_id = ?::uuid
+       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
+       WHERE a.class_id::text = ?
        ORDER BY a.scheduled_date ASC, a.created_at ASC`
     ).all(studentId, req.params.classId) as any[];
 
