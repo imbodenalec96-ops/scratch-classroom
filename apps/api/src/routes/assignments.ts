@@ -173,7 +173,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   const id = crypto.randomUUID();
   await ensureGradeCols();
   const safeDueDate = dueDate && String(dueDate).trim() ? dueDate : null;
-  const safeScheduledDate = scheduledDate && String(scheduledDate).trim() ? scheduledDate : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const safeScheduledDate = scheduledDate && String(scheduledDate).trim() ? scheduledDate : today;
   const tMin = targetGradeMin != null ? Number(targetGradeMin) : null;
   const tMax = targetGradeMax != null ? Number(targetGradeMax) : (tMin != null ? tMin : null);
   const tSub = targetSubject || null;
