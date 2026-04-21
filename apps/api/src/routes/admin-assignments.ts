@@ -228,6 +228,35 @@ router.get("/assignments", async (_req, res) => {
   }
 });
 
+// GET /admin/class-info — show Star class members and assignments (including NULL date)
+router.get("/class-info", async (_req, res) => {
+  try {
+    const starClass: any = await db.prepare(
+      `SELECT id, name FROM classes WHERE name ILIKE '%star%' ORDER BY created_at LIMIT 1`
+    ).get();
+    if (!starClass) return res.json({ error: "No Star class found" });
+
+    const members = await db.prepare(
+      `SELECT u.id, u.name, u.role, ugl.reading_grade, ugl.math_grade, ugl.writing_grade
+       FROM class_members cm
+       JOIN users u ON u.id = cm.user_id
+       LEFT JOIN user_grade_levels ugl ON ugl.user_id = cm.user_id
+       WHERE cm.class_id = ?
+       ORDER BY u.name`
+    ).all(starClass.id) as any[];
+
+    const assignments = await db.prepare(
+      `SELECT id, title, target_subject, target_grade_min, target_student_ids, scheduled_date
+       FROM assignments WHERE class_id = ?
+       ORDER BY target_subject, target_grade_min`
+    ).all(starClass.id) as any[];
+
+    res.json({ class: starClass, memberCount: members.length, members, assignmentCount: assignments.length, assignments });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // DELETE /admin/assignments/:id
 router.delete("/assignments/:id", async (req, res) => {
   try {
