@@ -53,7 +53,7 @@ const upload = multer({ dest: uploadsDir });
 // Health check
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 app.get("/api/ping", async (_req, res) => {
-  try { await db.query("SELECT 1"); res.json({ ok: true }); }
+  try { await db.prepare("SELECT 1").all(); res.json({ ok: true }); }
   catch { res.json({ ok: false }); }
 });
 
@@ -119,5 +119,10 @@ app.post("/api/upload", authMiddleware, upload.single("file"), (req, res) => {
 
 // Serve uploaded files
 app.use("/api/files", express.static(uploadsDir));
+
+// Keep Neon from going to sleep — ping every 4 minutes
+setInterval(async () => {
+  try { await db.prepare("SELECT 1").all(); } catch { /* ignore */ }
+}, 4 * 60 * 1000);
 
 export default app;
