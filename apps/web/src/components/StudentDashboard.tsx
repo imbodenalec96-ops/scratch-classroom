@@ -1550,9 +1550,7 @@ export default function StudentDashboard() {
       setStatGraded(subs.filter((s: any) => s.grade !== null).length);
     } catch {}
 
-    // Don't unlock free-time access yet — check whether more assignments are
-    // still pending across all classes. If so, swap the next one in and stay
-    // in 'working'. Only unlock when truly nothing's left.
+    // Check for more assignments across all classes before unlocking free time
     let nextAssignment: any = null;
     let nextParsed: any = null;
     const submittedId = pendingAssignment?.id;
@@ -1560,8 +1558,6 @@ export default function StudentDashboard() {
       try {
         const pending = await api.getPendingAssignments(cls.id);
         if (Array.isArray(pending)) {
-          // Filter out the one we just submitted in case the server is still
-          // catching up (some caches return stale lists briefly).
           const remaining = pending.filter((a: any) => a.id !== submittedId);
           if (remaining.length > 0 && !nextAssignment) {
             const a = remaining[0];
@@ -1579,7 +1575,6 @@ export default function StudentDashboard() {
     }
 
     if (nextAssignment) {
-      // Reset per-assignment UI state and render the next one immediately
       setQuestionsAnswered(0);
       setPendingAssignment(nextAssignment);
       setParsedAssignment(nextParsed);
