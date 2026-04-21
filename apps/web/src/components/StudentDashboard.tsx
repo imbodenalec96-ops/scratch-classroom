@@ -822,27 +822,45 @@ function WorkScreen({
                   <p style={{ color: "#2d2a3e", fontSize: "clamp(0.95rem, 1.5vw, 1.05rem)", lineHeight: 1.7 }}>{q.q.context}</p>
                 </div>
               )}
-              {/* Question text — Fraunces serif, typewriter reveal, tap-to-listen */}
-              <div className="flex items-start gap-3">
-                <p className="font-display leading-[1.3] flex-1" style={{ color: "#1A1915", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
-                  <TypewriterText text={q.q.text} speed={28} />
-                </p>
-                <button
-                  onClick={() => speakText(q.q.text)}
-                  className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
-                  style={{
-                    width: 44, height: 44,
-                    background: `${starfall.accent}14`,
-                    color: starfall.accent,
-                    border: `1px solid ${starfall.accent}33`,
-                    touchAction: "manipulation",
-                  }}
-                  title="Read aloud"
-                  aria-label="Read question aloud"
-                >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>🔊</span>
-                </button>
-              </div>
+              {/* Question text — hide the word for spelling, show hear button */}
+              {(() => {
+                const isSpelling = (assignment?.target_subject || parsedAssignment?.subject || "").toLowerCase() === "spelling";
+                const spellingMatch = isSpelling && q.q.text.match(/spell(?:\s+the\s+word)?[:\s]+([^\s,?.]+)/i);
+                const spellingWord = spellingMatch ? spellingMatch[1].replace(/[^a-zA-Z'-]/g, "") : null;
+                if (isSpelling && spellingWord) {
+                  return (
+                    <div className="flex flex-col items-center gap-4 py-2">
+                      <p className="font-display text-center" style={{ color: "#1A1915", fontSize: "clamp(1.2rem, 2vw, 1.5rem)", fontWeight: 600 }}>
+                        Listen carefully and spell the word:
+                      </p>
+                      <button
+                        onClick={() => { const u = new SpeechSynthesisUtterance(spellingWord); u.rate = 0.75; window.speechSynthesis.speak(u); }}
+                        className="flex items-center gap-3 rounded-2xl cursor-pointer transition-transform active:scale-95 hover:scale-105"
+                        style={{ background: `${starfall.accent}18`, border: `2px solid ${starfall.accent}`, padding: "18px 36px", touchAction: "manipulation" }}
+                      >
+                        <span style={{ fontSize: 32 }}>🔊</span>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: starfall.accent }}>Hear the word</span>
+                      </button>
+                      <p style={{ fontSize: 13, color: "#888", marginTop: -8 }}>Tap to hear it again</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex items-start gap-3">
+                    <p className="font-display leading-[1.3] flex-1" style={{ color: "#1A1915", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
+                      <TypewriterText text={q.q.text} speed={28} />
+                    </p>
+                    <button
+                      onClick={() => speakText(q.q.text)}
+                      className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
+                      style={{ width: 44, height: 44, background: `${starfall.accent}14`, color: starfall.accent, border: `1px solid ${starfall.accent}33`, touchAction: "manipulation" }}
+                      title="Read aloud" aria-label="Read question aloud"
+                    >
+                      <span style={{ fontSize: 18, lineHeight: 1 }}>🔊</span>
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Hint — always light (Starfall surface is always light) */}
               {q.q.hint && (
