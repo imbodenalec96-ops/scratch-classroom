@@ -237,17 +237,17 @@ router.get("/class-info", async (_req, res) => {
     if (!starClass) return res.json({ error: "No Star class found" });
 
     const members = await db.prepare(
-      `SELECT u.id, u.name, u.role, ugl.reading_grade, ugl.math_grade, ugl.writing_grade
+      `SELECT u.id::text, u.name, u.role, ugl.reading_grade, ugl.math_grade, ugl.writing_grade
        FROM class_members cm
-       JOIN users u ON u.id = cm.user_id
-       LEFT JOIN user_grade_levels ugl ON ugl.user_id = cm.user_id
-       WHERE cm.class_id = ?
+       JOIN users u ON u.id = cm.user_id::uuid
+       LEFT JOIN user_grade_levels ugl ON ugl.user_id::text = u.id::text
+       WHERE cm.class_id = ?::uuid
        ORDER BY u.name`
     ).all(starClass.id) as any[];
 
     const assignments = await db.prepare(
-      `SELECT id, title, target_subject, target_grade_min, target_student_ids, scheduled_date
-       FROM assignments WHERE class_id = ?
+      `SELECT id::text, title, target_subject, target_grade_min, target_student_ids, scheduled_date
+       FROM assignments WHERE class_id = ?::uuid
        ORDER BY target_subject, target_grade_min`
     ).all(starClass.id) as any[];
 
