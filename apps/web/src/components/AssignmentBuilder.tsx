@@ -43,7 +43,7 @@ interface Question {
   correctIndex?: number;  // For multiple choice: 0-based index of correct answer
   correctAnswer?: string; // For short answer / fill blank (optional — teacher grading if missing)
 }
-interface Section { title: string; questions: Question[]; }
+interface Section { title: string; passage?: string; questions: Question[]; }
 interface GeneratedAssignment {
   title: string; subject: string; grade: string;
   instructions: string; totalPoints: number; sections: Section[];
@@ -91,6 +91,13 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
               <h2 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider whitespace-nowrap px-2">{section.title}</h2>
               <div className="h-0.5 flex-1 bg-gray-300" />
             </div>
+
+            {section.passage && (
+              <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                <div className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">📖 Read this passage</div>
+                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{section.passage}</p>
+              </div>
+            )}
 
             <div className="space-y-5">
               {section.questions.map((q, qi) => (
