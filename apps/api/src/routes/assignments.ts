@@ -1691,4 +1691,159 @@ Only include "options" and "correctIndex" for multiple_choice questions.`,
   }
 });
 
+// ── Auto-by-grade: create one assignment per grade tier present in the class ──
+// POST /assignments/class/:classId/create-by-grade
+// Body: { title, subject, instructions, passage }
+// For each distinct grade level found in user_grade_levels for the class,
+// calls Mistral (or fallback AI) to generate grade-appropriate content and
+// inserts one assignment with target_grade_min = target_grade_max = grade_level.
+router.post("/class/:classId/create-by-grade", async (req: AuthRequest, res: Response) => {
+  if (req.user!.role === "student") return res.status(403).json({ error: "Forbidden" });
+  const { classId } = req.params;
+  const { title, subject, instructions, passage } = req.body;
+  if (!title || !classId) return res.status(400).json({ error: "title and classId are required" });
+
+  const subjectCol =
+    subject === "math" ? "ugl.math_grade" :
+    subject === "writing" ? "ugl.writing_grade" :
+    "ugl.reading_grade";
+
+  await ensureGradeCols();
+
+  // Distinct grade levels present in this class for the chosen subject
+  let gradeRows: any[] = [];
+  try {
+    gradeRows = await db.prepare(`
+      SELECT DISTINCT ${subjectCol} AS grade_level
+      FROM user_grade_levels ugl
+      JOIN class_members cm ON cm.user_id = ugl.user_id
+      WHERE cm.class_id = ?
+        AND ${subjectCol} IS NOT NULL
+      ORDER BY grade_level
+    `).all(classId);
+  } catch (e: any) {
+    return res.status(500).json({ error: "Could not query grade levels: " + (e?.message || String(e)) });
+  }
+
+  if (gradeRows.length === 0) {
+    return res.status(422).json({ error: "No grade-level data found for students in this class. Set grade levels first." });
+  }
+
+  const MISTRAL_KEY = process.env.MISTRAL_API_KEY;
+  const gradeNames: Record<number, string> = {
+    0: "Kindergarten", 1: "1st Grade", 2: "2nd Grade", 3: "3rd Grade",
+    4: "4th Grade", 5: "5th Grade", 6: "6th Grade", 7: "7th Grade",
+    8: "8th Grade", 9: "9th Grade", 10: "10th Grade", 11: "11th Grade", 12: "12th Grade",
+  };
+
+  const created: any[] = [];
+
+  for (const row of gradeRows) {
+    const gradeLevel = Number(row.grade_level);
+    const gradeName = gradeNames[gradeLevel] ?? `${gradeLevel}th Grade`;
+
+    // Build the same prompt as generate-assignment but with this grade
+    const subjectCapitalized = (subject || "reading").charAt(0).toUpperCase() + (subject || "reading").slice(1);
+    const safePassage = passage ? passage.replace(/\r/g, "").trim() : "";
+    const passageInstruction = safePassage
+      ? `USE THIS PASSAGE exactly as written:\n---\n${safePassage}\n---\nAll reading/comprehension questions must refer to this passage. Put this passage verbatim in the "passage" field of the first section.`
+      : subject === "reading" || subject === "Reading"
+      ? `GENERATE a short age-appropriate reading passage (5-8 sentences) and include it as the "passage" field in the first section. All comprehension questions must refer to it.`
+      : "";
+
+    const prompt = `You are an experienced elementary school teacher creating a printable paper worksheet.
+
+Grade Level: ${gradeName}
+Subject: ${subjectCapitalized}
+Worksheet Title: ${title}
+${instructions ? `Teacher's special instructions: ${instructions}` : ""}
+${passageInstruction}
+
+Create a thorough, realistic worksheet with 2-3 sections and 8-12 total questions appropriate for ${gradeName} level.
+
+IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON object:
+{
+  "title": "string",
+  "subject": "string",
+  "grade": "string",
+  "instructions": "string",
+  "totalPoints": number,
+  "sections": [
+    {
+      "title": "Part 1: Section Name (X pts each)",
+      "questions": [
+        { "type": "multiple_choice", "text": "Question?", "options": ["A. opt1","B. opt2","C. opt3","D. opt4"], "correctIndex": 0, "points": 5 },
+        { "type": "short_answer", "text": "Question?", "points": 10, "lines": 3 },
+        { "type": "fill_blank", "text": "The ___ is important.", "points": 5 }
+      ]
+    }
+  ]
+}`;
+
+    let generatedContent: any = null;
+
+    try {
+      if (MISTRAL_KEY) {
+        const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
+          body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+        });
+        if (!response.ok) throw new Error(`Mistral error: ${response.status} ${await response.text()}`);
+        const data: any = await response.json();
+        const text = data.choices?.[0]?.message?.content || "";
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) generatedContent = JSON.parse(match[0]);
+      }
+    } catch (aiErr: any) {
+      console.error(`[create-by-grade] AI error for grade ${gradeLevel}:`, aiErr?.message);
+      // Continue without generated content — use title/instructions as-is
+    }
+
+    // Insert one assignment for this grade level
+    const id = crypto.randomUUID();
+    const today = new Date().toISOString().slice(0, 10);
+    const contentStr = generatedContent ? JSON.stringify(generatedContent) : null;
+    const desc = generatedContent
+      ? `[Generated] ${generatedContent.instructions || instructions || ""}\n\nSections: ${(generatedContent.sections || []).map((s: any) => s.title).join(", ")}`
+      : (instructions || "");
+    const rubric = generatedContent
+      ? (generatedContent.sections || []).flatMap((s: any) =>
+          (s.questions || []).map((q: any) => ({ label: (q.text || "").slice(0, 60), maxPoints: q.points || 10 }))
+        )
+      : [{ label: "Correctness", maxPoints: 50 }, { label: "Creativity", maxPoints: 50 }];
+
+    try {
+      await db.prepare(
+        `INSERT INTO assignments (
+          id, class_id, teacher_id, title, description, due_date, rubric,
+          starter_project_id, content, scheduled_date,
+          target_grade_min, target_grade_max, target_subject,
+          teacher_notes, question_count, estimated_minutes,
+          focus_keywords, learning_objective, hints_allowed, question_type,
+          target_student_ids, is_group, group_name, video_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id, classId, req.user!.id,
+        `${title} (${gradeName})`,
+        desc,
+        null,
+        JSON.stringify(rubric),
+        null, contentStr, today,
+        gradeLevel, gradeLevel, subject || "reading",
+        null, null, null, null, null, 1, null, null, 0, null, null,
+      );
+      const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id) as any;
+      if (row) {
+        row.rubric = JSON.parse(row.rubric || "[]");
+        created.push(row);
+      }
+    } catch (insertErr: any) {
+      console.error(`[create-by-grade] insert error grade ${gradeLevel}:`, insertErr?.message);
+    }
+  }
+
+  res.json({ created: created.length, assignments: created });
+});
+
 export default router;
