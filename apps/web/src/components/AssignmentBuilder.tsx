@@ -267,7 +267,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         const today = new Date().toISOString().slice(0, 10);
         // Fetch all classes in parallel
         const results = await Promise.all(cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])));
-        const all: any[] = results.flat().filter((a: any) => a?.scheduled_date === today);
+        const all: any[] = results.flat().filter((a: any) => {
+          const sd = a?.scheduled_date;
+          return !sd || sd === today || sd.startsWith(today);
+        });
         const final = all.length > 0 ? all : results.flat();
         setTodayList(final);
       } catch {}
