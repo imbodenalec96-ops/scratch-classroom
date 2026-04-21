@@ -1087,8 +1087,10 @@ export default function AssignmentBuilder() {
     }
   };
 
+  const [createError, setCreateError] = useState("");
   const handleCreate = async () => {
-    if (!title || !classId) return;
+    if (!title || !classId) { setCreateError(`Missing: ${!title ? "title" : "class"}`); return; }
+    setCreateError("");
     const rubric = generated
       ? generated.sections.flatMap((s) => s.questions.map((q) => ({ label: q.text.slice(0, 60), maxPoints: q.points })))
       : [{ label: "Correctness", maxPoints: 50 }, { label: "Creativity", maxPoints: 50 }];
@@ -1127,12 +1129,15 @@ export default function AssignmentBuilder() {
     }
     // Video → assignment: persist the URL so WorkScreen embeds the player for students.
     const videoPayload: any = videoUrl.trim() ? { videoUrl: videoUrl.trim() } : {};
-    if (pdfSourceAssignmentId) {
-      // Update the existing assignment that was created during PDF upload
-      // (avoids a duplicate entry — the source already has attached_pdf_path + class_id)
-      await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
-    } else {
-      await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
+    try {
+      if (pdfSourceAssignmentId) {
+        await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
+      } else {
+        await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
+      }
+    } catch (e: any) {
+      setCreateError(`Failed to save: ${e?.message || String(e)}`);
+      return;
     }
     setShowForm(false);
     setGenerated(null);
@@ -2035,6 +2040,7 @@ export default function AssignmentBuilder() {
             </div>
           )}
 
+          {createError && <p className="text-red-400 text-xs">{createError}</p>}
           <div className="flex gap-2 pt-2 flex-wrap">
             <button onClick={handleCreate} disabled={!title || !classId} className="btn-primary gap-2">
               <Check size={14} />
