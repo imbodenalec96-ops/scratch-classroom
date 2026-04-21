@@ -589,11 +589,12 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
 }
 
 function WorkScreen({
-  assignment, parsed, dk, onComplete, onBreak, questionsAnswered, setQuestionsAnswered,
+  assignment, parsed, dk, onComplete, onBreak, onBack, questionsAnswered, setQuestionsAnswered,
 }: {
   assignment: any; parsed: any; dk: boolean;
   onComplete: (answers: Record<number, string>) => void;
   onBreak: () => void;
+  onBack: () => void;
   questionsAnswered: number; setQuestionsAnswered: (n: number) => void;
 }) {
   const allQuestions: Array<{ q: any; sectionTitle: string; passage?: string }> = parsed?.sections
@@ -720,11 +721,11 @@ function WorkScreen({
             <button
               onClick={() => {
                 if (answeredCount > 0 && !confirm("Leave before finishing? Your answers so far will be lost.")) return;
-                window.location.reload();
+                onBack();
               }}
               className="btn-ghost text-xs gap-1.5"
               style={{ padding: "6px 10px" }}>
-              ← Back to dashboard
+              ← Back
             </button>
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "#6B6860" }}>
               <span style={{ fontSize: 16 }}>{subjectPal.emoji}</span>
@@ -1520,6 +1521,7 @@ export default function StudentDashboard() {
       <WorkScreen
         assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
         onComplete={handleWorkComplete} onBreak={handleTakeBreak}
+        onBack={() => setPhase('done')}
         questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
       />
     );
