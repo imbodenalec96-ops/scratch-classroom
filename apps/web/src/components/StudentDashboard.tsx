@@ -1208,7 +1208,6 @@ export default function StudentDashboard() {
         await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
       } catch {}
     }
-    setWorkUnlocked();
     spawnConfetti();
     setMascotCelebrating(true);
     setTimeout(() => setMascotCelebrating(false), 3000);
@@ -1218,8 +1217,48 @@ export default function StudentDashboard() {
       setStatSubmitted(subs.length);
       setStatGraded(subs.filter((s: any) => s.grade !== null).length);
     } catch {}
-    setPhase('done');
-  }, [pendingAssignment]);
+
+    // Don't unlock free-time access yet — check whether more assignments are
+    // still pending across all classes. If so, swap the next one in and stay
+    // in 'working'. Only unlock when truly nothing's left.
+    let nextAssignment: any = null;
+    let nextParsed: any = null;
+    const submittedId = pendingAssignment?.id;
+    for (const cls of classes) {
+      try {
+        const pending = await api.getPendingAssignments(cls.id);
+        if (Array.isArray(pending)) {
+          // Filter out the one we just submitted in case the server is still
+          // catching up (some caches return stale lists briefly).
+          const remaining = pending.filter((a: any) => a.id !== submittedId);
+          if (remaining.length > 0 && !nextAssignment) {
+            const a = remaining[0];
+            nextAssignment = a;
+            if (a.content) {
+              try {
+                const parsed = JSON.parse(a.content);
+                if (parsed?.sections?.length > 0) nextParsed = parsed;
+              } catch {}
+            }
+            break;
+          }
+        }
+      } catch {}
+    }
+
+    if (nextAssignment) {
+      // Reset per-assignment UI state and render the next one immediately
+      setQuestionsAnswered(0);
+      setPendingAssignment(nextAssignment);
+      setParsedAssignment(nextParsed);
+      setPhase('working');
+    } else {
+      setWorkUnlocked();
+      setPendingAssignment(null);
+      setParsedAssignment(null);
+      setPhase('done');
+    }
+  }, [pendingAssignment, classes]);
 
   // "Take Break" from inside WorkScreen → use the REAL break system
   // (chooseBreak writes localStorage + fires breakstate-change). The
