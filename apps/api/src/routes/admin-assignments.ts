@@ -192,4 +192,125 @@ router.post("/reset-star-assignments", async (req, res) => {
   }
 });
 
+// GET /admin/students — list all active students for the assignment builder
+router.get("/students", async (_req, res) => {
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT u.id::text, u.name, ugl.reading_grade, ugl.math_grade, ugl.writing_grade
+         FROM users u
+         LEFT JOIN user_grade_levels ugl ON ugl.user_id::text = u.id::text
+         WHERE u.role = 'student'
+         ORDER BY u.name`
+      )
+      .all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /admin/assignments — list upcoming/today's assignments
+router.get("/assignments", async (_req, res) => {
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT id, title, target_subject, target_grade_min, target_student_ids, scheduled_date, created_at
+         FROM assignments
+         WHERE scheduled_date::date >= CURRENT_DATE - INTERVAL '1 day'
+         ORDER BY scheduled_date DESC, created_at DESC
+         LIMIT 50`
+      )
+      .all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// DELETE /admin/assignments/:id
+router.delete("/assignments/:id", async (req, res) => {
+  try {
+    await db.prepare("DELETE FROM assignments WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /admin/create-assignment
+// Body: { title, subject, grade, studentIds: string[], date: "YYYY-MM-DD", passage?: string, questions: Question[] }
+router.post("/create-assignment", async (req, res) => {
+  try {
+    const { title, subject, grade, studentIds, date, passage, questions } = req.body as {
+      title: string;
+      subject: string;
+      grade: number;
+      studentIds: string[];
+      date: string;
+      passage?: string;
+      questions: { type: string; text: string; options?: string[]; correctIndex?: number; points?: number }[];
+    };
+
+    if (!title || !subject || !studentIds?.length || !date || !questions?.length) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Find the Star class for these students
+    const classRow = await db
+      .prepare(
+        `SELECT DISTINCT cm.class_id FROM class_members cm
+         JOIN classes c ON c.id = cm.class_id
+         WHERE cm.user_id::text = ? AND c.name ILIKE '%Star%'
+         LIMIT 1`
+      )
+      .get(studentIds[0]);
+
+    const classId = classRow?.class_id ?? "0a635d79-4028-480c-8240-652a67bd973d";
+
+    const dueTime = subject === "reading" ? "09:30:00"
+      : subject === "math" ? "11:00:00"
+      : subject === "writing" ? "13:30:00"
+      : "14:30:00";
+
+    const content = JSON.stringify({
+      sections: [{
+        title: passage ? "Reading & Questions" : title,
+        passage: passage || undefined,
+        questions: questions.map((q) => ({
+          type: q.type,
+          text: passage && questions.indexOf(q) === 0
+            ? `📖 Read this story first:\n\n"${passage}"\n\n${q.text}`
+            : q.text,
+          context: passage || undefined,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          points: q.points ?? 1,
+        })),
+      }],
+    });
+
+    const id = randomUUID();
+    await db
+      .prepare(
+        `INSERT INTO assignments
+         (id, class_id, title, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, due_date, created_at, content)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id, classId, title, subject, grade, grade,
+        JSON.stringify(studentIds),
+        date,
+        `${date} ${dueTime}`,
+        new Date().toISOString(),
+        content
+      );
+
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error("❌ create-assignment failed:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 export default router;

@@ -1861,12 +1861,317 @@ function AuthGate({ onAuth }: { onAuth: () => void }) {
   );
 }
 
+// ─── Section: Assignments ─────────────────────────────────────────────────────
+interface AdminStudent {
+  id: string;
+  name: string;
+  reading_grade: number | null;
+  math_grade: number | null;
+  writing_grade: number | null;
+}
+interface AdminAssignment {
+  id: string;
+  title: string;
+  target_subject: string;
+  target_grade_min: number;
+  target_student_ids: string;
+  scheduled_date: string;
+}
+interface Question {
+  type: "multiple_choice" | "short_answer" | "fill_blank" | "draw";
+  text: string;
+  options: string[];
+  correctIndex: number;
+  points: number;
+}
+
+function AssignmentsSection() {
+  const [students, setStudents] = useState<AdminStudent[]>([]);
+  const [existing, setExisting] = useState<AdminAssignment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+
+  // Form state
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState<"reading" | "math" | "writing" | "sel">("reading");
+  const [grade, setGrade] = useState(1);
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [passage, setPassage] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([
+    { type: "multiple_choice", text: "", options: ["", "", "", ""], correctIndex: 0, points: 1 },
+  ]);
+
+  const load = useCallback(() => {
+    fetch(`${BASE}/admin/students`).then(r => r.json()).then(setStudents).catch(() => {});
+    fetch(`${BASE}/admin/assignments`).then(r => r.json()).then(setExisting).catch(() => {});
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleStudent = (id: string) =>
+    setSelectedStudents(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+
+  const selectAll = () => setSelectedStudents(students.map(s => s.id));
+  const selectNone = () => setSelectedStudents([]);
+
+  const addQuestion = () =>
+    setQuestions(q => [...q, { type: "multiple_choice", text: "", options: ["", "", "", ""], correctIndex: 0, points: 1 }]);
+
+  const removeQuestion = (i: number) =>
+    setQuestions(q => q.filter((_, idx) => idx !== i));
+
+  const updateQuestion = (i: number, patch: Partial<Question>) =>
+    setQuestions(q => q.map((item, idx) => idx === i ? { ...item, ...patch } : item));
+
+  const updateOption = (qi: number, oi: number, val: string) =>
+    setQuestions(q => q.map((item, idx) => {
+      if (idx !== qi) return item;
+      const opts = [...item.options];
+      opts[oi] = val;
+      return { ...item, options: opts };
+    }));
+
+  const submit = async () => {
+    setError(""); setSuccess(""); setLoading(true);
+    try {
+      await req("/admin/create-assignment", {
+        method: "POST",
+        body: JSON.stringify({
+          title, subject, grade,
+          studentIds: selectedStudents,
+          date,
+          passage: passage.trim() || undefined,
+          questions: questions.map(q => ({
+            type: q.type,
+            text: q.text,
+            options: q.type === "multiple_choice" ? q.options.filter(Boolean) : undefined,
+            correctIndex: q.type === "multiple_choice" ? q.correctIndex : undefined,
+            points: q.points,
+          })),
+        }),
+      });
+      setSuccess(`✅ Assignment "${title}" sent!`);
+      setTitle(""); setPassage(""); setSelectedStudents([]);
+      setQuestions([{ type: "multiple_choice", text: "", options: ["", "", "", ""], correctIndex: 0, points: 1 }]);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAssignment = async (id: string) => {
+    if (!confirm("Delete this assignment?")) return;
+    await fetch(`${BASE}/admin/assignments/${id}`, { method: "DELETE" });
+    load();
+  };
+
+  const subjectGradeKey = (s: AdminStudent) => {
+    if (subject === "reading") return s.reading_grade;
+    if (subject === "math") return s.math_grade;
+    if (subject === "writing") return s.writing_grade;
+    return null;
+  };
+
+  const SUBJ_COLOR: Record<string, string> = {
+    reading: "#7c3aed", math: "#0ea5e9", writing: "#10b981", sel: "#f59e0b",
+  };
+  const accent = SUBJ_COLOR[subject] || "#7c3aed";
+
+  const input: React.CSSProperties = {
+    width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
+    borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 14,
+  };
+  const label: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" };
+
+  return (
+    <div style={{ padding: "0 24px 48px" }}>
+      <SectionTitle>📝 Assignments</SectionTitle>
+
+      {/* Existing assignments */}
+      {existing.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 12 }}>
+            Upcoming / Recent
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {existing.map(a => {
+              const ids: string[] = (() => { try { return JSON.parse(a.target_student_ids); } catch { return []; } })();
+              const names = ids.map(id => students.find(s => s.id === id)?.name ?? "?").join(", ");
+              return (
+                <div key={a.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "white", fontSize: 14 }}>{a.title}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                      {a.target_subject} · Grade {a.target_grade_min} · {a.scheduled_date} · {names || "all"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteAssignment(a.id)}
+                    style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Create form */}
+      <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: 24, border: `1px solid ${accent}33` }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "white", marginBottom: 20 }}>Create New Assignment</div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+          <div>
+            <span style={label}>Title</span>
+            <input style={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Extra Reading Practice" />
+          </div>
+          <div>
+            <span style={label}>Subject</span>
+            <select style={{ ...input, cursor: "pointer" }} value={subject} onChange={e => setSubject(e.target.value as any)}>
+              <option value="reading">Reading</option>
+              <option value="math">Math</option>
+              <option value="writing">Writing</option>
+              <option value="sel">SEL</option>
+            </select>
+          </div>
+          <div>
+            <span style={label}>Grade Level</span>
+            <select style={{ ...input, cursor: "pointer" }} value={grade} onChange={e => setGrade(Number(e.target.value))}>
+              {[0,1,2,3,4,5].map(g => <option key={g} value={g}>{g === 0 ? "K" : `Grade ${g}`}</option>)}
+            </select>
+          </div>
+          <div>
+            <span style={label}>Date</span>
+            <input style={input} type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Students */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <span style={label}>Students</span>
+            <button onClick={selectAll} style={{ fontSize: 11, color: accent, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Select All</button>
+            <button onClick={selectNone} style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>None</button>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {students.map(s => {
+              const gradeVal = subjectGradeKey(s);
+              const sel = selectedStudents.includes(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => toggleStudent(s.id)}
+                  style={{
+                    padding: "8px 14px", borderRadius: 20, fontSize: 13, cursor: "pointer", fontWeight: sel ? 700 : 500,
+                    background: sel ? accent : "rgba(255,255,255,0.07)",
+                    color: sel ? "white" : "rgba(255,255,255,0.6)",
+                    border: `1px solid ${sel ? accent : "rgba(255,255,255,0.12)"}`,
+                  }}
+                >
+                  {s.name} {gradeVal !== null ? `(G${gradeVal === 0 ? "K" : gradeVal})` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Passage (reading only) */}
+        {subject === "reading" && (
+          <div style={{ marginBottom: 20 }}>
+            <span style={label}>Passage / Story (optional)</span>
+            <textarea
+              style={{ ...input, height: 100, resize: "vertical", fontFamily: "inherit" }}
+              value={passage}
+              onChange={e => setPassage(e.target.value)}
+              placeholder="Paste the reading passage here. It will appear at the top of the assignment."
+            />
+          </div>
+        )}
+
+        {/* Questions */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 12 }}>Questions</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {questions.map((q, i) => (
+              <div key={i} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: accent }}>Q{i + 1}</span>
+                  <select style={{ ...input, width: "auto" }} value={q.type} onChange={e => updateQuestion(i, { type: e.target.value as any })}>
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="short_answer">Short Answer</option>
+                    <option value="fill_blank">Fill in the Blank</option>
+                    <option value="draw">Drawing / Tracing</option>
+                  </select>
+                  {questions.length > 1 && (
+                    <button onClick={() => removeQuestion(i)} style={{ marginLeft: "auto", background: "rgba(239,68,68,0.15)", border: "none", color: "#f87171", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>✕</button>
+                  )}
+                </div>
+                <textarea
+                  style={{ ...input, height: 60, resize: "vertical", fontFamily: "inherit", marginBottom: 10 }}
+                  value={q.text}
+                  onChange={e => updateQuestion(i, { text: e.target.value })}
+                  placeholder={q.type === "draw" ? "e.g. Trace the letters: A B C" : "Question text…"}
+                />
+                {q.type === "multiple_choice" && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {q.options.map((opt, oi) => (
+                      <div key={oi} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="radio"
+                          name={`correct-${i}`}
+                          checked={q.correctIndex === oi}
+                          onChange={() => updateQuestion(i, { correctIndex: oi })}
+                          title="Mark as correct"
+                        />
+                        <input
+                          style={{ ...input, flex: 1 }}
+                          value={opt}
+                          onChange={e => updateOption(i, oi, e.target.value)}
+                          placeholder={`Option ${String.fromCharCode(65 + oi)}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addQuestion}
+            style={{ marginTop: 12, fontSize: 13, color: accent, background: `${accent}14`, border: `1px solid ${accent}33`, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 600 }}
+          >
+            + Add Question
+          </button>
+        </div>
+
+        {error && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        {success && <div style={{ color: "#34d399", fontSize: 13, marginBottom: 12 }}>{success}</div>}
+
+        <button
+          onClick={submit}
+          disabled={loading || !title || !selectedStudents.length || questions.some(q => !q.text)}
+          style={{ background: accent, color: "white", border: "none", borderRadius: 12, padding: "12px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: loading ? 0.6 : 1 }}
+        >
+          {loading ? "Sending…" : "Send Assignment"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── NAV ITEMS ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",   label: "Dashboard",      emoji: "📊" },
-  { id: "students",    label: "Students",        emoji: "👥" },
-  { id: "tasks",       label: "Tasks",           emoji: "📋" },
-  { id: "breaks",      label: "Break Settings",  emoji: "⏸️" },
+  { id: "dashboard",     label: "Dashboard",      emoji: "📊" },
+  { id: "assignments",   label: "Assignments",    emoji: "📝" },
+  { id: "students",      label: "Students",       emoji: "👥" },
+  { id: "tasks",         label: "Tasks",          emoji: "📋" },
+  { id: "breaks",        label: "Break Settings", emoji: "⏸️" },
   { id: "worksheets",  label: "Worksheets",      emoji: "📄" },
   { id: "youtube",     label: "YouTube Queue",   emoji: "📺" },
   { id: "settings",    label: "Settings",        emoji: "⚙️" },
@@ -1959,8 +2264,9 @@ function Portal() {
 
       {/* Main content */}
       <main style={{ flex: 1, overflowY: "auto", padding: 32, minWidth: 0 }}>
-        {activeSection === "dashboard"  && <DashboardSection  students={students} />}
-        {activeSection === "students"   && <StudentsSection   students={students} onRefresh={loadStudents} />}
+        {activeSection === "dashboard"   && <DashboardSection    students={students} />}
+        {activeSection === "assignments" && <AssignmentsSection />}
+        {activeSection === "students"    && <StudentsSection    students={students} onRefresh={loadStudents} />}
         {activeSection === "tasks"      && <TasksSection      students={students} />}
         {activeSection === "breaks"     && <BreakSection />}
         {activeSection === "worksheets" && <WorksheetsSection students={students} />}

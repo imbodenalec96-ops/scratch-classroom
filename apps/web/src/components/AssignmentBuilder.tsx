@@ -194,9 +194,23 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [feedback, setFeedback] = useState<string>("");
   const currentBlock = useCurrentBlock(classId);
 
-  // Flatten all questions from all sections into a single array
-  const allQuestions: Array<{ q: any; sectionTitle: string }> = parsed
-    ? parsed.sections?.flatMap((s: any) => s.questions.map((q: any) => ({ q, sectionTitle: s.title }))) ?? []
+  // Flatten all questions — normalise field names across content formats
+  const allQuestions: Array<{ q: any; sectionTitle: string; passage?: string }> = parsed
+    ? parsed.sections?.flatMap((s: any) =>
+        (s.questions ?? s.q ?? []).map((raw: any) => ({
+          // Normalise: prompt→text, answer→correctAnswer, o→options, c→correctIndex
+          q: {
+            ...raw,
+            text: raw.text ?? raw.prompt ?? "",
+            type: raw.type ?? (raw.options || raw.o ? "multiple_choice" : "short_answer"),
+            options: raw.options ?? (raw.o ? raw.o : undefined),
+            correctIndex: raw.correctIndex ?? raw.c ?? undefined,
+            correctAnswer: raw.correctAnswer ?? raw.answer ?? undefined,
+          },
+          sectionTitle: s.title,
+          passage: s.passage,
+        }))
+      ) ?? []
     : [];
   const total = allQuestions.length;
   const q = allQuestions[currentQ];
@@ -242,29 +256,13 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         // Client-side filtering would re-implement that (badly) and show work
         // meant for other students.
         const cls = classes.length ? classes : await api.getClasses();
+        if (!classes.length) setClasses(cls);
         const today = new Date().toISOString().slice(0, 10);
-        const all: any[] = [];
-        for (const c of cls) {
-          try {
-            const rows = await api.getPendingAssignments(c.id);
-            for (const a of rows || []) {
-              // Show today's work first; if none scheduled for today, fall
-              // through to anything pending (so kids aren't stuck).
-              if (a?.scheduled_date === today) all.push(a);
-            }
-          } catch {}
-        }
-        // If nothing scheduled for today across all classes, show ALL pending
-        // (still server-filtered), so students always have something to do.
-        if (all.length === 0) {
-          for (const c of cls) {
-            try {
-              const rows = await api.getPendingAssignments(c.id);
-              for (const a of rows || []) all.push(a);
-            } catch {}
-          }
-        }
-        setTodayList(all);
+        // Fetch all classes in parallel
+        const results = await Promise.all(cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])));
+        const all: any[] = results.flat().filter((a: any) => a?.scheduled_date === today);
+        const final = all.length > 0 ? all : results.flat();
+        setTodayList(final);
       } catch {}
       setLoading(false);
     };
@@ -376,62 +374,135 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
   if (!assignment) {
     // No specific assignment selected — render the full list of today's work.
+    const SUBJECT_META: Record<string, { emoji: string; grad: string; glow: string; accent: string }> = {
+      reading:  { emoji: "📖", grad: "linear-gradient(135deg,#7c3aed,#4f46e5)", glow: "rgba(124,58,237,0.5)",  accent: "#c4b5fd" },
+      math:     { emoji: "🔢", grad: "linear-gradient(135deg,#0ea5e9,#0284c7)", glow: "rgba(14,165,233,0.5)",  accent: "#7dd3fc" },
+      writing:  { emoji: "✏️", grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.5)",  accent: "#6ee7b7" },
+      sel:      { emoji: "💛", grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.5)",  accent: "#fcd34d" },
+      spelling: { emoji: "🔤", grad: "linear-gradient(135deg,#06b6d4,#0891b2)", glow: "rgba(6,182,212,0.5)",   accent: "#67e8f9" },
+      science:  { emoji: "🔬", grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.5)",  accent: "#f9a8d4" },
+    };
+    const DEFAULT_META = { emoji: "📚", grad: "linear-gradient(135deg,#8b5cf6,#7c3aed)", glow: "rgba(139,92,246,0.5)", accent: "#c4b5fd" };
+
     if (todayList.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-          <div className="text-6xl">🎉</div>
-          <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>No assignments today!</h2>
-          <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>
-            {classes.length === 0 ? "Join a class to receive assignments." : "Check back with your teacher — nothing scheduled for today."}
+        <div style={{ minHeight: "100dvh", background: "linear-gradient(135deg,#0f0826,#0a0b1e)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
+          <h2 style={{ fontSize: 24, fontWeight: 900, color: "white", margin: "0 0 8px" }}>All done for today!</h2>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+            {classes.length === 0 ? "Join a class to receive assignments." : "No new assignments — check back with your teacher."}
           </p>
         </div>
       );
     }
-    const SUBJECT_EMOJI: Record<string, string> = {
-      math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛", science: "🔬",
-    };
+
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-5">
-          <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${dk ? "text-violet-400" : "text-violet-600"}`}>
-            📅 {todayName}'s Assignments
+      <div style={{
+        minHeight: "100dvh",
+        background: "linear-gradient(160deg,#0f0826 0%,#0a0b1e 60%,#0c1030 100%)",
+        fontFamily: "'Baloo 2','Inter',system-ui,sans-serif",
+        padding: "0 0 60px",
+      }}>
+        <style>{`
+          @keyframes abPop { from { opacity:0; transform: translateY(22px) scale(.95); } to { opacity:1; transform: none; } }
+          @keyframes abGlow { 0%,100% { opacity:.7 } 50% { opacity:1 } }
+          .ab-card:active { transform: scale(.97) !important; }
+        `}</style>
+
+        {/* Hero header */}
+        <div style={{ padding: "48px 24px 32px", maxWidth: 640, margin: "0 auto" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a78bfa", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 16 }}>📅</span> {todayName.toUpperCase()}'S ASSIGNMENTS
           </div>
-          <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>
-            Pick any one to work on
+          <h1 style={{ fontSize: 34, fontWeight: 900, color: "#fff", margin: "0 0 6px", lineHeight: 1.15 }}>
+            What are you<br />working on today?
           </h1>
-          <p className={`text-sm mt-0.5 ${dk ? "text-white/50" : "text-gray-600"}`}>
-            {todayList.length} assignment{todayList.length === 1 ? "" : "s"} for today
+          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.38)", margin: 0 }}>
+            {todayList.length} assignment{todayList.length !== 1 ? "s" : ""} ready for you
           </p>
         </div>
-        <div className="grid gap-3">
-          {todayList.map((a) => {
-            const emoji = SUBJECT_EMOJI[(a.target_subject || "").toLowerCase()] || "📘";
+
+        {/* Cards */}
+        <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {todayList.map((a, i) => {
+            const subjectKey = (a.target_subject || "").toLowerCase();
+            const meta = SUBJECT_META[subjectKey] || DEFAULT_META;
             return (
-              <a
+              <button
                 key={a.id}
-                href={`/assignments?id=${encodeURIComponent(a.id)}`}
-                className="card p-4 flex items-center gap-4 hover:opacity-90 transition-opacity"
-                style={{ textDecoration: "none", borderLeft: "3px solid var(--accent)" }}
+                className="ab-card"
+                onClick={() => {
+                  setAssignment(a);
+                  if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 18,
+                  width: "100%", textAlign: "left", cursor: "pointer",
+                  background: "rgba(255,255,255,0.055)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 22,
+                  padding: "18px 20px",
+                  transition: "transform .15s, box-shadow .15s, border-color .15s",
+                  animation: `abPop .45s ease both`,
+                  animationDelay: `${i * 70}ms`,
+                  boxShadow: "none",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.boxShadow = `0 16px 40px ${meta.glow}`;
+                  e.currentTarget.style.borderColor = meta.accent + "55";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                }}
               >
-                <div className="text-3xl">{emoji}</div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-bold ${dk ? "text-white" : "text-gray-900"}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {/* Icon circle */}
+                <div style={{
+                  width: 58, height: 58, borderRadius: 18, flexShrink: 0,
+                  background: meta.grad,
+                  boxShadow: `0 8px 24px ${meta.glow}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 26,
+                }}>
+                  {meta.emoji}
+                </div>
+
+                {/* Text */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.2, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {a.title}
                   </div>
-                  {a.description && (
-                    <div className={`text-xs mt-0.5 ${dk ? "text-white/50" : "text-gray-500"}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {a.description}
-                    </div>
-                  )}
-                  <div className={`text-[11px] mt-1 font-semibold uppercase tracking-wider ${dk ? "text-violet-400" : "text-violet-600"}`}>
-                    {a.target_subject || "Assignment"}
-                    {a.estimated_minutes ? ` · ~${a.estimated_minutes} min` : ""}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                      color: meta.accent,
+                      background: meta.accent + "18",
+                      border: `1px solid ${meta.accent}30`,
+                      borderRadius: 6, padding: "2px 8px",
+                    }}>
+                      {a.target_subject || "Assignment"}
+                    </span>
+                    {a.target_grade_min != null && (
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>
+                        Grade {a.target_grade_min === 0 ? "K" : a.target_grade_min}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className={`text-sm font-semibold ${dk ? "text-violet-400" : "text-violet-600"}`}>
-                  Open →
+
+                {/* Arrow */}
+                <div style={{
+                  width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+                  background: meta.accent + "18",
+                  border: `1px solid ${meta.accent}30`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: meta.accent, fontSize: 18, fontWeight: 700,
+                }}>
+                  →
                 </div>
-              </a>
+              </button>
             );
           })}
         </div>
@@ -451,182 +522,215 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
   const progress = total > 0 ? ((currentQ + 1) / total) * 100 : 0;
   const currentAnswer = answers[currentQ] ?? "";
+  const subjectKey = (assignment.target_subject || "").toLowerCase();
+  const SUBJ_ACCENT: Record<string, string> = {
+    reading: "#c4b5fd", math: "#7dd3fc", writing: "#6ee7b7",
+    sel: "#fcd34d", spelling: "#67e8f9", science: "#f9a8d4",
+  };
+  const accent = SUBJ_ACCENT[subjectKey] || "#c4b5fd";
+  const accentGrad: Record<string, string> = {
+    reading: "linear-gradient(135deg,#7c3aed,#4f46e5)",
+    math: "linear-gradient(135deg,#0ea5e9,#0284c7)",
+    writing: "linear-gradient(135deg,#10b981,#059669)",
+    sel: "linear-gradient(135deg,#f59e0b,#d97706)",
+    spelling: "linear-gradient(135deg,#06b6d4,#0891b2)",
+    science: "linear-gradient(135deg,#ec4899,#db2777)",
+  };
+  const grad = accentGrad[subjectKey] || "linear-gradient(135deg,#8b5cf6,#6d28d9)";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      {/* Header */}
-      <div>
-        <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${dk ? "text-violet-400" : "text-violet-600"}`}>
-          📅 {todayName}'s Assignment
-        </div>
-        <h1 className={`text-xl font-extrabold ${dk ? "text-white" : "text-gray-900"}`}>{assignment.title}</h1>
-        <div className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-gray-500"}`}>
-          {parsed?.subject ?? assignment.target_subject ?? ""} {parsed?.grade ? `· ${parsed.grade}` : ""}
-          {assignment.source && (
-            <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-              style={{ background: "rgba(99,102,241,0.15)", color: "var(--accent)" }}>
-              📄 PDF · {assignment.source === "tpt" ? "from TPT" : "uploaded"}
-            </span>
-          )}
-        </div>
-      </div>
+    <div style={{
+      minHeight: "100dvh",
+      background: "linear-gradient(160deg,#0f0826 0%,#0a0b1e 60%,#0c1030 100%)",
+      fontFamily: "'Baloo 2','Inter',system-ui,sans-serif",
+      display: "flex", flexDirection: "column",
+    }}>
+      <style>{`@keyframes wsPop { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }`}</style>
 
-      {/* Attached PDF (TPT import or manual upload) */}
-      {assignment.attached_pdf_path && (
-        <div className="card p-2" style={{ borderLeft: "3px solid var(--accent)" }}>
-          <iframe
-            src={assignment.attached_pdf_path}
-            title={assignment.title}
-            style={{ width: "100%", height: "60vh", border: "none", borderRadius: 8, background: dk ? "#0a0a0f" : "#fff" }}
-          />
-          <a href={assignment.attached_pdf_path} target="_blank" rel="noreferrer"
-            className="text-xs mt-2 inline-block underline" style={{ color: "var(--accent)" }}>
-            Open PDF in new tab
-          </a>
-        </div>
-      )}
-
-      {/* Progress bar */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className={`text-xs font-semibold ${dk ? "text-white/40" : "text-gray-500"}`}>
-            Question {currentQ + 1} of {total}
-          </span>
-          <span className={`text-xs font-semibold ${dk ? "text-white/40" : "text-gray-500"}`}>{Math.round(progress)}%</span>
-        </div>
-        <div className={`h-2 rounded-full overflow-hidden ${dk ? "bg-white/10" : "bg-gray-200"}`}>
-          <div
-            className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Section label */}
-      {q && (
-        <div className={`text-[11px] font-bold uppercase tracking-widest ${dk ? "text-white/25" : "text-gray-400"}`}>
-          {q.sectionTitle}
-        </div>
-      )}
-
-      {/* Question card */}
-      {q && (
-        <div className="card rounded-2xl p-6 space-y-5">
-          <p className={`text-base font-semibold leading-relaxed ${dk ? "text-white" : "text-gray-900"}`}>
-            {q.q.text}
-          </p>
-
-          {/* Multiple choice */}
-          {q.q.type === "multiple_choice" && q.q.options && (
-            <div className="space-y-2.5">
-              {q.q.options.map((opt: string, oi: number) => {
-                const isSelected = currentAnswer === opt;
-                return (
-                  <button
-                    key={oi}
-                    onClick={() => handleSelect(opt)}
-                    className={`w-full text-left px-4 py-3.5 rounded-xl border-2 font-medium text-sm transition-all duration-150 cursor-pointer
-                      ${isSelected
-                        ? dk ? "border-violet-500 bg-violet-500/20 text-violet-300" : "border-violet-500 bg-violet-50 text-violet-700"
-                        : dk ? "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:bg-white/[0.06]"
-                               : "border-gray-200 bg-white text-gray-700 hover:border-violet-300 hover:bg-violet-50/50"
-                      }`}
-                    style={{ transform: isSelected ? "scale(1.01)" : "scale(1)" }}
-                  >
-                    <span
-                      className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 mr-3 text-xs flex-shrink-0
-                        ${isSelected ? "border-violet-500 bg-violet-500 text-white" : dk ? "border-white/25" : "border-gray-300"}`}
-                    >
-                      {isSelected ? "✓" : String.fromCharCode(65 + oi)}
-                    </span>
-                    {opt.replace(/^[A-D]\.\s*/, "")}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Short answer */}
-          {q.q.type === "short_answer" && (
-            <textarea
-              value={currentAnswer}
-              onChange={(e) => handleSelect(e.target.value)}
-              placeholder="Write your answer here…"
-              rows={q.q.lines || 3}
-              className="input w-full resize-none text-sm"
-            />
-          )}
-
-          {/* Fill in blank */}
-          {q.q.type === "fill_blank" && (
-            <input
-              value={currentAnswer}
-              onChange={(e) => handleSelect(e.target.value)}
-              placeholder="Fill in the blank…"
-              className="input w-full text-sm"
-            />
-          )}
-        </div>
-      )}
-
-      {/* Feedback message */}
-      {feedback && (
-        <div className={`p-4 rounded-xl border-2 text-sm font-semibold animate-pulse transition-all
-          ${feedback.includes("not quite right") || feedback.includes("not quite right")
-            ? dk ? "border-red-500/50 bg-red-500/10 text-red-300" : "border-red-300 bg-red-50 text-red-700"
-            : dk ? "border-amber-500/50 bg-amber-500/10 text-amber-300" : "border-amber-300 bg-amber-50 text-amber-700"
-          }`}>
-          {feedback}
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Top bar */}
+      <div style={{ padding: "16px 20px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 680, margin: "0 auto", width: "100%" }}>
         <button
-          onClick={handlePrev}
-          disabled={currentQ === 0}
-          className={`px-5 py-2.5 rounded-xl font-semibold text-sm border transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed
-            ${dk ? "border-white/10 text-white/60 hover:bg-white/[0.05]" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+          onClick={() => setAssignment(null)}
+          style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, padding: "6px 14px", cursor: "pointer" }}
         >
           ← Back
         </button>
-
-        {currentQ < total - 1 ? (
-          <button
-            onClick={handleNext}
-            className="btn-primary px-6 py-2.5"
-          >
-            Next →
-          </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="btn-primary px-6 py-2.5 gap-2"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
-          >
-            {submitting ? (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-            ) : "Submit ✓"}
-          </button>
-        )}
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
+          {currentQ + 1} / {total}
+        </div>
       </div>
 
-      {/* Question dots */}
-      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+      {/* Progress bar */}
+      <div style={{ padding: "12px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%" }}>
+        <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 99, background: grad, width: `${progress}%`, transition: "width .5s ease" }} />
+        </div>
+      </div>
+
+      {/* Assignment title strip */}
+      <div style={{ padding: "16px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>
+            {assignment.target_subject || "Assignment"}
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>·</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {assignment.title}
+          </span>
+        </div>
+      </div>
+
+      {/* Question dot nav */}
+      <div style={{ padding: "14px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%", display: "flex", gap: 6, flexWrap: "wrap" }}>
         {allQuestions.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrentQ(i)}
-            className={`h-2 rounded-full transition-all cursor-pointer ${
-              i === currentQ
-                ? "bg-violet-500 w-4"
-                : answers[i] !== undefined
-                  ? "bg-emerald-500 w-2"
-                  : dk ? "bg-white/20 w-2" : "bg-gray-300 w-2"
-            }`}
+            style={{
+              height: 8, width: i === currentQ ? 24 : 8,
+              borderRadius: 99, border: "none", cursor: "pointer",
+              background: i === currentQ ? accent : answers[i] !== undefined ? "#34d399" : "rgba(255,255,255,0.15)",
+              transition: "all .2s",
+            }}
           />
         ))}
+      </div>
+
+      {/* Question card */}
+      <div style={{ flex: 1, padding: "18px 20px 32px", maxWidth: 680, margin: "0 auto", width: "100%" }}>
+        {q && (
+          <div style={{ animation: "wsPop .35s ease both" }} key={currentQ}>
+
+            {/* Passage block */}
+            {q.passage && (
+              <div style={{
+                background: "rgba(255,255,255,0.05)", border: `1px solid ${accent}30`,
+                borderRadius: 16, padding: "16px 18px", marginBottom: 16,
+                fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.75)",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent, marginBottom: 8 }}>📖 Read this first</div>
+                {q.passage}
+              </div>
+            )}
+
+            {/* Question text */}
+            <div style={{
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20, padding: "22px 22px 20px",
+              boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)`,
+            }}>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "white", lineHeight: 1.5, margin: "0 0 20px", whiteSpace: "pre-wrap" }}>
+                {q.q.text}
+              </p>
+
+              {/* Multiple choice */}
+              {(q.q.type === "multiple_choice" || q.q.type === "mc") && (q.q.options || q.q.o) && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {(q.q.options || q.q.o).map((opt: string, oi: number) => {
+                    const isSelected = currentAnswer === opt || currentAnswer === String(oi);
+                    return (
+                      <button
+                        key={oi}
+                        onClick={() => handleSelect(opt)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 14,
+                          width: "100%", textAlign: "left", cursor: "pointer",
+                          padding: "14px 16px", borderRadius: 14,
+                          border: `2px solid ${isSelected ? accent : "rgba(255,255,255,0.1)"}`,
+                          background: isSelected ? accent + "20" : "rgba(255,255,255,0.03)",
+                          transition: "all .15s", color: isSelected ? accent : "rgba(255,255,255,0.75)",
+                          fontWeight: isSelected ? 700 : 500, fontSize: 15,
+                        }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                      >
+                        <span style={{
+                          width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                          border: `2px solid ${isSelected ? accent : "rgba(255,255,255,0.2)"}`,
+                          background: isSelected ? accent : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, fontWeight: 800, color: isSelected ? "#0f0826" : "rgba(255,255,255,0.4)",
+                        }}>
+                          {isSelected ? "✓" : String.fromCharCode(65 + oi)}
+                        </span>
+                        {opt.replace(/^[A-D]\.\s*/, "")}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Short answer / fill blank */}
+              {(q.q.type === "short_answer" || q.q.type === "sa" || q.q.type === "fill_blank") && (
+                <textarea
+                  value={currentAnswer}
+                  onChange={e => handleSelect(e.target.value)}
+                  placeholder="Write your answer here…"
+                  rows={q.q.type === "short_answer" || q.q.type === "sa" ? (q.q.lines || 3) : 1}
+                  style={{
+                    width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 15,
+                    background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
+                    color: "white", resize: "none", fontFamily: "inherit", outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Feedback */}
+            {feedback && (
+              <div style={{
+                marginTop: 12, padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+                background: feedback.includes("not quite") ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
+                border: `1px solid ${feedback.includes("not quite") ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.3)"}`,
+                color: feedback.includes("not quite") ? "#fca5a5" : "#fcd34d",
+              }}>
+                {feedback}
+              </div>
+            )}
+
+            {/* Nav buttons */}
+            <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+              <button
+                onClick={handlePrev}
+                disabled={currentQ === 0}
+                style={{
+                  flex: "0 0 auto", padding: "14px 22px", borderRadius: 14, fontSize: 15, fontWeight: 600,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "rgba(255,255,255,0.5)", cursor: currentQ === 0 ? "not-allowed" : "pointer",
+                  opacity: currentQ === 0 ? 0.35 : 1,
+                }}
+              >
+                ← Back
+              </button>
+              {currentQ < total - 1 ? (
+                <button
+                  onClick={handleNext}
+                  style={{
+                    flex: 1, padding: "14px 22px", borderRadius: 14, fontSize: 16, fontWeight: 800,
+                    background: grad, color: "white", border: "none", cursor: "pointer",
+                    boxShadow: `0 8px 24px ${accent}40`,
+                  }}
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  style={{
+                    flex: 1, padding: "14px 22px", borderRadius: 14, fontSize: 16, fontWeight: 800,
+                    background: "linear-gradient(135deg,#10b981,#059669)", color: "white", border: "none", cursor: "pointer",
+                    boxShadow: "0 8px 24px rgba(16,185,129,0.4)", opacity: submitting ? 0.7 : 1,
+                  }}
+                >
+                  {submitting ? "Submitting…" : "Submit ✓"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -827,8 +931,8 @@ export default function AssignmentBuilder() {
     try {
       const result = await api.generateAssignment({ title, subject, grade, instructions });
       setGenerated(result);
-    } catch {
-      setGenError("Generation failed — please try again.");
+    } catch (e: any) {
+      setGenError(`Generation failed: ${e?.message || String(e)}`);
     }
     setGenerating(false);
   };

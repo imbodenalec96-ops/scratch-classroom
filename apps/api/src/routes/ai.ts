@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { AuthRequest } from "../middleware/auth.js";
 import db from "../db.js";
+import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -211,23 +212,13 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
   ]
 }`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-opus-4-5",
-        max_tokens: 3000,
-        messages: [{ role: "user", content: prompt }],
-      }),
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 3000,
+      messages: [{ role: "user", content: prompt }],
     });
-
-    if (!response.ok) throw new Error(`Anthropic error: ${response.status}`);
-    const data = await response.json();
-    const text = (data as any).content?.[0]?.text || "";
+    const text = (msg.content[0] as any).text || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const quiz = JSON.parse(jsonMatch[0]);
@@ -246,14 +237,15 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
   }
 });
 
-// AI Assignment Generator (uses Anthropic claude API)
+// AI Assignment Generator (uses OpenAI GPT-4o)
 router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
   if (req.user!.role === "student") return res.status(403).json({ error: "Forbidden" });
 
   const { title, subject, grade, instructions } = req.body;
+  const OPENAI_KEY = process.env.OPENAI_API_KEY;
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
-  if (!ANTHROPIC_KEY) {
+  if (!OPENAI_KEY && !ANTHROPIC_KEY) {
     // Return a sample assignment for testing
     return res.json({
       title: title || "Sample Assignment",
@@ -364,31 +356,36 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
   ]
 }`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-opus-4-5",
+    let text = "";
+    if (OPENAI_KEY) {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!response.ok) throw new Error(`OpenAI error: ${response.status} ${await response.text()}`);
+      const data: any = await response.json();
+      text = data.choices?.[0]?.message?.content || "";
+    } else {
+      const client = new Anthropic({ apiKey: ANTHROPIC_KEY! });
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 4000,
         messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    const data = await response.json();
-    const text = (data as any).content?.[0]?.text || "";
-
-    // Extract JSON from response
+      });
+      text = (msg.content[0] as any).text || "";
+    }
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const assignment = JSON.parse(jsonMatch[0]);
     res.json(assignment);
-  } catch (err) {
-    res.status(500).json({ error: "AI generation failed", details: String(err) });
+  } catch (err: any) {
+    console.error("generate-assignment failed:", err?.message || err);
+    res.status(500).json({ error: "AI generation failed", details: err?.message || String(err) });
   }
 });
 
@@ -587,26 +584,13 @@ Return ONLY valid JSON, no markdown, no code fences, no explanation â€” just thi
   ]
 }`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-opus-4-5",
-        max_tokens: 4000,
-        messages: [{ role: "user", content: prompt }],
-      }),
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
     });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Anthropic error ${response.status}: ${body.slice(0, 200)}`);
-    }
-    const data = await response.json();
-    const text = (data as any).content?.[0]?.text || "";
+    const text = (msg.content[0] as any).text || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in model response");
     const assignment = JSON.parse(jsonMatch[0]);

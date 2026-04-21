@@ -490,6 +490,104 @@ function youtubeEmbedUrl(url: string): string | null {
 }
 
 /* ── Interactive Assignment Worker ── */
+function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string) => void; cardKey: number; accentColor: string }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const drawing = React.useRef(false);
+  const lastPos = React.useRef<{ x: number; y: number } | null>(null);
+
+  const drawGuides = React.useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#ddd8ff";
+    ctx.lineWidth = 1.5;
+    for (let y = 80; y < canvas.height; y += 80) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    // dotted midline
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = "#c4bcf7";
+    for (let y = 40; y < canvas.height; y += 80) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }, []);
+
+  React.useEffect(() => {
+    drawGuides();
+    onDraw("draw-ready");
+  }, [cardKey, drawGuides, onDraw]);
+
+  const getPos = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ("touches" in e && e.touches.length > 0) {
+      return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+    }
+    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+  };
+
+  const startDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    drawing.current = true;
+    lastPos.current = getPos(e);
+  };
+
+  const doDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!drawing.current || !canvasRef.current) return;
+    const ctx = canvasRef.current.getContext("2d")!;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current!.x, lastPos.current!.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#3b28cc";
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    lastPos.current = pos;
+    onDraw(canvasRef.current.toDataURL());
+  };
+
+  const stopDraw = () => { drawing.current = false; lastPos.current = null; };
+
+  const clear = () => { drawGuides(); onDraw("draw-ready"); };
+
+  return (
+    <div className="space-y-3">
+      <div className="text-[12px] font-bold uppercase tracking-wide" style={{ color: accentColor }}>
+        ✏️ Use your finger to write below
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={900} height={360}
+        style={{
+          width: "100%", height: 220,
+          borderRadius: 16,
+          border: `2px solid ${accentColor}55`,
+          background: "#f9f8ff",
+          touchAction: "none",
+          cursor: "crosshair",
+          display: "block",
+        }}
+        onMouseDown={startDraw} onMouseMove={doDraw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+        onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={stopDraw}
+      />
+      <button
+        onClick={clear}
+        className="text-[12px] font-semibold px-4 py-2 rounded-xl"
+        style={{ background: `${accentColor}14`, color: accentColor, border: `1px solid ${accentColor}33` }}
+      >
+        🗑 Clear
+      </button>
+    </div>
+  );
+}
+
 function WorkScreen({
   assignment, parsed, dk, onComplete, onBreak, questionsAnswered, setQuestionsAnswered,
 }: {
@@ -808,105 +906,9 @@ function WorkScreen({
                     );
                   })}
                 </div>
-              ) : q.q.type === "draw" ? (() => {
-                /* ── Finger-drawing canvas for tracing/writing ── */
-                const canvasRef = React.useRef<HTMLCanvasElement>(null);
-                const drawing = React.useRef(false);
-                const lastPos = React.useRef<{x:number,y:number}|null>(null);
-
-                const getPos = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
-                  const canvas = canvasRef.current!;
-                  const rect = canvas.getBoundingClientRect();
-                  const scaleX = canvas.width / rect.width;
-                  const scaleY = canvas.height / rect.height;
-                  if ('touches' in e) {
-                    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
-                  }
-                  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-                };
-
-                const startDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
-                  e.preventDefault();
-                  drawing.current = true;
-                  lastPos.current = getPos(e as any);
-                };
-
-                const draw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
-                  e.preventDefault();
-                  if (!drawing.current || !canvasRef.current) return;
-                  const ctx = canvasRef.current.getContext('2d')!;
-                  const pos = getPos(e as any);
-                  ctx.beginPath();
-                  ctx.moveTo(lastPos.current!.x, lastPos.current!.y);
-                  ctx.lineTo(pos.x, pos.y);
-                  ctx.strokeStyle = '#5B4FE8';
-                  ctx.lineWidth = 6;
-                  ctx.lineCap = 'round';
-                  ctx.lineJoin = 'round';
-                  ctx.stroke();
-                  lastPos.current = pos;
-                  // Save drawing as data URL answer
-                  handleSelect(canvasRef.current.toDataURL());
-                };
-
-                const stopDraw = () => { drawing.current = false; lastPos.current = null; };
-
-                const clearCanvas = () => {
-                  const canvas = canvasRef.current;
-                  if (!canvas) return;
-                  const ctx = canvas.getContext('2d')!;
-                  ctx.clearRect(0, 0, canvas.width, canvas.height);
-                  // Draw guide lines
-                  ctx.strokeStyle = '#e8e4ff';
-                  ctx.lineWidth = 1;
-                  for (let y = 80; y < canvas.height; y += 80) {
-                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-                  }
-                  handleSelect('');
-                };
-
-                // Draw guide lines on mount
-                React.useEffect(() => {
-                  const canvas = canvasRef.current;
-                  if (!canvas) return;
-                  const ctx = canvas.getContext('2d')!;
-                  ctx.strokeStyle = '#e8e4ff';
-                  ctx.lineWidth = 1;
-                  for (let y = 80; y < canvas.height; y += 80) {
-                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-                  }
-                }, [cardKey]);
-
-                return (
-                  <div className="space-y-3">
-                    <div className="text-[12px] font-semibold" style={{ color: starfall.accent }}>
-                      ✏️ Use your finger to write on the canvas below
-                    </div>
-                    <canvas
-                      ref={canvasRef}
-                      width={800} height={320}
-                      style={{
-                        width: '100%', height: 200,
-                        borderRadius: 16,
-                        border: `2px solid ${starfall.accent}44`,
-                        background: '#faf9ff',
-                        touchAction: 'none',
-                        cursor: 'crosshair',
-                        display: 'block',
-                      }}
-                      onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-                      onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
-                    />
-                    <button
-                      onClick={clearCanvas}
-                      className="text-[12px] font-semibold px-4 py-2 rounded-xl transition-colors"
-                      style={{ background: `${starfall.accent}14`, color: starfall.accent, border: `1px solid ${starfall.accent}33` }}
-                    >
-                      🗑 Clear and try again
-                    </button>
-                  </div>
-                );
-              })() : (() => {
+              ) : q.q.type === "draw" ? (
+                <DrawCanvas onDraw={handleSelect} cardKey={cardKey} accentColor={starfall.accent} />
+              ) : (() => {
                 /* ── Fallback input for anything that isn't MC: short_answer,
                    fill_blank, computation, undefined, etc. Math subject →
                    numeric keypad. Enter advances/submits. ── */
@@ -974,7 +976,7 @@ function WorkScreen({
 
         {/* ── Navigation buttons ── */}
         {(() => {
-          const answered = String(currentAnswer).trim().length > 0;
+          const answered = q.q.type === "draw" || String(currentAnswer).trim().length > 0;
           const isLast = currentQ >= total - 1;
           return (
             <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "180ms" }}>
@@ -1357,10 +1359,8 @@ export default function StudentDashboard() {
         if (found) {
           setPendingAssignment(found);
           setParsedAssignment(foundParsed);
-          setPhase('working');
-        } else {
-          setPhase('done');
         }
+        setPhase('done');
         clearTimeout(timer);
       } catch {
         clearTimeout(timer);
@@ -1494,6 +1494,8 @@ export default function StudentDashboard() {
     );
   }
 
+  const lockBanner = null;
+
   if (phase === 'welcome') return <WelcomeScreen name={user?.name || "Student"} />;
 
   if (phase === 'loading') return (
@@ -1511,22 +1513,20 @@ export default function StudentDashboard() {
   // work" gate and render the full dashboard so Arcade/Projects/YouTube are
   // reachable. This is what makes the dashboard flip in real-time when the
   // teacher clicks Grant Free Time or the student starts a break.
-  if (!accessUnlocked) {
-    if (phase === 'working' && pendingAssignment && parsedAssignment) {
-      return (
-        <WorkScreen
-          assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
-          onComplete={handleWorkComplete} onBreak={handleTakeBreak}
-          questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
-        />
-      );
-    }
+  if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
 
-    if (phase === 'working' && pendingAssignment && !parsedAssignment) {
-      return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
-    }
+  if (phase === 'working' && pendingAssignment && parsedAssignment) {
+    return (
+      <WorkScreen
+        assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
+        onComplete={handleWorkComplete} onBreak={handleTakeBreak}
+        questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
+      />
+    );
+  }
 
-    if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
+  if (phase === 'working' && pendingAssignment && !parsedAssignment) {
+    return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
   }
 
   // ── DONE / DASHBOARD ──
@@ -1558,6 +1558,8 @@ export default function StudentDashboard() {
       position: "relative",
     }}>
       <style>{DB_ANIM}</style>
+
+      {lockBanner}
 
       {broadcast && (
         <div style={{
@@ -2176,36 +2178,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Learning Apps — below class, quick request link when no play section shown */}
-        {!unlocked && (
-          <div style={{ marginTop: 22 }}>
-            <div style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🌐 Learning Apps</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => navigate("/websites")} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, cursor: "pointer", background: "rgba(99,102,241,.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.35)" }}>See all →</button>
-                <button onClick={() => { setShowWebsiteRequest(true); setWebsiteRequestSent(false); setWebsiteRequestTitle(""); }} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, cursor: "pointer", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)" }}>📝 Request</button>
-              </div>
-            </div>
-            <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              {myWebsites.length > 0 ? (
-                <LearningAppGrid>
-                  {myWebsites.map((w: any) => <LearningAppTile key={w.id} app={w} dk={true} />)}
-                </LearningAppGrid>
-              ) : websitesLoading ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} style={{ height: 100, borderRadius: 12, background: "rgba(255,255,255,0.04)", animation: `pulse 1.5s ease-in-out ${i * 0.1}s infinite` }} />
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "20px", opacity: 0.35 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🌐</div>
-                  <p style={{ fontSize: 12, fontWeight: 700 }}>No learning apps yet — ask your teacher!</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
       </div>{/* end max-width wrapper */}
 
