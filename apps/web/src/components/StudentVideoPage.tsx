@@ -227,10 +227,10 @@ export default function StudentVideoPage() {
             {/* Video */}
             <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 16, overflow: "hidden" }}>
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${playing.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+                src={`https://www.youtube-nocookie.com/embed/${playing.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&disablekb=0&fs=1`}
                 title={playing.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; fullscreen"
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
               />
             </div>
