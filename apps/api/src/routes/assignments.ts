@@ -936,6 +936,58 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
   }
 });
 
+// Debug: what does a specific student see? GET /class/:classId/debug-pending?studentId=XXX
+// Returns raw rows + filter reason for each — teacher-only diagnostic tool
+router.get("/class/:classId/debug-pending", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const { studentId } = req.query as any;
+  if (!studentId) return res.status(400).json({ error: "studentId query param required" });
+  const todayStr = new Date().toISOString().slice(0, 10);
+  try {
+    const rows = await db.prepare(
+      `SELECT a.id, a.title, a.student_id, a.target_student_ids, a.target_grade_min, a.target_grade_max,
+              a.target_subject, a.scheduled_date, a.class_id,
+              s.id as submission_id
+       FROM assignments a
+       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?
+       WHERE a.class_id = ?
+       ORDER BY a.scheduled_date ASC, a.created_at ASC`
+    ).all(studentId, req.params.classId) as any[];
+
+    const studentGrades = await db.prepare(
+      "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
+    ).get(studentId) as any;
+
+    const annotated = rows.map((r: any) => {
+      let visible = true;
+      let reason = "ok";
+
+      if (r.submission_id) { visible = false; reason = "already submitted"; }
+      else if (r.student_id && r.student_id !== studentId) { visible = false; reason = `student_id locked to ${r.student_id}`; }
+      else if (r.scheduled_date && r.scheduled_date.slice(0,10) > todayStr) { visible = false; reason = `future: ${r.scheduled_date}`; }
+      else if (r.target_student_ids) {
+        try {
+          const ids = JSON.parse(r.target_student_ids);
+          if (Array.isArray(ids) && ids.length > 0 && !ids.includes(studentId)) {
+            visible = false; reason = `target_student_ids excludes this student (${ids.join(",")})`;
+          }
+        } catch { reason = "target_student_ids parse error"; }
+      } else if (r.target_grade_min != null) {
+        const col = r.target_subject === 'math' ? 'math_grade' : r.target_subject === 'writing' ? 'writing_grade' : 'reading_grade';
+        const g = studentGrades ? Number(studentGrades[col] ?? 3) : 3;
+        const tMax = r.target_grade_max ?? r.target_grade_min;
+        if (g < Number(r.target_grade_min) || g > Number(tMax)) {
+          visible = false; reason = `grade ${g} outside [${r.target_grade_min}–${tMax}] for ${r.target_subject}`;
+        }
+      }
+      return { ...r, visible, reason };
+    });
+
+    res.json({ todayStr, studentGrades, assignments: annotated });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message });
+  }
+});
+
 // Get today's assignment for a class
 router.get("/class/:classId/today", async (req: AuthRequest, res: Response) => {
   const today = new Date().toISOString().slice(0, 10);
