@@ -356,20 +356,17 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
   ]
 }`;
 
-    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    const GROQ_KEY = process.env.GROQ_API_KEY;
     let text = "";
-    if (GEMINI_KEY) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        }
-      );
-      if (!response.ok) throw new Error(`Gemini error: ${response.status} ${await response.text()}`);
+    if (GROQ_KEY) {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({ model: "llama-3.1-8b-instant", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!response.ok) throw new Error(`Groq error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();
-      text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      text = data.choices?.[0]?.message?.content || "";
     } else if (OPENAI_KEY) {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
