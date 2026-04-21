@@ -60,21 +60,93 @@ function getStarfallPalette(subject?: string | null) {
 
 /* ── Read-aloud: speak question text via Web Speech API. Cancels any in-flight
  *    utterance first so rapid taps don't queue up. Gracefully no-ops if the
- *    browser doesn't support SpeechSynthesis. */
-function speakText(text: string) {
+ *    browser doesn't support SpeechSynthesis.
+ *
+ *    Voices load asynchronously — getVoices() returns [] on first call.
+ *    We wait for onvoiceschanged, then pick the clearest available English
+ *    voice across macOS, Windows, ChromeOS, iOS, and Android. */
+function getBestVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  // Priority list: clearest/most natural voices per platform
+  const preferred = [
+    // macOS / iOS
+    /samantha|karen|serena|daniel|moira/i,
+    // Chrome / ChromeOS
+    /google us english|google uk english female/i,
+    // Windows / Edge
+    /microsoft zira|microsoft jenny|microsoft aria|microsoft guy/i,
+    // Android
+    /en-us.*female|female.*en-us/i,
+    // Any en-US voice (last resort before default)
+    /.*/,
+  ];
+  const enUS = voices.filter(v => v.lang.toLowerCase().startsWith("en"));
+  for (const pattern of preferred) {
+    const match = enUS.find(v => pattern.test(v.name));
+    if (match) return match;
+  }
+  return voices[0] ?? null;
+}
+
+function speakText(text: string, rate = 0.82) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(String(text || ""));
-    u.rate = 0.95;
-    u.pitch = 1.05;
-    u.lang = "en-US";
-    // Prefer a friendly voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const friendly = voices.find(v => /samantha|karen|google us english|child/i.test(v.name));
-    if (friendly) u.voice = friendly;
-    window.speechSynthesis.speak(u);
-  } catch { /* best effort */ }
+  const doSpeak = () => {
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text || ""));
+      u.rate = rate;
+      u.pitch = 1.0;
+      u.lang = "en-US";
+      const voice = getBestVoice();
+      if (voice) u.voice = voice;
+      window.speechSynthesis.speak(u);
+    } catch { /* best effort */ }
+  };
+  // Voices may not be loaded yet — wait for them if needed
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    doSpeak();
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    };
+  }
+}
+
+/** Spelling-specific: say word → pause → say word again (classic dictation pattern) */
+function speakSpellingWord(word: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const doSpeak = () => {
+    try {
+      window.speechSynthesis.cancel();
+      const voice = getBestVoice();
+      const make = (t: string) => {
+        const u = new SpeechSynthesisUtterance(t);
+        u.rate = 0.78;
+        u.pitch = 1.0;
+        u.lang = "en-US";
+        if (voice) u.voice = voice;
+        return u;
+      };
+      window.speechSynthesis.speak(make(word));
+      // Brief silent pause utterance
+      const pause = new SpeechSynthesisUtterance(" ");
+      pause.rate = 0.1; pause.volume = 0;
+      window.speechSynthesis.speak(pause);
+      window.speechSynthesis.speak(make(word));
+    } catch { /* best effort */ }
+  };
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    doSpeak();
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    };
+  }
 }
 function stopSpeaking() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -842,7 +914,11 @@ function WorkScreen({
                   <TypewriterText text={q.q.text} speed={28} />
                 </p>
                 <button
-                  onClick={() => speakText(q.q.text)}
+                  onClick={() => {
+                    const subj = String(parsed?.subject || "").toLowerCase();
+                    if (subj === "spelling") speakSpellingWord(q.q.text);
+                    else speakText(q.q.text);
+                  }}
                   className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
                   style={{
                     width: 44, height: 44,
