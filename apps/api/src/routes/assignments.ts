@@ -172,6 +172,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
   } = req.body;
   const id = crypto.randomUUID();
   await ensureGradeCols();
+  const safeDueDate = dueDate && String(dueDate).trim() ? dueDate : null;
+  const safeScheduledDate = scheduledDate && String(scheduledDate).trim() ? scheduledDate : null;
   const tMin = targetGradeMin != null ? Number(targetGradeMin) : null;
   const tMax = targetGradeMax != null ? Number(targetGradeMax) : (tMin != null ? tMin : null);
   const tSub = targetSubject || null;
@@ -192,8 +194,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
         target_student_ids, is_group, group_name, video_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []),
-      starterProjectId, content ?? null, scheduledDate ?? null,
+      id, classId, req.user!.id, title, description, safeDueDate, JSON.stringify(rubric || []),
+      starterProjectId, content ?? null, safeScheduledDate,
       tMin, tMax, tSub,
       teacherNotes || null,
       questionCount != null ? Number(questionCount) : null,
