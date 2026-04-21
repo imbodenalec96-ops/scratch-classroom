@@ -33,7 +33,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     rows = await db.prepare("SELECT * FROM classes WHERE teacher_id = ? ORDER BY created_at DESC").all(u.id);
   } else {
     rows = await db.prepare(
-      `SELECT c.* FROM classes c JOIN class_members cm ON c.id = cm.class_id WHERE cm.user_id = ? ORDER BY c.created_at DESC`
+      `SELECT c.* FROM classes c JOIN class_members cm ON c.id::text = cm.class_id::text WHERE cm.user_id::text = ? ORDER BY c.created_at DESC`
     ).all(u.id);
   }
   res.json(rows);

@@ -869,8 +869,8 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
 router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const classId = req.params.classId;
-  await ensureGradeCols();
   try {
+    try { await ensureGradeCols(); } catch { /* non-fatal */ }
     // Paper-only students never see digital assignments — teacher prints them
     try {
       try { await db.exec(`ALTER TABLE users ADD COLUMN paper_only INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
