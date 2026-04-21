@@ -1217,6 +1217,42 @@ function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any;
 
 /* ── Dashboard (shown after work is done) ── */
 export default function StudentDashboard() {
+    // Back button handler
+    const handleBack = () => {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate("/student");
+      }
+    };
+      {/* Global Back Button (top left, always visible on dashboard and subpages) */}
+      <button
+        onClick={handleBack}
+        style={{
+          position: "fixed",
+          top: 18,
+          left: 18,
+          zIndex: 100,
+          background: dk ? "rgba(139,92,246,0.18)" : "#ede9fe",
+          color: dk ? "#c4b5fd" : "#6d28d9",
+          border: "none",
+          borderRadius: 16,
+          padding: "10px 18px 10px 14px",
+          fontWeight: 700,
+          fontSize: 16,
+          boxShadow: dk ? "0 2px 8px rgba(139,92,246,0.12)" : "0 2px 8px #ede9fe",
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          cursor: "pointer",
+          transition: "background 0.18s, color 0.18s",
+        }}
+        className="back-btn"
+        aria-label="Back"
+      >
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ marginRight: 4 }}><path d="M13.5 17L8.5 12L13.5 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Back
+      </button>
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
