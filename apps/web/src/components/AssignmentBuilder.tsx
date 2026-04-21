@@ -939,6 +939,7 @@ export default function AssignmentBuilder() {
     try {
       const result = await api.generateAssignment({ title, subject, grade, instructions, passage: genPassage.trim() || undefined });
       setGenerated(result);
+      setShowForm(true);
     } catch (e: any) {
       setGenError(`Generation failed: ${e?.message || String(e)}`);
     }
