@@ -889,11 +889,10 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
         AND (a.student_id IS NULL OR a.student_id = ?)
         AND (
           a.scheduled_date IS NULL
-          OR a.scheduled_date = ?
-          OR a.scheduled_date::date = ?::date
+          OR a.scheduled_date::date <= ?::date
         )
       ORDER BY a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, todayStr, todayStr) as any[];
+    `).all(userId, classId, userId, todayStr) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
