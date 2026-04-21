@@ -1499,13 +1499,10 @@ export default function StudentDashboard() {
     spawnConfetti();
     setMascotCelebrating(true);
     setTimeout(() => setMascotCelebrating(false), 3000);
-    try {
-      const subs = await api.getMySubmissions();
-      setSubmissions(subs);
-      setStatSubmitted(subs.length);
-      setStatGraded(subs.filter((s: any) => s.grade !== null).length);
-    } catch {}
-    setPhase('done');
+    // Clear current assignment and re-fetch so next pending one loads
+    setPendingAssignment(null);
+    setParsedAssignment(null);
+    setPhase('loading');
   }, [pendingAssignment]);
 
   // "Take Break" from inside WorkScreen → use the REAL break system
