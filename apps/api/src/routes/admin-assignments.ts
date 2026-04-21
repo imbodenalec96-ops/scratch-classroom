@@ -260,7 +260,20 @@ router.get("/pending-check", async (req, res) => {
       `SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?`
     ).get(student.id);
 
-    res.json({ student, classes, grades, pending: allPending });
+    // Simulate the JS filter from the real pending endpoint
+    const filtered: any[] = [];
+    for (const p of allPending) {
+      for (const r of p.rows) {
+        if (r.target_student_ids) {
+          let ids: string[] = [];
+          try { const parsed = JSON.parse(r.target_student_ids); if (Array.isArray(parsed)) ids = parsed; } catch {}
+          if (ids.length > 0 && ids.includes(student.id)) filtered.push({ classId: p.classId, title: r.title, included: true, reason: "in target_student_ids" });
+          else if (ids.length > 0) filtered.push({ title: r.title, included: false, reason: `not in ids: ${ids.slice(0,2).join(",")}...` });
+        }
+      }
+    }
+
+    res.json({ student, classes, grades, rawTotalRows: allPending.reduce((s, p) => s + p.rawCount, 0), simulatedFiltered: filtered });
   } catch (e: any) {
     res.status(500).json({ error: e?.message });
   }
