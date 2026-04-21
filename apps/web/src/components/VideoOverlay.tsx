@@ -221,7 +221,8 @@ export default function VideoOverlay() {
             ref={iframeRef}
             src={iframeSrc}
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
             title={activeTitle}
           />
           {/* iOS tap-to-play: sits over the loaded (paused) iframe */}

@@ -358,7 +358,7 @@ export default function ClassroomBoard() {
           ref={boardIframeRef}
           src={src}
           style={{ position: "absolute", top: 48, left: 0, right: 0, bottom: 0, width: "100%", height: "calc(100% - 48px)", border: "none" }}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           title={boardVideo.title}
           allowFullScreen
         />

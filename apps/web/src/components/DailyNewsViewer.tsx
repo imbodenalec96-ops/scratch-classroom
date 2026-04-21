@@ -150,9 +150,9 @@ export default function DailyNewsViewer() {
             src={embed.src}
             title={resolvedTitle}
             className="w-full h-full border-0"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
             allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-autoplay"
           />
         )}
       </div>

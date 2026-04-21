@@ -2104,9 +2104,9 @@ export default function StudentDashboard() {
               <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
             </div>
             <div style={{ position: "relative", paddingTop: "56.25%" }}>
-              <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
+              <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
                 title={classVideo.video_title || "Class Video"}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
             </div>

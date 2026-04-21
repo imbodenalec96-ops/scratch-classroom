@@ -234,7 +234,8 @@ function IframeModal({ url, onClose }: { url: string; onClose: () => void }) {
         </div>
         <iframe
           src={url}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-autoplay allow-presentation"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           style={{ flex: 1, border: "none", width: "100%", height: "100%" }}
           allowFullScreen
         />
@@ -790,7 +791,7 @@ export default function StudentKiosk() {
       {videoModal && (() => {
         const vid = extractYoutubeId(videoModal.url);
         const embedUrl = vid
-          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1`
+          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
           : videoModal.url;
         return <IframeModal url={embedUrl} onClose={() => setVideoModal(null)} />;
       })()}
@@ -799,7 +800,7 @@ export default function StudentKiosk() {
       {approvedVideoModal && activeStudent?.approved_video_url && (() => {
         const vid = extractYoutubeId(activeStudent.approved_video_url);
         const embedUrl = vid
-          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1`
+          ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
           : activeStudent.approved_video_url;
         return (
           <div style={{
@@ -830,7 +831,7 @@ export default function StudentKiosk() {
                 <iframe
                   src={embedUrl}
                   style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                   title="Approved Video"
                 />
