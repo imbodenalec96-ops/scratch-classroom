@@ -1366,35 +1366,45 @@ export default function StudentDashboard() {
       }
       setYoutubeLibrary(merged);
     };
-    loadAll();
-    const iv = setInterval(loadAll, 60_000);
-    return () => clearInterval(iv);
-  }, [classes]);
+    // ...existing code...
 
-  // Work state
-  const [pendingAssignment, setPendingAssignment] = useState<any>(null);
-  const [parsedAssignment, setParsedAssignment] = useState<any>(null);
-  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+    // Place Back button after dk is defined
+    const backButton = (
+      <button
+        onClick={handleBack}
+        style={{
+          position: "fixed",
+          top: 18,
+          left: 18,
+          zIndex: 100,
+          background: dk ? "rgba(139,92,246,0.18)" : "#ede9fe",
+          color: dk ? "#c4b5fd" : "#6d28d9",
+          border: "none",
+          borderRadius: 16,
+          padding: "10px 18px 10px 14px",
+          fontWeight: 700,
+          fontSize: 16,
+          boxShadow: dk ? "0 2px 8px rgba(139,92,246,0.12)" : "0 2px 8px #ede9fe",
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          cursor: "pointer",
+          transition: "background 0.18s, color 0.18s",
+        }}
+        className="back-btn"
+        aria-label="Back"
+      >
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ marginRight: 4 }}><path d="M13.5 17L8.5 12L13.5 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Back
+      </button>
+    );
 
-  // Pending quizzes (Bug #32): quizzes created by teachers should surface here
-  const [pendingQuizzes, setPendingQuizzes] = useState<any[]>([]);
-  const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
-  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
-  const [quizResult, setQuizResult] = useState<{ score: number } | null>(null);
-  const [quizSubmitting, setQuizSubmitting] = useState(false);
-
-  // Stats
-  const [statClasses, setStatClasses] = useState(0);
-  const [statSubmitted, setStatSubmitted] = useState(0);
-  const [statGraded, setStatGraded] = useState(0);
-  const c0 = useCountUp(statClasses, 900, 200);
-  const c1 = useCountUp(statSubmitted, 900, 290);
-  const c2 = useCountUp(statGraded, 900, 380);
-
-  // Behavior stars
-  const [myStars, setMyStars] = useState({ stars: 0, rewards: 0 });
-  useEffect(() => {
-    if (user?.role !== "student") return;
+    return (
+      <>
+        {backButton}
+        {/* ...existing dashboard code... */}
+      </>
+    );
     let cancelled = false;
     const load = () => api.getMyStars().then(d => { if (!cancelled) setMyStars({ stars: d.stars ?? 0, rewards: d.rewards ?? 0 }); }).catch(() => {});
     load();
