@@ -608,6 +608,7 @@ function WorkScreen({
   const [cardKey, setCardKey] = useState(0);
   const [streak, setStreak] = useState(0);
   const [showHint, setShowHint] = useState(false);
+  const [videoChoice, setVideoChoice] = useState<'pending' | 'watch' | 'skip'>('pending');
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
   const rm = prefersReducedMotion();
@@ -742,23 +743,35 @@ function WorkScreen({
           </h1>
         </div>
 
-        {/* ── Video embed (column video_url or parsed content video_url) ── */}
-        {(() => { const vurl = assignment.video_url || parsed?.video_url; return vurl && youtubeEmbedUrl(vurl) && (
-          <div className="animate-slide-up" style={{ animationDelay: "40ms" }}>
-            <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
-              <iframe
-                src={youtubeEmbedUrl(vurl)!}
-                style={{ width: "100%", height: "100%", border: "none" }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title="Assignment video"
-              />
+        {/* ── Video embed with opt-in prompt ── */}
+        {(() => {
+          const vurl = assignment.video_url || parsed?.video_url;
+          if (!vurl || !youtubeEmbedUrl(vurl)) return null;
+          if (videoChoice === 'pending') return (
+            <div className="animate-slide-up" style={{ animationDelay: "40ms", borderRadius: 16, padding: "20px 24px", background: "rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📺</div>
+              <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>There's a video for this assignment</p>
+              <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>Would you like to watch it before answering?</p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button onClick={() => setVideoChoice('watch')} style={{ padding: "10px 22px", borderRadius: 12, background: starfall.accent, color: "white", fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Watch Video</button>
+                <button onClick={() => setVideoChoice('skip')} style={{ padding: "10px 22px", borderRadius: 12, background: "rgba(0,0,0,0.08)", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Skip for now</button>
+              </div>
             </div>
-            <p style={{ fontSize: 11, textAlign: "center", marginTop: 8, opacity: 0.45 }}>
-              📺 Watch the video, then answer the questions below
-            </p>
-          </div>
-        ); })()}
+          );
+          if (videoChoice === 'watch') return (
+            <div className="animate-slide-up" style={{ animationDelay: "40ms" }}>
+              <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
+                <iframe src={youtubeEmbedUrl(vurl)!} style={{ width: "100%", height: "100%", border: "none" }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen title="Assignment video" />
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+                <button onClick={() => setVideoChoice('skip')} style={{ fontSize: 12, opacity: 0.5, background: "none", border: "none", cursor: "pointer" }}>Hide video</button>
+              </div>
+            </div>
+          );
+          return null;
+        })()}
 
         {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
