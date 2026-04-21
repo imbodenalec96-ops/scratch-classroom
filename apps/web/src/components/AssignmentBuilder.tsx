@@ -778,6 +778,8 @@ export default function AssignmentBuilder() {
   const [debugAssignmentId, setDebugAssignmentId] = useState<string | null>(null);
   const [debugData, setDebugData] = useState<any>(null);
   const [debugLoading, setDebugLoading] = useState(false);
+  const [studentCheck, setStudentCheck] = useState<any[] | null>(null);
+  const [studentCheckLoading, setStudentCheckLoading] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -1412,6 +1414,33 @@ export default function AssignmentBuilder() {
             >
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <button
+              onClick={async () => {
+                if (studentCheck) { setStudentCheck(null); return; }
+                if (!classId || classStudents.length === 0) { alert("Select a class with students first."); return; }
+                setStudentCheckLoading(true);
+                try {
+                  const results = await Promise.all(
+                    classStudents.map((s: any) =>
+                      fetch(`/api/assignments/class/${classId}/debug-pending?studentId=${s.id}`, {
+                        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+                      }).then(r => r.json()).then(d => ({
+                        student: s,
+                        visible: (d?.assignments || []).filter((a: any) => a.visible),
+                        blocked: (d?.assignments || []).filter((a: any) => !a.visible),
+                        total: (d?.assignments || []).length,
+                      }))
+                    )
+                  );
+                  setStudentCheck(results);
+                } catch (e: any) { alert("Check failed: " + e.message); }
+                finally { setStudentCheckLoading(false); }
+              }}
+              className="btn-secondary gap-1.5 text-xs"
+              style={{ borderColor: studentCheck ? "var(--accent)" : undefined }}
+            >
+              {studentCheckLoading ? "Checking…" : studentCheck ? "✓ Hide Check" : "👁 Who Sees What?"}
+            </button>
             <button onClick={() => setShowFullWeek(v => !v)} className="btn-secondary gap-1.5 text-xs">
               📅 Generate Full Week
             </button>
@@ -1425,6 +1454,46 @@ export default function AssignmentBuilder() {
           </div>
         </div>
       </header>
+
+      {/* ── Student visibility check panel ── */}
+      {studentCheck && (
+        <div className="card" style={{ borderLeft: "3px solid #4ade80" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>
+              👁 Assignment visibility — {classStudents.find((c: any) => c.id === classId)?.name || "this class"}
+            </div>
+            <button onClick={() => setStudentCheck(null)} className="btn-ghost text-xs">Close</button>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+            {studentCheck.map(({ student, visible, blocked, total }: any) => (
+              <div key={student.id} className="p-3 rounded-xl text-sm" style={{
+                background: visible.length > 0 ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.10)",
+                border: `1px solid ${visible.length > 0 ? "rgba(74,222,128,0.25)" : "rgba(248,113,113,0.25)"}`,
+              }}>
+                <div className="font-bold" style={{ color: "var(--text-1)" }}>
+                  {visible.length > 0 ? "✅" : "❌"} {student.name}
+                </div>
+                {visible.length > 0 ? (
+                  <div style={{ color: "#4ade80", fontSize: 11, marginTop: 3 }}>
+                    {visible.length} assignment{visible.length !== 1 ? "s" : ""} pending
+                  </div>
+                ) : (
+                  <div style={{ color: "#f87171", fontSize: 11, marginTop: 3 }}>
+                    {total === 0
+                      ? "No assignments in class"
+                      : blocked.map((b: any) => b.reason).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).join(", ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {studentCheck.every(({ visible }: any) => visible.length === 0) && (
+            <div className="mt-3 p-3 rounded-xl text-xs" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", color: "#fca5a5" }}>
+              ⚠️ No students can see any assignments. Either no assignments have been created for this class, or all have been submitted. Use "New Assignment" above to create one.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Full Week Generator dialog ── */}
       {showFullWeek && (
