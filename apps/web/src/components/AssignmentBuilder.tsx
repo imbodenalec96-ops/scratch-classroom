@@ -265,52 +265,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         const cls = classes.length ? classes : await api.getClasses();
         if (!classes.length) setClasses(cls);
         const today = new Date().toISOString().slice(0, 10);
-        const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-        const todayName = dayNames[new Date().getDay()];
-        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
 
-        // Fetch schedule + assignments in parallel
-        const [scheduleRows, ...assignResults] = await Promise.all([
-          cls[0] ? api.getClassSchedule(cls[0].id).catch(() => [] as any[]) : Promise.resolve([] as any[]),
-          ...cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])),
-        ]);
-
-        // Find current schedule block subject
-        const todayBlocks = (Array.isArray(scheduleRows) ? scheduleRows : []).filter((b: any) => {
-          const ad = String(b.active_days || "").split(",").map((s: string) => s.trim());
-          return !ad.length || !ad[0] || ad.includes(todayName);
-        }).sort((a: any, b: any) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
-
-        let currentSubject: string | null = null;
-        for (let i = 0; i < todayBlocks.length; i++) {
-          const block = todayBlocks[i];
-          const [sh, sm] = String(block.start_time || "0:0").split(":").map(Number);
-          const next = todayBlocks[i + 1];
-          const [nh, nm] = next ? String(next.start_time || "23:59").split(":").map(Number) : [23, 59];
-          const start = sh * 60 + sm;
-          const end = nh * 60 + nm;
-          if (nowMins >= start && nowMins < end) {
-            currentSubject = (block.subject || block.title || block.block_type || "").toLowerCase();
-            break;
-          }
-        }
-
-        const all: any[] = (assignResults as any[][]).flat().filter((a: any) => {
-          const sd = a?.scheduled_date;
-          if (sd && !sd.startsWith(today)) return false; // wrong day
-          // If we know the current subject block, only show matching subject
-          if (currentSubject) {
-            const as = (a.target_subject || "").toLowerCase();
-            if (as && !as.includes(currentSubject) && !currentSubject.includes(as)) return false;
-          }
-          return true;
-        });
-        // Fallback: show all today's assignments if none match current block
-        const todayAll: any[] = (assignResults as any[][]).flat().filter((a: any) => {
-          const sd = a?.scheduled_date;
-          return !sd || sd.startsWith(today);
-        });
-        const final = all.length > 0 ? all : todayAll;
+        const results = await Promise.all(cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])));
+        // Server already filters to today — just flatten
+        const final = (results as any[][]).flat();
         setTodayList(final);
       } catch {}
       setLoading(false);
