@@ -1172,6 +1172,7 @@ export default function StudentDashboard() {
   const [joinSuccess, setJoinSuccess] = useState(false);
   const [classVideo, setClassVideo] = useState<any>(null);
   const joinBtnRef = useRef<HTMLButtonElement>(null);
+  const [activeView, setActiveView] = useState<'home' | 'assignments' | 'leaderboard'>('home');
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
@@ -1545,7 +1546,73 @@ export default function StudentDashboard() {
     @keyframes dbShimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
     @keyframes lootShake { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-8deg)} 75%{transform:rotate(8deg)} }
     @keyframes lootOpen { from{transform:scaleY(0);opacity:0;transform-origin:top} to{transform:scaleY(1);opacity:1;transform-origin:top} }
+    @keyframes tileGlow { 0%,100%{box-shadow:0 0 0 0 transparent} 50%{box-shadow:0 0 24px 4px rgba(255,165,0,0.4)} }
   `;
+
+  const nowHHMM = (() => { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; })();
+  const fmtTime = (t: string) => { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${((h%12)||12)}:${String(m).padStart(2,"0")} ${h>=12?"pm":"am"}`; };
+  const SUBJ_EMOJI: Record<string, string> = { math:"🔢", reading:"📖", writing:"✏️", spelling:"🔤", sel:"💛", daily_news:"📰", science:"🔬", social_studies:"🌎", video_learning:"📺", ted_talk:"🎤", review:"🔁", coding_art_gym:"🎨", cashout:"🏪", dismissal:"👋", recess:"🏃", lunch:"🥪", calm_down:"🌿" };
+  const currentBlock = todaySchedule.find((b: any) => b.start_time && b.end_time && b.start_time <= nowHHMM && nowHHMM < b.end_time);
+  const nextBlock = !currentBlock ? todaySchedule.find((b: any) => b.start_time && b.start_time > nowHHMM) : null;
+  const lessonBlock = currentBlock || nextBlock;
+  const pendingCount = (pendingAssignment ? 1 : 0) + pendingQuizzes.length;
+  const medals = ["🥇","🥈","🥉"];
+
+  // ── Assignments sub-view ──
+  if (activeView === 'assignments') return (
+    <div style={{ minHeight:"100dvh", background:"#0f0f1a", color:"white", fontFamily:"'Baloo 2','Inter',system-ui,sans-serif" }}>
+      <style>{DB_ANIM}</style>
+      <div style={{ maxWidth:600, margin:"0 auto", padding:"24px 16px" }}>
+        <button onClick={() => setActiveView('home')} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)", color:"white", borderRadius:14, padding:"10px 18px", fontSize:15, fontWeight:700, cursor:"pointer", marginBottom:24, display:"flex", alignItems:"center", gap:8, touchAction:"manipulation" }}>← Back</button>
+        <h2 style={{ fontSize:28, fontWeight:900, marginBottom:16 }}>📝 Assignments</h2>
+        {pendingAssignment ? (
+          <button onClick={() => setPhase('working')} style={{ width:"100%", textAlign:"left", cursor:"pointer", borderRadius:22, padding:"24px 22px", marginBottom:12, background:"linear-gradient(135deg,rgba(139,92,246,0.5),rgba(99,102,241,0.3))", border:"2px solid rgba(139,92,246,0.7)", boxShadow:"0 8px 32px rgba(139,92,246,0.3)", color:"white", touchAction:"manipulation", display:"flex", alignItems:"center", gap:18 }}>
+            <div style={{ fontSize:48, lineHeight:1 }}>📝</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:11, fontWeight:800, letterSpacing:"0.15em", textTransform:"uppercase", opacity:0.7, marginBottom:4 }}>Today's Assignment</div>
+              <div style={{ fontSize:20, fontWeight:900 }}>{pendingAssignment.title}</div>
+              <div style={{ fontSize:14, opacity:0.65, marginTop:4 }}>Tap to start →</div>
+            </div>
+          </button>
+        ) : (
+          <div style={{ textAlign:"center", padding:"48px 24px", opacity:0.4, fontSize:16 }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>✅</div>All done for today!
+          </div>
+        )}
+        {pendingQuizzes.length > 0 && pendingQuizzes.map((q: any) => (
+          <button key={q.id} onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions||[]).length).fill(-1)); setQuizResult(null); }}
+            style={{ width:"100%", textAlign:"left", display:"flex", alignItems:"center", gap:16, padding:"20px", borderRadius:20, marginBottom:10, cursor:"pointer", background:"linear-gradient(135deg,rgba(245,158,11,0.25),rgba(234,179,8,0.12))", border:"1.5px solid rgba(245,158,11,0.5)", color:"white", touchAction:"manipulation" }}>
+            <div style={{ fontSize:40 }}>🧠</div>
+            <div style={{ flex:1 }}><div style={{ fontSize:16, fontWeight:900 }}>{q.title||"Quiz"}</div><div style={{ fontSize:12, opacity:0.55, marginTop:3 }}>{q._className} · {(q.questions||[]).length} questions</div></div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── Leaderboard sub-view ──
+  if (activeView === 'leaderboard') return (
+    <div style={{ minHeight:"100dvh", background:"#0f0f1a", color:"white", fontFamily:"'Baloo 2','Inter',system-ui,sans-serif" }}>
+      <style>{DB_ANIM}</style>
+      <div style={{ maxWidth:500, margin:"0 auto", padding:"24px 16px" }}>
+        <button onClick={() => setActiveView('home')} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)", color:"white", borderRadius:14, padding:"10px 18px", fontSize:15, fontWeight:700, cursor:"pointer", marginBottom:24, display:"flex", alignItems:"center", gap:8, touchAction:"manipulation" }}>← Back</button>
+        <h2 style={{ fontSize:28, fontWeight:900, marginBottom:20 }}>🏆 Leaderboard</h2>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {leaderboard.slice(0,10).map((entry: any, i: number) => {
+            const isMe = entry.user_id === user?.id;
+            return (
+              <div key={entry.user_id} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", borderRadius:20, background: isMe ? "linear-gradient(135deg,rgba(139,92,246,0.3),rgba(99,102,241,0.15))" : "rgba(255,255,255,0.05)", border: isMe ? "2px solid rgba(139,92,246,0.5)" : "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize:i<3?28:18, fontWeight:900, width:36, textAlign:"center", flexShrink:0 }}>{i<3 ? medals[i] : `${i+1}`}</div>
+                <div style={{ flex:1, fontSize:18, fontWeight:isMe?900:700, color:isMe?"#c4b5fd":"white" }}>{entry.name}{isMe?" (you)":""}</div>
+                <div style={{ fontSize:16, fontWeight:800, color:"#fbbf24" }}>⭐ {entry.behavior_stars??0}</div>
+              </div>
+            );
+          })}
+          {leaderboard.length===0 && <div style={{ textAlign:"center", padding:"40px", opacity:0.35, fontSize:15 }}>No scores yet</div>}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
@@ -1744,389 +1811,105 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ── Today's Schedule — time column so students can see WHEN things happen ── */}
-        {todaySchedule.length > 0 && (() => {
-          const nowHHMM = (() => {
-            const d = new Date();
-            return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-          })();
-          const fmt = (t: string) => {
-            if (!t) return "";
-            const [h, m] = t.split(":").map(Number);
-            const ampm = h >= 12 ? "pm" : "am";
-            return `${((h % 12) || 12)}:${String(m).padStart(2, "0")} ${ampm}`;
-          };
-          const SUBJECT_EMOJI: Record<string, string> = {
-            math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛",
-            daily_news: "📰", science: "🔬", social_studies: "🌎",
-            video_learning: "📺", ted_talk: "🎤", review: "🔁", extra_review: "🔁",
-            coding_art_gym: "🎨", cashout: "🏪", dismissal: "👋",
-            recess: "🏃", lunch: "🥪", calm_down: "🌿",
-          };
-          return (
-            <div style={{ marginTop: 22, marginBottom: 10, animation: "dbSlide .4s ease both" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
-                  📅 Today's Schedule
-                </div>
-                <button
-                  onClick={() => {
-                    try {
-                      const w: any = window;
-                      if (w.caches && typeof w.caches.keys === "function") {
-                        w.caches.keys()
-                          .then((ks: string[]) => Promise.all(ks.map((k) => w.caches.delete(k))))
-                          .finally(() => w.location.reload());
-                      } else {
-                        w.location.reload();
-                      }
-                    } catch { window.location.reload(); }
-                  }}
-                  style={{
-                    fontSize: 10, padding: "4px 10px", borderRadius: 999,
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                    color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: 700,
-                  }}
-                  title="Reload the page and clear caches"
-                >↻ Refresh</button>
-              </div>
-              <div style={{
-                borderRadius: 16, padding: "6px 4px", overflow: "hidden",
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-              }}>
-                {todaySchedule.map((b: any, idx: number) => {
-                  const isLive = b.start_time && b.end_time && b.start_time <= nowHHMM && nowHHMM < b.end_time;
-                  const isPast = b.end_time && b.end_time <= nowHHMM;
-                  const subjectKey = b.is_break ? (b.break_type || "lunch") : (b.subject || "");
-                  const emoji = SUBJECT_EMOJI[subjectKey] || "📘";
-                  return (
-                    <div key={b.id || idx} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "10px 14px", borderRadius: 12,
-                      background: isLive ? "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(124,58,237,0.05))" : "transparent",
-                      border: isLive ? "1px solid rgba(139,92,246,0.4)" : "1px solid transparent",
-                      opacity: isPast && !isLive ? 0.38 : 1,
-                      marginBottom: 2,
-                      transition: "background .2s",
-                    }}>
-                      <div style={{
-                        width: 84, flexShrink: 0, textAlign: "right",
-                        fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                        color: isLive ? "#c4b5fd" : "rgba(255,255,255,0.6)",
-                        fontFamily: "ui-monospace, Menlo, monospace",
-                      }}>
-                        {fmt(b.start_time)}
-                      </div>
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 18,
-                        background: isLive ? "rgba(139,92,246,0.28)" : "rgba(255,255,255,0.05)",
-                      }}>
-                        {emoji}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {b.label || "—"}
-                        </div>
-                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>
-                          until {fmt(b.end_time)}
-                        </div>
-                      </div>
-                      {isLive && (
-                        <span style={{
-                          fontSize: 9, padding: "3px 8px", borderRadius: 999,
-                          background: "rgba(139,92,246,0.35)", color: "#c4b5fd", fontWeight: 800,
-                          letterSpacing: "0.06em", flexShrink: 0,
-                        }}>NOW</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {/* ── New 2×2 Tile Grid ── */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:14, marginTop:18, animation:"dbSlide .4s ease both" }}>
 
-        {/* Today's assignment — prominent hero when there's one to do */}
-        {pendingAssignment && (
-          <div
-            onClick={() => { setPhase('working'); }}
-            style={{
-              borderRadius: 20, padding: "20px 22px", marginBottom: 14, cursor: "pointer",
-              background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.22))",
-              border: "1px solid rgba(139,92,246,0.55)",
-              display: "flex", alignItems: "center", gap: 18,
-              animation: "dbSlide .4s ease both",
-              transition: "transform .15s",
-              boxShadow: "0 8px 28px rgba(139,92,246,0.25)",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-          >
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
-              boxShadow: "0 8px 20px rgba(139,92,246,0.4)",
-            }}>📝</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", opacity: 0.7, marginBottom: 3 }}>Today's Assignment</div>
-              <div style={{ fontSize: 16, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pendingAssignment.title}</div>
-              <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>Tap to start →</div>
+          {/* Assignments tile */}
+          <button onClick={() => setActiveView('assignments')} style={{ borderRadius:22, padding:"22px 18px", minHeight:150, background:"linear-gradient(140deg,rgba(139,92,246,0.35) 0%,rgba(99,102,241,0.15) 100%)", border:"2px solid rgba(139,92,246,0.45)", boxShadow:pendingCount>0?"0 6px 28px rgba(139,92,246,0.35)":"none", textAlign:"left", color:"white", cursor:"pointer", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation", transition:"transform .12s" }}
+            onTouchStart={e => { (e.currentTarget as HTMLElement).style.transform="scale(0.97)"; }}
+            onTouchEnd={e => { (e.currentTarget as HTMLElement).style.transform=""; }}>
+            <div style={{ fontSize:40, lineHeight:1 }}>📝</div>
+            <div style={{ fontSize:18, fontWeight:900, letterSpacing:"-0.01em" }}>Assignments</div>
+            <div style={{ fontSize:13, fontWeight:700, color:pendingCount>0?"#c4b5fd":"rgba(255,255,255,0.45)" }}>
+              {pendingCount>0 ? `${pendingCount} to do today` : "All done! ✅"}
             </div>
-            <div style={{ fontSize: 22, opacity: 0.7 }}>›</div>
-          </div>
-        )}
-
-        {/* ── Menu — admin-dashboard-style tile grid with circle icons ── */}
-        {(() => {
-          type Tile = { to?: string; onClick?: () => void; icon: string; label: string; desc: string; grad: string; glow: string };
-          const TILES: Tile[] = [
-            // Always visible — the schoolwork core
-            { to: "/assignments", icon: "📝", label: "Assignments", desc: "Work to do",   grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.35)" },
-            { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
-            { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",   grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
-            { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",  grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
-            // Store only visible during the cashout block
-            ...((blockInfo.state === "current" && (blockInfo as any).block?.subject?.toLowerCase() === "cashout") ? [
-              { to: "/cashout", icon: "🪙", label: "Store", desc: dojoPoints != null ? `${dojoPoints} pts` : "Spend points", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
-            ] as Tile[] : []),
-            // Free-time only — Websites, Videos, Arcade, Projects
-            ...(unlocked ? ([
-              { to: "/websites", icon: "🌐", label: "Websites", desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },
-              ...(classConfig.youtubeEnabled ? [{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: "linear-gradient(135deg,#ef4444,#dc2626)", glow: "rgba(239,68,68,0.35)" }] as Tile[] : []),
-              { to: "/arcade",   icon: "🎮", label: "Arcade",   desc: "31 games",         grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
-              { to: "/projects", icon: "💻", label: "Projects", desc: "2D · 3D · Unity",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
-            ] as Tile[]) : []),
-            // Sign out button
-            { onClick: logout, icon: "🚪", label: "Sign Out", desc: "Logout", grad: "linear-gradient(135deg,#6b7280,#4b5563)", glow: "rgba(107,114,128,0.35)" },
-          ];
-          return (
-            <div style={{ marginTop: 18, marginBottom: 18, animation: "dbSlide .45s ease both" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
-                {TILES.map((t, i) => {
-                  const inner = (
-                    <div style={{
-                      height: "100%", borderRadius: 18, overflow: "hidden",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      transition: "transform .15s, box-shadow .15s, border-color .15s",
-                      display: "flex", flexDirection: "column",
-                      animation: "dbPop .4s ease both",
-                      animationDelay: `${i * 40}ms`,
-                    }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget as HTMLElement;
-                        el.style.transform = "translateY(-4px)";
-                        el.style.boxShadow = `0 12px 32px ${t.glow}`;
-                        el.style.borderColor = "rgba(255,255,255,0.16)";
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget as HTMLElement;
-                        el.style.transform = "";
-                        el.style.boxShadow = "";
-                        el.style.borderColor = "rgba(255,255,255,0.08)";
-                      }}
-                    >
-                      <div style={{ height: 3, background: t.grad }} />
-                      <div style={{ padding: "16px 14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{
-                          width: 56, height: 56, borderRadius: "50%",
-                          background: t.grad,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 28, color: "white",
-                          boxShadow: `0 8px 20px ${t.glow}`,
-                        }}>
-                          {t.icon}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 900, color: "white", letterSpacing: "-0.01em" }}>{t.label}</div>
-                          <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{t.desc}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                  if (t.to) {
-                    return (
-                      <Link key={i} to={t.to} style={{ textDecoration: "none", color: "inherit" }}>{inner}</Link>
-                    );
-                  }
-                  return (
-                    <button key={i} onClick={t.onClick} style={{ background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}>{inner}</button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Quiz tiles */}
-        {pendingQuizzes.length > 0 && !activeQuiz && pendingQuizzes.map(q => (
-          <button key={q.id}
-            onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
-            style={{
-              width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 16,
-              padding: "18px 20px", borderRadius: 16, marginBottom: 10, cursor: "pointer",
-              background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.12))",
-              border: "1px solid rgba(245,158,11,0.45)", color: "white",
-              animation: "dbSlide .48s ease both", transition: "transform .15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-          >
-            <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: "rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🧠</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>{q.title || "Quiz"}</div>
-              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{q._className} · {(q.questions || []).length} questions{q.estimated_minutes ? ` · ~${q.estimated_minutes} min` : ""}</div>
-            </div>
-            <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
           </button>
-        ))}
 
-        {/* Inline quiz taker */}
-        {activeQuiz && (
-          <div style={{
-            borderRadius: 16, padding: "20px", marginBottom: 10,
-            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,.4)",
-            animation: "dbSlide .4s ease both",
-          }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 4 }}>Quiz</div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{activeQuiz.title}</h2>
-              </div>
-              <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize: 13, opacity: 0.5, background: "none", border: "none", color: "white", cursor: "pointer" }}>Close</button>
+          {/* Lesson / schedule tile */}
+          <div style={{ borderRadius:22, padding:"22px 18px", minHeight:150, background:"linear-gradient(140deg,rgba(59,130,246,0.32) 0%,rgba(37,99,235,0.14) 100%)", border:"2px solid rgba(59,130,246,0.38)", textAlign:"left", color:"white", display:"flex", flexDirection:"column", gap:8 }}>
+            <div style={{ fontSize:40, lineHeight:1 }}>
+              {lessonBlock ? (SUBJ_EMOJI[lessonBlock.subject||lessonBlock.break_type||""]||"📚") : "📚"}
             </div>
-            {quizResult ? (
-              <div style={{ textAlign: "center", padding: "24px 0" }}>
-                <div style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}>{quizResult.score}%</div>
-                <div style={{ opacity: 0.6, marginTop: 8 }}>Quiz submitted. Nice work! 🎉</div>
-                <button onClick={() => { setPendingQuizzes(p => p.filter(x => x.id !== activeQuiz.id)); setActiveQuiz(null); setQuizResult(null); }}
-                  style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Done</button>
+            <div style={{ fontSize:18, fontWeight:900, letterSpacing:"-0.01em" }}>Lesson</div>
+            <div style={{ fontSize:12, fontWeight:700, color:"rgba(147,197,253,0.9)", lineHeight:1.4 }}>
+              {lessonBlock
+                ? `${currentBlock?"Now:":"Next:"} ${lessonBlock.label||lessonBlock.subject||"—"} · ${fmtTime(lessonBlock.start_time)}`
+                : todaySchedule.length>0 ? "All blocks done ✅" : "No schedule set"}
+            </div>
+          </div>
+
+          {/* Leaderboard tile */}
+          <button onClick={() => setActiveView('leaderboard')} style={{ borderRadius:22, padding:"22px 18px", minHeight:150, background:"linear-gradient(140deg,rgba(245,158,11,0.32) 0%,rgba(217,119,6,0.14) 100%)", border:"2px solid rgba(245,158,11,0.4)", textAlign:"left", color:"white", cursor:"pointer", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation", transition:"transform .12s" }}
+            onTouchStart={e => { (e.currentTarget as HTMLElement).style.transform="scale(0.97)"; }}
+            onTouchEnd={e => { (e.currentTarget as HTMLElement).style.transform=""; }}>
+            <div style={{ fontSize:40, lineHeight:1 }}>🏆</div>
+            <div style={{ fontSize:18, fontWeight:900, letterSpacing:"-0.01em" }}>Leaderboard</div>
+            <div style={{ fontSize:13, fontWeight:700, color:"rgba(253,211,77,0.9)" }}>
+              {leaderboard.length>0 ? `#${myRank>0?myRank:"?"} of ${leaderboard.length} · Tap to see` : "Tap to see"}
+            </div>
+            {leaderboard.length>0 && (
+              <div style={{ fontSize:11, opacity:0.7, display:"flex", flexDirection:"column", gap:2, marginTop:2 }}>
+                {leaderboard.slice(0,3).map((e: any, i: number) => (
+                  <div key={e.user_id} style={{ color:e.user_id===user?.id?"#fde68a":"rgba(255,255,255,0.7)" }}>
+                    {["🥇","🥈","🥉"][i]} {e.name}{e.user_id===user?.id?" (you)":""} · ⭐{e.behavior_stars??0}
+                  </div>
+                ))}
               </div>
-            ) : (
-              <>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {(activeQuiz.questions || []).map((q: any, qi: number) => (
-                    <div key={qi} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontWeight: 700, marginBottom: 10 }}>{qi + 1}. {q.text}</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {(q.options || []).map((opt: string, oi: number) => (
-                          <label key={oi} style={{
-                            display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 10px", borderRadius: 10,
-                            background: quizAnswers[qi] === oi ? "rgba(139,92,246,.3)" : "rgba(255,255,255,.04)",
-                            border: quizAnswers[qi] === oi ? "1px solid rgba(139,92,246,.5)" : "1px solid rgba(255,255,255,.06)",
-                          }}>
-                            <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
-                              onChange={() => setQuizAnswers(a => { const n = [...a]; n[qi] = oi; return n; })} />
-                            <span>{opt}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  disabled={quizSubmitting || quizAnswers.some(a => a < 0)}
-                  onClick={async () => {
-                    setQuizSubmitting(true);
-                    try { const r = await api.submitQuiz(activeQuiz.id, quizAnswers); setQuizResult({ score: r.score }); }
-                    catch (e: any) { alert("Could not submit: " + (e?.message || "unknown error")); }
-                    finally { setQuizSubmitting(false); }
-                  }}
-                  style={{ marginTop: 16, padding: "12px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: (quizSubmitting || quizAnswers.some(a => a < 0)) ? 0.4 : 1 }}>
-                  {quizSubmitting ? "Submitting…" : "Submit quiz"}
-                </button>
-              </>
+            )}
+          </button>
+
+          {/* Achievements tile */}
+          <div style={{ borderRadius:22, padding:"22px 18px", minHeight:150, background:"linear-gradient(140deg,rgba(16,185,129,0.3) 0%,rgba(5,150,105,0.12) 100%)", border:"2px solid rgba(16,185,129,0.38)", textAlign:"left", color:"white", display:"flex", flexDirection:"column", gap:8 }}>
+            <div style={{ fontSize:40, lineHeight:1 }}>🌟</div>
+            <div style={{ fontSize:18, fontWeight:900, letterSpacing:"-0.01em" }}>Achievements</div>
+            <div style={{ fontSize:13, fontWeight:700, color:"rgba(110,231,183,0.9)" }}>
+              ⭐ {myStars.stars} star{myStars.stars!==1?"s":""}
+              {dojoPoints!=null ? ` · 🪙 ${dojoPoints} pts` : ""}
+            </div>
+          </div>
+        </div>
+
+        {/* Free-time tiles (only when unlocked) */}
+        {unlocked && (
+          <div style={{ marginTop:14, display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:14 }}>
+            <Link to="/arcade" style={{ borderRadius:22, padding:"22px 18px", minHeight:120, background:"linear-gradient(140deg,rgba(236,72,153,0.35) 0%,rgba(219,39,119,0.15) 100%)", border:"2px solid rgba(236,72,153,0.45)", textDecoration:"none", color:"white", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation" }}>
+              <div style={{ fontSize:40, lineHeight:1 }}>🎮</div>
+              <div style={{ fontSize:18, fontWeight:900 }}>Arcade</div>
+            </Link>
+            <Link to="/projects" style={{ borderRadius:22, padding:"22px 18px", minHeight:120, background:"linear-gradient(140deg,rgba(20,184,166,0.3) 0%,rgba(13,148,136,0.12) 100%)", border:"2px solid rgba(20,184,166,0.38)", textDecoration:"none", color:"white", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation" }}>
+              <div style={{ fontSize:40, lineHeight:1 }}>💻</div>
+              <div style={{ fontSize:18, fontWeight:900 }}>Projects</div>
+            </Link>
+            <Link to="/websites" style={{ borderRadius:22, padding:"22px 18px", minHeight:120, background:"linear-gradient(140deg,rgba(99,102,241,0.3) 0%,rgba(79,70,229,0.12) 100%)", border:"2px solid rgba(99,102,241,0.38)", textDecoration:"none", color:"white", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation" }}>
+              <div style={{ fontSize:40, lineHeight:1 }}>🌐</div>
+              <div style={{ fontSize:18, fontWeight:900 }}>Websites</div>
+            </Link>
+            {classConfig.youtubeEnabled && (
+              <Link to="/student/videos" style={{ borderRadius:22, padding:"22px 18px", minHeight:120, background:"linear-gradient(140deg,rgba(239,68,68,0.3) 0%,rgba(220,38,38,0.12) 100%)", border:"2px solid rgba(239,68,68,0.38)", textDecoration:"none", color:"white", display:"flex", flexDirection:"column", gap:8, touchAction:"manipulation" }}>
+                <div style={{ fontSize:40, lineHeight:1 }}>📺</div>
+                <div style={{ fontSize:18, fontWeight:900 }}>Videos</div>
+              </Link>
             )}
           </div>
         )}
 
-        {/* Teacher-shared video inline (shown regardless of free-time state) */}
+        {/* Teacher-shared video */}
         {classVideo && (
-          <div style={{ marginTop: 18, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
-              <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
+          <div style={{ marginTop:18, borderRadius:16, overflow:"hidden", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"12px 14px" }}>
+              <div style={{ width:8, height:8, borderRadius:"50%", background:"#f87171", animation:"pulse 2s infinite" }} />
+              <span style={{ fontSize:13, fontWeight:700 }}>📺 Teacher shared a video</span>
             </div>
-            <div style={{ position: "relative", paddingTop: "56.25%" }}>
+            <div style={{ position:"relative", paddingTop:"56.25%" }}>
               <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1`}
-                title={classVideo.video_title || "Class Video"}
+                title={classVideo.video_title||"Class Video"}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                allowFullScreen style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }} />
             </div>
           </div>
         )}
 
-        {/* ── LEADERBOARD ── */}
-        {leaderboard.length > 0 && (
-          <div style={{ marginTop: 22 }}>
-            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🏆 Leaderboard</div>
-            <div style={{
-              borderRadius: 16, padding: "12px",
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-              animation: "dbSlide .5s ease .1s both",
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {leaderboard.slice(0, 10).map((entry: any, i: number) => {
-                  const isMe = entry.user_id === user?.id;
-                  const medals = ["🥇","🥈","🥉"];
-                  return (
-                    <div key={entry.user_id} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "8px 10px", borderRadius: 10,
-                      background: isMe ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.03)",
-                      border: isMe ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.05)",
-                    }}>
-                      <div style={{ width: 24, textAlign: "center", fontSize: i < 3 ? 16 : 12, fontWeight: 800, opacity: i < 3 ? 1 : 0.4 }}>
-                        {i < 3 ? medals[i] : `${i + 1}`}
-                      </div>
-                      <div style={{ flex: 1, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)" }}>
-                        {entry.name}{isMe ? " (you)" : ""}
-                      </div>
-                      <div style={{ display: "flex", gap: 2 }}>
-                        {Array.from({ length: 5 }, (_, si) => (
-                          <span key={si} style={{ fontSize: 10, opacity: si < entry.behavior_stars ? 1 : 0.15 }}>⭐</span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {myEntry && myRank > 10 && (
-                <div style={{
-                  marginTop: 8, padding: "8px 10px", borderRadius: 10,
-                  background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-                  display: "flex", alignItems: "center", gap: 10,
-                }}>
-                  <div style={{ width: 24, textAlign: "center", fontSize: 12, fontWeight: 800, opacity: 0.6 }}>{myRank}</div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#c4b5fd" }}>{myEntry.name} (you)</div>
-                  <div style={{ display: "flex", gap: 2 }}>
-                    {Array.from({ length: 5 }, (_, si) => (
-                      <span key={si} style={{ fontSize: 10, opacity: si < myEntry.behavior_stars ? 1 : 0.15 }}>⭐</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── ACHIEVEMENTS: loot-box cards ── */}
-        {(myStars.rewards > 0 || badgeCount > 0) && (
-          <div style={{ marginTop: 22 }}>
-            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🎁 Achievements</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
-              {Array.from({ length: myStars.rewards || badgeCount || 0 }).map((_, i) => (
-                <LootBox key={i} index={i} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── CLASS: Recent Grades + Join a Class ── */}
+                {/* ── CLASS: Recent Grades + Join a Class ── */}
         <div style={{ marginTop: 22 }}>
           <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>📋 Class</div>
 
