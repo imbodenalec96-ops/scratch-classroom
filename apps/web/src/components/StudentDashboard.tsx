@@ -1263,6 +1263,9 @@ export default function StudentDashboard() {
     return () => clearInterval(iv);
   }, [classes]);
 
+  // Sub-view state for the new tile layout
+  const [activeView, setActiveView] = useState<'home' | 'assignments' | 'leaderboard'>('home');
+
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
@@ -1553,9 +1556,6 @@ export default function StudentDashboard() {
   const firstName = user?.name?.split(" ")[0] || "Student";
   const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
   const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
-
-  // Sub-view state for the new tile layout
-  const [activeView, setActiveView] = useState<'home' | 'assignments' | 'leaderboard'>('home');
 
   const DB_ANIM = `
     @keyframes dbGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
