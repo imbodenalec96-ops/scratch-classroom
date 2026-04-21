@@ -780,6 +780,7 @@ export default function AssignmentBuilder() {
   const [debugLoading, setDebugLoading] = useState(false);
   const [studentCheck, setStudentCheck] = useState<any[] | null>(null);
   const [studentCheckLoading, setStudentCheckLoading] = useState(false);
+  const [genTodayLoading, setGenTodayLoading] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -1414,6 +1415,24 @@ export default function AssignmentBuilder() {
             >
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <button
+              disabled={genTodayLoading || !classId}
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm("Generate grade-differentiated assignments for ALL subjects (reading, math, writing, spelling) for every grade level in this class today?\n\nThis uses AI and may take 30–60 seconds.")) return;
+                setGenTodayLoading(true);
+                try {
+                  const result = await api.generateTodayAssignments(classId);
+                  await loadAssignments(classId);
+                  alert(`✅ Created ${result.created} assignments for today!\n${result.errors?.length ? "Errors: " + result.errors.join(", ") : ""}`);
+                } catch (e: any) { alert("Failed: " + e.message); }
+                finally { setGenTodayLoading(false); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
+            >
+              {genTodayLoading ? "⏳ Generating…" : "🎯 Generate Today (All Grades)"}
+            </button>
             <button
               onClick={async () => {
                 if (studentCheck) { setStudentCheck(null); return; }
