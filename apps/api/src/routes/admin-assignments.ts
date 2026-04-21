@@ -238,7 +238,7 @@ router.get("/pending-check", async (req, res) => {
     if (!student) return res.json({ error: `Student '${name}' not found` });
 
     const classes = await db.prepare(
-      `SELECT c.id::text, c.name FROM class_members cm JOIN classes c ON c.id = cm.class_id::uuid WHERE cm.user_id = ?::uuid`
+      `SELECT c.id::text, c.name FROM class_members cm JOIN classes c ON c.id::text = cm.class_id::text WHERE cm.user_id::text = ?`
     ).all(student.id) as any[];
 
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -247,9 +247,9 @@ router.get("/pending-check", async (req, res) => {
       const rows = await db.prepare(`
         SELECT a.id::text, a.title, a.target_subject, a.target_grade_min, a.target_student_ids, a.scheduled_date, a.student_id::text
         FROM assignments a
-        LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?::uuid
-        WHERE a.class_id = ?::uuid AND s.id IS NULL
-          AND (a.student_id IS NULL OR a.student_id = ?::uuid)
+        LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
+        WHERE a.class_id::text = ? AND s.id IS NULL
+          AND (a.student_id IS NULL OR a.student_id::text = ?)
           AND (a.scheduled_date IS NULL OR a.scheduled_date::date <= ?::date)
         ORDER BY a.created_at ASC
       `).all(student.id, cls.id, student.id, todayStr) as any[];
@@ -257,7 +257,7 @@ router.get("/pending-check", async (req, res) => {
     }
 
     const grades: any = await db.prepare(
-      `SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?::uuid`
+      `SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?`
     ).get(student.id);
 
     res.json({ student, classes, grades, pending: allPending });
