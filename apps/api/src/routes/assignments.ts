@@ -1898,4 +1898,77 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
   res.json({ created: created.length, assignments: created });
 });
 
+// POST /assignments/class/:classId/generate-today
+// One-click: creates grade-differentiated assignments for ALL subjects (reading, math, writing, spelling)
+// for every grade level present in the class. Uses Mistral AI for content.
+router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const MISTRAL_KEY = process.env.MISTRAL_API_KEY;
+  const subjects = ["reading", "math", "writing", "spelling"];
+  const subjectCol: Record<string, string> = { math: "math_grade", writing: "writing_grade", reading: "reading_grade", spelling: "reading_grade" };
+
+  const created: any[] = [];
+  const errors: string[] = [];
+
+  for (const subject of subjects) {
+    const col = subjectCol[subject];
+    try {
+      const gradeLevels = await db.prepare(
+        `SELECT DISTINCT ${col} AS grade_level
+         FROM user_grade_levels ugl
+         JOIN class_members cm ON cm.user_id = ugl.user_id
+         WHERE cm.class_id = ? AND ${col} IS NOT NULL
+         ORDER BY grade_level`
+      ).all(classId) as any[];
+
+      for (const { grade_level } of gradeLevels) {
+        if (!grade_level && grade_level !== 0) continue;
+        const gradeNum = Number(grade_level);
+        const gradeLabel = gradeNum === 0 ? "Kindergarten" : `Grade ${gradeNum}`;
+        const titleStr = `${subject.charAt(0).toUpperCase() + subject.slice(1)} — ${gradeLabel}`;
+
+        // Check if one already exists for today
+        const existing: any = await db.prepare(
+          `SELECT id FROM assignments WHERE class_id = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date::date = ?::date LIMIT 1`
+        ).get(classId, subject, gradeNum, todayStr);
+        if (existing) { created.push({ title: titleStr, skipped: true }); continue; }
+
+        let content: any = null;
+        if (MISTRAL_KEY) {
+          try {
+            const prompt = `Create a ${gradeLabel} ${subject} worksheet with 5 questions. Return ONLY valid JSON: {"title":"...","subject":"${subject}","grade":"${gradeLabel}","instructions":"...","totalPoints":50,"sections":[{"title":"...","questions":[{"type":"multiple_choice","text":"...","options":["A....","B....","C....","D...."],"correctIndex":0,"points":10}]}]}`;
+            const resp = await fetch("https://api.mistral.ai/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
+              body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+            });
+            const data = await resp.json() as any;
+            const text = data.choices?.[0]?.message?.content || "";
+            const match = text.match(/\{[\s\S]*\}/);
+            if (match) content = JSON.parse(match[0]);
+          } catch { /* use null content */ }
+        }
+
+        const id = crypto.randomUUID();
+        await db.prepare(
+          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+        ).run(
+          id, classId, req.user!.id, titleStr,
+          `${gradeLabel} ${subject} assignment`,
+          content ? JSON.stringify(content) : null,
+          subject, gradeNum, gradeNum, todayStr,
+          JSON.stringify([{ label: "Correctness", maxPoints: 50 }])
+        );
+        created.push({ id, title: titleStr, grade: gradeNum, subject });
+      }
+    } catch (e: any) {
+      errors.push(`${subject}: ${e?.message}`);
+    }
+  }
+
+  res.json({ created: created.length, assignments: created, errors });
+});
+
 export default router;
