@@ -627,9 +627,31 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               borderRadius: 20, padding: "22px 22px 20px",
               boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)`,
             }}>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "white", lineHeight: 1.5, margin: "0 0 20px", whiteSpace: "pre-wrap" }}>
-                {q.q.text}
-              </p>
+              {(() => {
+                const isSpelling = (assignment.target_subject || "").toLowerCase() === "spelling";
+                // Extract the word from "Spell the word: cake" or "Spell: cake"
+                const spellingMatch = isSpelling && q.q.text.match(/spell(?:\s+the\s+word)?[:\s]+(\S+)/i);
+                const spellingWord = spellingMatch ? spellingMatch[1].replace(/[^a-zA-Z'-]/g, "") : null;
+                return isSpelling && spellingWord ? (
+                  <div style={{ textAlign: "center", margin: "0 0 20px" }}>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>Listen and spell the word:</p>
+                    <button
+                      onClick={() => {
+                        const u = new SpeechSynthesisUtterance(spellingWord);
+                        u.rate = 0.8;
+                        window.speechSynthesis.speak(u);
+                      }}
+                      style={{ background: accent + "22", border: `2px solid ${accent}`, borderRadius: 16, padding: "18px 36px", cursor: "pointer", color: "white", fontSize: 28 }}
+                    >
+                      🔊 Hear the word
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "white", lineHeight: 1.5, margin: "0 0 20px", whiteSpace: "pre-wrap" }}>
+                    {q.q.text}
+                  </p>
+                );
+              })()}
 
               {/* Multiple choice */}
               {(q.q.type === "multiple_choice" || q.q.type === "mc") && (q.q.options || q.q.o) && (
