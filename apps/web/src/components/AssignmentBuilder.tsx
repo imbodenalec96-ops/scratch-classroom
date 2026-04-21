@@ -310,7 +310,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           const sd = a?.scheduled_date;
           return !sd || sd.startsWith(today);
         });
-        const final = all.length > 0 ? all : todayAll.length > 0 ? todayAll : (assignResults as any[][]).flat();
+        const final = all.length > 0 ? all : todayAll;
         setTodayList(final);
       } catch {}
       setLoading(false);
