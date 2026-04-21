@@ -824,7 +824,7 @@ function WorkScreen({
               )}
               {/* Question text — hide the word for spelling, show hear button */}
               {(() => {
-                const isSpelling = (assignment?.target_subject || parsedAssignment?.subject || "").toLowerCase() === "spelling";
+                const isSpelling = (assignment?.target_subject || "").toLowerCase() === "spelling";
                 const spellingMatch = isSpelling && q.q.text.match(/spell(?:\s+the\s+word)?[:\s]+([^\s,?.]+)/i);
                 const spellingWord = spellingMatch ? spellingMatch[1].replace(/[^a-zA-Z'-]/g, "") : null;
                 if (isSpelling && spellingWord) {
