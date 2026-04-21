@@ -228,6 +228,44 @@ router.get("/assignments", async (_req, res) => {
   }
 });
 
+// GET /admin/pending-check?name=kaleb — simulate the pending query for a student by name
+router.get("/pending-check", async (req, res) => {
+  const name = (req.query.name as string) || "kaleb";
+  try {
+    const student: any = await db.prepare(
+      `SELECT id::text, name FROM users WHERE name ILIKE ? AND role='student' LIMIT 1`
+    ).get(`%${name}%`);
+    if (!student) return res.json({ error: `Student '${name}' not found` });
+
+    const classes = await db.prepare(
+      `SELECT c.id::text, c.name FROM class_members cm JOIN classes c ON c.id = cm.class_id::uuid WHERE cm.user_id = ?::uuid`
+    ).all(student.id) as any[];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const allPending: any[] = [];
+    for (const cls of classes) {
+      const rows = await db.prepare(`
+        SELECT a.id::text, a.title, a.target_subject, a.target_grade_min, a.target_student_ids, a.scheduled_date, a.student_id::text
+        FROM assignments a
+        LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?::uuid
+        WHERE a.class_id = ?::uuid AND s.id IS NULL
+          AND (a.student_id IS NULL OR a.student_id = ?::uuid)
+          AND (a.scheduled_date IS NULL OR a.scheduled_date::date <= ?::date)
+        ORDER BY a.created_at ASC
+      `).all(student.id, cls.id, student.id, todayStr) as any[];
+      allPending.push({ classId: cls.id, className: cls.name, rawCount: rows.length, rows: rows.slice(0, 5) });
+    }
+
+    const grades: any = await db.prepare(
+      `SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?::uuid`
+    ).get(student.id);
+
+    res.json({ student, classes, grades, pending: allPending });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message });
+  }
+});
+
 // GET /admin/class-info — show Star class members and assignments (including NULL date)
 router.get("/class-info", async (_req, res) => {
   try {
