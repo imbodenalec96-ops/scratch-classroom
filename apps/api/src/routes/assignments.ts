@@ -208,14 +208,8 @@ router.post("/", requireRole("teacher", "admin"), async (req: AuthRequest, res: 
       videoUrl || null,
     );
   } catch (e: any) {
-    console.error('assignment insert error:', e?.message);
-    // fallback without new cols
-    try { await db.exec("ALTER TABLE assignments ADD COLUMN content TEXT"); } catch {}
-    try { await db.exec("ALTER TABLE assignments ADD COLUMN scheduled_date TEXT"); } catch {}
-    await db.prepare(
-      `INSERT INTO assignments (id, class_id, teacher_id, title, description, due_date, rubric, starter_project_id, content, scheduled_date, target_grade_min, target_grade_max, target_subject)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, classId, req.user!.id, title, description, dueDate, JSON.stringify(rubric || []), starterProjectId, content ?? null, scheduledDate ?? null, tMin, tMax, tSub);
+    console.error('assignment insert error:', e?.message, e);
+    return res.status(500).json({ error: e?.message || String(e) || "Insert failed" });
   }
   const row = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id) as any;
   row.rubric = JSON.parse(row.rubric || "[]");
