@@ -785,7 +785,7 @@ export default function AssignmentBuilder() {
   const [dueDate, setDueDate] = useState("");
 
   // Per-assignment grade targeting
-  const [targetMode, setTargetMode] = useState<"all" | "single" | "range" | "students">("all");
+  const [targetMode, setTargetMode] = useState<"all" | "single" | "range" | "students" | "auto">("all");
   const [targetGradeMin, setTargetGradeMin] = useState<number>(3);
   const [targetGradeMax, setTargetGradeMax] = useState<number>(3);
   const [targetSubject, setTargetSubject] = useState<"reading" | "math" | "writing">("reading");
@@ -1152,7 +1152,30 @@ export default function AssignmentBuilder() {
     // Video → assignment: persist the URL so WorkScreen embeds the player for students.
     const videoPayload: any = videoUrl.trim() ? { videoUrl: videoUrl.trim() } : {};
     try {
-      if (pdfSourceAssignmentId) {
+      if (targetMode === "auto") {
+        setCreateError("Creating grade-level assignments...");
+        const result = await api.createAssignmentByGrade({
+          classId,
+          title,
+          subject: targetSubject,
+          instructions: desc,
+          passage: genPassage,
+        });
+        setCreateError("");
+        setShowForm(false);
+        setGenerated(null);
+        setPdfSourceAssignmentId(null);
+        setTitle(""); setInstructions(""); setDueDate("");
+        setVideoUrl(""); setVideoGenError(""); setVideoGenNote("");
+        setCustomQuestionCount(""); setCustomEstimatedMinutes(""); setCustomQuestionType("");
+        setCustomHintsAllowed(true); setCustomLearningObjective(""); setCustomFocusKeywords(""); setCustomTeacherNotes("");
+        setShowAdvanced(false);
+        setTargetMode("all"); setTargetStudentIds([]);
+        setIsGroup(false); setGroupName("");
+        loadAssignments(classId);
+        alert(`Created assignments for ${result.created} grade levels!`);
+        return;
+      } else if (pdfSourceAssignmentId) {
         await api.updateAssignment(pdfSourceAssignmentId, { title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
       } else {
         await api.createAssignment({ classId, title, description: desc, dueDate, rubric, content, ...targeting, ...customization, ...groupPayload, ...videoPayload });
@@ -1732,6 +1755,7 @@ export default function AssignmentBuilder() {
               </div>
               <div className="stamp">{
                 targetMode === "all" ? "All students" :
+                targetMode === "auto" ? "Auto by grade" :
                 targetMode === "single" ? `${targetSubject} · Gr ${targetGradeMin}` :
                 targetMode === "range"  ? `${targetSubject} · Gr ${Math.min(targetGradeMin, targetGradeMax)}–${Math.max(targetGradeMin, targetGradeMax)}` :
                 targetStudentIds.length > 0 ? `${targetStudentIds.length} student${targetStudentIds.length === 1 ? "" : "s"}` : "Pick students"
@@ -1744,6 +1768,7 @@ export default function AssignmentBuilder() {
                 ["students", "Specific students"],
                 ["single",   "Specific grade"],
                 ["range",    "Grade range"],
+                ["auto",     "Auto (by grade)"],
               ] as const).map(([mode, label]) => (
                 <button key={mode} onClick={() => setTargetMode(mode)} type="button"
                   className="px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer"
@@ -1752,9 +1777,25 @@ export default function AssignmentBuilder() {
                     background: targetMode === mode ? "var(--accent-light)" : "transparent",
                     color: targetMode === mode ? "var(--text-accent)" : "var(--text-2)",
                     borderColor: targetMode === mode ? "var(--accent)" : "var(--border-md)",
-                  }}>{label}</button>
+                  }}>{mode === "auto" ? "🎯 " : ""}{label}</button>
               ))}
             </div>
+
+            {targetMode === "auto" && (
+              <div className="flex items-start gap-4 flex-wrap">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>Subject</label>
+                  <select value={targetSubject} onChange={e => setTargetSubject(e.target.value as any)} className="input text-sm w-32">
+                    <option value="reading">📖 Reading</option>
+                    <option value="math">🔢 Math</option>
+                    <option value="writing">✏️ Writing</option>
+                  </select>
+                </div>
+                <div className="text-[11px] mt-5 max-w-xs" style={{ color: "var(--text-3)" }}>
+                  Creates separate grade-level versions for every student tier in this class. Each student only sees the version matching their grade level.
+                </div>
+              </div>
+            )}
 
             {targetMode === "students" && (
               <div>
