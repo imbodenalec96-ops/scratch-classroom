@@ -4,22 +4,42 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
-import { isWorkUnlocked, isAccessAllowed, setWorkUnlocked } from "../lib/workUnlock.ts";
+import {
+  isWorkUnlocked,
+  isAccessAllowed,
+  setWorkUnlocked,
+} from "../lib/workUnlock.ts";
 import { isOnBreak, chooseBreak } from "../lib/breakSystem.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
 import { useBlockInfo } from "../lib/useCurrentBlock.ts";
 import { usePresencePing } from "../lib/presence.ts";
-import { motion, prefersReducedMotion, getSubjectPalette } from "../lib/motionPresets.ts";
-import { Users, CheckCircle, Star, Lock, Megaphone, Trophy, Clock, Gamepad2 } from "lucide-react";
+import {
+  motion,
+  prefersReducedMotion,
+  getSubjectPalette,
+} from "../lib/motionPresets.ts";
+import {
+  Users,
+  CheckCircle,
+  Star,
+  Lock,
+  Megaphone,
+  Trophy,
+  Clock,
+  Gamepad2,
+} from "lucide-react";
 import { LearningAppTile, LearningAppGrid } from "./LearningAppTile.tsx";
 
-type Phase = 'welcome' | 'loading' | 'working' | 'break' | 'done';
+type Phase = "welcome" | "loading" | "working" | "break" | "done";
 
 /* ── Count-up hook ── */
 function useCountUp(target: number, duration = 900, delay = 0) {
   const [value, setValue] = useState(0);
   useEffect(() => {
-    if (target === 0) { setValue(0); return; }
+    if (target === 0) {
+      setValue(0);
+      return;
+    }
     const t = setTimeout(() => {
       const start = performance.now();
       const tick = (now: number) => {
@@ -37,25 +57,77 @@ function useCountUp(target: number, duration = 900, delay = 0) {
 /* ── Starfall palettes: bright, playful, pastel per subject. Used by the
  *    assignment doer (WorkScreen) so every subject has its own warm backdrop. */
 /* Soft tint wash over Paper cream (#FAF9F7) — subtle, not candy-shop. */
-const STARFALL_PALETTES: Record<string, { bg: string; accent: string; emoji: string; label: string }> = {
-  reading:        { bg: "linear-gradient(160deg, #f5eeff 0%, #faf9f7 60%)", accent: "#8b5cf6", emoji: "📖", label: "Reading" },
-  math:           { bg: "linear-gradient(160deg, #fff5e0 0%, #faf9f7 60%)", accent: "#D97757", emoji: "🔢", label: "Math" },
-  writing:        { bg: "linear-gradient(160deg, #eaf5ec 0%, #faf9f7 60%)", accent: "#059669", emoji: "✏️", label: "Writing" },
-  spelling:       { bg: "linear-gradient(160deg, #e6f0fb 0%, #faf9f7 60%)", accent: "#2563eb", emoji: "🔤", label: "Spelling" },
-  sel:            { bg: "linear-gradient(160deg, #fdeaec 0%, #faf9f7 60%)", accent: "#e11d48", emoji: "💛", label: "SEL" },
-  daily_news:     { bg: "linear-gradient(160deg, #e4f0fa 0%, #faf9f7 60%)", accent: "#0284c7", emoji: "📰", label: "Daily News" },
-  review:         { bg: "linear-gradient(160deg, #f1e8fa 0%, #faf9f7 60%)", accent: "#a855f7", emoji: "🔁", label: "Review" },
-  science:        { bg: "linear-gradient(160deg, #e0f2ed 0%, #faf9f7 60%)", accent: "#0d9488", emoji: "🔬", label: "Science" },
-  social_studies: { bg: "linear-gradient(160deg, #fbecd8 0%, #faf9f7 60%)", accent: "#c2410c", emoji: "🌎", label: "Social Studies" },
+const STARFALL_PALETTES: Record<
+  string,
+  { bg: string; accent: string; emoji: string; label: string }
+> = {
+  reading: {
+    bg: "linear-gradient(160deg, #f5eeff 0%, #faf9f7 60%)",
+    accent: "#8b5cf6",
+    emoji: "📖",
+    label: "Reading",
+  },
+  math: {
+    bg: "linear-gradient(160deg, #fff5e0 0%, #faf9f7 60%)",
+    accent: "#D97757",
+    emoji: "🔢",
+    label: "Math",
+  },
+  writing: {
+    bg: "linear-gradient(160deg, #eaf5ec 0%, #faf9f7 60%)",
+    accent: "#059669",
+    emoji: "✏️",
+    label: "Writing",
+  },
+  spelling: {
+    bg: "linear-gradient(160deg, #e6f0fb 0%, #faf9f7 60%)",
+    accent: "#2563eb",
+    emoji: "🔤",
+    label: "Spelling",
+  },
+  sel: {
+    bg: "linear-gradient(160deg, #fdeaec 0%, #faf9f7 60%)",
+    accent: "#e11d48",
+    emoji: "💛",
+    label: "SEL",
+  },
+  daily_news: {
+    bg: "linear-gradient(160deg, #e4f0fa 0%, #faf9f7 60%)",
+    accent: "#0284c7",
+    emoji: "📰",
+    label: "Daily News",
+  },
+  review: {
+    bg: "linear-gradient(160deg, #f1e8fa 0%, #faf9f7 60%)",
+    accent: "#a855f7",
+    emoji: "🔁",
+    label: "Review",
+  },
+  science: {
+    bg: "linear-gradient(160deg, #e0f2ed 0%, #faf9f7 60%)",
+    accent: "#0d9488",
+    emoji: "🔬",
+    label: "Science",
+  },
+  social_studies: {
+    bg: "linear-gradient(160deg, #fbecd8 0%, #faf9f7 60%)",
+    accent: "#c2410c",
+    emoji: "🌎",
+    label: "Social Studies",
+  },
 };
 function getStarfallPalette(subject?: string | null) {
-  const key = String(subject || "").toLowerCase().trim();
-  return STARFALL_PALETTES[key] || {
-    bg: "linear-gradient(160deg, #f1e8fa 0%, #faf9f7 60%)",
-    accent: "#8b5cf6",
-    emoji: "📝",
-    label: "Today's Work",
-  };
+  const key = String(subject || "")
+    .toLowerCase()
+    .trim();
+  return (
+    STARFALL_PALETTES[key] || {
+      bg: "linear-gradient(160deg, #f1e8fa 0%, #faf9f7 60%)",
+      accent: "#8b5cf6",
+      emoji: "📝",
+      label: "Today's Work",
+    }
+  );
 }
 
 /* ── Read-aloud: speak question text via Web Speech API. Cancels any in-flight
@@ -81,9 +153,9 @@ function getBestVoice(): SpeechSynthesisVoice | null {
     // Any en-US voice (last resort before default)
     /.*/,
   ];
-  const enUS = voices.filter(v => v.lang.toLowerCase().startsWith("en"));
+  const enUS = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
   for (const pattern of preferred) {
-    const match = enUS.find(v => pattern.test(v.name));
+    const match = enUS.find((v) => pattern.test(v.name));
     if (match) return match;
   }
   return voices[0] ?? null;
@@ -101,7 +173,9 @@ function speakText(text: string, rate = 0.82) {
       const voice = getBestVoice();
       if (voice) u.voice = voice;
       window.speechSynthesis.speak(u);
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   };
   // Voices may not be loaded yet — wait for them if needed
   const voices = window.speechSynthesis.getVoices();
@@ -133,10 +207,13 @@ function speakSpellingWord(word: string) {
       window.speechSynthesis.speak(make(word));
       // Brief silent pause utterance
       const pause = new SpeechSynthesisUtterance(" ");
-      pause.rate = 0.1; pause.volume = 0;
+      pause.rate = 0.1;
+      pause.volume = 0;
       window.speechSynthesis.speak(pause);
       window.speechSynthesis.speak(make(word));
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   };
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
@@ -150,7 +227,9 @@ function speakSpellingWord(word: string) {
 }
 function stopSpeaking() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try { window.speechSynthesis.cancel(); } catch {}
+  try {
+    window.speechSynthesis.cancel();
+  } catch {}
 }
 
 /* ── Confetti ── */
@@ -172,7 +251,15 @@ function spawnConfetti() {
 }
 
 /* ── YouTubeRequestForm — inline request-a-video form ── */
-function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: string; onSent?: () => void }) {
+function YouTubeRequestForm({
+  dk,
+  userId,
+  onSent,
+}: {
+  dk: boolean;
+  userId?: string;
+  onSent?: () => void;
+}) {
   const [title, setTitle] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [sending, setSending] = React.useState(false);
@@ -180,37 +267,52 @@ function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: stri
     if (!title.trim() || !userId) return;
     setSending(true);
     try {
-      await api.createYouTubeRequest({ student_id: userId, title: title.trim() });
-      setTitle(""); setSent(true);
+      await api.createYouTubeRequest({
+        student_id: userId,
+        title: title.trim(),
+      });
+      setTitle("");
+      setSent(true);
       setTimeout(() => setSent(false), 3000);
       onSent?.();
     } catch (e: any) {
       alert("Couldn't send request: " + e.message);
-    } finally { setSending(false); }
+    } finally {
+      setSending(false);
+    }
   };
   return (
     <div>
-      <div className="text-xs font-bold mb-2" style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}>
+      <div
+        className="text-xs font-bold mb-2"
+        style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}
+      >
         🎬 Want a video? Ask your teacher:
       </div>
       <div className="flex gap-2">
         <input
           value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && submit()}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="e.g. fun math song about fractions"
           className="input text-sm flex-1"
           style={{ minHeight: 40 }}
         />
-        <button onClick={submit} disabled={!title.trim() || sending}
+        <button
+          onClick={submit}
+          disabled={!title.trim() || sending}
           className={`text-xs font-bold px-4 rounded-xl cursor-pointer transition-all ${
             sent ? "bg-emerald-500 text-white" : "btn-primary"
           }`}
-          style={{ minHeight: 40 }}>
+          style={{ minHeight: 40 }}
+        >
           {sent ? "✓ Sent!" : sending ? "…" : "Request"}
         </button>
       </div>
-      <p className="text-[10px] mt-1.5" style={{ color: dk ? "rgba(255,255,255,0.25)" : "#94a3b8" }}>
+      <p
+        className="text-[10px] mt-1.5"
+        style={{ color: dk ? "rgba(255,255,255,0.25)" : "#94a3b8" }}
+      >
         Your teacher will find the video and approve it for you.
       </p>
     </div>
@@ -219,19 +321,309 @@ function YouTubeRequestForm({ dk, userId, onSent }: { dk: boolean; userId?: stri
 
 /* ── Avatar Gallery ── */
 const AVATAR_SECTIONS = [
-  { label: "🐾 Animals", items: ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🦅","🦆","🦉","🦋","🐢","🐬","🐳","🦈","🦓","🦒","🦘","🐘","🦏","🐆","🦝","🦦","🦥","🐿️","🦔","🐇","🦌","🐓","🦃","🦚","🦜","🦩","🐾"] },
-  { label: "⚽ Sports", items: ["⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏸","🏒","🎿","⛷️","🏄","🤸","🏋️","🤼","🥊","🎯","🏹","🛹","🛼","🚴","🧗","🤺","🏊","🏇","⛸️","🥋","🏌️"] },
-  { label: "🚀 Sci-fi & Fantasy", items: ["🚀","🤖","👾","🛸","🌌","🔭","🪐","⭐","🌟","💫","✨","🌠","🧙","🧚","🧜","🧝","🦄","🐉","🔮","🧿","🗺️","⚔️","🛡️","🪄","🏰","🗡️","🌀","🌊","🔥","⚡"] },
-  { label: "🎨 Arts & Music", items: ["🎨","🖌️","✏️","📐","🎵","🎸","🎹","🥁","🎺","🎻","🎤","🎧","📸","🎬","🎭","🎪","🖼️","🎠","🎡","🎢","🃏","🎲","🧩","♟️","🎰","🎳"] },
-  { label: "🍕 Food & Treats", items: ["🍕","🍦","🍩","🍪","🎂","🧁","🍫","🍬","🍭","🍿","🌮","🍔","🌯","🥞","🧇","🍣","🍜","🧃","🥤","☕","🍵","🧋","🍓","🍇","🍉","🍒","🍑","🥝","🍋","🍊"] },
-  { label: "🌿 Nature", items: ["🌺","🌻","🌸","🌷","🌹","🌼","💐","🌴","🌵","🎋","🍀","🌿","🍁","🍂","🌾","🌱","🪴","🌲","🌳","🌙","☀️","⛅","🌈","❄️","⚡","🔥","🌊","🌪️","🪐","🗻"] },
-  { label: "🚗 Vehicles", items: ["🚀","✈️","🚁","🛸","🚂","🚢","🚗","🚕","🏎️","🚒","🚑","🚓","🚜","🚛","🛻","🏍️","🛵","🚲","🛺","⛵","🛥️","🚤","🛶","🚡","🚟","🛳️","🛰️","🪂","🚠","🚃"] },
-  { label: "✨ Magic & Objects", items: ["🎃","🎄","🎁","🎀","🎈","🎉","🎊","🪆","🧸","🪀","🪁","🎏","🔮","🪄","💎","👑","🏆","🥇","🌟","💫","⭐","🌠","🌈","🎆","🎇","✨","💥","🔔","📯","🪘"] },
+  {
+    label: "🐾 Animals",
+    items: [
+      "🐶",
+      "🐱",
+      "🐭",
+      "🐹",
+      "🐰",
+      "🦊",
+      "🐻",
+      "🐼",
+      "🐨",
+      "🐯",
+      "🦁",
+      "🐮",
+      "🐷",
+      "🐸",
+      "🐵",
+      "🐔",
+      "🐧",
+      "🐦",
+      "🦅",
+      "🦆",
+      "🦉",
+      "🦋",
+      "🐢",
+      "🐬",
+      "🐳",
+      "🦈",
+      "🦓",
+      "🦒",
+      "🦘",
+      "🐘",
+      "🦏",
+      "🐆",
+      "🦝",
+      "🦦",
+      "🦥",
+      "🐿️",
+      "🦔",
+      "🐇",
+      "🦌",
+      "🐓",
+      "🦃",
+      "🦚",
+      "🦜",
+      "🦩",
+      "🐾",
+    ],
+  },
+  {
+    label: "⚽ Sports",
+    items: [
+      "⚽",
+      "🏀",
+      "🏈",
+      "⚾",
+      "🎾",
+      "🏐",
+      "🏉",
+      "🎱",
+      "🏸",
+      "🏒",
+      "🎿",
+      "⛷️",
+      "🏄",
+      "🤸",
+      "🏋️",
+      "🤼",
+      "🥊",
+      "🎯",
+      "🏹",
+      "🛹",
+      "🛼",
+      "🚴",
+      "🧗",
+      "🤺",
+      "🏊",
+      "🏇",
+      "⛸️",
+      "🥋",
+      "🏌️",
+    ],
+  },
+  {
+    label: "🚀 Sci-fi & Fantasy",
+    items: [
+      "🚀",
+      "🤖",
+      "👾",
+      "🛸",
+      "🌌",
+      "🔭",
+      "🪐",
+      "⭐",
+      "🌟",
+      "💫",
+      "✨",
+      "🌠",
+      "🧙",
+      "🧚",
+      "🧜",
+      "🧝",
+      "🦄",
+      "🐉",
+      "🔮",
+      "🧿",
+      "🗺️",
+      "⚔️",
+      "🛡️",
+      "🪄",
+      "🏰",
+      "🗡️",
+      "🌀",
+      "🌊",
+      "🔥",
+      "⚡",
+    ],
+  },
+  {
+    label: "🎨 Arts & Music",
+    items: [
+      "🎨",
+      "🖌️",
+      "✏️",
+      "📐",
+      "🎵",
+      "🎸",
+      "🎹",
+      "🥁",
+      "🎺",
+      "🎻",
+      "🎤",
+      "🎧",
+      "📸",
+      "🎬",
+      "🎭",
+      "🎪",
+      "🖼️",
+      "🎠",
+      "🎡",
+      "🎢",
+      "🃏",
+      "🎲",
+      "🧩",
+      "♟️",
+      "🎰",
+      "🎳",
+    ],
+  },
+  {
+    label: "🍕 Food & Treats",
+    items: [
+      "🍕",
+      "🍦",
+      "🍩",
+      "🍪",
+      "🎂",
+      "🧁",
+      "🍫",
+      "🍬",
+      "🍭",
+      "🍿",
+      "🌮",
+      "🍔",
+      "🌯",
+      "🥞",
+      "🧇",
+      "🍣",
+      "🍜",
+      "🧃",
+      "🥤",
+      "☕",
+      "🍵",
+      "🧋",
+      "🍓",
+      "🍇",
+      "🍉",
+      "🍒",
+      "🍑",
+      "🥝",
+      "🍋",
+      "🍊",
+    ],
+  },
+  {
+    label: "🌿 Nature",
+    items: [
+      "🌺",
+      "🌻",
+      "🌸",
+      "🌷",
+      "🌹",
+      "🌼",
+      "💐",
+      "🌴",
+      "🌵",
+      "🎋",
+      "🍀",
+      "🌿",
+      "🍁",
+      "🍂",
+      "🌾",
+      "🌱",
+      "🪴",
+      "🌲",
+      "🌳",
+      "🌙",
+      "☀️",
+      "⛅",
+      "🌈",
+      "❄️",
+      "⚡",
+      "🔥",
+      "🌊",
+      "🌪️",
+      "🪐",
+      "🗻",
+    ],
+  },
+  {
+    label: "🚗 Vehicles",
+    items: [
+      "🚀",
+      "✈️",
+      "🚁",
+      "🛸",
+      "🚂",
+      "🚢",
+      "🚗",
+      "🚕",
+      "🏎️",
+      "🚒",
+      "🚑",
+      "🚓",
+      "🚜",
+      "🚛",
+      "🛻",
+      "🏍️",
+      "🛵",
+      "🚲",
+      "🛺",
+      "⛵",
+      "🛥️",
+      "🚤",
+      "🛶",
+      "🚡",
+      "🚟",
+      "🛳️",
+      "🛰️",
+      "🪂",
+      "🚠",
+      "🚃",
+    ],
+  },
+  {
+    label: "✨ Magic & Objects",
+    items: [
+      "🎃",
+      "🎄",
+      "🎁",
+      "🎀",
+      "🎈",
+      "🎉",
+      "🎊",
+      "🪆",
+      "🧸",
+      "🪀",
+      "🪁",
+      "🎏",
+      "🔮",
+      "🪄",
+      "💎",
+      "👑",
+      "🏆",
+      "🥇",
+      "🌟",
+      "💫",
+      "⭐",
+      "🌠",
+      "🌈",
+      "🎆",
+      "🎇",
+      "✨",
+      "💥",
+      "🔔",
+      "📯",
+      "🪘",
+    ],
+  },
 ];
-const AVATAR_GALLERY = AVATAR_SECTIONS.flatMap(s => s.items);
+const AVATAR_GALLERY = AVATAR_SECTIONS.flatMap((s) => s.items);
 
-function AvatarPickerModal({ userId, current, onSelect, onClose }: {
-  userId: string; current: string; onSelect: (e: string) => void; onClose: () => void;
+function AvatarPickerModal({
+  userId,
+  current,
+  onSelect,
+  onClose,
+}: {
+  userId: string;
+  current: string;
+  onSelect: (e: string) => void;
+  onClose: () => void;
 }) {
   const [saving, setSaving] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState(0);
@@ -241,64 +633,189 @@ function AvatarPickerModal({ userId, current, onSelect, onClose }: {
       await api.setMyAvatar(userId, emoji);
       onSelect(emoji);
       onClose();
-    } catch { setSaving(false); }
+    } catch {
+      setSaving(false);
+    }
   };
   const section = AVATAR_SECTIONS[activeSection];
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 16,
-    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        background: "linear-gradient(160deg, #1a0d3a, #0d1a3a)",
-        border: "1px solid rgba(139,92,246,0.35)",
-        borderRadius: 24, padding: "20px",
-        maxWidth: 500, width: "100%",
-        boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
-        animation: "dbPop .25s ease both",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.80)",
+        backdropFilter: "blur(10px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: "linear-gradient(160deg, #1a0d3a, #0d1a3a)",
+          border: "1px solid rgba(139,92,246,0.35)",
+          borderRadius: 24,
+          padding: "20px",
+          maxWidth: 500,
+          width: "100%",
+          boxShadow:
+            "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
+          animation: "dbPop .25s ease both",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14,
+          }}
+        >
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: "white" }}>Choose Your Avatar</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "white" }}>
+              Choose Your Avatar
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.4)",
+                marginTop: 2,
+              }}
+            >
               {current ? `Current: ${current}` : "Pick something that's you!"}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              border: "none",
+              borderRadius: 10,
+              width: 32,
+              height: 32,
+              cursor: "pointer",
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
         </div>
         {/* Category tabs */}
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 10, scrollbarWidth: "none" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            paddingBottom: 10,
+            marginBottom: 10,
+            scrollbarWidth: "none",
+          }}
+        >
           {AVATAR_SECTIONS.map((s, i) => (
-            <button key={i} onClick={() => setActiveSection(i)} style={{
-              flexShrink: 0, padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-              border: i === activeSection ? "1.5px solid rgba(139,92,246,0.7)" : "1.5px solid rgba(255,255,255,0.1)",
-              background: i === activeSection ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.04)",
-              color: i === activeSection ? "#c4b5fd" : "rgba(255,255,255,0.5)",
-              cursor: "pointer", transition: "all 0.15s",
-            }}>{s.label}</button>
+            <button
+              key={i}
+              onClick={() => setActiveSection(i)}
+              style={{
+                flexShrink: 0,
+                padding: "6px 12px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 700,
+                border:
+                  i === activeSection
+                    ? "1.5px solid rgba(139,92,246,0.7)"
+                    : "1.5px solid rgba(255,255,255,0.1)",
+                background:
+                  i === activeSection
+                    ? "rgba(139,92,246,0.3)"
+                    : "rgba(255,255,255,0.04)",
+                color:
+                  i === activeSection ? "#c4b5fd" : "rgba(255,255,255,0.5)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {s.label}
+            </button>
           ))}
         </div>
         {/* Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(8, 1fr)",
+            gap: 8,
+            maxHeight: 280,
+            overflowY: "auto",
+          }}
+        >
           {section.items.map((emoji) => (
-            <button key={emoji} onClick={() => pick(emoji)} disabled={saving} style={{
-              width: "100%", aspectRatio: "1", borderRadius: 12, fontSize: 26, lineHeight: 1,
-              border: emoji === current ? "2.5px solid #a78bfa" : "1.5px solid rgba(255,255,255,0.08)",
-              background: emoji === current ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.04)",
-              cursor: "pointer", transition: "all 0.13s",
-              boxShadow: emoji === current ? "0 0 16px rgba(139,92,246,0.6)" : "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.28)"; (e.currentTarget as HTMLElement).style.transform = "scale(1.22)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = emoji === current ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.04)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
-            >{emoji}</button>
+            <button
+              key={emoji}
+              onClick={() => pick(emoji)}
+              disabled={saving}
+              style={{
+                width: "100%",
+                aspectRatio: "1",
+                borderRadius: 12,
+                fontSize: 26,
+                lineHeight: 1,
+                border:
+                  emoji === current
+                    ? "2.5px solid #a78bfa"
+                    : "1.5px solid rgba(255,255,255,0.08)",
+                background:
+                  emoji === current
+                    ? "rgba(139,92,246,0.35)"
+                    : "rgba(255,255,255,0.04)",
+                cursor: "pointer",
+                transition: "all 0.13s",
+                boxShadow:
+                  emoji === current ? "0 0 16px rgba(139,92,246,0.6)" : "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background =
+                  "rgba(139,92,246,0.28)";
+                (e.currentTarget as HTMLElement).style.transform =
+                  "scale(1.22)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background =
+                  emoji === current
+                    ? "rgba(139,92,246,0.35)"
+                    : "rgba(255,255,255,0.04)";
+                (e.currentTarget as HTMLElement).style.transform = "";
+              }}
+            >
+              {emoji}
+            </button>
           ))}
         </div>
         {current && (
           <div style={{ marginTop: 14, textAlign: "center" }}>
-            <button onClick={() => pick("")} style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+            <button
+              onClick={() => pick("")}
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.3)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
               Use initials instead
             </button>
           </div>
@@ -341,57 +858,160 @@ function FlyingBuddy({ active = true }: { active?: boolean }) {
       `}</style>
       <svg width="52" height="44" viewBox="0 0 52 44" fill="none">
         {/* Left wings */}
-        <ellipse cx="14" cy="18" rx="13" ry="17" fill="#f9a8d4" opacity="0.85" style={{ animation: "wingFlap 0.4s ease-in-out infinite" }}/>
-        <ellipse cx="12" cy="30" rx="10" ry="10" fill="#fda4af" opacity="0.7" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.1s" }}/>
+        <ellipse
+          cx="14"
+          cy="18"
+          rx="13"
+          ry="17"
+          fill="#f9a8d4"
+          opacity="0.85"
+          style={{ animation: "wingFlap 0.4s ease-in-out infinite" }}
+        />
+        <ellipse
+          cx="12"
+          cy="30"
+          rx="10"
+          ry="10"
+          fill="#fda4af"
+          opacity="0.7"
+          style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.1s" }}
+        />
         {/* Right wings */}
-        <ellipse cx="38" cy="18" rx="13" ry="17" fill="#c4b5fd" opacity="0.85" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.05s" }}/>
-        <ellipse cx="40" cy="30" rx="10" ry="10" fill="#a5b4fc" opacity="0.7" style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.15s" }}/>
+        <ellipse
+          cx="38"
+          cy="18"
+          rx="13"
+          ry="17"
+          fill="#c4b5fd"
+          opacity="0.85"
+          style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.05s" }}
+        />
+        <ellipse
+          cx="40"
+          cy="30"
+          rx="10"
+          ry="10"
+          fill="#a5b4fc"
+          opacity="0.7"
+          style={{ animation: "wingFlap 0.4s ease-in-out infinite 0.15s" }}
+        />
         {/* Body */}
-        <ellipse cx="26" cy="22" rx="4" ry="14" fill="#7c3aed"/>
+        <ellipse cx="26" cy="22" rx="4" ry="14" fill="#7c3aed" />
         {/* Head */}
-        <circle cx="26" cy="7" r="5" fill="#6d28d9"/>
+        <circle cx="26" cy="7" r="5" fill="#6d28d9" />
         {/* Eyes */}
-        <circle cx="24" cy="6" r="1.2" fill="white"/>
-        <circle cx="28" cy="6" r="1.2" fill="white"/>
-        <circle cx="24.5" cy="6" r="0.6" fill="#1e293b"/>
-        <circle cx="28.5" cy="6" r="0.6" fill="#1e293b"/>
+        <circle cx="24" cy="6" r="1.2" fill="white" />
+        <circle cx="28" cy="6" r="1.2" fill="white" />
+        <circle cx="24.5" cy="6" r="0.6" fill="#1e293b" />
+        <circle cx="28.5" cy="6" r="0.6" fill="#1e293b" />
         {/* Smile */}
-        <path d="M23.5 8.5 Q26 10.5 28.5 8.5" stroke="#f9a8d4" strokeWidth="1" strokeLinecap="round" fill="none"/>
+        <path
+          d="M23.5 8.5 Q26 10.5 28.5 8.5"
+          stroke="#f9a8d4"
+          strokeWidth="1"
+          strokeLinecap="round"
+          fill="none"
+        />
         {/* Antennae */}
-        <line x1="24" y1="3" x2="21" y2="-1" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round"/>
-        <line x1="28" y1="3" x2="31" y2="-1" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round"/>
-        <circle cx="21" cy="-1" r="1.5" fill="#f9a8d4"/>
-        <circle cx="31" cy="-1" r="1.5" fill="#c4b5fd"/>
+        <line
+          x1="24"
+          y1="3"
+          x2="21"
+          y2="-1"
+          stroke="#7c3aed"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+        <line
+          x1="28"
+          y1="3"
+          x2="31"
+          y2="-1"
+          stroke="#7c3aed"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+        <circle cx="21" cy="-1" r="1.5" fill="#f9a8d4" />
+        <circle cx="31" cy="-1" r="1.5" fill="#c4b5fd" />
         {/* Wing letter accents */}
-        <text x="10" y="21" fontSize="8" fill="white" opacity="0.7" fontWeight="bold">A</text>
-        <text x="36" y="21" fontSize="8" fill="white" opacity="0.7" fontWeight="bold">B</text>
+        <text
+          x="10"
+          y="21"
+          fontSize="8"
+          fill="white"
+          opacity="0.7"
+          fontWeight="bold"
+        >
+          A
+        </text>
+        <text
+          x="36"
+          y="21"
+          fontSize="8"
+          fill="white"
+          opacity="0.7"
+          fontWeight="bold"
+        >
+          B
+        </text>
       </svg>
     </div>
   );
 }
 
 /* ── TypewriterText ── */
-function TypewriterText({ text, speed = 28, className, style }: {
-  text: string; speed?: number; className?: string; style?: React.CSSProperties;
+function TypewriterText({
+  text,
+  speed = 28,
+  className,
+  style,
+}: {
+  text: string;
+  speed?: number;
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
   const rm = prefersReducedMotion();
   useEffect(() => {
-    if (rm) { setDisplayed(text); setDone(true); return; }
-    setDisplayed(""); setDone(false);
+    if (rm) {
+      setDisplayed(text);
+      setDone(true);
+      return;
+    }
+    setDisplayed("");
+    setDone(false);
     let i = 0;
     const iv = setInterval(() => {
       i++;
       setDisplayed(text.slice(0, i));
-      if (i >= text.length) { clearInterval(iv); setDone(true); }
+      if (i >= text.length) {
+        clearInterval(iv);
+        setDone(true);
+      }
     }, speed);
     return () => clearInterval(iv);
   }, [text, speed, rm]);
   return (
-    <span className={className} style={style} onClick={() => { setDisplayed(text); setDone(true); }}>
+    <span
+      className={className}
+      style={style}
+      onClick={() => {
+        setDisplayed(text);
+        setDone(true);
+      }}
+    >
       {displayed}
-      {!done && <span style={{ borderRight: "2px solid currentColor", marginLeft: 1, animation: "blink 0.7s step-end infinite" }} />}
+      {!done && (
+        <span
+          style={{
+            borderRight: "2px solid currentColor",
+            marginLeft: 1,
+            animation: "blink 0.7s step-end infinite",
+          }}
+        />
+      )}
     </span>
   );
 }
@@ -429,7 +1049,14 @@ function StreakCounter({ streak }: { streak: number }) {
 /* ── Mascot Star SVG ── */
 function MascotStar({ size = 64 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path
         d="M32 5L39 24H59L43.5 35.5L49.5 54.5L32 43L14.5 54.5L20.5 35.5L5 24H25L32 5Z"
         fill="#fbbf24"
@@ -441,7 +1068,13 @@ function MascotStar({ size = 64 }: { size?: number }) {
       <circle cx="38.5" cy="29" r="2.8" fill="#1e293b" />
       <circle cx="26.8" cy="27.5" r="0.9" fill="white" />
       <circle cx="39.8" cy="27.5" r="0.9" fill="white" />
-      <path d="M25.5 37 Q32 43.5 38.5 37" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      <path
+        d="M25.5 37 Q32 43.5 38.5 37"
+        stroke="#1e293b"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
       <circle cx="22" cy="35" r="3.2" fill="#fb7185" opacity="0.35" />
       <circle cx="42" cy="35" r="3.2" fill="#fb7185" opacity="0.35" />
     </svg>
@@ -449,15 +1082,26 @@ function MascotStar({ size = 64 }: { size?: number }) {
 }
 
 /* ── Mascot component ── */
-function Mascot({ state, style }: { state: 'idle' | 'cheer'; style?: React.CSSProperties }) {
+function Mascot({
+  state,
+  style,
+}: {
+  state: "idle" | "cheer";
+  style?: React.CSSProperties;
+}) {
   const rm = prefersReducedMotion();
   return (
     <div
-      className={rm ? "" : state === 'idle' ? "mascot-bop" : "mascot-cheer"}
-      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", ...style }}
+      className={rm ? "" : state === "idle" ? "mascot-bop" : "mascot-cheer"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        ...style,
+      }}
       aria-hidden="true"
     >
-      <MascotStar size={state === 'cheer' ? 80 : 64} />
+      <MascotStar size={state === "cheer" ? 80 : 64} />
     </div>
   );
 }
@@ -465,22 +1109,47 @@ function Mascot({ state, style }: { state: 'idle' | 'cheer'; style?: React.CSSPr
 /* ── Welcome Screen ── */
 function WelcomeScreen({ name }: { name: string }) {
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: "var(--bg)" }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
-        style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: "var(--bg)" }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
       <div className="relative z-10 text-center space-y-4 animate-page-enter max-w-md px-6">
-        <div className="section-label mb-3">— {new Date().toLocaleDateString("en-US", { weekday: "long" })} —</div>
-        <h1 className="font-display text-6xl leading-[1.02]" style={{ color: "var(--text-1)" }}>
-          {greeting},<br/>
-          <em style={{ color: "var(--accent)", fontStyle: "italic" }}>{name.split(" ")[0]}.</em>
+        <div className="section-label mb-3">
+          — {new Date().toLocaleDateString("en-US", { weekday: "long" })} —
+        </div>
+        <h1
+          className="font-display text-6xl leading-[1.02]"
+          style={{ color: "var(--text-1)" }}
+        >
+          {greeting},<br />
+          <em style={{ color: "var(--accent)", fontStyle: "italic" }}>
+            {name.split(" ")[0]}.
+          </em>
         </h1>
-        <p className="text-sm mt-4" style={{ color: "var(--text-2)" }}>Setting your desk up…</p>
+        <p className="text-sm mt-4" style={{ color: "var(--text-2)" }}>
+          Setting your desk up…
+        </p>
         <div className="flex justify-center gap-1.5 mt-4">
           {[0, 1, 2].map((i) => (
-            <span key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
-              style={{ background: "var(--accent)", animationDelay: `${i * 150}ms` }} />
+            <span
+              key={i}
+              className="w-1.5 h-1.5 rounded-full animate-bounce"
+              style={{
+                background: "var(--accent)",
+                animationDelay: `${i * 150}ms`,
+              }}
+            />
           ))}
         </div>
       </div>
@@ -493,43 +1162,105 @@ function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
   const BREAK_SECONDS = 10 * 60;
   const [secs, setSecs] = useState(BREAK_SECONDS);
   useEffect(() => {
-    const iv = setInterval(() => setSecs((s) => { if (s <= 1) { clearInterval(iv); onDone(); return 0; } return s - 1; }), 1000);
+    const iv = setInterval(
+      () =>
+        setSecs((s) => {
+          if (s <= 1) {
+            clearInterval(iv);
+            onDone();
+            return 0;
+          }
+          return s - 1;
+        }),
+      1000,
+    );
     return () => clearInterval(iv);
   }, []);
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   const pct = ((BREAK_SECONDS - secs) / BREAK_SECONDS) * 100;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8" style={{ background: "var(--bg)" }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
-        style={{ backgroundImage: "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8"
+      style={{ background: "var(--bg)" }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
       <div className="relative z-10 text-center space-y-3">
         <div className="text-5xl">☕</div>
         <div className="section-label">— Pause —</div>
-        <h2 className="font-display text-5xl leading-tight" style={{ color: "var(--text-1)" }}>
-          Break<em style={{ color: "var(--accent)", fontStyle: "italic" }}> time.</em>
+        <h2
+          className="font-display text-5xl leading-tight"
+          style={{ color: "var(--text-1)" }}
+        >
+          Break
+          <em style={{ color: "var(--accent)", fontStyle: "italic" }}>
+            {" "}
+            time.
+          </em>
         </h2>
-        <p className="text-sm" style={{ color: "var(--text-2)" }}>Relax, stretch, grab some water.</p>
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>
+          Relax, stretch, grab some water.
+        </p>
       </div>
       <div className="relative w-48 h-48 z-10">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--border)" strokeWidth="4" />
-          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--accent)" strokeWidth="4"
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth="4"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="4"
             strokeDasharray={`${2 * Math.PI * 44}`}
             strokeDashoffset={`${2 * Math.PI * 44 * (1 - pct / 100)}`}
             strokeLinecap="round"
-            style={{ transition: "stroke-dashoffset 1s linear" }} />
+            style={{ transition: "stroke-dashoffset 1s linear" }}
+          />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display text-5xl tabular-nums leading-none" style={{ color: "var(--text-1)" }}>{mm}:{ss}</span>
-          <span className="text-[10px] uppercase tracking-wider mt-2" style={{ color: "var(--text-3)" }}>remaining</span>
+          <span
+            className="font-display text-5xl tabular-nums leading-none"
+            style={{ color: "var(--text-1)" }}
+          >
+            {mm}:{ss}
+          </span>
+          <span
+            className="text-[10px] uppercase tracking-wider mt-2"
+            style={{ color: "var(--text-3)" }}
+          >
+            remaining
+          </span>
         </div>
       </div>
       <div className="relative flex items-center justify-center">
-        <div className="w-24 h-24 rounded-full bg-cyan-500/20 animate-ping absolute" style={{ animationDuration: "4s" }} />
-        <div className="w-16 h-16 rounded-full bg-cyan-400/30 flex items-center justify-center text-2xl">🌊</div>
+        <div
+          className="w-24 h-24 rounded-full bg-cyan-500/20 animate-ping absolute"
+          style={{ animationDuration: "4s" }}
+        />
+        <div className="w-16 h-16 rounded-full bg-cyan-400/30 flex items-center justify-center text-2xl">
+          🌊
+        </div>
       </div>
-      <button onClick={onDone} className="text-white/40 text-sm hover:text-white/70 transition-colors cursor-pointer" style={{ minHeight: 44, padding: "10px 20px" }}>
+      <button
+        onClick={onDone}
+        className="text-white/40 text-sm hover:text-white/70 transition-colors cursor-pointer"
+        style={{ minHeight: 44, padding: "10px 20px" }}
+      >
         Skip break →
       </button>
     </div>
@@ -537,12 +1268,28 @@ function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
 }
 
 /* ── Progress dots ── */
-function ProgressDots({ total, current, answers }: { total: number; current: number; answers: Record<number, string> }) {
+function ProgressDots({
+  total,
+  current,
+  answers,
+}: {
+  total: number;
+  current: number;
+  answers: Record<number, string>;
+}) {
   return (
-    <div className="flex items-center justify-center gap-1.5 flex-wrap" role="tablist" aria-label="Questions">
+    <div
+      className="flex items-center justify-center gap-1.5 flex-wrap"
+      role="tablist"
+      aria-label="Questions"
+    >
       {Array.from({ length: total }).map((_, i) => (
-        <div key={i} role="tab" aria-selected={i === current}
-          className={`rounded-full transition-all duration-300 ${i === current ? "w-6 h-3 bg-violet-500" : answers[i] !== undefined ? "w-3 h-3 bg-emerald-500" : "w-3 h-3 bg-gray-200"}`} />
+        <div
+          key={i}
+          role="tab"
+          aria-selected={i === current}
+          className={`rounded-full transition-all duration-300 ${i === current ? "w-6 h-3 bg-violet-500" : answers[i] !== undefined ? "w-3 h-3 bg-emerald-500" : "w-3 h-3 bg-gray-200"}`}
+        />
       ))}
     </div>
   );
@@ -554,7 +1301,7 @@ function youtubeEmbedUrl(url: string): string | null {
     if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
       const id = u.hostname.includes("youtu.be")
         ? u.pathname.slice(1).split("?")[0]
-        : u.searchParams.get("v") ?? u.pathname.split("/").pop();
+        : (u.searchParams.get("v") ?? u.pathname.split("/").pop());
       if (id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
     }
   } catch {}
@@ -562,7 +1309,15 @@ function youtubeEmbedUrl(url: string): string | null {
 }
 
 /* ── Interactive Assignment Worker ── */
-function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string) => void; cardKey: number; accentColor: string }) {
+function DrawCanvas({
+  onDraw,
+  cardKey,
+  accentColor,
+}: {
+  onDraw: (dataUrl: string) => void;
+  cardKey: number;
+  accentColor: string;
+}) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const drawing = React.useRef(false);
   const lastPos = React.useRef<{ x: number; y: number } | null>(null);
@@ -575,13 +1330,19 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
     ctx.strokeStyle = "#ddd8ff";
     ctx.lineWidth = 1.5;
     for (let y = 80; y < canvas.height; y += 80) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
     }
     // dotted midline
     ctx.setLineDash([6, 6]);
     ctx.strokeStyle = "#c4bcf7";
     for (let y = 40; y < canvas.height; y += 80) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
     }
     ctx.setLineDash([]);
   }, []);
@@ -591,24 +1352,42 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
     onDraw("draw-ready");
   }, [cardKey, drawGuides, onDraw]);
 
-  const getPos = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+  const getPos = (
+    e:
+      | React.TouchEvent<HTMLCanvasElement>
+      | React.MouseEvent<HTMLCanvasElement>,
+  ) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     if ("touches" in e && e.touches.length > 0) {
-      return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
+      };
     }
-    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+    return {
+      x: ((e as React.MouseEvent).clientX - rect.left) * scaleX,
+      y: ((e as React.MouseEvent).clientY - rect.top) * scaleY,
+    };
   };
 
-  const startDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+  const startDraw = (
+    e:
+      | React.TouchEvent<HTMLCanvasElement>
+      | React.MouseEvent<HTMLCanvasElement>,
+  ) => {
     e.preventDefault();
     drawing.current = true;
     lastPos.current = getPos(e);
   };
 
-  const doDraw = (e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
+  const doDraw = (
+    e:
+      | React.TouchEvent<HTMLCanvasElement>
+      | React.MouseEvent<HTMLCanvasElement>,
+  ) => {
     e.preventDefault();
     if (!drawing.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d")!;
@@ -625,20 +1404,31 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
     onDraw(canvasRef.current.toDataURL());
   };
 
-  const stopDraw = () => { drawing.current = false; lastPos.current = null; };
+  const stopDraw = () => {
+    drawing.current = false;
+    lastPos.current = null;
+  };
 
-  const clear = () => { drawGuides(); onDraw("draw-ready"); };
+  const clear = () => {
+    drawGuides();
+    onDraw("draw-ready");
+  };
 
   return (
     <div className="space-y-3">
-      <div className="text-[12px] font-bold uppercase tracking-wide" style={{ color: accentColor }}>
+      <div
+        className="text-[12px] font-bold uppercase tracking-wide"
+        style={{ color: accentColor }}
+      >
         ✏️ Use your finger to write below
       </div>
       <canvas
         ref={canvasRef}
-        width={900} height={360}
+        width={900}
+        height={360}
         style={{
-          width: "100%", height: 220,
+          width: "100%",
+          height: 220,
           borderRadius: 16,
           border: `2px solid ${accentColor}55`,
           background: "#f9f8ff",
@@ -646,13 +1436,22 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
           cursor: "crosshair",
           display: "block",
         }}
-        onMouseDown={startDraw} onMouseMove={doDraw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-        onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={stopDraw}
+        onMouseDown={startDraw}
+        onMouseMove={doDraw}
+        onMouseUp={stopDraw}
+        onMouseLeave={stopDraw}
+        onTouchStart={startDraw}
+        onTouchMove={doDraw}
+        onTouchEnd={stopDraw}
       />
       <button
         onClick={clear}
         className="text-[12px] font-semibold px-4 py-2 rounded-xl"
-        style={{ background: `${accentColor}14`, color: accentColor, border: `1px solid ${accentColor}33` }}
+        style={{
+          background: `${accentColor}14`,
+          color: accentColor,
+          border: `1px solid ${accentColor}33`,
+        }}
       >
         🗑 Clear
       </button>
@@ -661,26 +1460,48 @@ function DrawCanvas({ onDraw, cardKey, accentColor }: { onDraw: (dataUrl: string
 }
 
 function WorkScreen({
-  assignment, parsed, dk, onComplete, onBreak, onBack, questionsAnswered, setQuestionsAnswered,
+  assignment,
+  parsed,
+  dk,
+  onComplete,
+  onBreak,
+  onBack,
+  questionsAnswered,
+  setQuestionsAnswered,
 }: {
-  assignment: any; parsed: any; dk: boolean;
+  assignment: any;
+  parsed: any;
+  dk: boolean;
   onComplete: (answers: Record<number, string>) => void;
   onBreak: () => void;
   onBack: () => void;
-  questionsAnswered: number; setQuestionsAnswered: (n: number) => void;
+  questionsAnswered: number;
+  setQuestionsAnswered: (n: number) => void;
 }) {
-  const allQuestions: Array<{ q: any; sectionTitle: string; passage?: string }> = parsed?.sections
-    ?.flatMap((s: any) => s.questions.map((q: any) => ({ q, sectionTitle: s.title, passage: s.passage }))) ?? [];
+  const allQuestions: Array<{
+    q: any;
+    sectionTitle: string;
+    passage?: string;
+  }> =
+    parsed?.sections?.flatMap((s: any) =>
+      s.questions.map((q: any) => ({
+        q,
+        sectionTitle: s.title,
+        passage: s.passage,
+      })),
+    ) ?? [];
   const total = allQuestions.length;
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showBreakBanner, setShowBreakBanner] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [mascotState, setMascotState] = useState<'idle' | 'cheer'>('idle');
+  const [mascotState, setMascotState] = useState<"idle" | "cheer">("idle");
   const [cardKey, setCardKey] = useState(0);
   const [streak, setStreak] = useState(0);
   const [showHint, setShowHint] = useState(false);
-  const [videoChoice, setVideoChoice] = useState<'pending' | 'watch' | 'skip'>('pending');
+  const [videoChoice, setVideoChoice] = useState<"pending" | "watch" | "skip">(
+    "pending",
+  );
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
   const rm = prefersReducedMotion();
@@ -690,7 +1511,9 @@ function WorkScreen({
   const starfall = getStarfallPalette(parsed?.subject);
   // Stop any in-flight speech when leaving the screen or switching questions
   useEffect(() => () => stopSpeaking(), []);
-  useEffect(() => { stopSpeaking(); }, [currentQ]);
+  useEffect(() => {
+    stopSpeaking();
+  }, [currentQ]);
 
   const handleSelect = (value: string) => {
     const isNew = answers[currentQ] === undefined;
@@ -699,10 +1522,10 @@ function WorkScreen({
       const next = questionsAnswered + 1;
       setQuestionsAnswered(next);
       if (next >= 3) setShowBreakBanner(true);
-      setStreak(s => s + 1);
+      setStreak((s) => s + 1);
       // Briefly cheer the mascot
-      setMascotState('cheer');
-      setTimeout(() => setMascotState('idle'), 800);
+      setMascotState("cheer");
+      setTimeout(() => setMascotState("idle"), 800);
     }
     setShowHint(false); // hide hint on new answer
   };
@@ -710,14 +1533,14 @@ function WorkScreen({
   const handleNext = () => {
     if (currentQ < total - 1) {
       setCurrentQ(currentQ + 1);
-      setCardKey(k => k + 1);
+      setCardKey((k) => k + 1);
       setShowHint(false);
     }
   };
   const handlePrev = () => {
     if (currentQ > 0) {
       setCurrentQ(currentQ - 1);
-      setCardKey(k => k + 1);
+      setCardKey((k) => k + 1);
       setStreak(0);
       setShowHint(false);
     }
@@ -725,7 +1548,7 @@ function WorkScreen({
 
   const handleSubmit = () => {
     spawnConfetti();
-    setMascotState('cheer');
+    setMascotState("cheer");
     setSubmitted(true);
     setTimeout(() => onComplete(answers), 2200);
   };
@@ -747,12 +1570,21 @@ function WorkScreen({
           }}
         >
           <div style={{ fontSize: 64 }}>🎉</div>
-          <div className="text-xs uppercase tracking-[0.18em] font-semibold mt-2 mb-1" style={{ color: starfallSubmit.accent }}>
+          <div
+            className="text-xs uppercase tracking-[0.18em] font-semibold mt-2 mb-1"
+            style={{ color: starfallSubmit.accent }}
+          >
             All done!
           </div>
-          <h2 className="font-display text-5xl leading-[1.05]" style={{ color: "#1e293b" }}>
+          <h2
+            className="font-display text-5xl leading-[1.05]"
+            style={{ color: "#1e293b" }}
+          >
             Nice
-            <em style={{ color: starfallSubmit.accent, fontStyle: "italic" }}> work!</em>
+            <em style={{ color: starfallSubmit.accent, fontStyle: "italic" }}>
+              {" "}
+              work!
+            </em>
           </h2>
           <p className="text-sm mt-4" style={{ color: "#64748b" }}>
             {submittedCount} of {total} answered · heading home…
@@ -762,7 +1594,15 @@ function WorkScreen({
     );
   }
 
-  const todayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
+  const todayName = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ][new Date().getDay()];
   const answeredCount = Object.keys(answers).length;
   const progress = total > 0 ? (answeredCount / total) * 100 : 0;
 
@@ -771,36 +1611,66 @@ function WorkScreen({
   const starfallBg = starfall.bg;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto starfall-doer" style={{ background: starfallBg, touchAction: "pan-y" }}>
+    <div
+      className="fixed inset-0 z-50 overflow-auto starfall-doer"
+      style={{ background: starfallBg, touchAction: "pan-y" }}
+    >
       {/* Break banner */}
       {showBreakBanner && (
-        <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-5 py-3 text-sm font-medium"
-          style={{ background: "linear-gradient(90deg, #0e7490, #0891b2)", color: "white" }}>
+        <div
+          className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-5 py-3 text-sm font-medium"
+          style={{
+            background: "linear-gradient(90deg, #0e7490, #0891b2)",
+            color: "white",
+          }}
+        >
           <span>☕ You've earned a 10-minute break!</span>
           <div className="flex gap-3">
-            <button onClick={onBreak} className="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 transition-colors cursor-pointer font-bold" style={{ minHeight: 40 }}>
+            <button
+              onClick={onBreak}
+              className="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 transition-colors cursor-pointer font-bold"
+              style={{ minHeight: 40 }}
+            >
               Take Break
             </button>
-            <button onClick={() => setShowBreakBanner(false)} className="text-white/60 hover:text-white cursor-pointer px-2" style={{ minHeight: 40 }}>✕</button>
+            <button
+              onClick={() => setShowBreakBanner(false)}
+              className="text-white/60 hover:text-white cursor-pointer px-2"
+              style={{ minHeight: 40 }}
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
 
-      <div className={`mx-auto px-6 py-12 space-y-7 ${showBreakBanner ? "pt-20" : ""}`} style={{ maxWidth: 720 }}>
-
+      <div
+        className={`mx-auto px-6 py-12 space-y-7 ${showBreakBanner ? "pt-20" : ""}`}
+        style={{ maxWidth: 720 }}
+      >
         {/* ── Editorial header: exit + subject eyebrow + progress strip ── */}
         <div className="animate-slide-up" style={{ animationDelay: "0ms" }}>
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => {
-                if (answeredCount > 0 && !confirm("Leave before finishing? Your answers so far will be lost.")) return;
+                if (
+                  answeredCount > 0 &&
+                  !confirm(
+                    "Leave before finishing? Your answers so far will be lost.",
+                  )
+                )
+                  return;
                 onBack();
               }}
               className="btn-ghost text-xs gap-1.5"
-              style={{ padding: "6px 10px" }}>
+              style={{ padding: "6px 10px" }}
+            >
               ← Back
             </button>
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]" style={{ color: "#6B6860" }}>
+            <div
+              className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em]"
+              style={{ color: "#6B6860" }}
+            >
               <span style={{ fontSize: 16 }}>{subjectPal.emoji}</span>
               <span>{parsed?.subject || subjectPal.label}</span>
               <span style={{ color: "#D4CEC2" }}>·</span>
@@ -809,108 +1679,250 @@ function WorkScreen({
           </div>
 
           {/* Masthead */}
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: starfall.accent }}>— Today's assignment —</div>
-          <h1 className="font-display text-3xl sm:text-4xl leading-[1.05]" style={{ color: "#1A1915" }}>
-            {assignment.title}<em style={{ color: starfall.accent, fontStyle: "italic" }}>.</em>
+          <div
+            className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2"
+            style={{ color: starfall.accent }}
+          >
+            — Today's assignment —
+          </div>
+          <h1
+            className="font-display text-3xl sm:text-4xl leading-[1.05]"
+            style={{ color: "#1A1915" }}
+          >
+            {assignment.title}
+            <em style={{ color: starfall.accent, fontStyle: "italic" }}>.</em>
           </h1>
         </div>
-
         {/* ── Video embed with opt-in prompt ── */}
         {(() => {
           const vurl = assignment.video_url || parsed?.video_url;
           if (!vurl || !youtubeEmbedUrl(vurl)) return null;
-          if (videoChoice === 'pending') return (
-            <div className="animate-slide-up" style={{ animationDelay: "40ms", borderRadius: 16, padding: "20px 24px", background: "rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>📺</div>
-              <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>There's a video for this assignment</p>
-              <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>Would you like to watch it before answering?</p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={() => setVideoChoice('watch')} style={{ padding: "10px 22px", borderRadius: 12, background: starfall.accent, color: "white", fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Watch Video</button>
-                <button onClick={() => setVideoChoice('skip')} style={{ padding: "10px 22px", borderRadius: 12, background: "rgba(0,0,0,0.08)", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Skip for now</button>
+          if (videoChoice === "pending")
+            return (
+              <div
+                className="animate-slide-up"
+                style={{
+                  animationDelay: "40ms",
+                  borderRadius: 16,
+                  padding: "20px 24px",
+                  background: "rgba(0,0,0,0.06)",
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📺</div>
+                <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
+                  There's a video for this assignment
+                </p>
+                <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 16 }}>
+                  Would you like to watch it before answering?
+                </p>
+                <div
+                  style={{ display: "flex", gap: 10, justifyContent: "center" }}
+                >
+                  <button
+                    onClick={() => setVideoChoice("watch")}
+                    style={{
+                      padding: "10px 22px",
+                      borderRadius: 12,
+                      background: starfall.accent,
+                      color: "white",
+                      fontWeight: 700,
+                      fontSize: 14,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Watch Video
+                  </button>
+                  <button
+                    onClick={() => setVideoChoice("skip")}
+                    style={{
+                      padding: "10px 22px",
+                      borderRadius: 12,
+                      background: "rgba(0,0,0,0.08)",
+                      fontWeight: 600,
+                      fontSize: 14,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Skip for now
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-          if (videoChoice === 'watch') return (
-            <div className="animate-slide-up" style={{ animationDelay: "40ms" }}>
-              <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
-                <iframe src={youtubeEmbedUrl(vurl)!} style={{ width: "100%", height: "100%", border: "none" }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen title="Assignment video" />
+            );
+          if (videoChoice === "watch")
+            return (
+              <div
+                className="animate-slide-up"
+                style={{ animationDelay: "40ms" }}
+              >
+                <div
+                  style={{
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    aspectRatio: "16/9",
+                    boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                  }}
+                >
+                  <iframe
+                    src={youtubeEmbedUrl(vurl)!}
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="Assignment video"
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    marginTop: 8,
+                  }}
+                >
+                  <button
+                    onClick={() => setVideoChoice("skip")}
+                    style={{
+                      fontSize: 12,
+                      opacity: 0.5,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Hide video
+                  </button>
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-                <button onClick={() => setVideoChoice('skip')} style={{ fontSize: 12, opacity: 0.5, background: "none", border: "none", cursor: "pointer" }}>Hide video</button>
-              </div>
-            </div>
-          );
+            );
           return null;
         })()}
-
         {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#6B6860" }}>
-              Question {currentQ + 1} <span style={{ color: "#D4CEC2" }}>of</span> {total}
+            <div
+              className="text-[11px] uppercase tracking-wider font-semibold"
+              style={{ color: "#6B6860" }}
+            >
+              Question {currentQ + 1}{" "}
+              <span style={{ color: "#D4CEC2" }}>of</span> {total}
             </div>
-            <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: starfall.accent }}>
+            <div
+              className="text-[11px] uppercase tracking-wider font-semibold"
+              style={{ color: starfall.accent }}
+            >
               {answeredCount} answered · {Math.round(progress)}%
             </div>
           </div>
-          <div style={{ height: 3, background: "rgba(26,25,21,0.08)", overflow: "hidden", borderRadius: 2 }}>
-            <div style={{
-              width: `${progress}%`, height: "100%",
-              background: starfall.accent,
-              transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
-            }}/>
+          <div
+            style={{
+              height: 3,
+              background: "rgba(26,25,21,0.08)",
+              overflow: "hidden",
+              borderRadius: 2,
+            }}
+          >
+            <div
+              style={{
+                width: `${progress}%`,
+                height: "100%",
+                background: starfall.accent,
+                transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+              }}
+            />
           </div>
         </div>
-
         {/* ── Section label ── */}
         {q && (
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] animate-slide-up" style={{ animationDelay: "90ms", color: starfall.accent }}>
+          <div
+            className="text-[11px] font-semibold uppercase tracking-[0.12em] animate-slide-up"
+            style={{ animationDelay: "90ms", color: starfall.accent }}
+          >
             — {q.sectionTitle} —
           </div>
         )}
-
         {/* ── Passage / reading text ── */}
         {q?.passage && (
-          <div className="rounded-2xl p-6 animate-fade-in" style={{
-            background: "linear-gradient(135deg, #1e1b2e 0%, #16132a 100%)",
-            border: `1px solid ${starfall.accent}33`,
-            borderLeft: `3px solid ${starfall.accent}`,
-          }}>
-            <div className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: starfall.accent }}>Read this first</div>
-            <p className="leading-relaxed" style={{ color: "#e2e0f0", fontSize: "clamp(1rem, 1.6vw, 1.15rem)", whiteSpace: "pre-wrap" }}>
+          <div
+            className="rounded-2xl p-6 animate-fade-in"
+            style={{
+              background: "linear-gradient(135deg, #1e1b2e 0%, #16132a 100%)",
+              border: `1px solid ${starfall.accent}33`,
+              borderLeft: `3px solid ${starfall.accent}`,
+            }}
+          >
+            <div
+              className="text-[10px] font-bold uppercase tracking-widest mb-3"
+              style={{ color: starfall.accent }}
+            >
+              Read this first
+            </div>
+            <p
+              className="leading-relaxed"
+              style={{
+                color: "#e2e0f0",
+                fontSize: "clamp(1rem, 1.6vw, 1.15rem)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
               {q.passage}
             </p>
           </div>
         )}
-
         {/* ── Question card — editorial: big serif, generous whitespace ── */}
         {q && (
-          <div key={`card-${cardKey}`}
+          <div
+            key={`card-${cardKey}`}
             className={rm ? "" : "animate-fade-in"}
-            style={{ animationDelay: "80ms" }}>
-            <div className="p-8 sm:p-10 space-y-6" style={{
-              background: "#ffffff",
-              border: "1px solid rgba(0,0,0,0.05)",
-              borderLeft: `3px solid ${starfall.accent}`,
-              borderRadius: 20,
-              boxShadow: `0 4px 16px rgba(24,23,30,0.05)`,
-            }}>
+            style={{ animationDelay: "80ms" }}
+          >
+            <div
+              className="p-8 sm:p-10 space-y-6"
+              style={{
+                background: "#ffffff",
+                border: "1px solid rgba(0,0,0,0.05)",
+                borderLeft: `3px solid ${starfall.accent}`,
+                borderRadius: 20,
+                boxShadow: `0 4px 16px rgba(24,23,30,0.05)`,
+              }}
+            >
               {/* Reading passage / context — shown above the question */}
               {q.q.context && (
-                <div className="rounded-xl p-4" style={{
-                  background: "#f8f6ff",
-                  border: "1px solid #e0d8ff",
-                  borderLeft: `3px solid ${starfall.accent}`,
-                }}>
-                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: starfall.accent }}>Read this story</div>
-                  <p style={{ color: "#2d2a3e", fontSize: "clamp(0.95rem, 1.5vw, 1.05rem)", lineHeight: 1.7 }}>{q.q.context}</p>
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    background: "#f8f6ff",
+                    border: "1px solid #e0d8ff",
+                    borderLeft: `3px solid ${starfall.accent}`,
+                  }}
+                >
+                  <div
+                    className="text-[10px] font-bold uppercase tracking-widest mb-2"
+                    style={{ color: starfall.accent }}
+                  >
+                    Read this story
+                  </div>
+                  <p
+                    style={{
+                      color: "#2d2a3e",
+                      fontSize: "clamp(0.95rem, 1.5vw, 1.05rem)",
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {q.q.context}
+                  </p>
                 </div>
               )}
               {/* Question text — Fraunces serif, typewriter reveal, tap-to-listen */}
               <div className="flex items-start gap-3">
-                <p className="font-display leading-[1.3] flex-1" style={{ color: "#1A1915", fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)" }}>
+                <p
+                  className="font-display leading-[1.3] flex-1"
+                  style={{
+                    color: "#1A1915",
+                    fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)",
+                  }}
+                >
                   <TypewriterText text={q.q.text} speed={28} />
                 </p>
                 <button
@@ -921,7 +1933,8 @@ function WorkScreen({
                   }}
                   className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
                   style={{
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     background: `${starfall.accent}14`,
                     color: starfall.accent,
                     border: `1px solid ${starfall.accent}33`,
@@ -940,14 +1953,28 @@ function WorkScreen({
                   {showHint ? (
                     <div
                       className="rounded-2xl p-3 border animate-fade-in"
-                      style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
-                      <span className="text-xs font-bold" style={{ color: "#92400e" }}>💡 Hint: </span>
-                      <span className="text-sm" style={{ color: "#5A4B1F" }}>{q.q.hint}</span>
+                      style={{ background: "#fffbeb", borderColor: "#fde68a" }}
+                    >
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: "#92400e" }}
+                      >
+                        💡 Hint:{" "}
+                      </span>
+                      <span className="text-sm" style={{ color: "#5A4B1F" }}>
+                        {q.q.hint}
+                      </span>
                     </div>
                   ) : (
-                    <button onClick={() => setShowHint(true)}
+                    <button
+                      onClick={() => setShowHint(true)}
                       className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-all"
-                      style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
+                      style={{
+                        background: "#fffbeb",
+                        color: "#92400e",
+                        border: "1px solid #fde68a",
+                      }}
+                    >
                       💡 Show Hint
                     </button>
                   )}
@@ -955,7 +1982,9 @@ function WorkScreen({
               )}
 
               {/* ── Multiple choice ── */}
-              {q.q.type === "multiple_choice" && Array.isArray(q.q.options) && q.q.options.length > 0 ? (
+              {q.q.type === "multiple_choice" &&
+              Array.isArray(q.q.options) &&
+              q.q.options.length > 0 ? (
                 <div className="space-y-3">
                   {q.q.options.map((opt: string, oi: number) => {
                     const isSelected = currentAnswer === opt;
@@ -969,7 +1998,9 @@ function WorkScreen({
                           minHeight: 68,
                           padding: "14px 20px",
                           fontSize: 17,
-                          background: isSelected ? `${starfall.accent}0d` : "#ffffff",
+                          background: isSelected
+                            ? `${starfall.accent}0d`
+                            : "#ffffff",
                           border: `1px solid ${isSelected ? starfall.accent : "rgba(0,0,0,0.08)"}`,
                           color: "#1A1915",
                           touchAction: "manipulation",
@@ -982,14 +2013,19 @@ function WorkScreen({
                           style={{
                             width: 36,
                             height: 36,
-                            background: isSelected ? starfall.accent : `${starfall.accent}12`,
+                            background: isSelected
+                              ? starfall.accent
+                              : `${starfall.accent}12`,
                             color: isSelected ? "white" : starfall.accent,
                             fontSize: 15,
                           }}
                         >
                           {isSelected ? "✓" : letter}
                         </span>
-                        <span className="flex-1" style={{ fontWeight: 600, color: "#1A1915" }}>
+                        <span
+                          className="flex-1"
+                          style={{ fontWeight: 600, color: "#1A1915" }}
+                        >
                           {opt.replace(/^[A-D]\.\s*/, "")}
                         </span>
                       </button>
@@ -997,89 +2033,131 @@ function WorkScreen({
                   })}
                 </div>
               ) : q.q.type === "draw" ? (
-                <DrawCanvas onDraw={handleSelect} cardKey={cardKey} accentColor={starfall.accent} />
-              ) : (() => {
-                /* ── Fallback input for anything that isn't MC: short_answer,
+                <DrawCanvas
+                  onDraw={handleSelect}
+                  cardKey={cardKey}
+                  accentColor={starfall.accent}
+                />
+              ) : (
+                (() => {
+                  /* ── Fallback input for anything that isn't MC: short_answer,
                    fill_blank, computation, undefined, etc. Math subject →
                    numeric keypad. Enter advances/submits. ── */
-                const isMath = String(parsed?.subject || "").toLowerCase() === "math";
-                const isShort = q.q.type === "short_answer" && (q.q.lines || 0) > 1;
-                const onEnter = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                  if (e.key === "Enter" && !e.shiftKey && !isShort) {
-                    e.preventDefault();
-                    if (String(currentAnswer).trim()) {
-                      if (currentQ < total - 1) handleNext(); else handleSubmit();
+                  const isMath =
+                    String(parsed?.subject || "").toLowerCase() === "math";
+                  const isShort =
+                    q.q.type === "short_answer" && (q.q.lines || 0) > 1;
+                  const onEnter = (
+                    e: React.KeyboardEvent<
+                      HTMLInputElement | HTMLTextAreaElement
+                    >,
+                  ) => {
+                    if (e.key === "Enter" && !e.shiftKey && !isShort) {
+                      e.preventDefault();
+                      if (String(currentAnswer).trim()) {
+                        if (currentQ < total - 1) handleNext();
+                        else handleSubmit();
+                      }
                     }
-                  }
-                };
-                const sharedStyle: React.CSSProperties = {
-                  width: "100%",
-                  minHeight: isShort ? 140 : 64,
-                  padding: "16px 20px",
-                  fontSize: isShort ? 17 : 22,
-                  fontFamily: isShort ? undefined : "'Fraunces', ui-serif, Georgia, serif",
-                  fontWeight: 600,
-                  color: "#1A1915",
-                  background: "#FAF9F7",
-                  border: `2px solid ${starfall.accent}33`,
-                  borderRadius: 16,
-                  outline: "none",
-                  touchAction: "manipulation",
-                };
-                const placeholder = isShort ? "Write your answer here…" : (isMath ? "Type your answer…" : "Type your answer…");
-                return (
-                  <div>
-                    {isShort ? (
-                      <textarea
-                        value={currentAnswer}
-                        onChange={(e) => handleSelect(e.target.value)}
-                        placeholder={placeholder}
-                        rows={q.q.lines || 4}
-                        style={{ ...sharedStyle, resize: "vertical" }}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = starfall.accent)}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = `${starfall.accent}33`)}
-                      />
-                    ) : (
-                      <input
-                        type={isMath ? "text" : "text"}
-                        inputMode={isMath ? "numeric" : "text"}
-                        autoComplete="off"
-                        autoCorrect={isMath ? "off" : "on"}
-                        value={currentAnswer}
-                        onChange={(e) => handleSelect(e.target.value)}
-                        onKeyDown={onEnter}
-                        placeholder={placeholder}
-                        style={sharedStyle}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = starfall.accent)}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = `${starfall.accent}33`)}
-                      />
-                    )}
-                    <div className="text-[11px] mt-2" style={{ color: "#8A867E" }}>
-                      {isShort ? "Shift + Enter for a new line" : "Press Enter to continue"}
+                  };
+                  const sharedStyle: React.CSSProperties = {
+                    width: "100%",
+                    minHeight: isShort ? 140 : 64,
+                    padding: "16px 20px",
+                    fontSize: isShort ? 17 : 22,
+                    fontFamily: isShort
+                      ? undefined
+                      : "'Fraunces', ui-serif, Georgia, serif",
+                    fontWeight: 600,
+                    color: "#1A1915",
+                    background: "#FAF9F7",
+                    border: `2px solid ${starfall.accent}33`,
+                    borderRadius: 16,
+                    outline: "none",
+                    touchAction: "manipulation",
+                  };
+                  const placeholder = isShort
+                    ? "Write your answer here…"
+                    : isMath
+                      ? "Type your answer…"
+                      : "Type your answer…";
+                  return (
+                    <div>
+                      {isShort ? (
+                        <textarea
+                          value={currentAnswer}
+                          onChange={(e) => handleSelect(e.target.value)}
+                          placeholder={placeholder}
+                          rows={q.q.lines || 4}
+                          style={{ ...sharedStyle, resize: "vertical" }}
+                          onFocus={(e) =>
+                            (e.currentTarget.style.borderColor =
+                              starfall.accent)
+                          }
+                          onBlur={(e) =>
+                            (e.currentTarget.style.borderColor = `${starfall.accent}33`)
+                          }
+                        />
+                      ) : (
+                        <input
+                          type={isMath ? "text" : "text"}
+                          inputMode={isMath ? "numeric" : "text"}
+                          autoComplete="off"
+                          autoCorrect={isMath ? "off" : "on"}
+                          value={currentAnswer}
+                          onChange={(e) => handleSelect(e.target.value)}
+                          onKeyDown={onEnter}
+                          placeholder={placeholder}
+                          style={sharedStyle}
+                          onFocus={(e) =>
+                            (e.currentTarget.style.borderColor =
+                              starfall.accent)
+                          }
+                          onBlur={(e) =>
+                            (e.currentTarget.style.borderColor = `${starfall.accent}33`)
+                          }
+                        />
+                      )}
+                      <div
+                        className="text-[11px] mt-2"
+                        style={{ color: "#8A867E" }}
+                      >
+                        {isShort
+                          ? "Shift + Enter for a new line"
+                          : "Press Enter to continue"}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()
+              )}
             </div>
           </div>
         )}
-
         {/* ── Navigation buttons ── */}
         {(() => {
-          const answered = q.q.type === "draw" || String(currentAnswer).trim().length > 0;
+          const answered =
+            q.q.type === "draw" || String(currentAnswer).trim().length > 0;
           const isLast = currentQ >= total - 1;
           return (
-            <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "180ms" }}>
+            <div
+              className="flex items-center gap-3 animate-slide-up"
+              style={{ animationDelay: "180ms" }}
+            >
               <button
                 onClick={handlePrev}
                 disabled={currentQ === 0}
                 className="rounded-2xl font-semibold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{
-                  minHeight: 56, minWidth: 100, padding: "0 20px", fontSize: 15,
-                  background: "#ffffff", color: "#5A564F",
+                  minHeight: 56,
+                  minWidth: 100,
+                  padding: "0 20px",
+                  fontSize: 15,
+                  background: "#ffffff",
+                  color: "#5A564F",
                   border: "1px solid rgba(0,0,0,0.1)",
                   touchAction: "manipulation",
-                }}>
+                }}
+              >
                 ← Back
               </button>
               <button
@@ -1087,24 +2165,28 @@ function WorkScreen({
                 disabled={!answered}
                 className="flex-1 rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  minHeight: 56, fontSize: 16, color: "white",
+                  minHeight: 56,
+                  fontSize: 16,
+                  color: "white",
                   background: answered
-                    ? (isLast ? "linear-gradient(135deg, #10b981, #059669)" : starfall.accent)
+                    ? isLast
+                      ? "linear-gradient(135deg, #10b981, #059669)"
+                      : starfall.accent
                     : "#D4CEC2",
                   border: "none",
                   touchAction: "manipulation",
                 }}
-                title={answered ? undefined : "Answer the question to continue"}>
+                title={answered ? undefined : "Answer the question to continue"}
+              >
                 {isLast ? "Submit Work ✓" : "Next Question →"}
               </button>
             </div>
           );
         })()}
-
         {/* ── Progress dots ── */}
         <ProgressDots total={total} current={currentQ} answers={answers} />
-
-        <div style={{ height: 80 }} /> {/* spacer so mascot doesn't overlap last button */}
+        <div style={{ height: 80 }} />{" "}
+        {/* spacer so mascot doesn't overlap last button */}
       </div>
 
       {/* Streak counter */}
@@ -1114,32 +2196,65 @@ function WorkScreen({
 }
 
 /* ── Simple Assignment Card (for non-AI / unstructured assignments) ── */
-function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any; dk: boolean; onComplete: () => void }) {
+function SimpleAssignmentCard({
+  assignment,
+  dk,
+  onComplete,
+}: {
+  assignment: any;
+  dk: boolean;
+  onComplete: () => void;
+}) {
   const [confirming, setConfirming] = useState(false);
-  const todayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
+  const todayName = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ][new Date().getDay()];
   const subjectPal = getSubjectPalette(assignment?.description);
 
   const lightBg = `linear-gradient(160deg, ${subjectPal.bg} 0%, #faf9ff 60%, #f0f1ff 100%)`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto flex flex-col items-center justify-center p-6"
-      style={{ background: dk ? "#07071a" : lightBg }}>
+    <div
+      className="fixed inset-0 z-50 overflow-auto flex flex-col items-center justify-center p-6"
+      style={{ background: dk ? "#07071a" : lightBg }}
+    >
       <div className={`w-full max-w-lg space-y-6 animate-spring-in`}>
-        <div className={dk
-          ? "rounded-3xl p-8 space-y-5 shadow-2xl border border-white/[0.07] bg-white/[0.04]"
-          : "clay-card p-8 space-y-5"
-        }>
+        <div
+          className={
+            dk
+              ? "rounded-3xl p-8 space-y-5 shadow-2xl border border-white/[0.07] bg-white/[0.04]"
+              : "clay-card p-8 space-y-5"
+          }
+        >
           {/* Subject icon + title */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-md flex-shrink-0"
-              style={{ background: `linear-gradient(135deg, ${subjectPal.border}, ${subjectPal.bg})` }}>
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-md flex-shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${subjectPal.border}, ${subjectPal.bg})`,
+              }}
+            >
               {subjectPal.emoji}
             </div>
             <div>
-              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: dk ? "rgba(255,255,255,0.4)" : subjectPal.accent }}>
+              <div
+                className="text-xs font-bold uppercase tracking-widest mb-1"
+                style={{
+                  color: dk ? "rgba(255,255,255,0.4)" : subjectPal.accent,
+                }}
+              >
                 📅 {todayName}'s Assignment
               </div>
-              <h1 className="font-student text-2xl font-extrabold" style={{ color: dk ? "white" : "#1e293b" }}>
+              <h1
+                className="font-student text-2xl font-extrabold"
+                style={{ color: dk ? "white" : "#1e293b" }}
+              >
                 {assignment.title}
               </h1>
             </div>
@@ -1147,62 +2262,97 @@ function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any;
 
           {/* Instructions box */}
           {assignment.description && (
-            <div className="rounded-2xl p-5 border-2"
-              style={{ background: dk ? "rgba(245,158,11,0.06)" : "#fffbeb", borderColor: dk ? "rgba(245,158,11,0.2)" : "#fde68a" }}>
-              <div className="font-bold text-sm mb-2" style={{ color: dk ? "#fbbf24" : "#92400e" }}>
+            <div
+              className="rounded-2xl p-5 border-2"
+              style={{
+                background: dk ? "rgba(245,158,11,0.06)" : "#fffbeb",
+                borderColor: dk ? "rgba(245,158,11,0.2)" : "#fde68a",
+              }}
+            >
+              <div
+                className="font-bold text-sm mb-2"
+                style={{ color: dk ? "#fbbf24" : "#92400e" }}
+              >
                 📋 Instructions from your teacher
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: dk ? "rgba(251,191,36,0.7)" : "#78350f" }}>
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: dk ? "rgba(251,191,36,0.7)" : "#78350f" }}
+              >
                 {assignment.description}
               </p>
             </div>
           )}
 
           {assignment.due_date && (
-            <p className="text-xs" style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}>
+            <p
+              className="text-xs"
+              style={{ color: dk ? "rgba(255,255,255,0.3)" : "#94a3b8" }}
+            >
               Due: {new Date(assignment.due_date).toLocaleDateString()}
             </p>
           )}
 
           {!confirming ? (
-            <button onClick={() => setConfirming(true)}
-              className={dk
-                ? "w-full py-4 rounded-2xl font-bold text-white text-lg cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
-                : "clay-btn w-full text-lg"
+            <button
+              onClick={() => setConfirming(true)}
+              className={
+                dk
+                  ? "w-full py-4 rounded-2xl font-bold text-white text-lg cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
+                  : "clay-btn w-full text-lg"
               }
               style={{
                 minHeight: 64,
                 background: "linear-gradient(135deg, #10b981, #059669)",
                 color: "white",
                 borderColor: dk ? "transparent" : "rgba(16,185,129,0.3)",
-              }}>
+              }}
+            >
               I'm Done ✓
             </button>
           ) : (
             <div className="space-y-3 animate-spring-in">
-              <p className="text-center text-sm font-semibold" style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}>
+              <p
+                className="text-center text-sm font-semibold"
+                style={{ color: dk ? "rgba(255,255,255,0.6)" : "#64748b" }}
+              >
                 Are you sure you've finished?
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setConfirming(false)}
-                  className={dk
-                    ? "flex-1 py-3 rounded-2xl font-semibold text-sm border border-white/10 text-white/50 hover:bg-white/[0.05] cursor-pointer"
-                    : "clay-btn flex-1"
+                <button
+                  onClick={() => setConfirming(false)}
+                  className={
+                    dk
+                      ? "flex-1 py-3 rounded-2xl font-semibold text-sm border border-white/10 text-white/50 hover:bg-white/[0.05] cursor-pointer"
+                      : "clay-btn flex-1"
                   }
-                  style={!dk ? { background: "#f1f5f9", color: "#475569", borderColor: "#e2e8f0", fontSize: 15 } : { minHeight: 52 }}>
+                  style={
+                    !dk
+                      ? {
+                          background: "#f1f5f9",
+                          color: "#475569",
+                          borderColor: "#e2e8f0",
+                          fontSize: 15,
+                        }
+                      : { minHeight: 52 }
+                  }
+                >
                   Not yet
                 </button>
-                <button onClick={onComplete}
-                  className={dk
-                    ? "flex-1 py-3 rounded-2xl font-bold text-sm text-white cursor-pointer"
-                    : "clay-btn flex-1"
+                <button
+                  onClick={onComplete}
+                  className={
+                    dk
+                      ? "flex-1 py-3 rounded-2xl font-bold text-sm text-white cursor-pointer"
+                      : "clay-btn flex-1"
                   }
                   style={{
                     background: "linear-gradient(135deg, #10b981, #059669)",
                     color: "white",
                     borderColor: "rgba(16,185,129,0.3)",
                     ...(dk ? { minHeight: 52 } : {}),
-                  }}>
+                  }}
+                >
                   Yes, submit! 🌟
                 </button>
               </div>
@@ -1210,7 +2360,6 @@ function SimpleAssignmentCard({ assignment, dk, onComplete }: { assignment: any;
           )}
         </div>
       </div>
-
     </div>
   );
 }
@@ -1231,12 +2380,13 @@ export default function StudentDashboard() {
   const dk = theme === "dark";
   const navigate = useNavigate();
 
-  const [phase, setPhase] = useState<Phase>('welcome');
+  const [phase, setPhase] = useState<Phase>("welcome");
   // Reactive unlock state — students get dashboard access when on a 10-min
   // break OR after teacher-granted free time OR after submitting all work.
   // Re-polled every second + on `breakstate-change` + on `storage` so the
   // UI flips without a refresh when any of those flags change.
-  const [accessUnlocked, setAccessUnlocked] = useState<boolean>(isAccessAllowed);
+  const [accessUnlocked, setAccessUnlocked] =
+    useState<boolean>(isAccessAllowed);
   // When access flips from unlocked → locked (e.g. break timer just ended,
   // teacher revoked freetime), re-fetch pending assignments so the WorkScreen
   // has fresh data. Without this the dashboard stays on phase='done' and
@@ -1244,13 +2394,15 @@ export default function StudentDashboard() {
   const prevAccessRef = React.useRef<boolean>(accessUnlocked);
   useEffect(() => {
     if (prevAccessRef.current && !accessUnlocked) {
-      setPhase('loading');
+      setPhase("loading");
     }
     prevAccessRef.current = accessUnlocked;
   }, [accessUnlocked]);
   useEffect(() => {
     const refresh = () => setAccessUnlocked(isAccessAllowed());
-    const onStorage = (e: StorageEvent) => { if (e.key === "workDoneDate" || e.key === null) refresh(); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "workDoneDate" || e.key === null) refresh();
+    };
     window.addEventListener("breakstate-change", refresh);
     window.addEventListener("storage", onStorage);
     window.addEventListener("blockforge:workdone-change", refresh);
@@ -1273,23 +2425,38 @@ export default function StudentDashboard() {
   const joinBtnRef = useRef<HTMLButtonElement>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
-  const [playingLibVideo, setPlayingLibVideo] = useState<{ videoId: string; title: string } | null>(null);
+  const [playingLibVideo, setPlayingLibVideo] = useState<{
+    videoId: string;
+    title: string;
+  } | null>(null);
   // Teacher-granted websites (Poki-style per-student URL library)
   const WS_CACHE = "sw_cache_v1";
   const [myWebsites, setMyWebsites] = useState<any[]>(() => {
-    try { const c = localStorage.getItem(WS_CACHE); return c ? JSON.parse(c) : []; } catch { return []; }
+    try {
+      const c = localStorage.getItem(WS_CACHE);
+      return c ? JSON.parse(c) : [];
+    } catch {
+      return [];
+    }
   });
-  const [websitesLoading, setWebsitesLoading] = useState(myWebsites.length === 0);
+  const [websitesLoading, setWebsitesLoading] = useState(
+    myWebsites.length === 0,
+  );
   const [showWebsiteRequest, setShowWebsiteRequest] = useState(false);
   const [websiteRequestTitle, setWebsiteRequestTitle] = useState("");
   const [websiteRequestSent, setWebsiteRequestSent] = useState(false);
   useEffect(() => {
-    api.getMyWebsites().then(data => {
-      const list = data || [];
-      setMyWebsites(list);
-      setWebsitesLoading(false);
-      try { localStorage.setItem(WS_CACHE, JSON.stringify(list)); } catch {}
-    }).catch(() => setWebsitesLoading(false));
+    api
+      .getMyWebsites()
+      .then((data) => {
+        const list = data || [];
+        setMyWebsites(list);
+        setWebsitesLoading(false);
+        try {
+          localStorage.setItem(WS_CACHE, JSON.stringify(list));
+        } catch {}
+      })
+      .catch(() => setWebsitesLoading(false));
   }, []);
   const classConfig = useClassConfig();
   const blockInfo = useBlockInfo(classes[0]?.id ?? null);
@@ -1299,10 +2466,14 @@ export default function StudentDashboard() {
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
   useEffect(() => {
     const cid = classes[0]?.id;
-    if (!cid) { setTodaySchedule([]); return; }
+    if (!cid) {
+      setTodaySchedule([]);
+      return;
+    }
     let cancelled = false;
     const load = () => {
-      api.getClassSchedule(cid)
+      api
+        .getClassSchedule(cid)
         .then((rows: any[]) => {
           if (cancelled) return;
           const dowIdx = new Date().getDay(); // 0=Sun..6=Sat
@@ -1310,17 +2481,28 @@ export default function StudentDashboard() {
           const today = dayNames[dowIdx];
           const filtered = (Array.isArray(rows) ? rows : [])
             .filter((b: any) => {
-              const ad = String(b.active_days || "").split(",").map((s: string) => s.trim());
+              const ad = String(b.active_days || "")
+                .split(",")
+                .map((s: string) => s.trim());
               return !ad.length || !ad[0] || ad.includes(today);
             })
-            .sort((a: any, b: any) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+            .sort((a: any, b: any) =>
+              String(a.start_time || "").localeCompare(
+                String(b.start_time || ""),
+              ),
+            );
           setTodaySchedule(filtered);
         })
-        .catch(() => { if (!cancelled) setTodaySchedule([]); });
+        .catch(() => {
+          if (!cancelled) setTodaySchedule([]);
+        });
     };
     load();
     const iv = setInterval(load, 60_000);
-    return () => { cancelled = true; clearInterval(iv); };
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, [classes]);
 
   // Reload YouTube library from ALL classes (merged) so we never miss videos
@@ -1328,61 +2510,66 @@ export default function StudentDashboard() {
     if (classes.length === 0) return;
     const loadAll = async () => {
       const results = await Promise.all(
-        classes.map(c => api.getYouTubeLibrary(c.id).catch(() => [] as any[]))
+        classes.map((c) =>
+          api.getYouTubeLibrary(c.id).catch(() => [] as any[]),
+        ),
       );
       const seen = new Set<string>();
       const merged: any[] = [];
       for (const arr of results) {
         for (const v of arr) {
-          if (!seen.has(v.id)) { seen.add(v.id); merged.push(v); }
+          if (!seen.has(v.id)) {
+            seen.add(v.id);
+            merged.push(v);
+          }
         }
       }
       setYoutubeLibrary(merged);
     };
-    // ...existing code...
+    loadAll();
+    const iv = setInterval(loadAll, 60_000);
+    return () => clearInterval(iv);
+  }, [classes]);
 
-    // Place Back button after dk is defined
-    const backButton = (
-      <button
-        onClick={handleBack}
-        style={{
-          position: "fixed",
-          top: 18,
-          left: 18,
-          zIndex: 100,
-          background: dk ? "rgba(139,92,246,0.18)" : "#ede9fe",
-          color: dk ? "#c4b5fd" : "#6d28d9",
-          border: "none",
-          borderRadius: 16,
-          padding: "10px 18px 10px 14px",
-          fontWeight: 700,
-          fontSize: 16,
-          boxShadow: dk ? "0 2px 8px rgba(139,92,246,0.12)" : "0 2px 8px #ede9fe",
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          cursor: "pointer",
-          transition: "background 0.18s, color 0.18s",
-        }}
-        className="back-btn"
-        aria-label="Back"
-      >
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ marginRight: 4 }}><path d="M13.5 17L8.5 12L13.5 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        Back
-      </button>
-    );
+  // Work state
+  const [pendingAssignment, setPendingAssignment] = useState<any>(null);
+  const [parsedAssignment, setParsedAssignment] = useState<any>(null);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
 
-    return (
-      <>
-        {backButton}
-        {/* ...existing dashboard code... */}
-      </>
-    );
+  // Pending quizzes
+  const [pendingQuizzes, setPendingQuizzes] = useState<any[]>([]);
+  const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
+  const [quizResult, setQuizResult] = useState<{ score: number } | null>(null);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+
+  // Stats
+  const [statClasses, setStatClasses] = useState(0);
+  const [statSubmitted, setStatSubmitted] = useState(0);
+  const [statGraded, setStatGraded] = useState(0);
+  const c0 = useCountUp(statClasses, 900, 200);
+  const c1 = useCountUp(statSubmitted, 900, 290);
+  const c2 = useCountUp(statGraded, 900, 380);
+
+  // Behavior stars
+  const [myStars, setMyStars] = useState({ stars: 0, rewards: 0 });
+  useEffect(() => {
+    if (user?.role !== "student") return;
     let cancelled = false;
-    const load = () => api.getMyStars().then(d => { if (!cancelled) setMyStars({ stars: d.stars ?? 0, rewards: d.rewards ?? 0 }); }).catch(() => {});
+    const load = () =>
+      api
+        .getMyStars()
+        .then((d) => {
+          if (!cancelled)
+            setMyStars({ stars: d.stars ?? 0, rewards: d.rewards ?? 0 });
+        })
+        .catch(() => {});
     load();
     const iv = setInterval(load, 20_000);
-    return () => { cancelled = true; clearInterval(iv); };
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, [user?.role]);
 
   // Classroom-store points (ClassDojo-style). Separate from behavior stars —
@@ -1391,32 +2578,41 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (user?.role !== "student") return;
     let cancelled = false;
-    const load = () => api.getMyBalance()
-      .then(d => { if (!cancelled) setDojoPoints(d?.dojo_points ?? 0); })
-      .catch(() => {});
+    const load = () =>
+      api
+        .getMyBalance()
+        .then((d) => {
+          if (!cancelled) setDojoPoints(d?.dojo_points ?? 0);
+        })
+        .catch(() => {});
     load();
     const iv = setInterval(load, 30_000);
-    return () => { cancelled = true; clearInterval(iv); };
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, [user?.role]);
 
   // Avatar emoji (persisted to server)
-  const [avatarEmoji, setAvatarEmoji] = useState<string>((user as any)?.avatarEmoji || "");
+  const [avatarEmoji, setAvatarEmoji] = useState<string>(
+    (user as any)?.avatarEmoji || "",
+  );
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   // Welcome → loading transition
   useEffect(() => {
-    const t = setTimeout(() => setPhase('loading'), 1800);
+    const t = setTimeout(() => setPhase("loading"), 1800);
     return () => clearTimeout(t);
   }, []);
 
   // Load data (with 7s global timeout — if anything stalls, fail-open so the
   // student sees the dashboard rather than an infinite spinner)
   useEffect(() => {
-    if (phase !== 'loading') return;
+    if (phase !== "loading") return;
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      setPhase('done');
+      setPhase("done");
     }, 7000);
     const load = async () => {
       try {
@@ -1435,7 +2631,10 @@ export default function StudentDashboard() {
 
         // Load YouTube library for first enrolled class
         if (clsList.length > 0) {
-          api.getYouTubeLibrary(clsList[0].id).then(setYoutubeLibrary).catch(() => {});
+          api
+            .getYouTubeLibrary(clsList[0].id)
+            .then(setYoutubeLibrary)
+            .catch(() => {});
         }
 
         let found: any = null;
@@ -1459,7 +2658,9 @@ export default function StudentDashboard() {
           try {
             const qz = await api.getPendingQuizzes(cls.id);
             if (Array.isArray(qz) && qz.length) {
-              qz.forEach((q: any) => allQuizzes.push({ ...q, _className: cls.name }));
+              qz.forEach((q: any) =>
+                allQuizzes.push({ ...q, _className: cls.name }),
+              );
             }
           } catch {}
         }
@@ -1469,11 +2670,11 @@ export default function StudentDashboard() {
           setPendingAssignment(found);
           setParsedAssignment(foundParsed);
         }
-        setPhase('done');
+        setPhase("done");
         clearTimeout(timer);
       } catch {
         clearTimeout(timer);
-        setPhase('done');
+        setPhase("done");
       }
     };
     load();
@@ -1487,7 +2688,10 @@ export default function StudentDashboard() {
       for (const cls of classes) {
         try {
           const v = await api.getClassVideo(cls.id);
-          if (v?.video_id) { setClassVideo(v); return; }
+          if (v?.video_id) {
+            setClassVideo(v);
+            return;
+          }
         } catch {}
       }
       setClassVideo(null);
@@ -1504,7 +2708,10 @@ export default function StudentDashboard() {
       for (const cls of classes) {
         try {
           const ctrl = await api.getMyControls(cls.id);
-          if (ctrl?.screen_locked) { setLockedScreen(true); return; }
+          if (ctrl?.screen_locked) {
+            setLockedScreen(true);
+            return;
+          }
         } catch {}
       }
       setLockedScreen(false);
@@ -1515,11 +2722,15 @@ export default function StudentDashboard() {
   }, [classes]);
 
   const phaseActivity =
-    phase === 'welcome' ? "Just logged in 👋" :
-    phase === 'loading' ? "Loading dashboard 🔄" :
-    phase === 'working' ? `Working on assignment 📝${pendingAssignment ? ` — ${pendingAssignment.title}` : ""}` :
-    phase === 'break'   ? "On break ☕" :
-                          "Free time! 🎉";
+    phase === "welcome"
+      ? "Just logged in 👋"
+      : phase === "loading"
+        ? "Loading dashboard 🔄"
+        : phase === "working"
+          ? `Working on assignment 📝${pendingAssignment ? ` — ${pendingAssignment.title}` : ""}`
+          : phase === "break"
+            ? "On break ☕"
+            : "Free time! 🎉";
   usePresencePing(phaseActivity);
 
   useSocket("class:lock", (data) => setLockedScreen(data.locked));
@@ -1536,75 +2747,84 @@ export default function StudentDashboard() {
       const updated = await api.getClasses();
       setClasses(updated);
       setStatClasses(updated.length);
-      setJoinCode(""); setJoinSuccess(true);
+      setJoinCode("");
+      setJoinSuccess(true);
       if (joinBtnRef.current) {
-        const glyphs = ["🎉","✨","🌟"];
+        const glyphs = ["🎉", "✨", "🌟"];
         const rect = joinBtnRef.current.getBoundingClientRect();
         for (let i = 0; i < 6; i++) {
           const el = document.createElement("span");
           el.textContent = glyphs[i % glyphs.length];
-          el.style.cssText = `position:fixed;left:${rect.left + rect.width/2}px;top:${rect.top}px;font-size:1rem;pointer-events:none;z-index:9999;transition:transform .7s ease,opacity .7s ease;opacity:1`;
+          el.style.cssText = `position:fixed;left:${rect.left + rect.width / 2}px;top:${rect.top}px;font-size:1rem;pointer-events:none;z-index:9999;transition:transform .7s ease,opacity .7s ease;opacity:1`;
           document.body.appendChild(el);
-          requestAnimationFrame(() => { el.style.transform = `translate(${(Math.random()-0.5)*100}px,-80px)`; el.style.opacity = "0"; });
+          requestAnimationFrame(() => {
+            el.style.transform = `translate(${(Math.random() - 0.5) * 100}px,-80px)`;
+            el.style.opacity = "0";
+          });
           setTimeout(() => el.remove(), 800);
         }
       }
       setTimeout(() => setJoinSuccess(false), 2000);
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
-  const handleWorkComplete = useCallback(async (answers: Record<number, string>) => {
-    if (pendingAssignment) {
+  const handleWorkComplete = useCallback(
+    async (answers: Record<number, string>) => {
+      if (pendingAssignment) {
+        try {
+          await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
+        } catch {}
+      }
+      spawnConfetti();
+      setMascotCelebrating(true);
+      setTimeout(() => setMascotCelebrating(false), 3000);
       try {
-        await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
+        const subs = await api.getMySubmissions();
+        setSubmissions(subs);
+        setStatSubmitted(subs.length);
+        setStatGraded(subs.filter((s: any) => s.grade !== null).length);
       } catch {}
-    }
-    spawnConfetti();
-    setMascotCelebrating(true);
-    setTimeout(() => setMascotCelebrating(false), 3000);
-    try {
-      const subs = await api.getMySubmissions();
-      setSubmissions(subs);
-      setStatSubmitted(subs.length);
-      setStatGraded(subs.filter((s: any) => s.grade !== null).length);
-    } catch {}
 
-    // Check for more assignments across all classes before unlocking free time
-    let nextAssignment: any = null;
-    let nextParsed: any = null;
-    const submittedId = pendingAssignment?.id;
-    for (const cls of classes) {
-      try {
-        const pending = await api.getPendingAssignments(cls.id);
-        if (Array.isArray(pending)) {
-          const remaining = pending.filter((a: any) => a.id !== submittedId);
-          if (remaining.length > 0 && !nextAssignment) {
-            const a = remaining[0];
-            nextAssignment = a;
-            if (a.content) {
-              try {
-                const parsed = JSON.parse(a.content);
-                if (parsed?.sections?.length > 0) nextParsed = parsed;
-              } catch {}
+      // Check for more assignments across all classes before unlocking free time
+      let nextAssignment: any = null;
+      let nextParsed: any = null;
+      const submittedId = pendingAssignment?.id;
+      for (const cls of classes) {
+        try {
+          const pending = await api.getPendingAssignments(cls.id);
+          if (Array.isArray(pending)) {
+            const remaining = pending.filter((a: any) => a.id !== submittedId);
+            if (remaining.length > 0 && !nextAssignment) {
+              const a = remaining[0];
+              nextAssignment = a;
+              if (a.content) {
+                try {
+                  const parsed = JSON.parse(a.content);
+                  if (parsed?.sections?.length > 0) nextParsed = parsed;
+                } catch {}
+              }
+              break;
             }
-            break;
           }
-        }
-      } catch {}
-    }
+        } catch {}
+      }
 
-    if (nextAssignment) {
-      setQuestionsAnswered(0);
-      setPendingAssignment(nextAssignment);
-      setParsedAssignment(nextParsed);
-      setPhase('working');
-    } else {
-      setWorkUnlocked();
-      setPendingAssignment(null);
-      setParsedAssignment(null);
-      setPhase('done');
-    }
-  }, [pendingAssignment, classes]);
+      if (nextAssignment) {
+        setQuestionsAnswered(0);
+        setPendingAssignment(nextAssignment);
+        setParsedAssignment(nextParsed);
+        setPhase("working");
+      } else {
+        setWorkUnlocked();
+        setPendingAssignment(null);
+        setParsedAssignment(null);
+        setPhase("done");
+      }
+    },
+    [pendingAssignment, classes],
+  );
 
   // "Take Break" from inside WorkScreen → use the REAL break system
   // (chooseBreak writes localStorage + fires breakstate-change). The
@@ -1616,7 +2836,7 @@ export default function StudentDashboard() {
     chooseBreak();
     setAccessUnlocked(true); // optimistic — don't wait for 1s poll
   }, []);
-  const handleBreakDone = useCallback(() => setPhase('working'), []);
+  const handleBreakDone = useCallback(() => setPhase("working"), []);
 
   const myEntry = leaderboard.find((e: any) => e.user_id === user?.id);
   const rm = prefersReducedMotion();
@@ -1625,13 +2845,28 @@ export default function StudentDashboard() {
 
   if (lockedScreen) {
     return (
-      <div className={`fixed inset-0 z-50 flex items-center justify-center ${dk ? "bg-[#07071a]/98" : "bg-white/95"} backdrop-blur-xl`}>
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center ${dk ? "bg-[#07071a]/98" : "bg-white/95"} backdrop-blur-xl`}
+      >
         <div className="text-center">
-          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 ${dk ? "bg-white/[0.06]" : "bg-gray-100"}`}>
-            <Lock size={36} className={dk ? "text-white/60" : "text-gray-400"} />
+          <div
+            className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 ${dk ? "bg-white/[0.06]" : "bg-gray-100"}`}
+          >
+            <Lock
+              size={36}
+              className={dk ? "text-white/60" : "text-gray-400"}
+            />
           </div>
-          <h2 className={`text-2xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>Screen Locked</h2>
-          <p className={`mt-2 text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>Your teacher has locked screens.</p>
+          <h2
+            className={`text-2xl font-bold ${dk ? "text-white" : "text-gray-900"}`}
+          >
+            Screen Locked
+          </h2>
+          <p
+            className={`mt-2 text-sm ${dk ? "text-white/40" : "text-gray-500"}`}
+          >
+            Your teacher has locked screens.
+          </p>
         </div>
       </div>
     );
@@ -1639,37 +2874,53 @@ export default function StudentDashboard() {
 
   const lockBanner = null;
 
-  if (phase === 'welcome') return <WelcomeScreen name={user?.name || "Student"} />;
+  if (phase === "welcome")
+    return <WelcomeScreen name={user?.name || "Student"} />;
 
-  if (phase === 'loading') return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #0f0726, #0a0b20)" }}>
-      <div className="text-center space-y-4">
-        <div className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-white/50 text-sm">Checking your assignments…</p>
+  if (phase === "loading")
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: "linear-gradient(135deg, #0f0726, #0a0b20)" }}
+      >
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-white/50 text-sm">Checking your assignments…</p>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   // Access-unlocked short-circuit: while the student is on a 10-min break OR
   // after teacher granted free time / all work submitted, skip the "do your
   // work" gate and render the full dashboard so Arcade/Projects/YouTube are
   // reachable. This is what makes the dashboard flip in real-time when the
   // teacher clicks Grant Free Time or the student starts a break.
-  if (phase === 'break') return <BreakScreen dk={dk} onDone={handleBreakDone} />;
+  if (phase === "break")
+    return <BreakScreen dk={dk} onDone={handleBreakDone} />;
 
-  if (phase === 'working' && pendingAssignment && parsedAssignment) {
+  if (phase === "working" && pendingAssignment && parsedAssignment) {
     return (
       <WorkScreen
-        assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
-        onComplete={handleWorkComplete} onBreak={handleTakeBreak} onBack={() => setPhase('done')}
-        questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
+        assignment={pendingAssignment}
+        parsed={parsedAssignment}
+        dk={dk}
+        onComplete={handleWorkComplete}
+        onBreak={handleTakeBreak}
+        onBack={() => setPhase("done")}
+        questionsAnswered={questionsAnswered}
+        setQuestionsAnswered={setQuestionsAnswered}
       />
     );
   }
 
-  if (phase === 'working' && pendingAssignment && !parsedAssignment) {
-    return <SimpleAssignmentCard assignment={pendingAssignment} dk={dk} onComplete={() => handleWorkComplete({})} />;
+  if (phase === "working" && pendingAssignment && !parsedAssignment) {
+    return (
+      <SimpleAssignmentCard
+        assignment={pendingAssignment}
+        dk={dk}
+        onComplete={() => handleWorkComplete({})}
+      />
+    );
   }
 
   // ── DONE / DASHBOARD ──
@@ -1677,7 +2928,11 @@ export default function StudentDashboard() {
   const starsCount = Math.max(0, Math.min(5, myStars.stars));
   const firstName = user?.name?.split(" ")[0] || "Student";
   const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
-  const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
+  const badgeCount = myEntry?.badges
+    ? Array.isArray(myEntry.badges)
+      ? myEntry.badges.length
+      : 0
+    : 0;
 
   const DB_ANIM = `
     @keyframes dbGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
@@ -1691,27 +2946,44 @@ export default function StudentDashboard() {
   `;
 
   return (
-    <div style={{
-      minHeight: "100dvh",
-      background: "#0f1628",
-      backgroundImage: "radial-gradient(circle at 15% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(circle at 95% 30%, rgba(245,158,11,0.08), transparent 55%)",
-      color: "white",
-      fontFamily: "'Baloo 2', 'Inter', system-ui, sans-serif",
-      paddingBottom: 80,
-      position: "relative",
-    }}>
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: "#0f1628",
+        backgroundImage:
+          "radial-gradient(circle at 15% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(circle at 95% 30%, rgba(245,158,11,0.08), transparent 55%)",
+        color: "white",
+        fontFamily: "'Baloo 2', 'Inter', system-ui, sans-serif",
+        paddingBottom: 80,
+        position: "relative",
+      }}
+    >
       <style>{DB_ANIM}</style>
 
       {lockBanner}
 
       {broadcast && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 40,
-          padding: "12px 24px", textAlign: "center", fontSize: 14, fontWeight: 700,
-          background: "linear-gradient(90deg, #7c3aed, #6d28d9)",
-          color: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          <Megaphone size={15} />{broadcast}
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 40,
+            padding: "12px 24px",
+            textAlign: "center",
+            fontSize: 14,
+            fontWeight: 700,
+            background: "linear-gradient(90deg, #7c3aed, #6d28d9)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <Megaphone size={15} />
+          {broadcast}
         </div>
       )}
 
@@ -1727,47 +2999,129 @@ export default function StudentDashboard() {
 
       {/* Website request modal */}
       {showWebsiteRequest && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.7)" }} onClick={() => setShowWebsiteRequest(false)}>
-          <div style={{
-            maxWidth: 440, width: "100%", padding: 24, borderRadius: 20,
-            background: "linear-gradient(135deg,#1a0f40,#0f1a3a)",
-            border: "1px solid rgba(139,92,246,.4)",
-            boxShadow: "0 20px 60px rgba(0,0,0,.6)",
-            color: "white",
-          }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Request a website</h3>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            background: "rgba(0,0,0,0.7)",
+          }}
+          onClick={() => setShowWebsiteRequest(false)}
+        >
+          <div
+            style={{
+              maxWidth: 440,
+              width: "100%",
+              padding: 24,
+              borderRadius: 20,
+              background: "linear-gradient(135deg,#1a0f40,#0f1a3a)",
+              border: "1px solid rgba(139,92,246,.4)",
+              boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+              color: "white",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
+              Request a website
+            </h3>
             <p style={{ fontSize: 13, opacity: 0.55, marginBottom: 16 }}>
-              Tell your teacher the name of the site you'd like to use. They'll review it and unlock it for you.
+              Tell your teacher the name of the site you'd like to use. They'll
+              review it and unlock it for you.
             </p>
             {websiteRequestSent ? (
               <div style={{ textAlign: "center", padding: "16px 0" }}>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>Request sent! Your teacher will review it.</p>
-                <button onClick={() => setShowWebsiteRequest(false)} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Close</button>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>
+                  Request sent! Your teacher will review it.
+                </p>
+                <button
+                  onClick={() => setShowWebsiteRequest(false)}
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 24px",
+                    borderRadius: 12,
+                    background: "#7c3aed",
+                    color: "white",
+                    border: "none",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
               </div>
             ) : (
               <>
                 <input
                   autoFocus
                   value={websiteRequestTitle}
-                  onChange={e => setWebsiteRequestTitle(e.target.value)}
+                  onChange={(e) => setWebsiteRequestTitle(e.target.value)}
                   placeholder="e.g. Typing Club, Prodigy, Cool Math…"
-                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, marginBottom: 14, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    marginBottom: 14,
+                    background: "rgba(255,255,255,0.09)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "white",
+                    fontSize: 14,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
                   maxLength={200}
-                  onKeyDown={async e => {
+                  onKeyDown={async (e) => {
                     if (e.key === "Enter" && websiteRequestTitle.trim()) {
-                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
+                      try {
+                        await api.requestWebsite(websiteRequestTitle.trim());
+                        setWebsiteRequestSent(true);
+                      } catch {}
                     }
                   }}
                 />
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button onClick={() => setShowWebsiteRequest(false)} style={{ padding: "10px 18px", borderRadius: 12, background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)", border: "none", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    onClick={() => setShowWebsiteRequest(false)}
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.07)",
+                      color: "rgba(255,255,255,0.7)",
+                      border: "none",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
                   <button
                     disabled={!websiteRequestTitle.trim()}
                     onClick={async () => {
-                      try { await api.requestWebsite(websiteRequestTitle.trim()); setWebsiteRequestSent(true); } catch {}
+                      try {
+                        await api.requestWebsite(websiteRequestTitle.trim());
+                        setWebsiteRequestSent(true);
+                      } catch {}
                     }}
-                    style={{ padding: "10px 22px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: websiteRequestTitle.trim() ? 1 : 0.4 }}
+                    style={{
+                      padding: "10px 22px",
+                      borderRadius: 12,
+                      background: "#7c3aed",
+                      color: "white",
+                      border: "none",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      opacity: websiteRequestTitle.trim() ? 1 : 0.4,
+                    }}
                   >
                     Send request
                   </button>
@@ -1779,14 +3133,17 @@ export default function StudentDashboard() {
       )}
 
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px" }}>
-
         {/* ── Header: big friendly greeting with avatar ── */}
-        <header style={{
-          display: "flex", alignItems: "center", gap: 16,
-          padding: "24px 4px 18px",
-          animation: "dbPop .4s ease both",
-          position: "relative"
-        }}>
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "24px 4px 18px",
+            animation: "dbPop .4s ease both",
+            position: "relative",
+          }}
+        >
           {/* Back Button in header */}
           <button
             onClick={handleBack}
@@ -1800,7 +3157,9 @@ export default function StudentDashboard() {
               padding: "8px 16px 8px 12px",
               fontWeight: 700,
               fontSize: 15,
-              boxShadow: dk ? "0 2px 8px rgba(139,92,246,0.12)" : "0 2px 8px #ede9fe",
+              boxShadow: dk
+                ? "0 2px 8px rgba(139,92,246,0.12)"
+                : "0 2px 8px #ede9fe",
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -1810,50 +3169,104 @@ export default function StudentDashboard() {
             className="back-btn"
             aria-label="Back"
           >
-            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" style={{ marginRight: 3 }}><path d="M13.5 17L8.5 12L13.5 7" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 22 22"
+              fill="none"
+              style={{ marginRight: 3 }}
+            >
+              <path
+                d="M13.5 17L8.5 12L13.5 7"
+                stroke="currentColor"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             Back
           </button>
           <button
             onClick={() => setShowAvatarPicker(true)}
             title="Change your avatar"
             style={{
-              width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
+              width: 72,
+              height: 72,
+              borderRadius: "50%",
+              flexShrink: 0,
               background: avatarEmoji
                 ? "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(79,70,229,0.25))"
                 : "linear-gradient(135deg, #7c3aed, #4f46e5)",
               border: "3px solid rgba(255,255,255,0.15)",
               boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: avatarEmoji ? 40 : 28, fontWeight: 900, color: "white",
-              cursor: "pointer", transition: "transform 0.18s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: avatarEmoji ? 40 : 28,
+              fontWeight: 900,
+              color: "white",
+              cursor: "pointer",
+              transition: "transform 0.18s",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.06)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "scale(1.06)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "";
+            }}
           >
             {avatarEmoji || firstName[0].toUpperCase()}
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 4, fontWeight: 700 }}>
+            <div
+              style={{
+                fontSize: 11,
+                opacity: 0.5,
+                textTransform: "uppercase",
+                letterSpacing: "0.18em",
+                marginBottom: 4,
+                fontWeight: 700,
+              }}
+            >
               {new Date().toLocaleDateString("en-US", { weekday: "long" })}
             </div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, margin: 0, letterSpacing: "-0.02em" }}>
+            <h1
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                lineHeight: 1,
+                margin: 0,
+                letterSpacing: "-0.02em",
+              }}
+            >
               {unlocked ? `Free time, ${firstName}! 🎉` : `Hi, ${firstName}!`}
             </h1>
           </div>
         </header>
 
         {/* ── Stats row: Points (big) + Stars (compact) — one clean line ── */}
-        <div style={{ marginTop: 14, display: "flex", gap: 10, animation: "dbSlide .4s ease both" }}>
+        <div
+          style={{
+            marginTop: 14,
+            display: "flex",
+            gap: 10,
+            animation: "dbSlide .4s ease both",
+          }}
+        >
           {/* Points — clickable → store. Biggest visual element. */}
           {dojoPoints != null && (
             <Link
               to="/cashout"
               style={{
                 flex: 2,
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "16px 18px", borderRadius: 18,
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: "16px 18px",
+                borderRadius: 18,
                 textDecoration: "none",
-                background: "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(217,119,6,0.08))",
+                background:
+                  "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(217,119,6,0.08))",
                 border: "1px solid rgba(245,158,11,0.35)",
                 boxShadow: "0 2px 14px rgba(245,158,11,0.12)",
                 color: "white",
@@ -1861,189 +3274,416 @@ export default function StudentDashboard() {
               aria-label="Your points — tap to visit the store"
             >
               <span style={{ fontSize: 34 }}>🪙</span>
-              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontSize: 26, fontWeight: 900, color: "#fbbf24", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+              <span
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 900,
+                    color: "#fbbf24",
+                    lineHeight: 1,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
                   {dojoPoints}
                 </span>
-                <span style={{ fontSize: 12, opacity: 0.8, marginTop: 3, fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.8,
+                    marginTop: 3,
+                    fontWeight: 700,
+                  }}
+                >
                   points · tap to shop →
                 </span>
               </span>
             </Link>
           )}
           {/* Stars — simple, amber when they've earned rewards */}
-          <div style={{
-            flex: 1, borderRadius: 18, padding: "12px 14px",
-            background: myStars.rewards > 0
-              ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
-              : "rgba(255,255,255,0.05)",
-            border: myStars.rewards > 0 ? "1px solid rgba(245,158,11,0.3)" : "1px solid rgba(255,255,255,0.08)",
-            display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-          }}>
+          <div
+            style={{
+              flex: 1,
+              borderRadius: 18,
+              padding: "12px 14px",
+              background:
+                myStars.rewards > 0
+                  ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
+                  : "rgba(255,255,255,0.05)",
+              border:
+                myStars.rewards > 0
+                  ? "1px solid rgba(245,158,11,0.3)"
+                  : "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
             <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
               {Array.from({ length: 5 }, (_, i) => (
-                <svg key={i} width="17" height="17" viewBox="0 0 24 24"
+                <svg
+                  key={i}
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
                   fill={i < starsCount ? "#fbbf24" : "none"}
                   stroke={i < starsCount ? "#f59e0b" : "rgba(255,255,255,0.18)"}
-                  strokeWidth="2" strokeLinejoin="round">
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                >
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               ))}
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
-              {myStars.rewards > 0 ? `🏆 ${myStars.rewards} reward${myStars.rewards === 1 ? "" : "s"}` : `${starsCount} / 5 stars`}
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "rgba(255,255,255,0.55)",
+              }}
+            >
+              {myStars.rewards > 0
+                ? `🏆 ${myStars.rewards} reward${myStars.rewards === 1 ? "" : "s"}`
+                : `${starsCount} / 5 stars`}
             </div>
           </div>
         </div>
 
         {/* ── Right Now strip — one tidy line when a block is live ── */}
-        {blockInfo.state === "current" && !(blockInfo as any).block.is_break && (
-          <div style={{
-            marginTop: 10, borderRadius: 12, padding: "8px 12px",
-            background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)",
-            display: "flex", alignItems: "center", gap: 8, fontSize: 12, animation: "dbSlide .4s ease both",
-          }}>
-            <span style={{ fontSize: 14 }}>
-              {({"math":"🔢","reading":"📖","writing":"✏️","spelling":"🔤","sel":"💛","daily_news":"📰","science":"🔬","social_studies":"🌎","video_learning":"📺"} as Record<string,string>)[(blockInfo as any).block.subject] || "📚"}
-            </span>
-            <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>Now:</span>
-            <span style={{ flex: 1, color: "rgba(255,255,255,0.75)" }}>{(blockInfo as any).block.label}</span>
-            <span style={{ fontSize: 10, opacity: 0.55, fontFamily: "ui-monospace, Menlo, monospace" }}>
-              until {(blockInfo as any).block.end_time}
-            </span>
-          </div>
-        )}
+        {blockInfo.state === "current" &&
+          !(blockInfo as any).block.is_break && (
+            <div
+              style={{
+                marginTop: 10,
+                borderRadius: 12,
+                padding: "8px 12px",
+                background: "rgba(139,92,246,0.1)",
+                border: "1px solid rgba(139,92,246,0.25)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                animation: "dbSlide .4s ease both",
+              }}
+            >
+              <span style={{ fontSize: 14 }}>
+                {(
+                  {
+                    math: "🔢",
+                    reading: "📖",
+                    writing: "✏️",
+                    spelling: "🔤",
+                    sel: "💛",
+                    daily_news: "📰",
+                    science: "🔬",
+                    social_studies: "🌎",
+                    video_learning: "📺",
+                  } as Record<string, string>
+                )[(blockInfo as any).block.subject] || "📚"}
+              </span>
+              <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+                Now:
+              </span>
+              <span style={{ flex: 1, color: "rgba(255,255,255,0.75)" }}>
+                {(blockInfo as any).block.label}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  opacity: 0.55,
+                  fontFamily: "ui-monospace, Menlo, monospace",
+                }}
+              >
+                until {(blockInfo as any).block.end_time}
+              </span>
+            </div>
+          )}
 
         {/* ── Today's Schedule — time column so students can see WHEN things happen ── */}
-        {todaySchedule.length > 0 && (() => {
-          const nowHHMM = (() => {
-            const d = new Date();
-            return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-          })();
-          const fmt = (t: string) => {
-            if (!t) return "";
-            const [h, m] = t.split(":").map(Number);
-            const ampm = h >= 12 ? "pm" : "am";
-            return `${((h % 12) || 12)}:${String(m).padStart(2, "0")} ${ampm}`;
-          };
-          const SUBJECT_EMOJI: Record<string, string> = {
-            math: "🔢", reading: "📖", writing: "✏️", spelling: "🔤", sel: "💛",
-            daily_news: "📰", science: "🔬", social_studies: "🌎",
-            video_learning: "📺", ted_talk: "🎤", review: "🔁", extra_review: "🔁",
-            coding_art_gym: "🎨", cashout: "🏪", dismissal: "👋",
-            recess: "🏃", lunch: "🥪", calm_down: "🌿",
-          };
-          return (
-            <div style={{ marginTop: 22, marginBottom: 10, animation: "dbSlide .4s ease both" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>
-                  📅 Today's Schedule
-                </div>
-                <button
-                  onClick={() => {
-                    try {
-                      const w: any = window;
-                      if (w.caches && typeof w.caches.keys === "function") {
-                        w.caches.keys()
-                          .then((ks: string[]) => Promise.all(ks.map((k) => w.caches.delete(k))))
-                          .finally(() => w.location.reload());
-                      } else {
-                        w.location.reload();
-                      }
-                    } catch { window.location.reload(); }
-                  }}
+        {todaySchedule.length > 0 &&
+          (() => {
+            const nowHHMM = (() => {
+              const d = new Date();
+              return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            })();
+            const fmt = (t: string) => {
+              if (!t) return "";
+              const [h, m] = t.split(":").map(Number);
+              const ampm = h >= 12 ? "pm" : "am";
+              return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
+            };
+            const SUBJECT_EMOJI: Record<string, string> = {
+              math: "🔢",
+              reading: "📖",
+              writing: "✏️",
+              spelling: "🔤",
+              sel: "💛",
+              daily_news: "📰",
+              science: "🔬",
+              social_studies: "🌎",
+              video_learning: "📺",
+              ted_talk: "🎤",
+              review: "🔁",
+              extra_review: "🔁",
+              coding_art_gym: "🎨",
+              cashout: "🏪",
+              dismissal: "👋",
+              recess: "🏃",
+              lunch: "🥪",
+              calm_down: "🌿",
+            };
+            return (
+              <div
+                style={{
+                  marginTop: 22,
+                  marginBottom: 10,
+                  animation: "dbSlide .4s ease both",
+                }}
+              >
+                <div
                   style={{
-                    fontSize: 10, padding: "4px 10px", borderRadius: 999,
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                    color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 10,
                   }}
-                  title="Reload the page and clear caches"
-                >↻ Refresh</button>
-              </div>
-              <div style={{
-                borderRadius: 16, padding: "6px 4px", overflow: "hidden",
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-              }}>
-                {todaySchedule.map((b: any, idx: number) => {
-                  const isLive = b.start_time && b.end_time && b.start_time <= nowHHMM && nowHHMM < b.end_time;
-                  const isPast = b.end_time && b.end_time <= nowHHMM;
-                  const subjectKey = b.is_break ? (b.break_type || "lunch") : (b.subject || "");
-                  const emoji = SUBJECT_EMOJI[subjectKey] || "📘";
-                  return (
-                    <div key={b.id || idx} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "10px 14px", borderRadius: 12,
-                      background: isLive ? "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(124,58,237,0.05))" : "transparent",
-                      border: isLive ? "1px solid rgba(139,92,246,0.4)" : "1px solid transparent",
-                      opacity: isPast && !isLive ? 0.38 : 1,
-                      marginBottom: 2,
-                      transition: "background .2s",
-                    }}>
-                      <div style={{
-                        width: 84, flexShrink: 0, textAlign: "right",
-                        fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                        color: isLive ? "#c4b5fd" : "rgba(255,255,255,0.6)",
-                        fontFamily: "ui-monospace, Menlo, monospace",
-                      }}>
-                        {fmt(b.start_time)}
-                      </div>
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 18,
-                        background: isLive ? "rgba(139,92,246,0.28)" : "rgba(255,255,255,0.05)",
-                      }}>
-                        {emoji}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {b.label || "—"}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      opacity: 0.4,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.2em",
+                    }}
+                  >
+                    📅 Today's Schedule
+                  </div>
+                  <button
+                    onClick={() => {
+                      try {
+                        const w: any = window;
+                        if (w.caches && typeof w.caches.keys === "function") {
+                          w.caches
+                            .keys()
+                            .then((ks: string[]) =>
+                              Promise.all(ks.map((k) => w.caches.delete(k))),
+                            )
+                            .finally(() => w.location.reload());
+                        } else {
+                          w.location.reload();
+                        }
+                      } catch {
+                        window.location.reload();
+                      }
+                    }}
+                    style={{
+                      fontSize: 10,
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: "rgba(255,255,255,0.5)",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                    title="Reload the page and clear caches"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
+                <div
+                  style={{
+                    borderRadius: 16,
+                    padding: "6px 4px",
+                    overflow: "hidden",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  {todaySchedule.map((b: any, idx: number) => {
+                    const isLive =
+                      b.start_time &&
+                      b.end_time &&
+                      b.start_time <= nowHHMM &&
+                      nowHHMM < b.end_time;
+                    const isPast = b.end_time && b.end_time <= nowHHMM;
+                    const subjectKey = b.is_break
+                      ? b.break_type || "lunch"
+                      : b.subject || "";
+                    const emoji = SUBJECT_EMOJI[subjectKey] || "📘";
+                    return (
+                      <div
+                        key={b.id || idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          background: isLive
+                            ? "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(124,58,237,0.05))"
+                            : "transparent",
+                          border: isLive
+                            ? "1px solid rgba(139,92,246,0.4)"
+                            : "1px solid transparent",
+                          opacity: isPast && !isLive ? 0.38 : 1,
+                          marginBottom: 2,
+                          transition: "background .2s",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 84,
+                            flexShrink: 0,
+                            textAlign: "right",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            fontVariantNumeric: "tabular-nums",
+                            color: isLive ? "#c4b5fd" : "rgba(255,255,255,0.6)",
+                            fontFamily: "ui-monospace, Menlo, monospace",
+                          }}
+                        >
+                          {fmt(b.start_time)}
                         </div>
-                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>
-                          until {fmt(b.end_time)}
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 18,
+                            background: isLive
+                              ? "rgba(139,92,246,0.28)"
+                              : "rgba(255,255,255,0.05)",
+                          }}
+                        >
+                          {emoji}
                         </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 800,
+                              color: "rgba(255,255,255,0.92)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {b.label || "—"}
+                          </div>
+                          <div
+                            style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}
+                          >
+                            until {fmt(b.end_time)}
+                          </div>
+                        </div>
+                        {isLive && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              background: "rgba(139,92,246,0.35)",
+                              color: "#c4b5fd",
+                              fontWeight: 800,
+                              letterSpacing: "0.06em",
+                              flexShrink: 0,
+                            }}
+                          >
+                            NOW
+                          </span>
+                        )}
                       </div>
-                      {isLive && (
-                        <span style={{
-                          fontSize: 9, padding: "3px 8px", borderRadius: 999,
-                          background: "rgba(139,92,246,0.35)", color: "#c4b5fd", fontWeight: 800,
-                          letterSpacing: "0.06em", flexShrink: 0,
-                        }}>NOW</span>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
         {/* Today's assignment — prominent hero when there's one to do */}
         {pendingAssignment && (
           <div
-            onClick={() => { setPhase('working'); }}
+            onClick={() => {
+              setPhase("working");
+            }}
             style={{
-              borderRadius: 20, padding: "20px 22px", marginBottom: 14, cursor: "pointer",
-              background: "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.22))",
+              borderRadius: 20,
+              padding: "20px 22px",
+              marginBottom: 14,
+              cursor: "pointer",
+              background:
+                "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.22))",
               border: "1px solid rgba(139,92,246,0.55)",
-              display: "flex", alignItems: "center", gap: 18,
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
               animation: "dbSlide .4s ease both",
               transition: "transform .15s",
               boxShadow: "0 8px 28px rgba(139,92,246,0.25)",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.transform =
+                "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "";
+            }}
           >
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
-              boxShadow: "0 8px 20px rgba(139,92,246,0.4)",
-            }}>📝</div>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                flexShrink: 0,
+                background: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 28,
+                boxShadow: "0 8px 20px rgba(139,92,246,0.4)",
+              }}
+            >
+              📝
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", opacity: 0.7, marginBottom: 3 }}>Today's Assignment</div>
-              <div style={{ fontSize: 16, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pendingAssignment.title}</div>
-              <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>Tap to start →</div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  opacity: 0.7,
+                  marginBottom: 3,
+                }}
+              >
+                Today's Assignment
+              </div>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 900,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {pendingAssignment.title}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>
+                Tap to start →
+              </div>
             </div>
             <div style={{ fontSize: 22, opacity: 0.7 }}>›</div>
           </div>
@@ -2051,41 +3691,152 @@ export default function StudentDashboard() {
 
         {/* ── Menu — admin-dashboard-style tile grid with circle icons ── */}
         {(() => {
-          type Tile = { to?: string; onClick?: () => void; icon: string; label: string; desc: string; grad: string; glow: string };
+          type Tile = {
+            to?: string;
+            onClick?: () => void;
+            icon: string;
+            label: string;
+            desc: string;
+            grad: string;
+            glow: string;
+          };
           const TILES: Tile[] = [
             // Always visible — the schoolwork core
-            { to: "/assignments", icon: "📝", label: "Assignments", desc: "Work to do",   grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.35)" },
-            { to: "/lessons",     icon: "📖", label: "Lessons",     desc: "Read & review",grad: "linear-gradient(135deg,#3b82f6,#2563eb)", glow: "rgba(59,130,246,0.35)" },
-            { to: "/leaderboard", icon: "🏆", label: "Leaderboard", desc: "Top points",   grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.35)" },
-            { to: "/achievements",icon: "🎖️", label: "Achievements",desc: "Your badges",  grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.35)" },
+            {
+              to: "/assignments",
+              icon: "📝",
+              label: "Assignments",
+              desc: "Work to do",
+              grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+              glow: "rgba(139,92,246,0.35)",
+            },
+            {
+              to: "/lessons",
+              icon: "📖",
+              label: "Lessons",
+              desc: "Read & review",
+              grad: "linear-gradient(135deg,#3b82f6,#2563eb)",
+              glow: "rgba(59,130,246,0.35)",
+            },
+            {
+              to: "/leaderboard",
+              icon: "🏆",
+              label: "Leaderboard",
+              desc: "Top points",
+              grad: "linear-gradient(135deg,#f59e0b,#d97706)",
+              glow: "rgba(245,158,11,0.35)",
+            },
+            {
+              to: "/achievements",
+              icon: "🎖️",
+              label: "Achievements",
+              desc: "Your badges",
+              grad: "linear-gradient(135deg,#10b981,#059669)",
+              glow: "rgba(16,185,129,0.35)",
+            },
             // Store only visible during the cashout block
-            ...((blockInfo.state === "current" && (blockInfo as any).block?.subject?.toLowerCase() === "cashout") ? [
-              { to: "/cashout", icon: "🪙", label: "Store", desc: dojoPoints != null ? `${dojoPoints} pts` : "Spend points", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", glow: "rgba(251,191,36,0.35)" },
-            ] as Tile[] : []),
+            ...(blockInfo.state === "current" &&
+            (blockInfo as any).block?.subject?.toLowerCase() === "cashout"
+              ? ([
+                  {
+                    to: "/cashout",
+                    icon: "🪙",
+                    label: "Store",
+                    desc:
+                      dojoPoints != null ? `${dojoPoints} pts` : "Spend points",
+                    grad: "linear-gradient(135deg,#fbbf24,#f59e0b)",
+                    glow: "rgba(251,191,36,0.35)",
+                  },
+                ] as Tile[])
+              : []),
             // Free-time only — Websites, Videos, Arcade, Projects
-            ...(unlocked ? ([
-              { to: "/websites", icon: "🌐", label: "Websites", desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.35)" },
-              ...(classConfig.youtubeEnabled ? [{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: "linear-gradient(135deg,#ef4444,#dc2626)", glow: "rgba(239,68,68,0.35)" }] as Tile[] : []),
-              { to: "/arcade",   icon: "🎮", label: "Arcade",   desc: "31 games",         grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.35)" },
-              { to: "/projects", icon: "💻", label: "Projects", desc: "2D · 3D · Unity",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.35)" },
-            ] as Tile[]) : []),
+            ...(unlocked
+              ? ([
+                  {
+                    to: "/websites",
+                    icon: "🌐",
+                    label: "Websites",
+                    desc:
+                      myWebsites.length > 0
+                        ? `${myWebsites.length} apps`
+                        : "Apps",
+                    grad: "linear-gradient(135deg,#6366f1,#4f46e5)",
+                    glow: "rgba(99,102,241,0.35)",
+                  },
+                  ...(classConfig.youtubeEnabled
+                    ? ([
+                        {
+                          to: "/student/videos",
+                          icon: "📺",
+                          label: "Videos",
+                          desc:
+                            youtubeLibrary.length > 0
+                              ? `${youtubeLibrary.length} ready`
+                              : "Teacher's picks",
+                          grad: "linear-gradient(135deg,#ef4444,#dc2626)",
+                          glow: "rgba(239,68,68,0.35)",
+                        },
+                      ] as Tile[])
+                    : []),
+                  {
+                    to: "/arcade",
+                    icon: "🎮",
+                    label: "Arcade",
+                    desc: "31 games",
+                    grad: "linear-gradient(135deg,#ec4899,#db2777)",
+                    glow: "rgba(236,72,153,0.35)",
+                  },
+                  {
+                    to: "/projects",
+                    icon: "💻",
+                    label: "Projects",
+                    desc: "2D · 3D · Unity",
+                    grad: "linear-gradient(135deg,#14b8a6,#0d9488)",
+                    glow: "rgba(20,184,166,0.35)",
+                  },
+                ] as Tile[])
+              : []),
             // Sign out button
-            { onClick: logout, icon: "🚪", label: "Sign Out", desc: "Logout", grad: "linear-gradient(135deg,#6b7280,#4b5563)", glow: "rgba(107,114,128,0.35)" },
+            {
+              onClick: logout,
+              icon: "🚪",
+              label: "Sign Out",
+              desc: "Logout",
+              grad: "linear-gradient(135deg,#6b7280,#4b5563)",
+              glow: "rgba(107,114,128,0.35)",
+            },
           ];
           return (
-            <div style={{ marginTop: 18, marginBottom: 18, animation: "dbSlide .45s ease both" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+            <div
+              style={{
+                marginTop: 18,
+                marginBottom: 18,
+                animation: "dbSlide .45s ease both",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+                  gap: 12,
+                }}
+              >
                 {TILES.map((t, i) => {
                   const inner = (
-                    <div style={{
-                      height: "100%", borderRadius: 18, overflow: "hidden",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      transition: "transform .15s, box-shadow .15s, border-color .15s",
-                      display: "flex", flexDirection: "column",
-                      animation: "dbPop .4s ease both",
-                      animationDelay: `${i * 40}ms`,
-                    }}
+                    <div
+                      style={{
+                        height: "100%",
+                        borderRadius: 18,
+                        overflow: "hidden",
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        transition:
+                          "transform .15s, box-shadow .15s, border-color .15s",
+                        display: "flex",
+                        flexDirection: "column",
+                        animation: "dbPop .4s ease both",
+                        animationDelay: `${i * 40}ms`,
+                      }}
                       onMouseEnter={(e) => {
                         const el = e.currentTarget as HTMLElement;
                         el.style.transform = "translateY(-4px)";
@@ -2100,30 +3851,76 @@ export default function StudentDashboard() {
                       }}
                     >
                       <div style={{ height: 3, background: t.grad }} />
-                      <div style={{ padding: "16px 14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{
-                          width: 56, height: 56, borderRadius: "50%",
-                          background: t.grad,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 28, color: "white",
-                          boxShadow: `0 8px 20px ${t.glow}`,
-                        }}>
+                      <div
+                        style={{
+                          padding: "16px 14px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: "50%",
+                            background: t.grad,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 28,
+                            color: "white",
+                            boxShadow: `0 8px 20px ${t.glow}`,
+                          }}
+                        >
                           {t.icon}
                         </div>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 900, color: "white", letterSpacing: "-0.01em" }}>{t.label}</div>
-                          <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{t.desc}</div>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 900,
+                              color: "white",
+                              letterSpacing: "-0.01em",
+                            }}
+                          >
+                            {t.label}
+                          </div>
+                          <div
+                            style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}
+                          >
+                            {t.desc}
+                          </div>
                         </div>
                       </div>
                     </div>
                   );
                   if (t.to) {
                     return (
-                      <Link key={i} to={t.to} style={{ textDecoration: "none", color: "inherit" }}>{inner}</Link>
+                      <Link
+                        key={i}
+                        to={t.to}
+                        style={{ textDecoration: "none", color: "inherit" }}
+                      >
+                        {inner}
+                      </Link>
                     );
                   }
                   return (
-                    <button key={i} onClick={t.onClick} style={{ background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}>{inner}</button>
+                    <button
+                      key={i}
+                      onClick={t.onClick}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        textAlign: "left",
+                        cursor: "pointer",
+                        color: "inherit",
+                      }}
+                    >
+                      {inner}
+                    </button>
                   );
                 })}
               </div>
@@ -2132,64 +3929,211 @@ export default function StudentDashboard() {
         })()}
 
         {/* Quiz tiles */}
-        {pendingQuizzes.length > 0 && !activeQuiz && pendingQuizzes.map(q => (
-          <button key={q.id}
-            onClick={() => { setActiveQuiz(q); setQuizAnswers(new Array((q.questions || []).length).fill(-1)); setQuizResult(null); }}
-            style={{
-              width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 16,
-              padding: "18px 20px", borderRadius: 16, marginBottom: 10, cursor: "pointer",
-              background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.12))",
-              border: "1px solid rgba(245,158,11,0.45)", color: "white",
-              animation: "dbSlide .48s ease both", transition: "transform .15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.01)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-          >
-            <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: "rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🧠</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>{q.title || "Quiz"}</div>
-              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{q._className} · {(q.questions || []).length} questions{q.estimated_minutes ? ` · ~${q.estimated_minutes} min` : ""}</div>
-            </div>
-            <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
-          </button>
-        ))}
+        {pendingQuizzes.length > 0 &&
+          !activeQuiz &&
+          pendingQuizzes.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => {
+                setActiveQuiz(q);
+                setQuizAnswers(new Array((q.questions || []).length).fill(-1));
+                setQuizResult(null);
+              }}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: "18px 20px",
+                borderRadius: 16,
+                marginBottom: 10,
+                cursor: "pointer",
+                background:
+                  "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.12))",
+                border: "1px solid rgba(245,158,11,0.45)",
+                color: "white",
+                animation: "dbSlide .48s ease both",
+                transition: "transform .15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.transform =
+                  "scale(1.01)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.transform = "";
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  flexShrink: 0,
+                  background: "rgba(245,158,11,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24,
+                }}
+              >
+                🧠
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 900 }}>
+                  {q.title || "Quiz"}
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>
+                  {q._className} · {(q.questions || []).length} questions
+                  {q.estimated_minutes ? ` · ~${q.estimated_minutes} min` : ""}
+                </div>
+              </div>
+              <div style={{ fontSize: 18, opacity: 0.6 }}>›</div>
+            </button>
+          ))}
 
         {/* Inline quiz taker */}
         {activeQuiz && (
-          <div style={{
-            borderRadius: 16, padding: "20px", marginBottom: 10,
-            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(139,92,246,.4)",
-            animation: "dbSlide .4s ease both",
-          }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+          <div
+            style={{
+              borderRadius: 16,
+              padding: "20px",
+              marginBottom: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(139,92,246,.4)",
+              animation: "dbSlide .4s ease both",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                marginBottom: 16,
+              }}
+            >
               <div>
-                <div style={{ fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em", marginBottom: 4 }}>Quiz</div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{activeQuiz.title}</h2>
+                <div
+                  style={{
+                    fontSize: 10,
+                    opacity: 0.4,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.2em",
+                    marginBottom: 4,
+                  }}
+                >
+                  Quiz
+                </div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
+                  {activeQuiz.title}
+                </h2>
               </div>
-              <button onClick={() => { setActiveQuiz(null); setQuizResult(null); }} style={{ fontSize: 13, opacity: 0.5, background: "none", border: "none", color: "white", cursor: "pointer" }}>Close</button>
+              <button
+                onClick={() => {
+                  setActiveQuiz(null);
+                  setQuizResult(null);
+                }}
+                style={{
+                  fontSize: 13,
+                  opacity: 0.5,
+                  background: "none",
+                  border: "none",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
             </div>
             {quizResult ? (
               <div style={{ textAlign: "center", padding: "24px 0" }}>
-                <div style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}>{quizResult.score}%</div>
-                <div style={{ opacity: 0.6, marginTop: 8 }}>Quiz submitted. Nice work! 🎉</div>
-                <button onClick={() => { setPendingQuizzes(p => p.filter(x => x.id !== activeQuiz.id)); setActiveQuiz(null); setQuizResult(null); }}
-                  style={{ marginTop: 16, padding: "10px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Done</button>
+                <div
+                  style={{ fontSize: 52, fontWeight: 900, color: "#a78bfa" }}
+                >
+                  {quizResult.score}%
+                </div>
+                <div style={{ opacity: 0.6, marginTop: 8 }}>
+                  Quiz submitted. Nice work! 🎉
+                </div>
+                <button
+                  onClick={() => {
+                    setPendingQuizzes((p) =>
+                      p.filter((x) => x.id !== activeQuiz.id),
+                    );
+                    setActiveQuiz(null);
+                    setQuizResult(null);
+                  }}
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 24px",
+                    borderRadius: 12,
+                    background: "#7c3aed",
+                    color: "white",
+                    border: "none",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Done
+                </button>
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
                   {(activeQuiz.questions || []).map((q: any, qi: number) => (
-                    <div key={qi} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontWeight: 700, marginBottom: 10 }}>{qi + 1}. {q.text}</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div
+                      key={qi}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 10 }}>
+                        {qi + 1}. {q.text}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
                         {(q.options || []).map((opt: string, oi: number) => (
-                          <label key={oi} style={{
-                            display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 10px", borderRadius: 10,
-                            background: quizAnswers[qi] === oi ? "rgba(139,92,246,.3)" : "rgba(255,255,255,.04)",
-                            border: quizAnswers[qi] === oi ? "1px solid rgba(139,92,246,.5)" : "1px solid rgba(255,255,255,.06)",
-                          }}>
-                            <input type="radio" name={`q-${qi}`} checked={quizAnswers[qi] === oi}
-                              onChange={() => setQuizAnswers(a => { const n = [...a]; n[qi] = oi; return n; })} />
+                          <label
+                            key={oi}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              cursor: "pointer",
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              background:
+                                quizAnswers[qi] === oi
+                                  ? "rgba(139,92,246,.3)"
+                                  : "rgba(255,255,255,.04)",
+                              border:
+                                quizAnswers[qi] === oi
+                                  ? "1px solid rgba(139,92,246,.5)"
+                                  : "1px solid rgba(255,255,255,.06)",
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`q-${qi}`}
+                              checked={quizAnswers[qi] === oi}
+                              onChange={() =>
+                                setQuizAnswers((a) => {
+                                  const n = [...a];
+                                  n[qi] = oi;
+                                  return n;
+                                })
+                              }
+                            />
                             <span>{opt}</span>
                           </label>
                         ))}
@@ -2198,14 +4142,38 @@ export default function StudentDashboard() {
                   ))}
                 </div>
                 <button
-                  disabled={quizSubmitting || quizAnswers.some(a => a < 0)}
+                  disabled={quizSubmitting || quizAnswers.some((a) => a < 0)}
                   onClick={async () => {
                     setQuizSubmitting(true);
-                    try { const r = await api.submitQuiz(activeQuiz.id, quizAnswers); setQuizResult({ score: r.score }); }
-                    catch (e: any) { alert("Could not submit: " + (e?.message || "unknown error")); }
-                    finally { setQuizSubmitting(false); }
+                    try {
+                      const r = await api.submitQuiz(
+                        activeQuiz.id,
+                        quizAnswers,
+                      );
+                      setQuizResult({ score: r.score });
+                    } catch (e: any) {
+                      alert(
+                        "Could not submit: " + (e?.message || "unknown error"),
+                      );
+                    } finally {
+                      setQuizSubmitting(false);
+                    }
                   }}
-                  style={{ marginTop: 16, padding: "12px 24px", borderRadius: 12, background: "#7c3aed", color: "white", border: "none", fontWeight: 700, cursor: "pointer", opacity: (quizSubmitting || quizAnswers.some(a => a < 0)) ? 0.4 : 1 }}>
+                  style={{
+                    marginTop: 16,
+                    padding: "12px 24px",
+                    borderRadius: 12,
+                    background: "#7c3aed",
+                    color: "white",
+                    border: "none",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    opacity:
+                      quizSubmitting || quizAnswers.some((a) => a < 0)
+                        ? 0.4
+                        : 1,
+                  }}
+                >
                   {quizSubmitting ? "Submitting…" : "Submit quiz"}
                 </button>
               </>
@@ -2215,17 +4183,51 @@ export default function StudentDashboard() {
 
         {/* Teacher-shared video inline (shown regardless of free-time state) */}
         {classVideo && (
-          <div style={{ marginTop: 18, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "pulse 2s infinite" }} />
-              <span style={{ fontSize: 13, fontWeight: 700 }}>📺 Teacher shared a video</span>
+          <div
+            style={{
+              marginTop: 18,
+              borderRadius: 16,
+              overflow: "hidden",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 14px",
+              }}
+            >
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "#f87171",
+                  animation: "pulse 2s infinite",
+                }}
+              />
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                📺 Teacher shared a video
+              </span>
             </div>
             <div style={{ position: "relative", paddingTop: "56.25%" }}>
-              <iframe src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
                 title={classVideo.video_title || "Class Video"}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                }}
+              />
             </div>
           </div>
         )}
@@ -2233,32 +4235,81 @@ export default function StudentDashboard() {
         {/* ── LEADERBOARD ── */}
         {leaderboard.length > 0 && (
           <div style={{ marginTop: 22 }}>
-            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🏆 Leaderboard</div>
-            <div style={{
-              borderRadius: 16, padding: "12px",
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-              animation: "dbSlide .5s ease .1s both",
-            }}>
+            <div
+              style={{
+                marginBottom: 10,
+                fontSize: 10,
+                fontWeight: 700,
+                opacity: 0.4,
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+              }}
+            >
+              🏆 Leaderboard
+            </div>
+            <div
+              style={{
+                borderRadius: 16,
+                padding: "12px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                animation: "dbSlide .5s ease .1s both",
+              }}
+            >
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {leaderboard.slice(0, 10).map((entry: any, i: number) => {
                   const isMe = entry.user_id === user?.id;
-                  const medals = ["🥇","🥈","🥉"];
+                  const medals = ["🥇", "🥈", "🥉"];
                   return (
-                    <div key={entry.user_id} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "8px 10px", borderRadius: 10,
-                      background: isMe ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.03)",
-                      border: isMe ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.05)",
-                    }}>
-                      <div style={{ width: 24, textAlign: "center", fontSize: i < 3 ? 16 : 12, fontWeight: 800, opacity: i < 3 ? 1 : 0.4 }}>
+                    <div
+                      key={entry.user_id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        background: isMe
+                          ? "rgba(139,92,246,0.2)"
+                          : "rgba(255,255,255,0.03)",
+                        border: isMe
+                          ? "1px solid rgba(139,92,246,0.4)"
+                          : "1px solid rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 24,
+                          textAlign: "center",
+                          fontSize: i < 3 ? 16 : 12,
+                          fontWeight: 800,
+                          opacity: i < 3 ? 1 : 0.4,
+                        }}
+                      >
                         {i < 3 ? medals[i] : `${i + 1}`}
                       </div>
-                      <div style={{ flex: 1, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)" }}>
-                        {entry.name}{isMe ? " (you)" : ""}
+                      <div
+                        style={{
+                          flex: 1,
+                          fontSize: 13,
+                          fontWeight: isMe ? 800 : 600,
+                          color: isMe ? "#c4b5fd" : "rgba(255,255,255,0.75)",
+                        }}
+                      >
+                        {entry.name}
+                        {isMe ? " (you)" : ""}
                       </div>
                       <div style={{ display: "flex", gap: 2 }}>
                         {Array.from({ length: 5 }, (_, si) => (
-                          <span key={si} style={{ fontSize: 10, opacity: si < entry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                          <span
+                            key={si}
+                            style={{
+                              fontSize: 10,
+                              opacity: si < entry.behavior_stars ? 1 : 0.15,
+                            }}
+                          >
+                            ⭐
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -2266,16 +4317,50 @@ export default function StudentDashboard() {
                 })}
               </div>
               {myEntry && myRank > 10 && (
-                <div style={{
-                  marginTop: 8, padding: "8px 10px", borderRadius: 10,
-                  background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)",
-                  display: "flex", alignItems: "center", gap: 10,
-                }}>
-                  <div style={{ width: 24, textAlign: "center", fontSize: 12, fontWeight: 800, opacity: 0.6 }}>{myRank}</div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#c4b5fd" }}>{myEntry.name} (you)</div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    background: "rgba(139,92,246,0.15)",
+                    border: "1px solid rgba(139,92,246,0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 24,
+                      textAlign: "center",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      opacity: 0.6,
+                    }}
+                  >
+                    {myRank}
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: "#c4b5fd",
+                    }}
+                  >
+                    {myEntry.name} (you)
+                  </div>
                   <div style={{ display: "flex", gap: 2 }}>
                     {Array.from({ length: 5 }, (_, si) => (
-                      <span key={si} style={{ fontSize: 10, opacity: si < myEntry.behavior_stars ? 1 : 0.15 }}>⭐</span>
+                      <span
+                        key={si}
+                        style={{
+                          fontSize: 10,
+                          opacity: si < myEntry.behavior_stars ? 1 : 0.15,
+                        }}
+                      >
+                        ⭐
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -2287,76 +4372,231 @@ export default function StudentDashboard() {
         {/* ── ACHIEVEMENTS: loot-box cards ── */}
         {(myStars.rewards > 0 || badgeCount > 0) && (
           <div style={{ marginTop: 22 }}>
-            <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>🎁 Achievements</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
-              {Array.from({ length: myStars.rewards || badgeCount || 0 }).map((_, i) => (
-                <LootBox key={i} index={i} />
-              ))}
+            <div
+              style={{
+                marginBottom: 10,
+                fontSize: 10,
+                fontWeight: 700,
+                opacity: 0.4,
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+              }}
+            >
+              🎁 Achievements
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {Array.from({ length: myStars.rewards || badgeCount || 0 }).map(
+                (_, i) => (
+                  <LootBox key={i} index={i} />
+                ),
+              )}
             </div>
           </div>
         )}
 
         {/* ── CLASS: Recent Grades + Join a Class ── */}
         <div style={{ marginTop: 22 }}>
-          <div style={{ marginBottom: 10, fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.2em" }}>📋 Class</div>
+          <div
+            style={{
+              marginBottom: 10,
+              fontSize: 10,
+              fontWeight: 700,
+              opacity: 0.4,
+              textTransform: "uppercase",
+              letterSpacing: "0.2em",
+            }}
+          >
+            📋 Class
+          </div>
 
           {/* Recent Grades */}
-          <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Recent Grades</div>
+          <div
+            style={{
+              borderRadius: 16,
+              padding: "14px",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              marginBottom: 10,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                opacity: 0.5,
+                textTransform: "uppercase",
+                letterSpacing: "0.16em",
+                marginBottom: 10,
+              }}
+            >
+              Recent Grades
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {submissions.slice(0, 5).map((s: any) => (
-                <div key={s.id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 12px", borderRadius: 12,
-                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: 9, background: "rgba(139,92,246,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div
+                  key={s.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 9,
+                        background: "rgba(139,92,246,0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
                       <CheckCircle size={13} style={{ color: "#a78bfa" }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{s.assignment_title || "Assignment"}</div>
-                      <div style={{ fontSize: 10, opacity: 0.4 }}>{new Date(s.submitted_at).toLocaleDateString()}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        {s.assignment_title || "Assignment"}
+                      </div>
+                      <div style={{ fontSize: 10, opacity: 0.4 }}>
+                        {new Date(s.submitted_at).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
                   <div>
-                    {s.grade !== null
-                      ? <span style={{ fontSize: 14, fontWeight: 800, color: s.grade >= 70 ? "#34d399" : "#f87171" }}>{s.grade}%</span>
-                      : <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 20, background: "rgba(255,255,255,0.07)", opacity: 0.5 }}>Pending</span>}
+                    {s.grade !== null ? (
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: s.grade >= 70 ? "#34d399" : "#f87171",
+                        }}
+                      >
+                        {s.grade}%
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "3px 8px",
+                          borderRadius: 20,
+                          background: "rgba(255,255,255,0.07)",
+                          opacity: 0.5,
+                        }}
+                      >
+                        Pending
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
               {submissions.length === 0 && (
-                <div style={{ textAlign: "center", padding: "20px", opacity: 0.3, fontSize: 13 }}>No submissions yet</div>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "20px",
+                    opacity: 0.3,
+                    fontSize: 13,
+                  }}
+                >
+                  No submissions yet
+                </div>
               )}
             </div>
           </div>
 
           {/* Join a class */}
-          <div style={{ borderRadius: 16, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 10 }}>Join a Class</div>
+          <div
+            style={{
+              borderRadius: 16,
+              padding: "14px",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                opacity: 0.5,
+                textTransform: "uppercase",
+                letterSpacing: "0.16em",
+                marginBottom: 10,
+              }}
+            >
+              Join a Class
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input value={joinCode} onChange={e => setJoinCode(e.target.value)}
-                placeholder="Enter class code…" className="input text-sm flex-1 uppercase tracking-widest"
-                onKeyDown={e => e.key === "Enter" && handleJoinClass()}
-                style={{ minHeight: 48, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }} />
-              <button ref={joinBtnRef} onClick={handleJoinClass}
-                style={{ minHeight: 48, padding: "0 20px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer", background: joinSuccess ? "#10b981" : "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "white", border: "none", transition: "all .2s" }}>
+              <input
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="Enter class code…"
+                className="input text-sm flex-1 uppercase tracking-widest"
+                onKeyDown={(e) => e.key === "Enter" && handleJoinClass()}
+                style={{
+                  minHeight: 48,
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "white",
+                }}
+              />
+              <button
+                ref={joinBtnRef}
+                onClick={handleJoinClass}
+                style={{
+                  minHeight: 48,
+                  padding: "0 20px",
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  background: joinSuccess
+                    ? "#10b981"
+                    : "linear-gradient(135deg,#7c3aed,#6d28d9)",
+                  color: "white",
+                  border: "none",
+                  transition: "all .2s",
+                }}
+              >
                 {joinSuccess ? "✓" : "Join"}
               </button>
             </div>
           </div>
         </div>
-
-
-      </div>{/* end max-width wrapper */}
-
+      </div>
+      {/* end max-width wrapper */}
     </div>
   );
 }
 
 /* ── LootBox achievement card ── */
-const LOOT_PRIZES = ["🎉","🌟","🏆","💎","🎖️","🦄","🔥","✨","👑","🎯","🚀","🎪"];
+const LOOT_PRIZES = [
+  "🎉",
+  "🌟",
+  "🏆",
+  "💎",
+  "🎖️",
+  "🦄",
+  "🔥",
+  "✨",
+  "👑",
+  "🎯",
+  "🚀",
+  "🎪",
+];
 function LootBox({ index }: { index: number }) {
   const [opened, setOpened] = React.useState(false);
   const prize = LOOT_PRIZES[index % LOOT_PRIZES.length];
@@ -2364,20 +4604,38 @@ function LootBox({ index }: { index: number }) {
     <button
       onClick={() => setOpened(true)}
       style={{
-        padding: "16px 10px", borderRadius: 16, cursor: opened ? "default" : "pointer",
+        padding: "16px 10px",
+        borderRadius: 16,
+        cursor: opened ? "default" : "pointer",
         background: opened
           ? "linear-gradient(135deg, rgba(245,158,11,0.3), rgba(234,179,8,0.15))"
           : "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(79,70,229,0.18))",
-        border: opened ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(99,102,241,0.5)",
-        textAlign: "center", color: "white",
+        border: opened
+          ? "1px solid rgba(245,158,11,0.5)"
+          : "1px solid rgba(99,102,241,0.5)",
+        textAlign: "center",
+        color: "white",
         transition: "transform .15s",
         animation: opened ? "dbPop .3s ease both" : undefined,
       }}
-      onMouseEnter={e => { if (!opened) { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.animation = "lootShake .3s ease both"; } }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.animation = ""; }}
+      onMouseEnter={(e) => {
+        if (!opened) {
+          (e.currentTarget as HTMLElement).style.transform = "scale(1.08)";
+          (e.currentTarget as HTMLElement).style.animation =
+            "lootShake .3s ease both";
+        }
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.transform = "";
+        (e.currentTarget as HTMLElement).style.animation = "";
+      }}
     >
-      <div style={{ fontSize: 32, marginBottom: 6 }}>{opened ? prize : "🎁"}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.65 }}>{opened ? "Earned!" : "Tap to open"}</div>
+      <div style={{ fontSize: 32, marginBottom: 6 }}>
+        {opened ? prize : "🎁"}
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.65 }}>
+        {opened ? "Earned!" : "Tap to open"}
+      </div>
     </button>
   );
 }
