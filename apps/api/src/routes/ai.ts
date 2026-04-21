@@ -299,8 +299,9 @@ router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
 - No math calculation questions`
         : `Create questions appropriate for a ${subject || "General"} worksheet at the ${grade || "3rd grade"} level.`;
 
+    const safePassage = passage ? passage.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ").replace(/\r/g, "") : "";
     const passageInstruction = passage
-      ? `USE THIS PASSAGE (do not change it): "${passage}"\nAll reading/comprehension questions must refer to this passage.`
+      ? `USE THIS PASSAGE exactly as written (do not modify it):\n---\n${passage.replace(/\r/g, "").trim()}\n---\nAll reading/comprehension questions must refer to this passage. Put this passage verbatim in the "passage" field of the first section.`
       : subject === "Reading" || subject === "reading"
       ? `GENERATE a short age-appropriate reading passage (5-8 sentences) and include it as the "passage" field in the first section. All comprehension questions must refer to it.`
       : "";
@@ -346,11 +347,21 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
 
     const GROQ_KEY = process.env.GROQ_API_KEY;
     let text = "";
-    if (GROQ_KEY) {
+    const MISTRAL_KEY = process.env.MISTRAL_API_KEY;
+    if (MISTRAL_KEY) {
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
+        body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!response.ok) throw new Error(`Mistral error: ${response.status} ${await response.text()}`);
+      const data: any = await response.json();
+      text = data.choices?.[0]?.message?.content || "";
+    } else if (GROQ_KEY) {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama-3.1-8b-instant", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: "llama3-70b-8192", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`Groq error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();
@@ -375,7 +386,20 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
     }
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
-    const assignment = JSON.parse(jsonMatch[0]);
+    let jsonStr = jsonMatch[0];
+    // If truncated, try to close open structures gracefully
+    try {
+      JSON.parse(jsonStr);
+    } catch {
+      // Count unclosed brackets/braces and close them
+      const opens = (jsonStr.match(/\[/g) || []).length - (jsonStr.match(/\]/g) || []).length;
+      const openBraces = (jsonStr.match(/\{/g) || []).length - (jsonStr.match(/\}/g) || []).length;
+      // Remove trailing comma if present before closing
+      jsonStr = jsonStr.replace(/,\s*$/, "");
+      for (let i = 0; i < opens; i++) jsonStr += "]";
+      for (let i = 0; i < openBraces; i++) jsonStr += "}";
+    }
+    const assignment = JSON.parse(jsonStr);
     res.json(assignment);
   } catch (err: any) {
     console.error("generate-assignment failed:", err?.message || err);
