@@ -356,16 +356,25 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
   ]
 }`;
 
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
     let text = "";
-    if (OPENAI_KEY) {
+    if (GEMINI_KEY) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        }
+      );
+      if (!response.ok) throw new Error(`Gemini error: ${response.status} ${await response.text()}`);
+      const data: any = await response.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } else if (OPENAI_KEY) {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`OpenAI error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();
