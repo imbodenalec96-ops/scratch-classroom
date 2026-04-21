@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { isAccessAllowed } from "./lib/workUnlock.ts";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
@@ -127,6 +127,13 @@ function ProjectsGuard() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const ping = () => fetch("/api/ping").catch(() => {});
+    ping();
+    const iv = setInterval(ping, 4 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
+
   return (
     <ThemeProvider>
     <AuthProvider>

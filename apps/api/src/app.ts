@@ -52,6 +52,10 @@ const upload = multer({ dest: uploadsDir });
 
 // Health check
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/api/ping", async (_req, res) => {
+  try { await db.query("SELECT 1"); res.json({ ok: true }); }
+  catch { res.json({ ok: false }); }
+});
 
 // Status endpoint (public, no auth)
 const startTime = Date.now();
