@@ -68,7 +68,7 @@ export const api = {
   getAssignments: (classId: string) => request<any[]>(`/assignments/class/${classId}`),
   createAssignment: (data: any) => request<any>("/assignments", { method: "POST", body: JSON.stringify(data) }),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
-  generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string }) =>
+  generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),
   generateAssignmentFromVideo: (data: {
     videoUrl: string; title?: string; subject?: string; grade?: string; questionCount?: number;
