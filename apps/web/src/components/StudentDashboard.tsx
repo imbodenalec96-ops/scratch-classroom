@@ -742,12 +742,12 @@ function WorkScreen({
           </h1>
         </div>
 
-        {/* ── Video embed (if teacher attached a YouTube link) ── */}
-        {assignment.video_url && youtubeEmbedUrl(assignment.video_url) && (
+        {/* ── Video embed (column video_url or parsed content video_url) ── */}
+        {(() => { const vurl = assignment.video_url || parsed?.video_url; return vurl && youtubeEmbedUrl(vurl) && (
           <div className="animate-slide-up" style={{ animationDelay: "40ms" }}>
             <div style={{ borderRadius: 16, overflow: "hidden", aspectRatio: "16/9", boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
               <iframe
-                src={youtubeEmbedUrl(assignment.video_url)!}
+                src={youtubeEmbedUrl(vurl)!}
                 style={{ width: "100%", height: "100%", border: "none" }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -758,7 +758,7 @@ function WorkScreen({
               📺 Watch the video, then answer the questions below
             </p>
           </div>
-        )}
+        ); })()}
 
         {/* ── Editorial progress strip: dots + counter + slim bar ── */}
         <div className="animate-slide-up" style={{ animationDelay: "60ms" }}>
@@ -1520,8 +1520,7 @@ export default function StudentDashboard() {
     return (
       <WorkScreen
         assignment={pendingAssignment} parsed={parsedAssignment} dk={dk}
-        onComplete={handleWorkComplete} onBreak={handleTakeBreak}
-        onBack={() => setPhase('done')}
+        onComplete={handleWorkComplete} onBreak={handleTakeBreak} onBack={() => setPhase('done')}
         questionsAnswered={questionsAnswered} setQuestionsAnswered={setQuestionsAnswered}
       />
     );
