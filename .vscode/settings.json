@@ -2,5 +2,20 @@
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "typescript.tsdk": "node_modules/typescript/lib",
-  "tailwindCSS.experimental.classRegex": [["className\\s*=\\s*[\"'`]([^\"'`]*)[\"'`]"]]
+  "tailwindCSS.experimental.classRegex": [["className\\s*=\\s*[\"'`]([^\"'`]*)[\"'`]"]],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.inlayHints.enabled": "on",
+  "npm.packageManager": "npm",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "github.copilot.enable": {
+    "*": true
+  },
+  "claude.enabledFeatures": {
+    "codeActions": true
+  }
 }
