@@ -775,6 +775,9 @@ export default function AssignmentBuilder() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [debugAssignmentId, setDebugAssignmentId] = useState<string | null>(null);
+  const [debugData, setDebugData] = useState<any>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -2447,6 +2450,28 @@ export default function AssignmentBuilder() {
                 </button>
                 <button
                   onClick={async () => {
+                    if (debugAssignmentId === a.id) { setDebugAssignmentId(null); setDebugData(null); return; }
+                    setDebugAssignmentId(a.id);
+                    setDebugLoading(true);
+                    setDebugData(null);
+                    try {
+                      const results = await Promise.all(
+                        classStudents.map((s: any) =>
+                          fetch(`/api/assignments/class/${classId}/debug-pending?studentId=${s.id}`, {
+                            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+                          }).then(r => r.json()).then(d => ({ student: s, data: d }))
+                        )
+                      );
+                      setDebugData(results);
+                    } catch (e: any) { alert("Debug failed: " + e.message); }
+                    finally { setDebugLoading(false); }
+                  }}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(34,197,94,0.3)", color: "#4ade80", background: "rgba(34,197,94,0.06)" }}>
+                  👁 Who sees this?
+                </button>
+                <button
+                  onClick={async () => {
                     const count = await api.getAssignmentSubmissionCount(a.id).catch(() => ({ count: 0 }));
                     const warn = count.count > 0
                       ? `Delete "${a.title}"?\n\n⚠️ ${count.count} student${count.count === 1 ? " has" : "s have"} already submitted. Their submissions will be deleted too.\n\nThis cannot be undone.`
@@ -2465,6 +2490,38 @@ export default function AssignmentBuilder() {
                   {adjusting[a.id] === "delete" ? "Deleting…" : "Delete"}
                 </button>
               </div>
+
+              {/* Who sees this? debug panel */}
+              {debugAssignmentId === a.id && (
+                <div className="mt-3 p-3 rounded-xl text-xs" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                  <div className="font-bold mb-2" style={{ color: "#4ade80" }}>👁 Assignment visibility for "{a.title}"</div>
+                  {debugLoading ? (
+                    <div style={{ color: "var(--text-3)" }}>Checking…</div>
+                  ) : debugData ? (
+                    <div className="space-y-1">
+                      {debugData.map(({ student, data }: any) => {
+                        const match = (data?.assignments || []).find((r: any) => r.id === a.id);
+                        if (!match) return (
+                          <div key={student.id} className="flex items-center gap-2">
+                            <span style={{ color: "#f87171" }}>❌</span>
+                            <span style={{ color: "var(--text-2)" }}>{student.name}</span>
+                            <span style={{ color: "#f87171", opacity: 0.7 }}>— assignment not found in class</span>
+                          </div>
+                        );
+                        return (
+                          <div key={student.id} className="flex items-center gap-2">
+                            <span>{match.visible ? "✅" : "❌"}</span>
+                            <span style={{ color: "var(--text-1)", fontWeight: 600 }}>{student.name}</span>
+                            <span style={{ color: match.visible ? "#4ade80" : "#f87171", opacity: 0.8 }}>
+                              — {match.visible ? "can see it" : match.reason}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               {/* Expanded paper preview */}
               {isExpanded && parsed && (

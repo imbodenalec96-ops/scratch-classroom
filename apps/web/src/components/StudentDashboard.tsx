@@ -1263,6 +1263,9 @@ export default function StudentDashboard() {
     return () => clearInterval(iv);
   }, [classes]);
 
+  // Sub-view state for the new tile layout
+  const [activeView, setActiveView] = useState<'home' | 'assignments' | 'leaderboard'>('home');
+
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
@@ -1293,6 +1296,16 @@ export default function StudentDashboard() {
     const iv = setInterval(load, 20_000);
     return () => { cancelled = true; clearInterval(iv); };
   }, [user?.role]);
+
+  // Reload leaderboard periodically so it stays fresh after Neon wakes up
+  useEffect(() => {
+    if (phase !== 'done') return;
+    let cancelled = false;
+    const load = () => api.getLeaderboard().then(lb => { if (!cancelled && lb?.length) setLeaderboard(lb); }).catch(() => {});
+    load();
+    const iv = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [phase]);
 
   // Classroom-store points (ClassDojo-style). Separate from behavior stars —
   // cumulative teacher-awarded currency students spend at /cashout.
@@ -1553,9 +1566,6 @@ export default function StudentDashboard() {
   const firstName = user?.name?.split(" ")[0] || "Student";
   const myRank = leaderboard.findIndex((e: any) => e.user_id === user?.id) + 1;
   const badgeCount = myEntry?.badges ? (Array.isArray(myEntry.badges) ? myEntry.badges.length : 0) : 0;
-
-  // Sub-view state for the new tile layout
-  const [activeView, setActiveView] = useState<'home' | 'assignments' | 'leaderboard'>('home');
 
   const DB_ANIM = `
     @keyframes dbGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
@@ -1964,7 +1974,9 @@ export default function StudentDashboard() {
             <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(147,197,253,0.9)", lineHeight: 1.4 }}>
               {lessonBlock
                 ? `${currentBlock ? "Now:" : "Next:"} ${lessonBlock.label || lessonBlock.subject || "—"} · ${fmtTime(lessonBlock.start_time)}`
-                : "No schedule today"}
+                : todaySchedule.length > 0
+                  ? "All blocks done for today ✅"
+                  : "No schedule set"}
             </div>
           </div>
 
@@ -1986,9 +1998,18 @@ export default function StudentDashboard() {
             <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.01em" }}>Leaderboard</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(253,211,77,0.9)" }}>
               {leaderboard.length > 0
-                ? `#${myRank > 0 ? myRank : "?"} · ${leaderboard[0]?.name || "—"} is #1`
+                ? `#${myRank > 0 ? myRank : "?"} of ${leaderboard.length} · Tap to see`
                 : "Tap to see"}
             </div>
+            {leaderboard.length > 0 && (
+              <div style={{ fontSize: 11, opacity: 0.7, display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+                {leaderboard.slice(0, 3).map((e: any, i: number) => (
+                  <div key={e.user_id} style={{ color: e.user_id === user?.id ? "#fde68a" : "rgba(255,255,255,0.7)" }}>
+                    {["🥇","🥈","🥉"][i]} {e.name}{e.user_id === user?.id ? " (you)" : ""} · ⭐{e.behavior_stars ?? 0}
+                  </div>
+                ))}
+              </div>
+            )}
           </button>
 
           {/* ── 4. Achievements tile ── */}
