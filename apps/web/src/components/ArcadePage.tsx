@@ -706,9 +706,10 @@ function PlayerModal({ game, onClose }: { game: Game; onClose: () => void; showB
           <iframe
             src={game.embedUrl}
             className="w-full flex-1"
-            style={{ height: "100%", border: "none", display: "block" }}
+            style={{ height: "100%", border: "none", display: "block", width: "100%", touchAction: "none", pointerEvents: "auto" }}
             title={game.title}
-            allow="autoplay; microphone; fullscreen; pointer-lock"
+            allow="autoplay; microphone; fullscreen; pointer-lock; accelerometer; gyroscope"
+            allowFullScreen
           />
         )}
       </div>

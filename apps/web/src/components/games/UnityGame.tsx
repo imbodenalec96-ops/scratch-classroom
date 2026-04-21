@@ -64,9 +64,10 @@ export default function UnityGame({ src, title = "Unity Game" }: Props) {
         src={src}
         title={title}
         className="w-full flex-1"
-        style={{ height: "100%", minHeight: 480, border: "none", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", display: "block" }}
-        allow="autoplay; fullscreen; microphone; pointer-lock"
-        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-modals"
+        style={{ height: "100%", minHeight: 480, border: "none", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", display: "block", width: "100%", touchAction: "none", pointerEvents: "auto" }}
+        allow="autoplay; fullscreen; microphone; pointer-lock; accelerometer; gyroscope"
+        allowFullScreen
+        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-modals allow-downloads"
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
       />
