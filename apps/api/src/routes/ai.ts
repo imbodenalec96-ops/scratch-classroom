@@ -241,7 +241,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation �
 router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
   if (req.user!.role === "student") return res.status(403).json({ error: "Forbidden" });
 
-  const { title, subject, grade, instructions } = req.body;
+  const { title, subject, grade, instructions, passage } = req.body;
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -299,12 +299,19 @@ router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
 - No math calculation questions`
         : `Create questions appropriate for a ${subject || "General"} worksheet at the ${grade || "3rd grade"} level.`;
 
+    const passageInstruction = passage
+      ? `USE THIS PASSAGE (do not change it): "${passage}"\nAll reading/comprehension questions must refer to this passage.`
+      : subject === "Reading" || subject === "reading"
+      ? `GENERATE a short age-appropriate reading passage (5-8 sentences) and include it as the "passage" field in the first section. All comprehension questions must refer to it.`
+      : "";
+
     const prompt = `You are an experienced elementary school teacher creating a printable paper worksheet.
 
 Grade Level: ${grade || "3rd Grade"}
 Subject: ${subject || "General"}
 Worksheet Title: ${title || "Assignment"}
 ${instructions ? `Teacher's special instructions: ${instructions}` : ""}
+${passageInstruction}
 
 ${subjectGuide}
 
@@ -313,44 +320,25 @@ The worksheet should feel like something a real teacher would hand out in class.
 Mix question types: multiple_choice, short_answer, and fill_blank within each section.
 
 CRITICAL RULES FOR multiple_choice QUESTIONS:
-1. Every multiple_choice question MUST include a "correctIndex" field.
-2. "correctIndex" is the 0-based index of the correct answer in the "options" array.
-   - If "A. Paris" is correct and appears first in options, set "correctIndex": 0
-   - If "B. London" is correct and appears second, set "correctIndex": 1
-   - If "C. Rome" is correct and appears third, set "correctIndex": 2
-   - If "D. Berlin" is correct and appears fourth, set "correctIndex": 3
-3. Options must be prefixed: "A. ...", "B. ...", "C. ...", "D. ..."
-4. There must be exactly ONE correct answer per question.
+1. Every multiple_choice question MUST include a "correctIndex" field (0-based index of the correct answer).
+2. Options must be prefixed: "A. ...", "B. ...", "C. ...", "D. ..."
+3. There must be exactly ONE correct answer per question.
 
-IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation — just the JSON object:
+IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON object:
 {
   "title": "string",
   "subject": "string",
   "grade": "string",
-  "instructions": "string (1-2 sentences of clear student-facing directions)",
+  "instructions": "string",
   "totalPoints": number,
   "sections": [
     {
       "title": "Part 1: Section Name (X pts each)",
+      "passage": "REQUIRED for reading sections — the full passage text goes here",
       "questions": [
-        {
-          "type": "multiple_choice",
-          "text": "Question text?",
-          "options": ["A. option1", "B. option2", "C. option3", "D. option4"],
-          "correctIndex": 2,
-          "points": 5
-        },
-        {
-          "type": "short_answer",
-          "text": "Question requiring written answer?",
-          "points": 10,
-          "lines": 3
-        },
-        {
-          "type": "fill_blank",
-          "text": "The ___ of a paragraph is its most important point.",
-          "points": 5
-        }
+        { "type": "multiple_choice", "text": "Question?", "options": ["A. opt1","B. opt2","C. opt3","D. opt4"], "correctIndex": 2, "points": 5 },
+        { "type": "short_answer", "text": "Question?", "points": 10, "lines": 3 },
+        { "type": "fill_blank", "text": "The ___ is important.", "points": 5 }
       ]
     }
   ]

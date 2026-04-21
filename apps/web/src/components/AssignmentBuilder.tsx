@@ -781,6 +781,7 @@ export default function AssignmentBuilder() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedAssignment | null>(null);
   const [genError, setGenError] = useState("");
+  const [genPassage, setGenPassage] = useState("");
 
   // Video → assignment state
   const [videoUrl, setVideoUrl] = useState("");
@@ -929,7 +930,7 @@ export default function AssignmentBuilder() {
     setGenError("");
     setGenerated(null);
     try {
-      const result = await api.generateAssignment({ title, subject, grade, instructions });
+      const result = await api.generateAssignment({ title, subject, grade, instructions, passage: genPassage.trim() || undefined });
       setGenerated(result);
     } catch (e: any) {
       setGenError(`Generation failed: ${e?.message || String(e)}`);
@@ -1953,6 +1954,19 @@ export default function AssignmentBuilder() {
                 {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                 {generating ? "Generating…" : "Generate Worksheet"}
               </button>
+            </div>
+            <div className="mt-3">
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1 ${dk ? "text-violet-400/70" : "text-violet-600"}`}>
+                Reading Passage <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional — leave blank to auto-generate)</span>
+              </label>
+              <textarea
+                value={genPassage}
+                onChange={e => setGenPassage(e.target.value)}
+                placeholder="Paste your own passage here, or leave blank and AI will write one…"
+                rows={3}
+                className="input w-full text-xs"
+                style={{ resize: "vertical" }}
+              />
             </div>
             {genError && <p className="text-red-400 text-xs mt-2">{genError}</p>}
           </div>
