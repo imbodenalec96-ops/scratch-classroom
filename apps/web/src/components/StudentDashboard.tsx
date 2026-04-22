@@ -194,52 +194,9 @@ function speakText(text: string, rate = 0.82) {
   }
 }
 
-/**
- * Spelling dictation: "The word is: [word]. [word]. [letters one by one]. [word]."
- * Slow, clear, with pauses — mimics a real teacher reading spelling words.
- */
-function speakSpellingWord(word: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  const doSpeak = () => {
-    try {
-      window.speechSynthesis.cancel();
-      const voice = getBestVoice();
-
-      const say = (text: string, rate = 0.72, pauseAfter = true) => {
-        const u = new SpeechSynthesisUtterance(text);
-        u.rate = rate;
-        u.pitch = 1.0;
-        u.lang = "en-US";
-        if (voice) u.voice = voice;
-        window.speechSynthesis.speak(u);
-        if (pauseAfter) {
-          const gap = new SpeechSynthesisUtterance("  ");
-          gap.rate = 0.1;
-          gap.volume = 0;
-          window.speechSynthesis.speak(gap);
-        }
-      };
-
-      // "The word is: [word]"
-      say(`The word is: ${word}`);
-      // Spell it out — each letter separated so TTS reads them individually
-      const spelled = word.toUpperCase().split("").join(", ");
-      say(spelled, 0.6);
-      // Say the word one more time clearly
-      say(word, 0.68, false);
-    } catch {
-      /* best effort */
-    }
-  };
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    doSpeak();
-  } else {
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.onvoiceschanged = null;
-      doSpeak();
-    };
-  }
+/** Spelling questions use clue format ("Spell the word: a small insect") — read slowly and clearly, twice. */
+function speakSpellingWord(text: string) {
+  speakText(text, 0.68);
 }
 function stopSpeaking() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -3007,30 +2964,6 @@ export default function StudentDashboard() {
           {broadcast}
         </div>
       )}
-
-      {/* Back button for dashboard, leaderboard, achievements, and 'all done' state */}
-      <button
-        onClick={handleBack}
-        style={{
-          position: "fixed",
-          top: 18,
-          left: 18,
-          zIndex: 100,
-          background: "rgba(139,92,246,0.18)",
-          color: "#c4b5fd",
-          border: "none",
-          borderRadius: 14,
-          padding: "10px 22px",
-          fontWeight: 700,
-          fontSize: 16,
-          boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
-          cursor: "pointer",
-          transition: "background 0.15s, color 0.15s",
-        }}
-        aria-label="Back"
-      >
-        ← Back
-      </button>
 
       {/* Avatar picker modal */}
       {showAvatarPicker && user && (

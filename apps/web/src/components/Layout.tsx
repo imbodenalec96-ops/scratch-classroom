@@ -224,8 +224,32 @@ export default function Layout() {
 
   // Students get full-width layout — no sidebar, no hamburger
   if (isStudent) {
+    const showBack = location.pathname !== "/student";
     return (
       <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8" }}>
+        {showBack && (
+          <button
+            onClick={() => navigate("/student")}
+            style={{
+              position: "fixed",
+              top: 18,
+              left: 18,
+              zIndex: 200,
+              background: "rgba(139,92,246,0.18)",
+              color: "#c4b5fd",
+              border: "none",
+              borderRadius: 14,
+              padding: "10px 22px",
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
+            }}
+            aria-label="Back to dashboard"
+          >
+            ← Back
+          </button>
+        )}
         <main style={{ minHeight: "100vh" }} className="animate-page-enter">
           <CurrentBlockStrip />
           <Outlet />

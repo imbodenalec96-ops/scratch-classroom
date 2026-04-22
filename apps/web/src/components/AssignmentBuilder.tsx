@@ -311,11 +311,34 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const handleSubmit = async () => {
     if (!assignment) return;
     setSubmitting(true);
+    const submittedId = assignment.id;
     try {
-      await api.submitAssignmentWithAnswers(assignment.id, answers);
+      await api.submitAssignmentWithAnswers(submittedId, answers);
     } catch {}
     setSubmitting(false);
-    setSubmitted(true);
+
+    // Check if there are more assignments to do before showing "All done"
+    let remaining = todayList.filter((a: any) => a.id !== submittedId);
+    if (remaining.length === 0) {
+      // Re-fetch in case todayList was stale
+      try {
+        const cls = classes.length ? classes : await api.getClasses();
+        const results = await Promise.all(cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])));
+        remaining = (results as any[][]).flat().filter((a: any) => a.id !== submittedId);
+      } catch {}
+    }
+
+    if (remaining.length > 0) {
+      const next = remaining[0];
+      setTodayList(remaining);
+      setAssignment(next);
+      setParsed(next.content ? (() => { try { return JSON.parse(next.content); } catch { return null; } })() : null);
+      setAnswers({});
+      setCurrentQ(0);
+      setFeedback("");
+    } else {
+      setSubmitted(true);
+    }
   };
 
   const today = new Date();
