@@ -47,28 +47,44 @@ export default function WebsiteViewer() {
       });
   }, [websiteId]);
 
-  // Detect iframe block: if `load` fires but content is cross-origin blocked,
-  // the iframe stays empty. Start a timer; if the iframe src doesn't change
-  // within 4s we assume it's blocked and show the fallback.
+  // When a site refuses to be embedded, auto-open it in a new tab immediately
+  // so the student lands on the actual site without seeing a lock screen.
+  const openDirectly = useCallback((url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    setIframeBlocked(true);
+  }, []);
+
   const handleIframeLoad = useCallback(() => {
     if (blockTimerRef.current) clearTimeout(blockTimerRef.current);
     try {
-      // If we can access contentDocument the site loaded (same-origin or allowed)
       const doc = iframeRef.current?.contentDocument;
+      // If we can read contentDocument.URL and it's blank/error, the iframe was blocked
       if (!doc || doc.location.href === "about:blank") {
-        setIframeBlocked(true);
+        if (site?.url) openDirectly(site.url);
       }
     } catch {
-      // SecurityError = cross-origin = site loaded successfully in iframe
+      // SecurityError = cross-origin content loaded fine — do nothing
     }
-  }, []);
+  }, [site, openDirectly]);
 
   useEffect(() => {
     if (!site || isPwa) return;
-    // Fallback: if iframe hasn't loaded meaningfully in 5s, show "open directly" prompt
-    blockTimerRef.current = setTimeout(() => setIframeBlocked(true), 5000);
+    // Fallback: if nothing loads in 3s, auto-open in new tab
+    blockTimerRef.current = setTimeout(() => {
+      if (iframeRef.current) {
+        try {
+          const doc = iframeRef.current.contentDocument;
+          // If contentDocument is accessible and blank, it was blocked
+          if (!doc || doc.location.href === "about:blank") {
+            openDirectly(site.url);
+          }
+        } catch {
+          // Cross-origin means it DID load — don't open new tab
+        }
+      }
+    }, 3000);
     return () => { if (blockTimerRef.current) clearTimeout(blockTimerRef.current); };
-  }, [site, isPwa]);
+  }, [site, isPwa, openDirectly]);
 
   if (err) {
     return (

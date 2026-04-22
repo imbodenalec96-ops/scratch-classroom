@@ -1954,8 +1954,8 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
       const gradeLevels = await db.prepare(
         `SELECT DISTINCT ${col} AS grade_level
          FROM user_grade_levels ugl
-         JOIN class_members cm ON cm.user_id = ugl.user_id
-         WHERE cm.class_id = ? AND ${col} IS NOT NULL
+         JOIN class_members cm ON cm.user_id::text = ugl.user_id::text
+         WHERE cm.class_id::text = ? AND ${col} IS NOT NULL
          ORDER BY grade_level`
       ).all(classId) as any[];
 
@@ -1967,7 +1967,7 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 
         // Skip if already exists (no scheduled_date = always-on)
         const existing: any = await db.prepare(
-          `SELECT id FROM assignments WHERE class_id = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
+          `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
         ).get(classId, subject, gradeNum);
         if (existing) { created.push({ title: premade.title, skipped: true }); continue; }
 
@@ -1990,7 +1990,7 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
   // Insert SEL (class-wide, grades 1–5) if not already present
   try {
     const selExisting: any = await db.prepare(
-      `SELECT id FROM assignments WHERE class_id = ? AND target_subject = 'sel' AND scheduled_date IS NULL LIMIT 1`
+      `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = 'sel' AND scheduled_date IS NULL LIMIT 1`
     ).get(classId);
     if (!selExisting) {
       const id = crypto.randomUUID();
