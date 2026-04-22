@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
@@ -2397,10 +2397,7 @@ export default function StudentDashboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [lockedScreen, setLockedScreen] = useState(false);
   const [broadcast, setBroadcast] = useState<string | null>(null);
-  const [joinCode, setJoinCode] = useState("");
-  const [joinSuccess, setJoinSuccess] = useState(false);
   const [classVideo, setClassVideo] = useState<any>(null);
-  const joinBtnRef = useRef<HTMLButtonElement>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{
@@ -2717,36 +2714,6 @@ export default function StudentDashboard() {
     setBroadcast(`${data.from}: ${data.message}`);
     setTimeout(() => setBroadcast(null), 10000);
   });
-
-  const handleJoinClass = async () => {
-    if (!joinCode.trim()) return;
-    try {
-      await api.joinClass(joinCode.trim().toUpperCase());
-      const updated = await api.getClasses();
-      setClasses(updated);
-      setStatClasses(updated.length);
-      setJoinCode("");
-      setJoinSuccess(true);
-      if (joinBtnRef.current) {
-        const glyphs = ["🎉", "✨", "🌟"];
-        const rect = joinBtnRef.current.getBoundingClientRect();
-        for (let i = 0; i < 6; i++) {
-          const el = document.createElement("span");
-          el.textContent = glyphs[i % glyphs.length];
-          el.style.cssText = `position:fixed;left:${rect.left + rect.width / 2}px;top:${rect.top}px;font-size:1rem;pointer-events:none;z-index:9999;transition:transform .7s ease,opacity .7s ease;opacity:1`;
-          document.body.appendChild(el);
-          requestAnimationFrame(() => {
-            el.style.transform = `translate(${(Math.random() - 0.5) * 100}px,-80px)`;
-            el.style.opacity = "0";
-          });
-          setTimeout(() => el.remove(), 800);
-        }
-      }
-      setTimeout(() => setJoinSuccess(false), 2000);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
 
   const handleWorkComplete = useCallback(
     async (answers: Record<number, string>) => {
@@ -4496,63 +4463,6 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Join a class */}
-          <div
-            style={{
-              borderRadius: 16,
-              padding: "14px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                opacity: 0.5,
-                textTransform: "uppercase",
-                letterSpacing: "0.16em",
-                marginBottom: 10,
-              }}
-            >
-              Join a Class
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="Enter class code…"
-                className="input text-sm flex-1 uppercase tracking-widest"
-                onKeyDown={(e) => e.key === "Enter" && handleJoinClass()}
-                style={{
-                  minHeight: 48,
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  color: "white",
-                }}
-              />
-              <button
-                ref={joinBtnRef}
-                onClick={handleJoinClass}
-                style={{
-                  minHeight: 48,
-                  padding: "0 20px",
-                  borderRadius: 12,
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  background: joinSuccess
-                    ? "#10b981"
-                    : "linear-gradient(135deg,#7c3aed,#6d28d9)",
-                  color: "white",
-                  border: "none",
-                  transition: "all .2s",
-                }}
-              >
-                {joinSuccess ? "✓" : "Join"}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
       {/* end max-width wrapper */}

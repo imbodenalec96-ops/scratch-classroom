@@ -225,6 +225,24 @@ export default function Layout() {
   // Students get full-width layout — no sidebar, no hamburger
   if (isStudent) {
     const showBack = location.pathname !== "/student";
+    // Match back button accent to each section's visual identity
+    const backStyle = (() => {
+      const p = location.pathname;
+      if (p.startsWith("/leaderboard"))
+        return { bg: "rgba(245,158,11,0.2)", color: "#fcd34d", shadow: "rgba(245,158,11,0.15)" };
+      if (p.startsWith("/achievements"))
+        return { bg: "rgba(99,102,241,0.2)", color: "#a5b4fc", shadow: "rgba(99,102,241,0.15)" };
+      if (p.startsWith("/arcade"))
+        return { bg: "rgba(16,185,129,0.2)", color: "#6ee7b7", shadow: "rgba(16,185,129,0.15)" };
+      if (p.startsWith("/assignments"))
+        return { bg: "rgba(6,182,212,0.2)", color: "#67e8f9", shadow: "rgba(6,182,212,0.15)" };
+      if (p.startsWith("/student/videos") || p.startsWith("/youtube"))
+        return { bg: "rgba(239,68,68,0.2)", color: "#fca5a5", shadow: "rgba(239,68,68,0.15)" };
+      if (p.startsWith("/websites") || p.startsWith("/go/apps"))
+        return { bg: "rgba(236,72,153,0.2)", color: "#f9a8d4", shadow: "rgba(236,72,153,0.15)" };
+      // default: violet
+      return { bg: "rgba(139,92,246,0.2)", color: "#c4b5fd", shadow: "rgba(139,92,246,0.15)" };
+    })();
     return (
       <div style={{ minHeight: "100vh", background: dk ? "#070714" : "#f0f1f8" }}>
         {showBack && (
@@ -235,15 +253,16 @@ export default function Layout() {
               top: 18,
               left: 18,
               zIndex: 200,
-              background: "rgba(139,92,246,0.18)",
-              color: "#c4b5fd",
+              background: backStyle.bg,
+              color: backStyle.color,
               border: "none",
               borderRadius: 14,
               padding: "10px 22px",
               fontWeight: 700,
               fontSize: 16,
               cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
+              boxShadow: `0 2px 10px ${backStyle.shadow}`,
+              transition: "background 0.2s, color 0.2s",
             }}
             aria-label="Back to dashboard"
           >
