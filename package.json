@@ -16,7 +16,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vite": "^5.2.13",
+    "@vitejs/plugin-react": "^4.3.0"
   },
   "dependencies": {
     "pg": "^8.20.0"
