@@ -4,7 +4,8 @@ This is the Scratch Classroom platform (internal codename: Thign). React/TypeScr
 
 ## Deployment
 
-- **Production URL:** https://scratch-classroom.vercel.app
+- **Frontend URL:** https://scratch-classroom.vercel.app
+- **API URL:** https://scratch-classroom-api-td1x.vercel.app/api
 - **Deploys happen automatically** via Vercel's GitHub integration on every push to `main`. That is the only correct deploy path.
 - To ship a change: `git add <files>`, `git commit -m "..."`, `git push origin main`. That's it.
 - **NEVER run `vercel`, `npx vercel`, `vercel --prod`, or any Vercel CLI command.** They fail silently (invalid/missing token) and will mislead you into thinking you shipped when you didn't.

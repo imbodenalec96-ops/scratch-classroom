@@ -2,7 +2,7 @@ const BASE =
   (import.meta as any)?.env?.VITE_API_BASE ||
   (typeof window !== "undefined" && window.location.hostname === "localhost"
     ? "http://localhost:4000/api"
-    : "/api");
+    : "https://scratch-classroom-api-td1x.vercel.app/api");
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem("token");
