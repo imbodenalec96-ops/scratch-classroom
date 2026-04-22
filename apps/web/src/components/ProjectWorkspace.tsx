@@ -1103,7 +1103,7 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
           {mode === "2d" ? (
             <Stage2D sprites={sprites} stage={stage} running={running} selectedSpriteId={selectedSpriteId} onRunningChange={setRunning} onSpriteMove={handleSpriteMove} />
           ) : mode === "3d" ? (
-            <Stage3D sprites={sprites} stage={stage} running={running} projectId={projectId} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
+            <Stage3D sprites={sprites} stage={stage} running={running} onSpriteMove={handleSpriteMove} onAddSprite={handleAdd3DSprite} />
           ) : (
             <UnityStage />
           )}
@@ -1233,7 +1233,6 @@ export default function ProjectWorkspace({ projectId, aiEnabled = true }: Props)
       )}
       {showGameSystems && (
         <GameSystemsPanel
-          projectId={projectId}
           sprites={sprites}
           gameData={gameData}
           onChange={(next) => { setGameData(next); setDirty(true); }}
