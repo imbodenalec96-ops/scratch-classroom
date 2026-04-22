@@ -24,6 +24,11 @@ ON CONFLICT (user_id) DO UPDATE SET
   math_grade = EXCLUDED.math_grade,
   writing_grade = EXCLUDED.writing_grade;
 
+-- Ensure Jaida is enrolled in Star class
+INSERT INTO class_members (user_id, class_id)
+VALUES ('s0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002')
+ON CONFLICT DO NOTHING;
+
 -- Delete any existing assignments for this date in Star class
 DELETE FROM assignments
 WHERE class_id = 'b0000000-0000-0000-0000-000000000002'
