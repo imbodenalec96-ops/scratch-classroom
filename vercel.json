@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "npm -w packages/shared run build && npm -w apps/web run build",
+  "buildCommand": "npm -w @scratch/shared run build && npm -w @scratch/web run build",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
   "functions": {
