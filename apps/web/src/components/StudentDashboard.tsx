@@ -9,7 +9,6 @@ import {
   isAccessAllowed,
   setWorkUnlocked,
 } from "../lib/workUnlock.ts";
-import { isOnBreak, chooseBreak } from "../lib/breakSystem.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
 import { useBlockInfo } from "../lib/useCurrentBlock.ts";
 import { usePresencePing } from "../lib/presence.ts";
@@ -1130,115 +1129,6 @@ function WelcomeScreen({ name }: { name: string }) {
   );
 }
 
-/* ── Break Timer Screen ── */
-function BreakScreen({ dk, onDone }: { dk: boolean; onDone: () => void }) {
-  const BREAK_SECONDS = 10 * 60;
-  const [secs, setSecs] = useState(BREAK_SECONDS);
-  useEffect(() => {
-    const iv = setInterval(
-      () =>
-        setSecs((s) => {
-          if (s <= 1) {
-            clearInterval(iv);
-            onDone();
-            return 0;
-          }
-          return s - 1;
-        }),
-      1000,
-    );
-    return () => clearInterval(iv);
-  }, []);
-  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
-  const ss = String(secs % 60).padStart(2, "0");
-  const pct = ((BREAK_SECONDS - secs) / BREAK_SECONDS) * 100;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8"
-      style={{ background: "var(--bg)" }}
-    >
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(var(--text-1) 1px, transparent 1px), linear-gradient(90deg, var(--text-1) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
-      />
-      <div className="relative z-10 text-center space-y-3">
-        <div className="text-5xl">☕</div>
-        <div className="section-label">— Pause —</div>
-        <h2
-          className="font-display text-5xl leading-tight"
-          style={{ color: "var(--text-1)" }}
-        >
-          Break
-          <em style={{ color: "var(--accent)", fontStyle: "italic" }}>
-            {" "}
-            time.
-          </em>
-        </h2>
-        <p className="text-sm" style={{ color: "var(--text-2)" }}>
-          Relax, stretch, grab some water.
-        </p>
-      </div>
-      <div className="relative w-48 h-48 z-10">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle
-            cx="50"
-            cy="50"
-            r="44"
-            fill="none"
-            stroke="var(--border)"
-            strokeWidth="4"
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="44"
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="4"
-            strokeDasharray={`${2 * Math.PI * 44}`}
-            strokeDashoffset={`${2 * Math.PI * 44 * (1 - pct / 100)}`}
-            strokeLinecap="round"
-            style={{ transition: "stroke-dashoffset 1s linear" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="font-display text-5xl tabular-nums leading-none"
-            style={{ color: "var(--text-1)" }}
-          >
-            {mm}:{ss}
-          </span>
-          <span
-            className="text-[10px] uppercase tracking-wider mt-2"
-            style={{ color: "var(--text-3)" }}
-          >
-            remaining
-          </span>
-        </div>
-      </div>
-      <div className="relative flex items-center justify-center">
-        <div
-          className="w-24 h-24 rounded-full bg-cyan-500/20 animate-ping absolute"
-          style={{ animationDuration: "4s" }}
-        />
-        <div className="w-16 h-16 rounded-full bg-cyan-400/30 flex items-center justify-center text-2xl">
-          🌊
-        </div>
-      </div>
-      <button
-        onClick={onDone}
-        className="text-white/40 text-sm hover:text-white/70 transition-colors cursor-pointer"
-        style={{ minHeight: 44, padding: "10px 20px" }}
-      >
-        Skip break →
-      </button>
-    </div>
-  );
-}
 
 /* ── Progress dots ── */
 function ProgressDots({
@@ -1437,7 +1327,6 @@ function WorkScreen({
   parsed,
   dk,
   onComplete,
-  onBreak,
   onBack,
   questionsAnswered,
   setQuestionsAnswered,
@@ -1446,7 +1335,6 @@ function WorkScreen({
   parsed: any;
   dk: boolean;
   onComplete: (answers: Record<number, string>) => void;
-  onBreak: () => void;
   onBack: () => void;
   questionsAnswered: number;
   setQuestionsAnswered: (n: number) => void;
@@ -1466,7 +1354,6 @@ function WorkScreen({
   const total = allQuestions.length;
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [showBreakBanner, setShowBreakBanner] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mascotState, setMascotState] = useState<"idle" | "cheer">("idle");
   const [cardKey, setCardKey] = useState(0);
@@ -1499,7 +1386,6 @@ function WorkScreen({
     if (isNew) {
       const next = questionsAnswered + 1;
       setQuestionsAnswered(next);
-      if (next >= 3) setShowBreakBanner(true);
       setStreak((s) => s + 1);
       // Briefly cheer the mascot
       setMascotState("cheer");
@@ -1593,37 +1479,8 @@ function WorkScreen({
       className="fixed inset-0 z-50 overflow-auto starfall-doer"
       style={{ background: starfallBg, touchAction: "pan-y" }}
     >
-      {/* Break banner */}
-      {showBreakBanner && (
-        <div
-          className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-5 py-3 text-sm font-medium"
-          style={{
-            background: "linear-gradient(90deg, #0e7490, #0891b2)",
-            color: "white",
-          }}
-        >
-          <span>☕ You've earned a 10-minute break!</span>
-          <div className="flex gap-3">
-            <button
-              onClick={onBreak}
-              className="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 transition-colors cursor-pointer font-bold"
-              style={{ minHeight: 40 }}
-            >
-              Take Break
-            </button>
-            <button
-              onClick={() => setShowBreakBanner(false)}
-              className="text-white/60 hover:text-white cursor-pointer px-2"
-              style={{ minHeight: 40 }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       <div
-        className={`mx-auto px-6 py-12 space-y-7 ${showBreakBanner ? "pt-20" : ""}`}
+        className="mx-auto px-6 py-12 space-y-7"
         style={{ maxWidth: 720 }}
       >
         {/* ── Editorial header: exit + subject eyebrow + progress strip ── */}
@@ -2728,17 +2585,6 @@ export default function StudentDashboard() {
     [pendingAssignment, classes],
   );
 
-  // "Take Break" from inside WorkScreen → use the REAL break system
-  // (chooseBreak writes localStorage + fires breakstate-change). The
-  // accessUnlocked listener above will flip within ~1s and the dashboard
-  // falls through to the playground render. No more setPhase('break') → the
-  // legacy full-screen BreakScreen just dropped the student right back into
-  // WorkScreen when it exited (= "restarted the assignments" bug).
-  const handleTakeBreak = useCallback(() => {
-    chooseBreak();
-    setAccessUnlocked(true); // optimistic — don't wait for 1s poll
-  }, []);
-  const handleBreakDone = useCallback(() => setPhase("working"), []);
 
   const myEntry = leaderboard.find((e: any) => e.user_id === user?.id);
   const rm = prefersReducedMotion();
@@ -2797,8 +2643,6 @@ export default function StudentDashboard() {
   // work" gate and render the full dashboard so Arcade/Projects/YouTube are
   // reachable. This is what makes the dashboard flip in real-time when the
   // teacher clicks Grant Free Time or the student starts a break.
-  if (phase === "break")
-    return <BreakScreen dk={dk} onDone={handleBreakDone} />;
 
   if (phase === "working" && pendingAssignment && parsedAssignment) {
     return (
@@ -2807,7 +2651,6 @@ export default function StudentDashboard() {
         parsed={parsedAssignment}
         dk={dk}
         onComplete={handleWorkComplete}
-        onBreak={handleTakeBreak}
         onBack={() => setPhase("done")}
         questionsAnswered={questionsAnswered}
         setQuestionsAnswered={setQuestionsAnswered}

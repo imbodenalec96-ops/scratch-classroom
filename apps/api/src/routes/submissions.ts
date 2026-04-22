@@ -153,6 +153,17 @@ router.post("/", async (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
+// My submissions — MUST be before /:id so Express doesn't swallow "mine" as an id param
+router.get("/mine", async (req: AuthRequest, res: Response) => {
+  const rows = await db.prepare(
+    `SELECT s.*, a.title as assignment_title FROM submissions s
+     JOIN assignments a ON s.assignment_id::text = a.id::text
+     WHERE s.student_id::text = ? ORDER BY s.submitted_at DESC`
+  ).all(req.user!.id) as any[];
+  rows.forEach((r) => { if (r.auto_grade_result) r.auto_grade_result = JSON.parse(r.auto_grade_result); });
+  res.json(rows);
+});
+
 // Single submission — returns submission joined with the assignment content
 // so the gradebook can show question + answer side-by-side. Teacher/admin only
 // because it exposes raw student answers + the assignment's answer key.
@@ -185,17 +196,6 @@ router.get("/assignment/:assignmentId", requireRole("teacher", "admin"), async (
      JOIN users u ON s.student_id = u.id
      WHERE s.assignment_id = ? ORDER BY s.submitted_at DESC`
   ).all(req.params.assignmentId) as any[];
-  rows.forEach((r) => { if (r.auto_grade_result) r.auto_grade_result = JSON.parse(r.auto_grade_result); });
-  res.json(rows);
-});
-
-// My submissions
-router.get("/mine", async (req: AuthRequest, res: Response) => {
-  const rows = await db.prepare(
-    `SELECT s.*, a.title as assignment_title FROM submissions s
-     JOIN assignments a ON s.assignment_id::text = a.id::text
-     WHERE s.student_id::text = ? ORDER BY s.submitted_at DESC`
-  ).all(req.user!.id) as any[];
   rows.forEach((r) => { if (r.auto_grade_result) r.auto_grade_result = JSON.parse(r.auto_grade_result); });
   res.json(rows);
 });
