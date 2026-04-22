@@ -560,12 +560,12 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
       dateDayNames.push(ALL_DAY_NAMES_FW[d.getDay()]);
     }
   } else {
-    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-    if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2);
-    else if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
-    const friday = new Date(tomorrow); friday.setDate(tomorrow.getDate() + (5 - tomorrow.getDay()));
+    const today2 = new Date();
+    if (today2.getDay() === 6) today2.setDate(today2.getDate() + 2);
+    else if (today2.getDay() === 0) today2.setDate(today2.getDate() + 1);
+    const friday2 = new Date(today2); friday2.setDate(today2.getDate() + (5 - today2.getDay()));
     dates = []; dateDayNames = [];
-    for (let d = new Date(tomorrow); d <= friday; d = new Date(d.getTime() + 86_400_000)) {
+    for (let d = new Date(today2); d <= friday2; d = new Date(d.getTime() + 86_400_000)) {
       if (d.getDay() >= 1 && d.getDay() <= 5) {
         dates.push(d.toISOString().slice(0, 10));
         dateDayNames.push(ALL_DAY_NAMES_FW[d.getDay()]);
@@ -748,18 +748,17 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
       slotDayNames.push(ALL_DAY_NAMES[d.getDay()]);
     }
   } else {
-    // Default: tomorrow through Friday of this week
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    // If tomorrow lands on a weekend, push forward to Monday
-    if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2);
-    else if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
+    // Default: today through Friday of this week
+    const today = new Date();
+    // If today is weekend, push to Monday
+    if (today.getDay() === 6) today.setDate(today.getDate() + 2);
+    else if (today.getDay() === 0) today.setDate(today.getDate() + 1);
     // Friday of the same week
-    const friday = new Date(tomorrow);
-    friday.setDate(tomorrow.getDate() + (5 - tomorrow.getDay()));
+    const friday = new Date(today);
+    friday.setDate(today.getDate() + (5 - today.getDay()));
     dates = [];
     slotDayNames = [];
-    for (let d = new Date(tomorrow); d <= friday; d = new Date(d.getTime() + 86_400_000)) {
+    for (let d = new Date(today); d <= friday; d = new Date(d.getTime() + 86_400_000)) {
       if (d.getDay() >= 1 && d.getDay() <= 5) {
         dates.push(d.toISOString().slice(0, 10));
         slotDayNames.push(ALL_DAY_NAMES[d.getDay()]);
@@ -942,18 +941,13 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     //   - student_id IS NULL  → class-wide assignment (everyone sees it)
     //   - student_id = userId → only this student sees it
     //   - student_id = someone else → hidden
-    const todayStr = new Date().toISOString().slice(0, 10);
     const rows = await db.prepare(`
       SELECT a.* FROM assignments a
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
-        AND (
-          a.scheduled_date IS NULL
-          OR a.scheduled_date::date <= ?::date
-        )
       ORDER BY a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, todayStr) as any[];
+    `).all(userId, classId, userId) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
