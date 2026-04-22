@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install",
+  "installCommand": "npm install --include=dev",
   "buildCommand": "npm -w @scratch/shared run build && npm -w @scratch/web run build:deploy",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
