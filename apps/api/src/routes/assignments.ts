@@ -861,11 +861,15 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // Skip if this student already has an assignment for this date+subject
+  // Skip if this student already has an assignment for this date+display-subject.
+  // Use title prefix (e.g. "Spelling —") not target_subject, because both
+  // "spelling" and "writing" map to target_subject="writing" and would
+  // incorrectly block each other.
   try {
+    const titlePrefix = String(subject).charAt(0).toUpperCase() + String(subject).slice(1) + " —";
     const existing = await db.prepare(
-      "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND target_subject = ?"
-    ).get(studentId, date, subjectKey) as any;
+      "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND title LIKE ?"
+    ).get(studentId, date, titlePrefix + "%") as any;
     if (existing) {
       console.log(`${tag} SKIP_EXISTING id=${existing.id}`);
       return res.json({ ok: true, skipped: true, existingId: existing.id });
