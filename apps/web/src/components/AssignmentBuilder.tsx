@@ -907,6 +907,9 @@ export default function AssignmentBuilder() {
   // Edit modal state
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
   const [adjusting, setAdjusting] = useState<Record<string, string>>({});
+  // Inline student-assigner
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignDraft, setAssignDraft] = useState<string[]>([]);
 
   // Inline edit: { id, field, draft }. field = "title" | "description".
   const [inlineEdit, setInlineEdit] = useState<{ id: string; field: "title" | "description"; draft: string } | null>(null);
@@ -2635,6 +2638,19 @@ export default function AssignmentBuilder() {
                   👁 Who sees this?
                 </button>
                 <button
+                  onClick={() => {
+                    if (assigningId === a.id) { setAssigningId(null); return; }
+                    // Pre-populate from existing target_student_ids
+                    let existing: string[] = [];
+                    try { const p = JSON.parse(a.target_student_ids || "[]"); if (Array.isArray(p)) existing = p; } catch {}
+                    setAssignDraft(existing);
+                    setAssigningId(a.id);
+                  }}
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(56,189,248,0.3)", color: "#38bdf8", background: "rgba(56,189,248,0.06)" }}>
+                  👤 Assign to students
+                </button>
+                <button
                   onClick={async () => {
                     const count = await api.getAssignmentSubmissionCount(a.id).catch(() => ({ count: 0 }));
                     const warn = count.count > 0
@@ -2654,6 +2670,60 @@ export default function AssignmentBuilder() {
                   {adjusting[a.id] === "delete" ? "Deleting…" : "Delete"}
                 </button>
               </div>
+
+              {/* Inline student assigner */}
+              {assigningId === a.id && (
+                <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)" }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: "#38bdf8" }}>
+                    👤 Assign to specific students
+                    <span className="ml-2 font-normal opacity-60">Leave all unchecked = visible to whole class</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {classStudents.map((s: any) => (
+                      <label key={s.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                        style={{ background: assignDraft.includes(s.id) ? "rgba(56,189,248,0.12)" : "var(--bg-surface)", border: "1px solid", borderColor: assignDraft.includes(s.id) ? "rgba(56,189,248,0.4)" : "var(--border)" }}>
+                        <input
+                          type="checkbox"
+                          checked={assignDraft.includes(s.id)}
+                          onChange={() => setAssignDraft(prev =>
+                            prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                          )}
+                          className="accent-sky-400 cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.updateAssignment(a.id, { targetStudentIds: assignDraft });
+                          await loadAssignments(classId);
+                          setAssigningId(null);
+                        } catch (e: any) { alert("Failed: " + e.message); }
+                      }}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                      style={{ background: "rgba(56,189,248,0.18)", color: "#38bdf8", border: "1px solid rgba(56,189,248,0.3)" }}>
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setAssignDraft([]); setAssigningId(null); }}
+                      className="text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                      style={{ color: "var(--text-3)", border: "1px solid var(--border)" }}>
+                      Cancel
+                    </button>
+                    {assignDraft.length > 0 && (
+                      <button
+                        onClick={() => setAssignDraft(classStudents.map((s: any) => s.id))}
+                        className="text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                        style={{ color: "var(--text-3)", border: "1px solid var(--border)" }}>
+                        Select all
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Who sees this? debug panel */}
               {debugAssignmentId === a.id && (
