@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import LessonsBrowser from "./LessonsBrowser.tsx";
 import { useTheme } from "../lib/theme.tsx";
+import { useNavigate } from "react-router-dom";
 import { usePresencePing } from "../lib/presence.ts";
 import { api } from "../lib/api.ts";
 import {
@@ -999,6 +1000,7 @@ function SubjectProgress({
 export default function LessonsPage() {
   const { theme } = useTheme();
   const dk = theme === "dark";
+  const navigate = useNavigate();
 
   const [subject, setSubject] = useState<SubjectKey>("reading");
   const [gradeFilter, setGradeFilter] = useState<number>(0);
@@ -1110,6 +1112,25 @@ export default function LessonsPage() {
     >
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            background: "rgba(139,92,246,0.18)",
+            color: "#c4b5fd",
+            border: "none",
+            borderRadius: 14,
+            padding: "10px 22px",
+            fontWeight: 700,
+            fontSize: 15,
+            boxShadow: "0 2px 10px rgba(139,92,246,0.12)",
+            cursor: "pointer",
+            marginBottom: 14,
+            display: "inline-block",
+          }}
+          aria-label="Back"
+        >
+          ← Back
+        </button>
         <div
           className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]"
           style={{ color: "var(--text-3)" }}

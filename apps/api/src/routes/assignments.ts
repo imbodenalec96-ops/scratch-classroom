@@ -393,7 +393,7 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
 
   // Students in class
   const students = await db.prepare(
-    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id::text = u.id::text WHERE cm.class_id::text = ? AND u.role = 'student'"
   ).all(classId) as any[];
   if (students.length === 0) {
     return res.status(400).json({ error: "No students enrolled in this class" });
@@ -405,7 +405,7 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
 
   // Look up per-student grades once
   const gradeRows = await db.prepare(
-    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id IN (" +
+    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text IN (" +
     students.map(() => "?").join(",") + ")"
   ).all(...students.map(s => s.id)).catch(() => [] as any[]) as any[];
   const gradesById: Record<string, any> = {};
@@ -421,7 +421,7 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
   for (const s of students) {
     try {
       const rows = await db.prepare(
-        "SELECT prompt FROM daily_tasks WHERE student_id = ? AND subject = ? AND date >= date('now','-14 day')"
+        "SELECT prompt FROM daily_tasks WHERE student_id::text = ? AND subject = ? AND date >= date('now','-14 day')"
       ).all(s.id, subjectKey) as any[];
       recentPromptsByStudent[s.id] = rows.map(r => r.prompt || "").slice(0, 10);
     } catch {
@@ -553,7 +553,7 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
 
   // Roster — filter by studentIds if provided
   const roster = await db.prepare(
-    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id::text = u.id::text WHERE cm.class_id::text = ? AND u.role = 'student'"
   ).all(classId) as any[];
   const students = (Array.isArray(studentIds) && studentIds.length)
     ? roster.filter(s => studentIds.includes(s.id))
@@ -562,7 +562,7 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
 
   // Per-student grades
   const gradeRows = await db.prepare(
-    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id IN (" +
+    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text IN (" +
     students.map(() => "?").join(",") + ")"
   ).all(...students.map(s => s.id)).catch(() => [] as any[]) as any[];
   const gradesById: Record<string, any> = {};
@@ -590,7 +590,7 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
     for (const subj of subjects) {
       try {
         const rows = await db.prepare(
-          "SELECT prompt FROM daily_tasks WHERE student_id = ? AND subject = ? AND date >= date('now','-14 day')"
+          "SELECT prompt FROM daily_tasks WHERE student_id::text = ? AND subject = ? AND date >= date('now','-14 day')"
         ).all(s.id, subjectKey(subj)) as any[];
         recent[`${s.id}|${subj}`] = rows.map((r: any) => r.prompt || "").slice(0, 10);
       } catch { recent[`${s.id}|${subj}`] = []; }
@@ -717,7 +717,7 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
   }
 
   const roster = await db.prepare(
-    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id = u.id WHERE cm.class_id = ? AND u.role = 'student'"
+    "SELECT u.id, u.name FROM users u JOIN class_members cm ON cm.user_id::text = u.id::text WHERE cm.class_id::text = ? AND u.role = 'student'"
   ).all(classId) as any[];
   const students = (Array.isArray(studentIds) && studentIds.length)
     ? roster.filter(s => studentIds.includes(s.id))
@@ -726,7 +726,7 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
 
   // Grades lookup
   const gradeRows = await db.prepare(
-    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id IN (" +
+    "SELECT user_id, reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text IN (" +
     students.map(() => "?").join(",") + ")"
   ).all(...students.map(s => String(s.id))).catch(() => [] as any[]) as any[];
   const gradesById: Record<string, any> = {};
@@ -954,7 +954,7 @@ router.get("/class/:classId/debug-pending", requireRole("teacher", "admin"), asy
     ).all(studentId, req.params.classId) as any[];
 
     const studentGrades = await db.prepare(
-      "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id = ?"
+      "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?"
     ).get(studentId) as any;
 
     const annotated = rows.map((r: any) => {

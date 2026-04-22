@@ -42,30 +42,27 @@ export default function Achievements() {
 
   return (
     <div className="p-8 space-y-6">
-      {/* Back button */}
-      <button
-        onClick={() => navigate(-1)}
-        style={{
-          position: "fixed",
-          top: 18,
-          left: 18,
-          zIndex: 100,
-          background: "rgba(139,92,246,0.18)",
-          color: "#c4b5fd",
-          border: "none",
-          borderRadius: 14,
-          padding: "10px 22px",
-          fontWeight: 700,
-          fontSize: 16,
-          boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
-          cursor: "pointer",
-          transition: "background 0.15s, color 0.15s",
-        }}
-        aria-label="Back"
-      >
-        ← Back
-      </button>
-      <h1 className="text-2xl font-bold tracking-tight text-t1 animate-slide-up">Achievements</h1>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            background: "rgba(99,102,241,0.18)",
+            color: "#a5b4fc",
+            border: "none",
+            borderRadius: 14,
+            padding: "10px 22px",
+            fontWeight: 700,
+            fontSize: 15,
+            boxShadow: "0 2px 10px rgba(99,102,241,0.12)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+          aria-label="Back"
+        >
+          ← Back
+        </button>
+        <h1 className="text-2xl font-bold tracking-tight text-t1 animate-slide-up">Achievements</h1>
+      </div>
 
       {leaderboard && (
         <div className="card max-w-md animate-slide-up" style={{ animationDelay: "80ms" }}>

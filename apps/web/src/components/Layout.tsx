@@ -224,7 +224,12 @@ export default function Layout() {
 
   // Students get full-width layout — no sidebar, no hamburger
   if (isStudent) {
-    const showBack = location.pathname !== "/student";
+    // Exclude pages that have their own inline back buttons
+    const showBack = location.pathname !== "/student" &&
+      !location.pathname.startsWith("/assignments") &&
+      !location.pathname.startsWith("/lessons") &&
+      !location.pathname.startsWith("/leaderboard") &&
+      !location.pathname.startsWith("/achievements");
     // Match back button accent to each section's visual identity
     const backStyle = (() => {
       const p = location.pathname;

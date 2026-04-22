@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
@@ -188,6 +189,7 @@ function isAnswerCorrect(question: Question, answer: string): boolean {
 /* ── Student Interactive Assignment View ─────────────────────── */
 function StudentAssignmentView({ dk }: { dk: boolean }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [classes, setClasses] = useState<any[]>([]);
   const [assignment, setAssignment] = useState<any>(null);
   const [parsed, setParsed] = useState<any>(null);
@@ -440,7 +442,28 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         `}</style>
 
         {/* Hero header */}
-        <div style={{ padding: "48px 24px 32px", maxWidth: 640, margin: "0 auto" }}>
+        <div style={{ padding: "28px 24px 0", maxWidth: 640, margin: "0 auto" }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "rgba(6,182,212,0.18)",
+              color: "#67e8f9",
+              border: "none",
+              borderRadius: 14,
+              padding: "10px 22px",
+              fontWeight: 700,
+              fontSize: 15,
+              boxShadow: "0 2px 10px rgba(6,182,212,0.12)",
+              cursor: "pointer",
+              marginBottom: 20,
+              display: "inline-block",
+            }}
+            aria-label="Back"
+          >
+            ← Back
+          </button>
+        </div>
+        <div style={{ padding: "0 24px 32px", maxWidth: 640, margin: "0 auto" }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a78bfa", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 16 }}>📅</span> {todayName.toUpperCase()}'S ASSIGNMENTS
           </div>
