@@ -1787,11 +1787,14 @@ export default function AssignmentBuilder() {
               borderRadius: "var(--r-md)",
               fontSize: 13, fontWeight: 600,
             }}>
-              ✓ Created {fullWeekResult.created} / {fullWeekResult.expected} in {fullWeekResult.elapsed}s
+              {fullWeekResult.created > 0 ? "✓" : "✗"} Created {fullWeekResult.created} / {fullWeekResult.expected} in {fullWeekResult.elapsed}s
               ({fullWeekResult.studentsAffected} students × {fullWeekResult.subjectsPerStudent} subjects × 5 days)
               {fullWeekResult.failed > 0 && (
                 <div className="mt-1 text-xs" style={{ color: "var(--danger)" }}>
-                  {fullWeekResult.failed} failed. Click '✨ Regenerate fresh' on each missing day to retry.
+                  {fullWeekResult.failed} failed.
+                  {fullWeekResult.errors?.length > 0 && (
+                    <span> Errors: {fullWeekResult.errors.map((e: any) => e.err || JSON.stringify(e)).join("; ")}</span>
+                  )}
                 </div>
               )}
             </div>

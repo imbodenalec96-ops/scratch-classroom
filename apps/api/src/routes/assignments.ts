@@ -833,7 +833,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
 
   const id = crypto.randomUUID();
   try {
-    await db.prepare(
+    const result = await db.prepare(
       `INSERT INTO assignments (id, class_id, teacher_id, student_id, title, description, due_date, rubric, content, scheduled_date, target_subject, target_grade_min, target_grade_max, week_theme, teacher_notes, question_count, estimated_minutes, focus_keywords, learning_objective, hints_allowed, question_type)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -855,10 +855,15 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
       hintsAllowed != null ? (hintsAllowed ? 1 : 0) : 1,
       questionType || null,
     );
+    console.log(`${tag} INSERT_OK changes=${result.changes} id=${id}`);
+    if (!result.changes || result.changes < 1) {
+      console.error(`${tag} INSERT_NO_ROWS id=${id} classId=${classId} studentId=${studentId}`);
+      return res.status(500).json({ error: 'Insert wrote 0 rows', id, classId, studentId });
+    }
     res.json({ ok: true, id, student: studentId, date, subject });
   } catch (e: any) {
-    console.error('generate-slot insert', e?.message);
-    res.status(500).json({ error: 'Insert failed', detail: e?.message });
+    console.error(`${tag} INSERT_ERR`, e?.message, e?.stack?.slice(0, 400));
+    res.status(500).json({ error: 'Insert failed', detail: e?.message, classId, studentId });
   }
 });
 
