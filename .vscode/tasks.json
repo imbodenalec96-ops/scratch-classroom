@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Deploy",
+      "type": "shell",
+      "command": "git add -A && git commit -m \"${input:commitMessage}\" && git push origin main && echo '' && echo '✓ Pushed — auto-deploy in progress' && echo 'Frontend: https://scratch-classroom.vercel.app' && echo 'Vercel:   https://vercel.com/dashboard' && echo 'Railway:  https://railway.app/dashboard'",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Quick Deploy",
+      "type": "shell",
+      "command": "git add -A && git commit -m \"quick update\" && git push origin main && echo '✓ Pushed'",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Local Dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "commitMessage",
+      "type": "promptString",
+      "description": "What did you fix?"
+    }
+  ]
+}

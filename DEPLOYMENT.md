@@ -1,26 +1,32 @@
 # Deployment Guide
 
+## One-button deploy from VS Code
+
+**Cmd+Shift+B** → type what you fixed → Enter → done.
+
+This stages all changes, commits with your message, and pushes to `main`. Vercel and Railway pick it up automatically within ~60 seconds.
+
+- Frontend live at: https://scratch-classroom.vercel.app
+- Vercel dashboard: https://vercel.com/dashboard
+- Railway dashboard: https://railway.app/dashboard
+
+## Quick deploy (no prompt)
+
+Run the **Quick Deploy** task: Cmd+Shift+B → select "Quick Deploy" → commits as "quick update".
+
 ## Local dev
 ```bash
-npm run dev        # starts both frontend (port 5173) and API (port 3001)
+npm run dev        # starts frontend (port 5173) + API (port 4000)
 npm run dev:web    # frontend only
 npm run dev:api    # API only
 ```
 
-## Push to production
-```bash
-git add .
-git commit -m "your message"
-git push origin main
-```
-
 ## Auto-deploy
-- **Frontend → Vercel** (`scratch-classroom.vercel.app`) — deploys automatically when `main` is pushed
-- **API → Railway** — deploys automatically when `main` is pushed
+- **Frontend → Vercel** (`scratch-classroom.vercel.app`) — deploys on every push to `main`
+- **API → Railway** — deploys on every push to `main`
 
-## View deploy logs
-- Vercel: vercel.com → scratch-classroom → Deployments
-- Railway: railway.app → your project → Deployments
+## Roll back
+Go to Vercel/Railway dashboard → Deployments → click any previous deploy → Promote to Production.
 
-## When something breaks
-Open Claude Code (`claude` in terminal) from `/Users/alecimboden/Thign` — it has full context of this codebase.
+## Debugging
+Open Claude Code (`claude` in terminal) from `/Users/alecimboden/Thign` — it has full context.
