@@ -86,8 +86,12 @@ export default function GradingPanel() {
     loadSubmissions(selectedAssignment);
   };
 
-  const quickGrade = async (subId: string, score: number, note: string) => {
-    await api.gradeSubmission(subId, score, note);
+  const quickGrade = async (subId: string, score: number, note: string, isRedo = false) => {
+    if (isRedo) {
+      await api.deleteSubmission(subId);
+    } else {
+      await api.gradeSubmission(subId, score, note);
+    }
     loadSubmissions(selectedAssignment);
   };
 
@@ -151,7 +155,6 @@ export default function GradingPanel() {
               { label: "✅ Pass (100%)", score: 100, note: "Excellent work!" },
               { label: "👍 Good (85%)", score: 85, note: "Good job!" },
               { label: "📝 Needs Work (60%)", score: 60, note: "Please review and try again." },
-              { label: "❌ Redo (0%)", score: 0, note: "Please redo this assignment." },
             ].map((opt) => (
               <button key={opt.score}
                 onClick={() => setGrading({ ...grading, grade: String(opt.score), feedback: opt.note })}
@@ -163,6 +166,11 @@ export default function GradingPanel() {
                 {opt.label}
               </button>
             ))}
+            <button
+              onClick={async () => { await api.deleteSubmission(grading.id); setGrading(null); loadSubmissions(selectedAssignment); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer border-red-500/30 text-red-400 hover:bg-red-500/10`}>
+              ❌ Redo (sends back)
+            </button>
           </div>
           <div className="flex gap-2">
             <button onClick={handleGrade} disabled={saving} className="btn-primary text-sm gap-1">
@@ -312,7 +320,6 @@ export default function GradingPanel() {
                         { label: "Pass", score: 100, note: "Great work!" },
                         { label: "Good", score: 85, note: "Good job!" },
                         { label: "Needs Work", score: 60, note: "Please review and redo." },
-                        { label: "Redo", score: 0, note: "Please redo this assignment." },
                       ].map((opt) => (
                         <button key={opt.score}
                           onClick={() => quickGrade(s.id, opt.score, opt.note)}
@@ -323,6 +330,11 @@ export default function GradingPanel() {
                           {opt.label} ({opt.score}%)
                         </button>
                       ))}
+                      <button
+                        onClick={() => quickGrade(s.id, 0, "", true)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border border-red-500/30 text-red-400 hover:bg-red-500/10">
+                        Redo (sends back)
+                      </button>
                     </div>
                   </div>
                 )}

@@ -193,11 +193,18 @@ router.get("/assignment/:assignmentId", requireRole("teacher", "admin"), async (
 router.get("/mine", async (req: AuthRequest, res: Response) => {
   const rows = await db.prepare(
     `SELECT s.*, a.title as assignment_title FROM submissions s
-     JOIN assignments a ON s.assignment_id = a.id
-     WHERE s.student_id = ? ORDER BY s.submitted_at DESC`
+     JOIN assignments a ON s.assignment_id::text = a.id::text
+     WHERE s.student_id::text = ? ORDER BY s.submitted_at DESC`
   ).all(req.user!.id) as any[];
   rows.forEach((r) => { if (r.auto_grade_result) r.auto_grade_result = JSON.parse(r.auto_grade_result); });
   res.json(rows);
+});
+
+// Delete submission (teacher marks as redo — removes submission so student can resubmit)
+router.delete("/:id", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const result = await db.prepare("DELETE FROM submissions WHERE id::text = ?").run(req.params.id);
+  if (!result.changes) return res.status(404).json({ error: "Submission not found" });
+  res.json({ ok: true });
 });
 
 // Grade submission (teacher)

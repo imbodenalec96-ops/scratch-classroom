@@ -130,6 +130,7 @@ export const api = {
   getSubmissions: (assignmentId: string) => request<any[]>(`/submissions/assignment/${assignmentId}`),
   getMySubmissions: () => request<any[]>("/submissions/mine"),
   gradeSubmission: (id: string, grade: number, feedback: string) => request<any>(`/submissions/${id}/grade`, { method: "PUT", body: JSON.stringify({ grade, feedback }) }),
+  deleteSubmission: (id: string) => request<any>(`/submissions/${id}`, { method: "DELETE" }),
 
   // Gradebook (per-student)
   getSubmission: (id: string) => request<any>(`/submissions/${id}`),
