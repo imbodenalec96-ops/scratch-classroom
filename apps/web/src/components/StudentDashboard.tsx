@@ -140,22 +140,28 @@ function getStarfallPalette(subject?: string | null) {
 function getBestVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  // Priority list: clearest/most natural voices per platform
+  // Ordered from clearest/most natural to last resort
   const preferred = [
-    // macOS / iOS
-    /samantha|karen|serena|daniel|moira/i,
-    // Chrome / ChromeOS
-    /google us english|google uk english female/i,
-    // Windows / Edge
-    /microsoft zira|microsoft jenny|microsoft aria|microsoft guy/i,
-    // Android
-    /en-us.*female|female.*en-us/i,
-    // Any en-US voice (last resort before default)
+    // Chrome on any platform — Google voices are the clearest
+    /google us english female/i,
+    /google us english/i,
+    /google uk english female/i,
+    // macOS / iOS — Apple neural voices
+    /samantha/i,
+    /karen/i,
+    /serena/i,
+    // Windows / Edge — Microsoft neural voices
+    /microsoft jenny/i,
+    /microsoft aria/i,
+    /microsoft zira/i,
+    // Any English female voice
+    /en.*female|female.*en/i,
+    // Any English voice
     /.*/,
   ];
-  const enUS = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+  const enVoices = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
   for (const pattern of preferred) {
-    const match = enUS.find((v) => pattern.test(v.name));
+    const match = enVoices.find((v) => pattern.test(v.name));
     if (match) return match;
   }
   return voices[0] ?? null;
@@ -177,7 +183,6 @@ function speakText(text: string, rate = 0.82) {
       /* best effort */
     }
   };
-  // Voices may not be loaded yet — wait for them if needed
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
     doSpeak();
@@ -189,28 +194,39 @@ function speakText(text: string, rate = 0.82) {
   }
 }
 
-/** Spelling-specific: say word → pause → say word again (classic dictation pattern) */
+/**
+ * Spelling dictation: "The word is: [word]. [word]. [letters one by one]. [word]."
+ * Slow, clear, with pauses — mimics a real teacher reading spelling words.
+ */
 function speakSpellingWord(word: string) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const doSpeak = () => {
     try {
       window.speechSynthesis.cancel();
       const voice = getBestVoice();
-      const make = (t: string) => {
-        const u = new SpeechSynthesisUtterance(t);
-        u.rate = 0.78;
+
+      const say = (text: string, rate = 0.72, pauseAfter = true) => {
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = rate;
         u.pitch = 1.0;
         u.lang = "en-US";
         if (voice) u.voice = voice;
-        return u;
+        window.speechSynthesis.speak(u);
+        if (pauseAfter) {
+          const gap = new SpeechSynthesisUtterance("  ");
+          gap.rate = 0.1;
+          gap.volume = 0;
+          window.speechSynthesis.speak(gap);
+        }
       };
-      window.speechSynthesis.speak(make(word));
-      // Brief silent pause utterance
-      const pause = new SpeechSynthesisUtterance(" ");
-      pause.rate = 0.1;
-      pause.volume = 0;
-      window.speechSynthesis.speak(pause);
-      window.speechSynthesis.speak(make(word));
+
+      // "The word is: [word]"
+      say(`The word is: ${word}`);
+      // Spell it out — each letter separated so TTS reads them individually
+      const spelled = word.toUpperCase().split("").join(", ");
+      say(spelled, 0.6);
+      // Say the word one more time clearly
+      say(word, 0.68, false);
     } catch {
       /* best effort */
     }
@@ -1513,7 +1529,12 @@ function WorkScreen({
   useEffect(() => () => stopSpeaking(), []);
   useEffect(() => {
     stopSpeaking();
-  }, [currentQ]);
+    // Auto-read spelling words aloud when the question changes
+    if (String(parsed?.subject || "").toLowerCase() === "spelling" && q?.q?.text) {
+      const timer = setTimeout(() => speakSpellingWord(q.q.text), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [currentQ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (value: string) => {
     const isNew = answers[currentQ] === undefined;
