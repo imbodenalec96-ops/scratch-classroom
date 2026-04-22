@@ -23,7 +23,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    const msg = err.details ? `${err.error}: ${err.details}` : (err.error || res.statusText);
+    const msg = (err.details || err.detail) ? `${err.error}: ${err.details || err.detail}` : (err.error || res.statusText);
     const e = new Error(msg) as any;
     e.status = res.status;
     throw e;

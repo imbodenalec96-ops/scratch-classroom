@@ -81,7 +81,7 @@ async function getAnthropic() {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   return new Anthropic({ apiKey: key, timeout: 45_000, maxRetries: 0 });
 }
-const AI_MODEL = "claude-sonnet-4-20250514";
+const AI_MODEL = "claude-sonnet-4-6";
 
 function hashString(s: string): number {
   let h = 2166136261 >>> 0;
@@ -109,7 +109,7 @@ async function generateDailyAssignmentContent(client: any, opts: {
   focusKeywords?: string;
   questionType?: string;
   learningObjective?: string;
-}): Promise<{ title: string; content: any } | null> {
+}): Promise<{ title: string; content: any }> {
   const seed = hashString(`${opts.studentId}|${opts.date}|${opts.subject}`);
   const theme = WEEKLY_THEMES[seed % WEEKLY_THEMES.length];
   const recent = opts.recentPrompts.slice(0, 8).map(p => "- " + (p || "").slice(0, 80)).join("\n");
@@ -122,21 +122,20 @@ async function generateDailyAssignmentContent(client: any, opts: {
     ? "Every question must be fill_blank."
     : "Mix multiple_choice, short_answer, and fill_blank when natural.";
 
-  try {
-    // Explicit Promise.race hard-timeout. The SDK's `timeout` config is
-    // unreliable under rate-limit backoff — calls can stall past 120s even
-    // with maxRetries:0. This forcibly rejects at 40s regardless of SDK state.
-    const HARD_TIMEOUT_MS = 40_000;
-    const apiCall = client.messages.create({
-      model: AI_MODEL,
-      max_tokens: 900,
-      system:
-        "You are a creative elementary teacher. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
-        `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
-        `Exactly ${qCount} questions per task. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`,
-      messages: [{
-        role: "user",
-        content:
+  // Explicit Promise.race hard-timeout. The SDK's `timeout` config is
+  // unreliable under rate-limit backoff — calls can stall past 120s even
+  // with maxRetries:0. This forcibly rejects at 40s regardless of SDK state.
+  const HARD_TIMEOUT_MS = 40_000;
+  const apiCall = client.messages.create({
+    model: AI_MODEL,
+    max_tokens: 900,
+    system:
+      "You are a creative elementary teacher. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
+      `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
+      `Exactly ${qCount} questions per task. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`,
+    messages: [{
+      role: "user",
+      content:
 `Subject: ${opts.subject}. Student grade: ${opts.gradeMin === opts.gradeMax ? opts.gradeMax : `${opts.gradeMin}–${opts.gradeMax}`}. Date: ${opts.date}.
 Theme seed: ${theme}.${opts.weekTheme ? `\nThis week's focus: ${opts.weekTheme}.` : ""}
 ${opts.learningObjective ? `Learning objective: ${opts.learningObjective}.` : ""}
@@ -144,20 +143,18 @@ ${opts.focusKeywords ? `Emphasize these topics/keywords: ${opts.focusKeywords}.`
 ${opts.teacherNotes ? `Private teacher notes (don't expose to student, but use when crafting): ${opts.teacherNotes}` : ""}
 ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different question type):\n${recent}` : ""}
 Make this feel different from other days this week. Return ONLY JSON.`,
-      }],
-    });
-    const msg: any = await Promise.race([
-      apiCall,
-      new Promise((_r, rej) => setTimeout(() => rej(new Error(`anthropic hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
-    ]);
-    const raw = (msg.content[0] as any).text.trim();
-    const parsed = JSON.parse(raw);
-    if (!parsed.sections || !Array.isArray(parsed.sections)) throw new Error("bad shape");
-    return { title: parsed.title || "Assignment", content: parsed };
-  } catch (e: any) {
-    console.error("[weekly gen]", opts.studentId.slice(0, 8), opts.date, opts.subject, e?.message);
-    return null;
-  }
+    }],
+  });
+  const msg: any = await Promise.race([
+    apiCall,
+    new Promise((_r, rej) => setTimeout(() => rej(new Error(`anthropic hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
+  ]);
+  let raw = (msg.content[0] as any).text.trim();
+  // Strip markdown code fences if the model wraps its JSON response
+  if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
+  const parsed = JSON.parse(raw);
+  if (!parsed.sections || !Array.isArray(parsed.sections)) throw new Error("bad shape: no sections array");
+  return { title: parsed.title || "Assignment", content: parsed };
 }
 
 // Create assignment with full custom fields (Feature 29 rich customization)
@@ -447,24 +444,24 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
     const batch = slots.slice(i, i + BATCH);
     await Promise.all(batch.map(async (slot) => {
       const grade = gradeForStudent(slot.studentId);
-      const gen = await generateDailyAssignmentContent(client, {
-        studentId: slot.studentId,
-        date: slot.dateStr,
-        subject: subjectKey,
-        gradeMin: grade,
-        gradeMax: grade,
-        weekTheme,
-        recentPrompts: recentPromptsByStudent[slot.studentId] || [],
-      });
-      // Retry once
-      const final = gen || await generateDailyAssignmentContent(client, {
-        studentId: slot.studentId, date: slot.dateStr, subject: subjectKey,
-        gradeMin: grade, gradeMax: grade, weekTheme,
-        recentPrompts: recentPromptsByStudent[slot.studentId] || [],
-      });
-      if (!final) {
-        failed.push({ student_id: slot.studentId, date: slot.dateStr });
-        return;
+      let final: { title: string; content: any };
+      try {
+        final = await generateDailyAssignmentContent(client, {
+          studentId: slot.studentId, date: slot.dateStr, subject: subjectKey,
+          gradeMin: grade, gradeMax: grade, weekTheme,
+          recentPrompts: recentPromptsByStudent[slot.studentId] || [],
+        });
+      } catch {
+        try {
+          final = await generateDailyAssignmentContent(client, {
+            studentId: slot.studentId, date: slot.dateStr + "|retry", subject: subjectKey,
+            gradeMin: grade, gradeMax: grade, weekTheme,
+            recentPrompts: recentPromptsByStudent[slot.studentId] || [],
+          });
+        } catch (e: any) {
+          failed.push({ student_id: slot.studentId, date: slot.dateStr, reason: e?.message });
+          return;
+        }
       }
       // Add this generated prompt to the recent list so subsequent days in the
       // same batch run avoid repeating it too
@@ -625,20 +622,28 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
       const theme = themeBySubject[slot.subject] || themeBySubject[subjectKey(slot.subject)] || "";
       const recentList = recent[`${slot.studentId}|${slot.subject}`] || [];
 
-      const gen = await generateDailyAssignmentContent(client, {
-        studentId: slot.studentId,
-        date: slot.dateStr + "|" + slot.subject, // include subject in seed so same-day different-subject diverge
-        subject: subjectKey(slot.subject),
-        gradeMin: grade, gradeMax: grade,
-        weekTheme: [theme, varietyHint].filter(Boolean).join(". "),
-        recentPrompts: recentList,
-      });
-      const final = gen || await generateDailyAssignmentContent(client, {
-        studentId: slot.studentId, date: slot.dateStr + "|" + slot.subject + "|retry",
-        subject: subjectKey(slot.subject), gradeMin: grade, gradeMax: grade,
-        weekTheme: theme, recentPrompts: recentList,
-      });
-      if (!final) { failed.push({ student_id: slot.studentId, date: slot.dateStr, subject: slot.subject }); return; }
+      let final: { title: string; content: any };
+      try {
+        final = await generateDailyAssignmentContent(client, {
+          studentId: slot.studentId,
+          date: slot.dateStr + "|" + slot.subject,
+          subject: subjectKey(slot.subject),
+          gradeMin: grade, gradeMax: grade,
+          weekTheme: [theme, varietyHint].filter(Boolean).join(". "),
+          recentPrompts: recentList,
+        });
+      } catch {
+        try {
+          final = await generateDailyAssignmentContent(client, {
+            studentId: slot.studentId, date: slot.dateStr + "|" + slot.subject + "|retry",
+            subject: subjectKey(slot.subject), gradeMin: grade, gradeMax: grade,
+            weekTheme: theme, recentPrompts: recentList,
+          });
+        } catch (e: any) {
+          failed.push({ student_id: slot.studentId, date: slot.dateStr, subject: slot.subject, reason: e?.message });
+          return;
+        }
+      }
 
       const firstPrompt = final.content?.sections?.[0]?.questions?.[0]?.text || "";
       if (firstPrompt) recent[`${slot.studentId}|${slot.subject}`]?.unshift(firstPrompt);
@@ -822,14 +827,19 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   console.log(`${tag} RECENT_OK +${Date.now()-T0}ms n=${recent.length}`);
 
   console.log(`${tag} ANTHROPIC_START +${Date.now()-T0}ms`);
-  const gen = await generateDailyAssignmentContent(client, {
-    studentId, date: `${date}|${subject}`, subject: subjectKey,
-    gradeMin: Number(gradeMin), gradeMax: Number(gradeMax ?? gradeMin),
-    weekTheme, recentPrompts: recent,
-    questionCount, teacherNotes, focusKeywords, questionType, learningObjective,
-  });
-  console.log(`${tag} ANTHROPIC_DONE +${Date.now()-T0}ms ok=${!!gen}`);
-  if (!gen) return res.status(500).json({ error: "Generation failed", tag });
+  let gen: { title: string; content: any };
+  try {
+    gen = await generateDailyAssignmentContent(client, {
+      studentId, date: `${date}|${subject}`, subject: subjectKey,
+      gradeMin: Number(gradeMin), gradeMax: Number(gradeMax ?? gradeMin),
+      weekTheme, recentPrompts: recent,
+      questionCount, teacherNotes, focusKeywords, questionType, learningObjective,
+    });
+    console.log(`${tag} ANTHROPIC_DONE +${Date.now()-T0}ms`);
+  } catch (e: any) {
+    console.error(`${tag} AI_ERR +${Date.now()-T0}ms`, e?.message);
+    return res.status(500).json({ error: "Generation failed", detail: e?.message, tag });
+  }
 
   const id = crypto.randomUUID();
   try {
@@ -1344,12 +1354,16 @@ router.post("/:id/regenerate", requireRole("teacher", "admin"), async (req: Auth
     }
   } catch {}
 
-  const gen = await generateDailyAssignmentContent(client, {
-    studentId, date: dateStr + "-regen-" + Date.now(),
-    subject, gradeMin, gradeMax, weekTheme,
-    recentPrompts: currentPrompts,
-  });
-  if (!gen) return res.status(500).json({ error: "Regenerate failed" });
+  let gen: { title: string; content: any };
+  try {
+    gen = await generateDailyAssignmentContent(client, {
+      studentId, date: dateStr + "-regen-" + Date.now(),
+      subject, gradeMin, gradeMax, weekTheme,
+      recentPrompts: currentPrompts,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: "Regenerate failed", detail: e?.message });
+  }
 
   await db.prepare("UPDATE assignments SET content = ?, title = COALESCE(title, ?) WHERE id = ?")
     .run(JSON.stringify(gen.content), gen.title, req.params.id);
