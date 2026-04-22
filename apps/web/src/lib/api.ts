@@ -102,6 +102,10 @@ export const api = {
   generateAssignmentSlot: (slot: any, signal?: AbortSignal) => request<any>(`/assignments/generate-slot`, {
     method: "POST", body: JSON.stringify(slot), signal,
   }),
+  deleteGeneratedAssignments: (classId: string, dateFrom: string, dateTo: string) =>
+    request<{ deleted: number }>(`/assignments/class/${classId}/generated`, {
+      method: "DELETE", body: JSON.stringify({ dateFrom, dateTo }),
+    }),
   adjustAssignmentDifficulty: (id: string, direction: "easier" | "harder") =>
     request<any>(`/assignments/${id}/adjust-difficulty`, { method: "POST", body: JSON.stringify({ direction }) }),
   regenerateAssignment: (id: string) =>

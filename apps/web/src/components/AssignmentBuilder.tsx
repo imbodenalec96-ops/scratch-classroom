@@ -1691,6 +1691,33 @@ export default function AssignmentBuilder() {
               </button>
             )}
             {!fullWeekGenerating && (
+              <button
+                onClick={async () => {
+                  if (!confirm("Delete all AI-generated assignments for this week's date range? This cannot be undone.")) return;
+                  // Compute the same date range the generator uses: today through Friday
+                  const today = new Date();
+                  if (today.getDay() === 6) today.setDate(today.getDate() + 2);
+                  else if (today.getDay() === 0) today.setDate(today.getDate() + 1);
+                  const friday = new Date(today);
+                  friday.setDate(today.getDate() + (5 - today.getDay()));
+                  const from = fullWeekStart || today.toISOString().slice(0, 10);
+                  const to = friday.toISOString().slice(0, 10);
+                  try {
+                    const r = await api.deleteGeneratedAssignments(classId, from, to);
+                    alert(`Deleted ${r.deleted} assignment${r.deleted === 1 ? "" : "s"}.`);
+                    loadAssignments(classId);
+                    setFullWeekResult(null);
+                  } catch (e: any) {
+                    alert("Failed to delete: " + (e?.message || e));
+                  }
+                }}
+                className="btn-ghost text-xs"
+                style={{ color: "var(--danger)" }}
+              >
+                🗑 Clear this week
+              </button>
+            )}
+            {!fullWeekGenerating && (
               <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
                 ~{Object.values(fullWeekSubjects).filter(Boolean).length} subjects × 5 days × students, 10 calls in parallel
               </span>

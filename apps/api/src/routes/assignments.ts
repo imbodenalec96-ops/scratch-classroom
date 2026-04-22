@@ -861,6 +861,17 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  // Skip if this student already has an assignment for this date+subject
+  try {
+    const existing = await db.prepare(
+      "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND target_subject = ?"
+    ).get(studentId, date, subjectKey) as any;
+    if (existing) {
+      console.log(`${tag} SKIP_EXISTING id=${existing.id}`);
+      return res.json({ ok: true, skipped: true, existingId: existing.id });
+    }
+  } catch (e: any) { console.log(`${tag} SKIP_CHECK_ERR ${e?.message}`); }
+
   // Recent prompts for dedup (bounded, fast)
   let recent: string[] = [];
   try {
@@ -919,6 +930,23 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   } catch (e: any) {
     console.error(`${tag} INSERT_ERR`, e?.message, e?.stack?.slice(0, 400));
     res.status(500).json({ error: 'Insert failed', detail: e?.message, classId, studentId });
+  }
+});
+
+// Delete all student-specific (AI-generated) assignments for a class within a date range.
+// Body: { classId, dateFrom, dateTo }  — dateTo is inclusive.
+router.delete("/class/:classId/generated", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const { dateFrom, dateTo } = req.body as { dateFrom?: string; dateTo?: string };
+  if (!dateFrom || !dateTo) return res.status(400).json({ error: "dateFrom and dateTo required" });
+  try {
+    const result = await db.prepare(
+      `DELETE FROM assignments WHERE class_id::text = ? AND student_id IS NOT NULL
+         AND scheduled_date >= ? AND scheduled_date <= ?`
+    ).run(classId, dateFrom, dateTo);
+    res.json({ deleted: result.changes });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message });
   }
 });
 
