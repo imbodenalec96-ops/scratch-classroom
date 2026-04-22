@@ -2987,6 +2987,30 @@ export default function StudentDashboard() {
         </div>
       )}
 
+      {/* Back button for dashboard, leaderboard, achievements, and 'all done' state */}
+      <button
+        onClick={handleBack}
+        style={{
+          position: "fixed",
+          top: 18,
+          left: 18,
+          zIndex: 100,
+          background: "rgba(139,92,246,0.18)",
+          color: "#c4b5fd",
+          border: "none",
+          borderRadius: 14,
+          padding: "10px 22px",
+          fontWeight: 700,
+          fontSize: 16,
+          boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
+          cursor: "pointer",
+          transition: "background 0.15s, color 0.15s",
+        }}
+        aria-label="Back"
+      >
+        ← Back
+      </button>
+
       {/* Avatar picker modal */}
       {showAvatarPicker && user && (
         <AvatarPickerModal

@@ -49,10 +49,13 @@ const TIER = [
 // Podium column order: 2nd (left), 1st (center), 3rd (right)
 const PODIUM_ORDER = [1, 0, 2];
 
+import { useNavigate } from "react-router-dom";
+
 export default function Leaderboard() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const dk = theme === "dark";
+  const navigate = useNavigate();
 
   const [tab, setTab] = useState<"stars" | "assignments">("stars");
   const [stars, setStars] = useState<any[]>([]);
@@ -109,6 +112,30 @@ export default function Leaderboard() {
   return (
     <div style={{ minHeight: "100vh", background: bg, padding: "36px 24px 64px", fontFamily: "'Inter',system-ui,sans-serif", color: text1 }}>
       <style>{ANIM}</style>
+
+      {/* Back button */}
+      <button
+        onClick={() => navigate(-1)}
+        style={{
+          position: "fixed",
+          top: 18,
+          left: 18,
+          zIndex: 100,
+          background: "rgba(139,92,246,0.18)",
+          color: "#c4b5fd",
+          border: "none",
+          borderRadius: 14,
+          padding: "10px 22px",
+          fontWeight: 700,
+          fontSize: 16,
+          boxShadow: "0 2px 10px rgba(139,92,246,0.10)",
+          cursor: "pointer",
+          transition: "background 0.15s, color 0.15s",
+        }}
+        aria-label="Back"
+      >
+        ← Back
+      </button>
 
       {/* ── Header ── */}
       <div style={{ maxWidth: 700, margin: "0 auto 32px", animation: "lb-up .5s ease both" }}>
