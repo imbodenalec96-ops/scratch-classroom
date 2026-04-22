@@ -533,19 +533,29 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
     });
   }
 
-  // Monday of the target week
-  const start = weekStarting ? new Date(weekStarting) : (() => {
-    const t = new Date();
-    const d = t.getDay();
-    const plus = d === 0 ? 1 : d === 1 ? 0 : 8 - d;
-    const m = new Date(t); m.setDate(t.getDate() + plus);
-    return m;
-  })();
-  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-  const dates: string[] = [];
-  for (let i = 0; i < 5; i++) {
-    const d = new Date(start); d.setDate(start.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
+  const ALL_DAY_NAMES_FW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  let dates: string[];
+  let dateDayNames: string[];
+  if (weekStarting) {
+    const start = new Date(weekStarting);
+    dates = []; dateDayNames = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      dates.push(d.toISOString().slice(0, 10));
+      dateDayNames.push(ALL_DAY_NAMES_FW[d.getDay()]);
+    }
+  } else {
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2);
+    else if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
+    const friday = new Date(tomorrow); friday.setDate(tomorrow.getDate() + (5 - tomorrow.getDay()));
+    dates = []; dateDayNames = [];
+    for (let d = new Date(tomorrow); d <= friday; d = new Date(d.getTime() + 86_400_000)) {
+      if (d.getDay() >= 1 && d.getDay() <= 5) {
+        dates.push(d.toISOString().slice(0, 10));
+        dateDayNames.push(ALL_DAY_NAMES_FW[d.getDay()]);
+      }
+    }
   }
 
   // Roster — filter by studentIds if provided
@@ -599,8 +609,8 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
   const slots: Slot[] = [];
   for (const s of students) {
     for (const subj of subjects) {
-      for (let i = 0; i < 5; i++) {
-        slots.push({ studentId: s.id, subject: subj, dateStr: dates[i], dayName: dayNames[i] });
+      for (let i = 0; i < dates.length; i++) {
+        slots.push({ studentId: s.id, subject: subj, dateStr: dates[i], dayName: dateDayNames[i] });
       }
     }
   }
@@ -707,18 +717,39 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
     });
   }
 
-  const start = weekStarting ? new Date(weekStarting) : (() => {
-    const t = new Date();
-    const d = t.getDay();
-    const plus = d === 0 ? 1 : d === 1 ? 0 : 8 - d;
-    const m = new Date(t); m.setDate(t.getDate() + plus);
-    return m;
-  })();
-  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-  const dates: string[] = [];
-  for (let i = 0; i < 5; i++) {
-    const d = new Date(start); d.setDate(start.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
+  const ALL_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  let dates: string[];
+  let slotDayNames: string[];
+
+  if (weekStarting) {
+    // Teacher picked a specific start date — generate Mon–Fri (5 days) from there
+    const start = new Date(weekStarting);
+    dates = [];
+    slotDayNames = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      dates.push(d.toISOString().slice(0, 10));
+      slotDayNames.push(ALL_DAY_NAMES[d.getDay()]);
+    }
+  } else {
+    // Default: tomorrow through Friday of this week
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    // If tomorrow lands on a weekend, push forward to Monday
+    if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2);
+    else if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
+    // Friday of the same week
+    const friday = new Date(tomorrow);
+    friday.setDate(tomorrow.getDate() + (5 - tomorrow.getDay()));
+    dates = [];
+    slotDayNames = [];
+    for (let d = new Date(tomorrow); d <= friday; d = new Date(d.getTime() + 86_400_000)) {
+      if (d.getDay() >= 1 && d.getDay() <= 5) {
+        dates.push(d.toISOString().slice(0, 10));
+        slotDayNames.push(ALL_DAY_NAMES[d.getDay()]);
+      }
+    }
   }
 
   const roster = await db.prepare(
@@ -760,7 +791,7 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
   const slots: any[] = [];
   for (const s of students) {
     for (const subj of subjects) {
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < dates.length; i++) {
         const grade = gradeFor(s.id, subj);
         slots.push({
           classId,
@@ -769,7 +800,7 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
           subject: subj,
           subjectKey: subjectKey(subj),
           date: dates[i],
-          dayName: dayNames[i],
+          dayName: slotDayNames[i],
           gradeMin: grade,
           gradeMax: grade,
           weekTheme: [themeBySubject[subj] || themeBySubject[subjectKey(subj)] || "", varietyHint].filter(Boolean).join(". "),
@@ -783,7 +814,7 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
     total: slots.length,
     students: students.length,
     subjects: subjects.length,
-    days: 5,
+    days: dates.length,
     estimatedSecondsAtConcurrency: (s: number) => Math.ceil(slots.length / s * 6),
   });
 });

@@ -1568,7 +1568,7 @@ export default function AssignmentBuilder() {
               <div className="section-label">— Full week generator —</div>
               <h3 className="font-display text-2xl leading-tight" style={{ color: "var(--text-1)" }}>One click, full week.</h3>
               <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-                Generates unique content for every student × subject × day (Mon–Fri). Each task tailored to that student's grade.
+                Generates unique content for every student × subject × day. Default: tomorrow through Friday. Each task tailored to that student's grade.
               </p>
             </div>
             <button onClick={() => setShowFullWeek(false)} className="btn-ghost text-xs">Close</button>
@@ -1576,8 +1576,8 @@ export default function AssignmentBuilder() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Week starting (Monday)</label>
-              <input type="date" value={fullWeekStart} onChange={e => setFullWeekStart(e.target.value)} className="input text-sm" />
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Start date (optional — default: tomorrow)</label>
+              <input type="date" value={fullWeekStart} onChange={e => setFullWeekStart(e.target.value)} className="input text-sm" placeholder="Defaults to tomorrow" />
             </div>
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-3)" }}>Difficulty tweak</label>
