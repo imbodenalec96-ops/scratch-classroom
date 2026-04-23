@@ -312,18 +312,19 @@ Grade Level: ${grade || "3rd Grade"}
 Subject: ${subject || "General"}
 Worksheet Title: ${title || "Assignment"}
 ${instructions ? `Teacher's special instructions: ${instructions}` : ""}
-${passageInstruction}
 
 ${subjectGuide}
+
+${passageInstruction}
 
 Create a thorough, realistic worksheet with 2-3 sections and 8-12 total questions appropriate for ${grade || "3rd grade"} level.
 The worksheet should feel like something a real teacher would hand out in class.
 Mix question types: multiple_choice, short_answer, and fill_blank within each section.
 
-CRITICAL RULES FOR multiple_choice QUESTIONS:
+CRITICAL RULES:
 1. Every multiple_choice question MUST include a "correctIndex" field (0-based index of the correct answer).
 2. Options must be prefixed: "A. ...", "B. ...", "C. ...", "D. ..."
-3. There must be exactly ONE correct answer per question.
+3. For READING assignments: you MUST write the full passage in the "passage" field of the first section. Do not leave it as a placeholder.
 
 IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON object:
 {
@@ -335,7 +336,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
   "sections": [
     {
       "title": "Part 1: Section Name (X pts each)",
-      "passage": "REQUIRED for reading sections — the full passage text goes here",
+      "passage": "READING ONLY: write the complete 5-8 sentence passage here. Omit this field for non-reading subjects.",
       "questions": [
         { "type": "multiple_choice", "text": "Question?", "options": ["A. opt1","B. opt2","C. opt3","D. opt4"], "correctIndex": 2, "points": 5 },
         { "type": "short_answer", "text": "Question?", "points": 10, "lines": 3 },
@@ -352,7 +353,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
       const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
-        body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 6000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`Mistral error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();
@@ -361,7 +362,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama3-70b-8192", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: "llama3-70b-8192", max_tokens: 6000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`Groq error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();
@@ -370,7 +371,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 6000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`OpenAI error: ${response.status} ${await response.text()}`);
       const data: any = await response.json();

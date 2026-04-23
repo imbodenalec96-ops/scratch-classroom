@@ -1879,15 +1879,36 @@ router.post("/class/:classId/create-by-grade", async (req: AuthRequest, res: Res
       ? `GENERATE a short age-appropriate reading passage (5-8 sentences) and include it as the "passage" field in the first section. All comprehension questions must refer to it.`
       : "";
 
+    const subjectGuide =
+      (subject === "math" || subject === "Math")
+        ? `This is a MATH worksheet. Include real math problems with numbers, word problems, and fill-in equations. No reading comprehension questions.`
+        : (subject === "reading" || subject === "Reading")
+        ? `This is a READING / ELA worksheet. You MUST:
+- Write a short reading passage (5-8 sentences) and put it in the "passage" field of the FIRST section
+- All comprehension questions must refer to that passage
+- Include vocabulary, main idea, inference, and short-answer evidence questions
+- No math questions`
+        : (subject === "writing" || subject === "Writing")
+        ? `This is a WRITING / GRAMMAR worksheet. Include grammar correction, punctuation, sentence structure, and short writing tasks.`
+        : `Create questions appropriate for a ${subjectCapitalized} worksheet at ${gradeName} level.`;
+
     const prompt = `You are an experienced elementary school teacher creating a printable paper worksheet.
 
 Grade Level: ${gradeName}
 Subject: ${subjectCapitalized}
 Worksheet Title: ${title}
 ${instructions ? `Teacher's special instructions: ${instructions}` : ""}
+
+${subjectGuide}
+
 ${passageInstruction}
 
 Create a thorough, realistic worksheet with 2-3 sections and 8-12 total questions appropriate for ${gradeName} level.
+Mix question types: multiple_choice, short_answer, fill_blank.
+
+CRITICAL RULES:
+1. Every multiple_choice question MUST have a "correctIndex" (0-based).
+2. For reading assignments: the "passage" field in the first section is REQUIRED — write the full passage text there.
 
 IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON object:
 {
@@ -1899,6 +1920,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
   "sections": [
     {
       "title": "Part 1: Section Name (X pts each)",
+      "passage": "FOR READING: the full 5-8 sentence passage goes here. For other subjects omit this field.",
       "questions": [
         { "type": "multiple_choice", "text": "Question?", "options": ["A. opt1","B. opt2","C. opt3","D. opt4"], "correctIndex": 0, "points": 5 },
         { "type": "short_answer", "text": "Question?", "points": 10, "lines": 3 },
@@ -1915,7 +1937,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
         const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
-          body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 4000, messages: [{ role: "user", content: prompt }] }),
+          body: JSON.stringify({ model: "mistral-small-latest", max_tokens: 6000, messages: [{ role: "user", content: prompt }] }),
         });
         if (!response.ok) throw new Error(`Mistral error: ${response.status} ${await response.text()}`);
         const data: any = await response.json();
