@@ -634,39 +634,46 @@ Return ONLY valid JSON, no markdown, no code fences, no explanation — just thi
 });
 
 /* ─────────────────────────────────────────────────────────────────
- * Text-to-speech (spelling words)
+ * Text-to-speech
  * POST /api/ai/tts
- * Body: { text: string }
- * Returns: audio/mpeg — ElevenLabs "Rachel" voice (clear, natural).
- * Falls back to 503 if no key so the client uses Web Speech API.
+ * Body: { text: string, mode?: "spelling" | "passage" }
+ *
+ * mode "spelling" (default): Rachel voice, word repeated twice, turbo model
+ * mode "passage": Matilda voice, warm storytelling, multilingual v2 model
+ *
+ * Falls back to 503 if no ElevenLabs key.
  * ───────────────────────────────────────────────────────────────── */
-const ELEVENLABS_VOICE_ID = "21m00Tio1uXcvkmUEBsA"; // Rachel — clear, neutral, great for kids
+const EL_VOICE_SPELLING = "21m00Tio1uXcvkmUEBsA"; // Rachel — clear, neutral
+const EL_VOICE_PASSAGE  = "XrExE9yKIg1WjnnlVkGX"; // Matilda — warm, expressive, great for stories
 
 router.post("/tts", async (req: AuthRequest, res: Response) => {
-  const { text } = req.body;
+  const { text, mode } = req.body;
   if (!text || typeof text !== "string") return res.status(400).json({ error: "text required" });
 
   const EL_KEY = process.env.ELEVENLABS_API_KEY;
   if (!EL_KEY) return res.status(503).json({ error: "no_tts_key" });
 
-  // Say the word twice with a natural pause — spelling bee format
-  const word = text.trim().slice(0, 200);
-  const spoken = `${word}. ${word}.`;
+  const isPassage = mode === "passage";
+
+  const voiceId  = isPassage ? EL_VOICE_PASSAGE  : EL_VOICE_SPELLING;
+  const modelId  = isPassage ? "eleven_multilingual_v2" : "eleven_turbo_v2_5";
+  // Passages: lower stability = more natural expression; higher style = storytelling feel
+  const voiceSettings = isPassage
+    ? { stability: 0.40, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true }
+    : { stability: 0.75, similarity_boost: 0.80 };
+
+  // Spelling: repeat the word twice. Passage: read as-is (up to 5000 chars).
+  const spoken = isPassage
+    ? text.trim().slice(0, 5000)
+    : `${text.trim().slice(0, 200)}. ${text.trim().slice(0, 200)}.`;
 
   try {
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": EL_KEY,
-        },
-        body: JSON.stringify({
-          text: spoken,
-          model_id: "eleven_turbo_v2_5",
-          voice_settings: { stability: 0.75, similarity_boost: 0.80 },
-        }),
+        headers: { "Content-Type": "application/json", "xi-api-key": EL_KEY },
+        body: JSON.stringify({ text: spoken, model_id: modelId, voice_settings: voiceSettings }),
       }
     );
     if (!response.ok) {

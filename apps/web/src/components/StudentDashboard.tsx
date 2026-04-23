@@ -1422,6 +1422,8 @@ function WorkScreen({
   const [videoChoice, setVideoChoice] = useState<"pending" | "watch" | "skip">(
     "pending",
   );
+  const [passageState, setPassageState] = useState<"idle" | "loading" | "playing">("idle");
+  const passageAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
   const rm = prefersReducedMotion();
@@ -1433,6 +1435,12 @@ function WorkScreen({
   useEffect(() => () => stopSpeaking(), []);
   useEffect(() => {
     stopSpeaking();
+    // Stop any playing passage audio when question changes
+    if (passageAudioRef.current) {
+      passageAudioRef.current.pause();
+      passageAudioRef.current = null;
+    }
+    setPassageState("idle");
     // Auto-read spelling words aloud when the question changes
     if (String(parsed?.subject || "").toLowerCase() === "spelling" && q?.q?.text) {
       const timer = setTimeout(() => speakSpellingWord(q.q.text), 600);
@@ -1747,11 +1755,66 @@ function WorkScreen({
               borderLeft: `3px solid ${starfall.accent}`,
             }}
           >
-            <div
-              className="text-[10px] font-bold uppercase tracking-widest mb-3"
-              style={{ color: starfall.accent }}
-            >
-              Read this first
+            <div className="flex items-center justify-between mb-3">
+              <div
+                className="text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: starfall.accent }}
+              >
+                📖 Read this first
+              </div>
+              <button
+                onClick={async () => {
+                  if (passageState === "playing") {
+                    passageAudioRef.current?.pause();
+                    passageAudioRef.current = null;
+                    setPassageState("idle");
+                    return;
+                  }
+                  setPassageState("loading");
+                  try {
+                    const token = localStorage.getItem("token");
+                    const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+                      (window.location.hostname === "localhost"
+                        ? "http://localhost:4000/api"
+                        : "https://scratch-classroom-api-td1x.vercel.app/api");
+                    const res = await fetch(`${apiBase}/ai/tts`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({ text: q.passage, mode: "passage" }),
+                    });
+                    if (!res.ok) throw new Error("tts_failed");
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    passageAudioRef.current = audio;
+                    audio.onended = () => {
+                      URL.revokeObjectURL(url);
+                      setPassageState("idle");
+                    };
+                    audio.onerror = () => setPassageState("idle");
+                    await audio.play();
+                    setPassageState("playing");
+                  } catch {
+                    setPassageState("idle");
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all cursor-pointer"
+                style={{
+                  background: passageState === "playing" ? `${starfall.accent}30` : `${starfall.accent}18`,
+                  color: starfall.accent,
+                  border: `1px solid ${starfall.accent}55`,
+                  opacity: passageState === "loading" ? 0.6 : 1,
+                }}
+                disabled={passageState === "loading"}
+              >
+                {passageState === "loading" && (
+                  <span style={{ display: "inline-block", width: 10, height: 10, border: `2px solid ${starfall.accent}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                )}
+                {passageState === "playing" ? "⏸ Stop" : passageState === "loading" ? "Loading…" : "🎧 Listen"}
+              </button>
             </div>
             <p
               className="leading-relaxed"
