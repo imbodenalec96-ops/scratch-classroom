@@ -2628,6 +2628,7 @@ export default function StudentDashboard() {
   // Work state
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
+  const [allPendingAssignments, setAllPendingAssignments] = useState<any[]>([]);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [ttsPassages, setTtsPassages] = useState(true);
   const [ttsSpelling, setTtsSpelling] = useState(true);
@@ -2753,24 +2754,28 @@ export default function StudentDashboard() {
         );
 
         const allQuizzes: any[] = [];
+        const collectedPending: any[] = [];
         for (const { pending, quizzes } of classResults) {
-          if (!found && pending.length > 0) {
-            found = pending[0];
-            // Content excluded from list for perf — fetch on demand
-            if (found.content) {
-              try {
-                const p = JSON.parse(found.content);
-                if (p?.sections?.length > 0) foundParsed = p;
-              } catch {}
-            } else {
-              try {
-                const full = await api.getAssignment(found.id);
-                if (full?.content) {
-                  const p = JSON.parse(full.content);
+          if (Array.isArray(pending)) {
+            pending.forEach((a: any) => collectedPending.push(a));
+            if (!found && pending.length > 0) {
+              found = pending[0];
+              // Content excluded from list for perf — fetch on demand
+              if (found.content) {
+                try {
+                  const p = JSON.parse(found.content);
                   if (p?.sections?.length > 0) foundParsed = p;
-                  found = { ...found, content: full.content };
-                }
-              } catch {}
+                } catch {}
+              } else {
+                try {
+                  const full = await api.getAssignment(found.id);
+                  if (full?.content) {
+                    const p = JSON.parse(full.content);
+                    if (p?.sections?.length > 0) foundParsed = p;
+                    found = { ...found, content: full.content };
+                  }
+                } catch {}
+              }
             }
           }
           if (Array.isArray(quizzes) && quizzes.length) {
@@ -2778,6 +2783,7 @@ export default function StudentDashboard() {
           }
         }
         setPendingQuizzes(allQuizzes);
+        setAllPendingAssignments(collectedPending);
 
         if (found) {
           setPendingAssignment(found);
@@ -2870,62 +2876,95 @@ export default function StudentDashboard() {
         setStatGraded(subs.filter((s: any) => s.grade !== null).length);
       } catch {}
 
-      // Check for more assignments across all classes before unlocking free time.
-      // null = fetch errored; [] = successful but empty; [...] = has more work
-      let nextAssignment: any = null;
-      let nextParsed: any = null;
+      // Remove the just-completed assignment from the cached list and check
+      // whether there are more to do. Using the locally-cached list avoids any
+      // API error/timing issue that could falsely declare the student "done".
       const submittedId = pendingAssignment?.id;
-      const pendingResults = await Promise.all(
-        classes.map((cls: any) => api.getPendingAssignments(cls.id).catch(() => null as any[] | null))
-      );
-      for (const pending of pendingResults) {
-        if (nextAssignment) break;
-        if (Array.isArray(pending)) {
-          const remaining = pending.filter((a: any) => a.id !== submittedId);
-          if (remaining.length > 0) {
-            nextAssignment = remaining[0];
-            // Content excluded from list — fetch on demand
-            if (nextAssignment.content) {
-              try {
-                const p = JSON.parse(nextAssignment.content);
-                if (p?.sections?.length > 0) nextParsed = p;
-              } catch {}
-            } else {
-              try {
-                const full = await api.getAssignment(nextAssignment.id);
-                if (full?.content) {
-                  const p = JSON.parse(full.content);
-                  if (p?.sections?.length > 0) nextParsed = p;
-                  nextAssignment = { ...nextAssignment, content: full.content };
-                }
-              } catch {}
-            }
-          }
-        }
-      }
-      // Only unlock free time if at least one class returned a successful (non-error) result.
-      // If all fetches errored out (null), go back to the dashboard without unlocking so the
-      // student can refresh and retry rather than being falsely declared "done for the day".
-      const anySucceeded = pendingResults.some(r => r !== null);
+      const remaining = allPendingAssignments.filter((a: any) => a.id !== submittedId);
+      setAllPendingAssignments(remaining);
+
+      let nextAssignment: any = remaining.length > 0 ? remaining[0] : null;
+      let nextParsed: any = null;
 
       if (nextAssignment) {
+        // Fetch content for the next assignment on demand
+        if (nextAssignment.content) {
+          try {
+            const p = JSON.parse(nextAssignment.content);
+            if (p?.sections?.length > 0) nextParsed = p;
+          } catch {}
+        } else {
+          try {
+            const full = await api.getAssignment(nextAssignment.id);
+            if (full?.content) {
+              const p = JSON.parse(full.content);
+              if (p?.sections?.length > 0) nextParsed = p;
+              nextAssignment = { ...nextAssignment, content: full.content };
+            }
+          } catch {}
+        }
         setQuestionsAnswered(0);
         setPendingAssignment(nextAssignment);
         setParsedAssignment(nextParsed);
         setPhase("working");
-      } else if (anySucceeded) {
-        setWorkUnlocked();
-        setPendingAssignment(null);
-        setParsedAssignment(null);
-        setPhase("done");
       } else {
-        // All fetches failed — don't unlock free time, just return to dashboard
-        setPendingAssignment(null);
-        setParsedAssignment(null);
-        setPhase("done");
+        // Local list is empty — do a final API check to confirm before unlocking.
+        // This catches any assignments added by the teacher during the session.
+        let confirmedDone = true;
+        try {
+          const freshResults = await Promise.all(
+            classes.map((cls: any) => api.getPendingAssignments(cls.id).catch(() => null as any[] | null))
+          );
+          const anySucceeded = freshResults.some(r => r !== null);
+          if (anySucceeded) {
+            // We got valid results — check if there's truly nothing left
+            const freshRemaining = freshResults
+              .filter(Array.isArray)
+              .flat()
+              .filter((a: any) => a.id !== submittedId);
+            if (freshRemaining.length > 0) {
+              // Teacher added new work during the session
+              confirmedDone = false;
+              setAllPendingAssignments(freshRemaining);
+              nextAssignment = freshRemaining[0];
+              if (nextAssignment.content) {
+                try { const p = JSON.parse(nextAssignment.content); if (p?.sections?.length > 0) nextParsed = p; } catch {}
+              } else {
+                try {
+                  const full = await api.getAssignment(nextAssignment.id);
+                  if (full?.content) {
+                    const p = JSON.parse(full.content);
+                    if (p?.sections?.length > 0) nextParsed = p;
+                    nextAssignment = { ...nextAssignment, content: full.content };
+                  }
+                } catch {}
+              }
+              setQuestionsAnswered(0);
+              setPendingAssignment(nextAssignment);
+              setParsedAssignment(nextParsed);
+              setPhase("working");
+            }
+            // anySucceeded + freshRemaining empty → genuinely done
+          } else {
+            // All API calls failed — don't unlock, let student see dashboard and retry
+            confirmedDone = false;
+          }
+        } catch { confirmedDone = false; }
+
+        if (confirmedDone) {
+          setWorkUnlocked();
+          setPendingAssignment(null);
+          setParsedAssignment(null);
+          setPhase("done");
+        } else if (!nextAssignment) {
+          // API failed — go back to dashboard without unlocking
+          setPendingAssignment(null);
+          setParsedAssignment(null);
+          setPhase("done");
+        }
       }
     },
-    [pendingAssignment, classes],
+    [pendingAssignment, allPendingAssignments, classes],
   );
 
 
