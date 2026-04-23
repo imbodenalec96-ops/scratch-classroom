@@ -246,7 +246,8 @@ router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
   if (!OPENAI_KEY && !ANTHROPIC_KEY) {
-    // Return a sample assignment for testing
+    const isReading = !subject || subject === "Reading";
+    const samplePassage = "Every morning, Maria walked to school past the old oak tree at the corner of Maple Street. The tree had thick, knobbly roots that pushed up through the sidewalk, and in autumn its leaves turned a brilliant orange. Local kids called it the Wishing Tree because of an old story — if you touched its bark before a big test, you would do well. Maria had never believed the story until the day she forgot to study for her math quiz, reached out on instinct, and got every single answer right.";
     return res.json({
       title: title || "Sample Assignment",
       subject: subject || "Reading",
@@ -255,15 +256,22 @@ router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
       totalPoints: 100,
       sections: [
         {
-          title: "Part 1: Multiple Choice (5 pts each)",
-          questions: [
+          title: "Part 1: Reading Comprehension (5 pts each)",
+          ...(isReading ? { passage: samplePassage } : {}),
+          questions: isReading ? [
+            { type: "multiple_choice", text: "What color did the oak tree's leaves turn in autumn?", options: ["A. Green", "B. Orange", "C. Brown", "D. Yellow"], points: 5 },
+            { type: "multiple_choice", text: "Why did kids call it the \"Wishing Tree\"?", options: ["A. It was the tallest tree in town", "B. Touching its bark before a test was said to bring good luck", "C. It granted wishes on birthdays", "D. Maria planted it as a wish"], points: 5 },
+          ] : [
             { type: "multiple_choice", text: "What is the main idea of a paragraph?", options: ["A. The first sentence", "B. The most important point the author makes", "C. The last sentence", "D. The title"], points: 5 },
             { type: "multiple_choice", text: "Which sentence is a topic sentence?", options: ["A. Dogs have four legs.", "B. There are many reasons dogs make great pets.", "C. My dog is brown.", "D. Dogs eat food."], points: 5 },
           ]
         },
         {
           title: "Part 2: Short Answer (10 pts each)",
-          questions: [
+          questions: isReading ? [
+            { type: "short_answer", text: "Why did Maria stop believing the story — and what changed her mind? Use details from the passage.", points: 10, lines: 3 },
+            { type: "short_answer", text: "Describe the oak tree using at least two details from the passage.", points: 10, lines: 3 },
+          ] : [
             { type: "short_answer", text: "In your own words, explain what a main idea is.", points: 10, lines: 3 },
             { type: "short_answer", text: "Write a topic sentence for a paragraph about your favorite season.", points: 10, lines: 3 },
           ]
