@@ -26,6 +26,11 @@ export default function QuizBuilder() {
   const [answers, setAnswers] = useState<number[]>([]);
   const [result, setResult] = useState<any>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [showNavModal, setShowNavModal] = useState(false);
+  const [navTarget, setNavTarget] = useState(0);
+  const [navCode, setNavCode] = useState("");
+  const [navError, setNavError] = useState("");
+  const [navLoading, setNavLoading] = useState(false);
 
   useEffect(() => {
     api.getClasses().then((c) => { setClasses(c); if (c.length > 0) { setClassId(c[0].id); loadQuizzes(c[0].id); } }).catch(console.error);
@@ -81,6 +86,33 @@ export default function QuizBuilder() {
     if (!takingQuiz) return;
     const res = await api.submitQuiz(takingQuiz.id, answers);
     setResult(res);
+  };
+
+  const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+    (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
+
+  const handleNavJump = async () => {
+    if (!navCode.trim()) return;
+    setNavLoading(true);
+    setNavError("");
+    try {
+      const token = localStorage.getItem("token") || "";
+      const r = await fetch(`${apiBase}/admin-settings/check-skip-code?code=${encodeURIComponent(navCode.trim())}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await r.json();
+      if (data.valid) {
+        setCurrentQ(navTarget);
+        setShowNavModal(false);
+        setNavCode("");
+      } else {
+        setNavError("Incorrect code. Try again.");
+      }
+    } catch {
+      setNavError("Could not verify. Check connection.");
+    } finally {
+      setNavLoading(false);
+    }
   };
 
   // ── Quiz list view ──────────────────────────────────────────────
@@ -541,16 +573,17 @@ export default function QuizBuilder() {
           )}
         </div>
 
-        {/* Dot progress indicators */}
+        {/* Dot progress indicators — passcode required to jump */}
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
           {takingQuiz.questions.map((_: any, i: number) => (
             <button
               key={i}
-              onClick={() => setCurrentQ(i)}
-              className="rounded-full transition-all cursor-pointer"
+              onClick={() => { if (i !== currentQ) { setNavTarget(i); setNavCode(""); setNavError(""); setShowNavModal(true); } }}
+              className="rounded-full transition-all"
               style={{
                 width: i === currentQ ? 20 : 8,
                 height: 8,
+                cursor: i !== currentQ ? "pointer" : "default",
                 background: i === currentQ
                   ? "#6366f1"
                   : answers[i] !== -1
@@ -561,6 +594,35 @@ export default function QuizBuilder() {
             />
           ))}
         </div>
+
+      {/* Nav jump modal */}
+      {showNavModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowNavModal(false); setNavCode(""); setNavError(""); } }}
+        >
+          <div style={{ background: "white", borderRadius: 20, padding: 28, width: "min(360px, 90vw)", boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>🔒</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e1b4b", marginBottom: 4 }}>Jump to Question {navTarget + 1}?</div>
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", marginBottom: 20 }}>Enter the teacher passcode to navigate to a different question.</div>
+            <input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              value={navCode}
+              onChange={e => { setNavCode(e.target.value); setNavError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleNavJump()}
+              placeholder="Enter passcode…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 18, letterSpacing: "0.2em", borderRadius: 12, border: navError ? "1.5px solid #ef4444" : "1.5px solid rgba(0,0,0,0.15)", outline: "none", marginBottom: navError ? 8 : 16, textAlign: "center" }}
+            />
+            {navError && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 14, textAlign: "center" }}>{navError}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setShowNavModal(false); setNavCode(""); setNavError(""); }} style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", fontSize: 14, cursor: "pointer", color: "rgba(0,0,0,0.5)" }}>Cancel</button>
+              <button onClick={handleNavJump} disabled={navLoading || !navCode.trim()} style={{ flex: 2, padding: "11px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#7c3aed,#6366f1)", color: "white", fontSize: 14, fontWeight: 700, cursor: navLoading || !navCode.trim() ? "default" : "pointer", opacity: navLoading || !navCode.trim() ? 0.5 : 1 }}>{navLoading ? "Checking…" : "Go to Question"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     );
   }
