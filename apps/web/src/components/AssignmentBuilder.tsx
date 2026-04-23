@@ -205,6 +205,8 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [passageAudioState, setPassageAudioState] = useState<"idle"|"loading"|"playing">("idle");
   const passageAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const passageSpeechRef = React.useRef<SpeechSynthesisUtterance | null>(null);
+  const passageCtxRef = React.useRef<AudioContext | null>(null);
+  const passageSourceRef = React.useRef<AudioBufferSourceNode | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -218,6 +220,18 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [navError, setNavError] = useState("");
   const [navLoading, setNavLoading] = useState(false);
   const currentBlock = useCurrentBlock(classId);
+
+  const stopPassageAudio = React.useCallback(() => {
+    try { passageSourceRef.current?.stop(); } catch {}
+    passageSourceRef.current = null;
+    passageCtxRef.current?.close().catch(() => {});
+    passageCtxRef.current = null;
+    passageAudioRef.current?.pause();
+    passageAudioRef.current = null;
+    window.speechSynthesis?.cancel();
+    passageSpeechRef.current = null;
+    setPassageAudioState("idle");
+  }, []);
 
   // Flatten all questions — normalise field names across content formats
   const allQuestions: Array<{ q: any; sectionTitle: string; passage?: string }> = parsed
@@ -323,11 +337,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       // Answer is correct — clear feedback and advance
       setFeedback("");
       setCurrentQ(currentQ + 1);
-      // Stop all audio on question change
-      if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
-      window.speechSynthesis?.cancel();
-      passageSpeechRef.current = null;
-      setPassageAudioState("idle");
+      stopPassageAudio();
     }
   };
 
@@ -529,9 +539,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                     }
                     setLoadingContent(false);
                   }
-                  setPassageAudioState("idle");
-                  if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
-                  window.speechSynthesis?.cancel(); passageSpeechRef.current = null;
+                  stopPassageAudio();
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 18,
@@ -748,17 +756,14 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>📖 Read this first</div>
                   {ttsPassages && (
                     <button
-                      onClick={async () => {
-                        if (passageAudioState === "playing") {
-                          passageAudioRef.current?.pause();
-                          passageAudioRef.current = null;
-                          window.speechSynthesis?.cancel();
-                          passageSpeechRef.current = null;
-                          setPassageAudioState("idle");
-                          return;
-                        }
-                        setPassageAudioState("loading");
-                        // Start browser TTS immediately (synchronous) to hold iOS gesture context
+                      onClick={() => {
+                        if (passageAudioState === "playing") { stopPassageAudio(); return; }
+                        // Create AudioContext inside the gesture handler — this is the iOS audio unlock key.
+                        // AudioContext created here stays unlocked for all subsequent async playback.
+                        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                        const ctx = AudioCtx ? new AudioCtx() : null;
+                        if (ctx) passageCtxRef.current = ctx;
+                        // Start browser TTS immediately as a synchronous fallback
                         window.speechSynthesis?.cancel();
                         const uPassage = new SpeechSynthesisUtterance(q.passage);
                         uPassage.rate = 0.85; uPassage.lang = "en-US";
@@ -766,42 +771,37 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                         passageSpeechRef.current = uPassage;
                         window.speechSynthesis?.speak(uPassage);
                         setPassageAudioState("playing");
-                        // Try to upgrade to ElevenLabs in background
-                        try {
-                          const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
-                            (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
-                          const token = localStorage.getItem("token");
-                          const r = await fetch(`${apiBase}/ai/tts`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                            body: JSON.stringify({ text: q.passage, mode: "passage" }),
-                          });
-                          if (r.ok) {
-                            const blob = await r.blob();
-                            const url = URL.createObjectURL(blob);
-                            const audio = new Audio(url);
-                            passageAudioRef.current = audio;
-                            audio.onended = () => { URL.revokeObjectURL(url); passageAudioRef.current = null; setPassageAudioState("idle"); };
-                            audio.onerror = () => setPassageAudioState("idle");
-                            window.speechSynthesis?.cancel(); // switch to ElevenLabs
+                        // Fetch ElevenLabs and play via AudioContext (works on iOS since ctx was created in gesture)
+                        const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+                          (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
+                        const token = localStorage.getItem("token");
+                        fetch(`${apiBase}/ai/tts`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                          body: JSON.stringify({ text: q.passage, mode: "passage" }),
+                        })
+                          .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+                          .then(buf => ctx ? ctx.decodeAudioData(buf) : Promise.reject())
+                          .then(decoded => {
+                            window.speechSynthesis?.cancel();
                             passageSpeechRef.current = null;
-                            audio.play().catch(() => { /* browser TTS already playing on iOS */ });
-                          }
-                        } catch { /* browser TTS keeps playing */ }
+                            const source = ctx!.createBufferSource();
+                            source.buffer = decoded;
+                            source.connect(ctx!.destination);
+                            source.onended = () => { passageSourceRef.current = null; setPassageAudioState("idle"); };
+                            passageSourceRef.current = source;
+                            source.start(0);
+                          })
+                          .catch(() => { /* browser TTS keeps playing */ });
                       }}
-                      disabled={passageAudioState === "loading"}
                       style={{
                         display: "flex", alignItems: "center", gap: 6,
                         padding: "5px 14px", borderRadius: 20, border: `1px solid ${accent}55`,
                         background: passageAudioState === "playing" ? `${accent}30` : `${accent}18`,
                         color: accent, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                        opacity: passageAudioState === "loading" ? 0.6 : 1,
                       }}
                     >
-                      {passageAudioState === "loading" && (
-                        <span style={{ width: 10, height: 10, border: `2px solid ${accent}`, borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
-                      )}
-                      {passageAudioState === "playing" ? "⏸ Stop" : passageAudioState === "loading" ? "Loading…" : "🎧 Listen"}
+                      {passageAudioState === "playing" ? "⏸ Stop" : "🎧 Listen"}
                     </button>
                   )}
                 </div>
@@ -824,31 +824,36 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   <div style={{ textAlign: "center", margin: "0 0 20px" }}>
                     <p style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>Listen and spell the word:</p>
                     <button
-                      onClick={async () => {
+                      onClick={() => {
                         const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ||
                           (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
                         const token = localStorage.getItem("token");
-                        // Start browser TTS immediately (synchronous) to hold iOS gesture context
-                        window.speechSynthesis.cancel();
+                        // Create AudioContext inside the gesture — iOS audio unlock
+                        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                        const ctx = AudioCtx ? new AudioCtx() : null;
+                        // Browser TTS immediately as synchronous fallback
+                        window.speechSynthesis?.cancel();
                         const u = new SpeechSynthesisUtterance(spellingWord);
                         u.rate = 0.75; u.lang = "en-US";
-                        window.speechSynthesis.speak(u);
-                        // Try to upgrade to ElevenLabs
-                        try {
-                          const r = await fetch(`${API_BASE}/ai/tts`, {
+                        window.speechSynthesis?.speak(u);
+                        // Fetch ElevenLabs and play via AudioContext (works on iOS)
+                        if (ctx) {
+                          fetch(`${API_BASE}/ai/tts`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                             body: JSON.stringify({ text: spellingWord }),
-                          });
-                          if (r.ok) {
-                            const blob = await r.blob();
-                            const url = URL.createObjectURL(blob);
-                            const audio = new Audio(url);
-                            audio.onended = () => URL.revokeObjectURL(url);
-                            window.speechSynthesis.cancel(); // switch to ElevenLabs
-                            audio.play().catch(() => { /* browser TTS already playing on iOS */ });
-                          }
-                        } catch { /* keep browser TTS running */ }
+                          })
+                            .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+                            .then(buf => ctx.decodeAudioData(buf))
+                            .then(decoded => {
+                              window.speechSynthesis?.cancel(); // switch to ElevenLabs
+                              const source = ctx.createBufferSource();
+                              source.buffer = decoded;
+                              source.connect(ctx.destination);
+                              source.start(0);
+                            })
+                            .catch(() => { ctx.close().catch(() => {}); }); // browser TTS keeps playing
+                        }
                       }}
                       style={{ background: accent + "22", border: `2px solid ${accent}`, borderRadius: 16, padding: "18px 36px", cursor: "pointer", color: "white", fontSize: 28 }}
                     >
