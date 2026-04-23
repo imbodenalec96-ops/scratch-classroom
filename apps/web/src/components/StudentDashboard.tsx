@@ -2551,30 +2551,42 @@ export default function StudentDashboard() {
 
         let found: any = null;
         let foundParsed: any = null;
+
+        // Fetch pending assignments + quizzes for all classes in parallel
+        const classResults = await Promise.all(
+          clsList.map(async (cls: any) => {
+            const [pending, quizzes] = await Promise.all([
+              api.getPendingAssignments(cls.id).catch(() => [] as any[]),
+              api.getPendingQuizzes(cls.id).catch(() => [] as any[]),
+            ]);
+            return { pending, quizzes };
+          })
+        );
+
         const allQuizzes: any[] = [];
-        for (const cls of clsList) {
-          try {
-            const pending = await api.getPendingAssignments(cls.id);
-            if (pending && pending.length > 0 && !found) {
-              const a = pending[0];
-              found = a;
-              if (a.content) {
-                try {
-                  const parsed = JSON.parse(a.content);
-                  if (parsed?.sections?.length > 0) foundParsed = parsed;
-                } catch {}
-              }
+        for (const { pending, quizzes } of classResults) {
+          if (!found && pending.length > 0) {
+            found = pending[0];
+            // Content excluded from list for perf — fetch on demand
+            if (found.content) {
+              try {
+                const p = JSON.parse(found.content);
+                if (p?.sections?.length > 0) foundParsed = p;
+              } catch {}
+            } else {
+              try {
+                const full = await api.getAssignment(found.id);
+                if (full?.content) {
+                  const p = JSON.parse(full.content);
+                  if (p?.sections?.length > 0) foundParsed = p;
+                  found = { ...found, content: full.content };
+                }
+              } catch {}
             }
-          } catch {}
-          // Bug #32: pull pending quizzes per class too
-          try {
-            const qz = await api.getPendingQuizzes(cls.id);
-            if (Array.isArray(qz) && qz.length) {
-              qz.forEach((q: any) =>
-                allQuizzes.push({ ...q, _className: cls.name }),
-              );
-            }
-          } catch {}
+          }
+          if (Array.isArray(quizzes) && quizzes.length) {
+            quizzes.forEach((q: any) => allQuizzes.push(q));
+          }
         }
         setPendingQuizzes(allQuizzes);
 
@@ -2673,24 +2685,33 @@ export default function StudentDashboard() {
       let nextAssignment: any = null;
       let nextParsed: any = null;
       const submittedId = pendingAssignment?.id;
-      for (const cls of classes) {
-        try {
-          const pending = await api.getPendingAssignments(cls.id);
-          if (Array.isArray(pending)) {
-            const remaining = pending.filter((a: any) => a.id !== submittedId);
-            if (remaining.length > 0 && !nextAssignment) {
-              const a = remaining[0];
-              nextAssignment = a;
-              if (a.content) {
-                try {
-                  const parsed = JSON.parse(a.content);
-                  if (parsed?.sections?.length > 0) nextParsed = parsed;
-                } catch {}
-              }
-              break;
+      const pendingResults = await Promise.all(
+        classes.map((cls: any) => api.getPendingAssignments(cls.id).catch(() => [] as any[]))
+      );
+      for (const pending of pendingResults) {
+        if (nextAssignment) break;
+        if (Array.isArray(pending)) {
+          const remaining = pending.filter((a: any) => a.id !== submittedId);
+          if (remaining.length > 0) {
+            nextAssignment = remaining[0];
+            // Content excluded from list — fetch on demand
+            if (nextAssignment.content) {
+              try {
+                const p = JSON.parse(nextAssignment.content);
+                if (p?.sections?.length > 0) nextParsed = p;
+              } catch {}
+            } else {
+              try {
+                const full = await api.getAssignment(nextAssignment.id);
+                if (full?.content) {
+                  const p = JSON.parse(full.content);
+                  if (p?.sections?.length > 0) nextParsed = p;
+                  nextAssignment = { ...nextAssignment, content: full.content };
+                }
+              } catch {}
             }
           }
-        } catch {}
+        }
       }
 
       if (nextAssignment) {

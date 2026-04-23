@@ -973,17 +973,28 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     //   - student_id IS NULL  → class-wide assignment (everyone sees it)
     //   - student_id = userId → only this student sees it
     //   - student_id = someone else → hidden
-    const todayStr = new Date().toISOString().slice(0, 10);
-    // After 3:10 PM school time (US Eastern = UTC-4 during DST), also surface
-    // the next school day's assignments so students can start early.
-    const schoolTime = new Date(Date.now() - 4 * 3600000); // UTC-4
-    const isAfterRelease = schoolTime.getUTCHours() > 15 ||
-      (schoolTime.getUTCHours() === 15 && schoolTime.getUTCMinutes() >= 10);
+    // All date math in Pacific time (PDT = UTC-7; PST = UTC-8 Nov–Mar).
+    // Using UTC-7 covers the school year Apr–Oct; the teacher can update if needed.
+    const PACIFIC_MS = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PACIFIC_MS);
+    const todayStr = schoolNow.toISOString().slice(0, 10); // Pacific calendar date
+
+    // After 3:10 PM Pacific, surface the next school day's assignments.
+    const isAfterRelease = schoolNow.getUTCHours() > 15 ||
+      (schoolNow.getUTCHours() === 15 && schoolNow.getUTCMinutes() >= 10);
     const nextDayStr = isAfterRelease
-      ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-      : todayStr; // same as today → harmless duplicate in OR clause
+      ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
+      : todayStr; // same date → harmless duplicate in OR clause
+
+    // Exclude heavy content column from list — client fetches it on demand via GET /:id
     const rows = await db.prepare(`
-      SELECT a.* FROM assignments a
+      SELECT a.id, a.class_id, a.teacher_id, a.student_id, a.title, a.description,
+             a.due_date, a.rubric, a.scheduled_date, a.target_subject,
+             a.target_grade_min, a.target_grade_max, a.target_student_ids,
+             a.week_theme, a.hints_allowed, a.video_url, a.attached_pdf_path,
+             a.source, a.is_group, a.group_name, a.created_at,
+             a.question_count, a.estimated_minutes
+      FROM assignments a
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)

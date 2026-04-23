@@ -484,9 +484,17 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               <button
                 key={a.id}
                 className="ab-card"
-                onClick={() => {
+                onClick={async () => {
                   setAssignment(a);
-                  if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+                  // Content is stripped from list for perf — fetch full assignment on demand
+                  if (a.content) {
+                    try { setParsed(JSON.parse(a.content)); } catch {}
+                  } else {
+                    try {
+                      const full = await api.getAssignment(a.id);
+                      if (full?.content) setParsed(JSON.parse(full.content));
+                    } catch {}
+                  }
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 18,
