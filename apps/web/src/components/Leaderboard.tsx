@@ -273,7 +273,7 @@ export default function Leaderboard() {
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     paddingInline: 4,
                   }}>
-                    {entry.name}
+                    {isMe ? entry.name : (entry.name || "Student").split(" ")[0]}
                     {isMe && (
                       <span style={{
                         marginLeft: 6, fontSize: 9, fontWeight: 800, padding: "2px 6px",
@@ -396,7 +396,7 @@ export default function Leaderboard() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 700, fontSize: 14, color: text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {entry.name}
+                        {isMe ? entry.name : (entry.name || "Student").split(" ")[0]}
                       </span>
                       {isMe && (
                         <span style={{

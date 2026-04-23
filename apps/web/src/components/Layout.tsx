@@ -614,7 +614,6 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
     { path: "/lessons",      icon: BookOpen,        label: "Lessons"     },
     { path: "/assignments",  icon: ClipboardList,   label: "Assignments" },
     { path: "/websites",     icon: Globe,           label: "Learning Apps"},
-    { path: "/leaderboard",  icon: Trophy,          label: "Leaderboard" },
     { path: "/achievements", icon: Medal,           label: "Achievements"},
   ];
   if (workDone) {

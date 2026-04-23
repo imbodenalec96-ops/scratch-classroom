@@ -3434,55 +3434,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* ── Right Now strip — one tidy line when a block is live ── */}
-        {blockInfo.state === "current" &&
-          !(blockInfo as any).block.is_break && (
-            <div
-              style={{
-                marginTop: 10,
-                borderRadius: 12,
-                padding: "8px 12px",
-                background: "rgba(139,92,246,0.1)",
-                border: "1px solid rgba(139,92,246,0.25)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                animation: "dbSlide .4s ease both",
-              }}
-            >
-              <span style={{ fontSize: 14 }}>
-                {(
-                  {
-                    math: "🔢",
-                    reading: "📖",
-                    writing: "✏️",
-                    spelling: "🔤",
-                    sel: "💛",
-                    daily_news: "📰",
-                    science: "🔬",
-                    social_studies: "🌎",
-                    video_learning: "📺",
-                  } as Record<string, string>
-                )[(blockInfo as any).block.subject] || "📚"}
-              </span>
-              <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-                Now:
-              </span>
-              <span style={{ flex: 1, color: "rgba(255,255,255,0.75)" }}>
-                {(blockInfo as any).block.label}
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  opacity: 0.55,
-                  fontFamily: "ui-monospace, Menlo, monospace",
-                }}
-              >
-                until {(blockInfo as any).block.end_time}
-              </span>
-            </div>
-          )}
 
 
         {/* Today's assignment — prominent hero when there's one to do */}
@@ -3590,14 +3541,6 @@ export default function StudentDashboard() {
               desc: "Read & review",
               grad: "linear-gradient(135deg,#3b82f6,#2563eb)",
               glow: "rgba(59,130,246,0.35)",
-            },
-            {
-              to: "/leaderboard",
-              icon: "🏆",
-              label: "Leaderboard",
-              desc: "Top points",
-              grad: "linear-gradient(135deg,#f59e0b,#d97706)",
-              glow: "rgba(245,158,11,0.35)",
             },
             {
               to: "/achievements",
@@ -4137,125 +4080,6 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ── CLASS: Recent Grades + Join a Class ── */}
-        <div style={{ marginTop: 22 }}>
-          <div
-            style={{
-              marginBottom: 10,
-              fontSize: 10,
-              fontWeight: 700,
-              opacity: 0.4,
-              textTransform: "uppercase",
-              letterSpacing: "0.2em",
-            }}
-          >
-            📋 Class
-          </div>
-
-          {/* Recent Grades */}
-          <div
-            style={{
-              borderRadius: 16,
-              padding: "14px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              marginBottom: 10,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                opacity: 0.5,
-                textTransform: "uppercase",
-                letterSpacing: "0.16em",
-                marginBottom: 10,
-              }}
-            >
-              Recent Grades
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {submissions.slice(0, 5).map((s: any) => (
-                <div
-                  key={s.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <div
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 9,
-                        background: "rgba(139,92,246,0.2)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <CheckCircle size={13} style={{ color: "#a78bfa" }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>
-                        {s.assignment_title || "Assignment"}
-                      </div>
-                      <div style={{ fontSize: 10, opacity: 0.4 }}>
-                        {new Date(s.submitted_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    {s.grade !== null ? (
-                      <span
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 800,
-                          color: s.grade >= 70 ? "#34d399" : "#f87171",
-                        }}
-                      >
-                        {s.grade}%
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "3px 8px",
-                          borderRadius: 20,
-                          background: "rgba(255,255,255,0.07)",
-                          opacity: 0.5,
-                        }}
-                      >
-                        Pending
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {submissions.length === 0 && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "20px",
-                    opacity: 0.3,
-                    fontSize: 13,
-                  }}
-                >
-                  No submissions yet
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>
       </div>
       {/* end max-width wrapper */}
     </div>
