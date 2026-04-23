@@ -1040,7 +1040,7 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     res.json(filtered);
   } catch (e) {
     console.error('pending assignments error:', e);
-    res.json([]);
+    res.status(500).json({ error: 'Failed to fetch pending assignments' });
   }
 });
 

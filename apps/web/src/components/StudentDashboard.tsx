@@ -2870,12 +2870,13 @@ export default function StudentDashboard() {
         setStatGraded(subs.filter((s: any) => s.grade !== null).length);
       } catch {}
 
-      // Check for more assignments across all classes before unlocking free time
+      // Check for more assignments across all classes before unlocking free time.
+      // null = fetch errored; [] = successful but empty; [...] = has more work
       let nextAssignment: any = null;
       let nextParsed: any = null;
       const submittedId = pendingAssignment?.id;
       const pendingResults = await Promise.all(
-        classes.map((cls: any) => api.getPendingAssignments(cls.id).catch(() => [] as any[]))
+        classes.map((cls: any) => api.getPendingAssignments(cls.id).catch(() => null as any[] | null))
       );
       for (const pending of pendingResults) {
         if (nextAssignment) break;
@@ -2902,14 +2903,23 @@ export default function StudentDashboard() {
           }
         }
       }
+      // Only unlock free time if at least one class returned a successful (non-error) result.
+      // If all fetches errored out (null), go back to the dashboard without unlocking so the
+      // student can refresh and retry rather than being falsely declared "done for the day".
+      const anySucceeded = pendingResults.some(r => r !== null);
 
       if (nextAssignment) {
         setQuestionsAnswered(0);
         setPendingAssignment(nextAssignment);
         setParsedAssignment(nextParsed);
         setPhase("working");
-      } else {
+      } else if (anySucceeded) {
         setWorkUnlocked();
+        setPendingAssignment(null);
+        setParsedAssignment(null);
+        setPhase("done");
+      } else {
+        // All fetches failed — don't unlock free time, just return to dashboard
         setPendingAssignment(null);
         setParsedAssignment(null);
         setPhase("done");

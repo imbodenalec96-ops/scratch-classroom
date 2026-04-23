@@ -204,6 +204,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [ttsPassages, setTtsPassages] = useState(true);
   const [passageAudioState, setPassageAudioState] = useState<"idle"|"loading"|"playing">("idle");
   const passageAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const passageSpeechRef = React.useRef<SpeechSynthesisUtterance | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -322,8 +323,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       // Answer is correct — clear feedback and advance
       setFeedback("");
       setCurrentQ(currentQ + 1);
-      // Stop passage audio on question change
+      // Stop all audio on question change
       if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
+      window.speechSynthesis?.cancel();
+      passageSpeechRef.current = null;
       setPassageAudioState("idle");
     }
   };
@@ -528,6 +531,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   }
                   setPassageAudioState("idle");
                   if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
+                  window.speechSynthesis?.cancel(); passageSpeechRef.current = null;
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 18,
@@ -748,10 +752,21 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                         if (passageAudioState === "playing") {
                           passageAudioRef.current?.pause();
                           passageAudioRef.current = null;
+                          window.speechSynthesis?.cancel();
+                          passageSpeechRef.current = null;
                           setPassageAudioState("idle");
                           return;
                         }
                         setPassageAudioState("loading");
+                        // Start browser TTS immediately (synchronous) to hold iOS gesture context
+                        window.speechSynthesis?.cancel();
+                        const uPassage = new SpeechSynthesisUtterance(q.passage);
+                        uPassage.rate = 0.85; uPassage.lang = "en-US";
+                        uPassage.onend = () => { passageSpeechRef.current = null; setPassageAudioState("idle"); };
+                        passageSpeechRef.current = uPassage;
+                        window.speechSynthesis?.speak(uPassage);
+                        setPassageAudioState("playing");
+                        // Try to upgrade to ElevenLabs in background
                         try {
                           const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
                             (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
@@ -761,16 +776,18 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                             body: JSON.stringify({ text: q.passage, mode: "passage" }),
                           });
-                          if (!r.ok) throw new Error("tts_failed");
-                          const blob = await r.blob();
-                          const url = URL.createObjectURL(blob);
-                          const audio = new Audio(url);
-                          passageAudioRef.current = audio;
-                          audio.onended = () => { URL.revokeObjectURL(url); setPassageAudioState("idle"); };
-                          audio.onerror = () => setPassageAudioState("idle");
-                          await audio.play();
-                          setPassageAudioState("playing");
-                        } catch { setPassageAudioState("idle"); }
+                          if (r.ok) {
+                            const blob = await r.blob();
+                            const url = URL.createObjectURL(blob);
+                            const audio = new Audio(url);
+                            passageAudioRef.current = audio;
+                            audio.onended = () => { URL.revokeObjectURL(url); passageAudioRef.current = null; setPassageAudioState("idle"); };
+                            audio.onerror = () => setPassageAudioState("idle");
+                            window.speechSynthesis?.cancel(); // switch to ElevenLabs
+                            passageSpeechRef.current = null;
+                            audio.play().catch(() => { /* browser TTS already playing on iOS */ });
+                          }
+                        } catch { /* browser TTS keeps playing */ }
                       }}
                       disabled={passageAudioState === "loading"}
                       style={{
@@ -811,7 +828,12 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                         const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ||
                           (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
                         const token = localStorage.getItem("token");
-                        let usedApi = false;
+                        // Start browser TTS immediately (synchronous) to hold iOS gesture context
+                        window.speechSynthesis.cancel();
+                        const u = new SpeechSynthesisUtterance(spellingWord);
+                        u.rate = 0.75; u.lang = "en-US";
+                        window.speechSynthesis.speak(u);
+                        // Try to upgrade to ElevenLabs
                         try {
                           const r = await fetch(`${API_BASE}/ai/tts`, {
                             method: "POST",
@@ -823,16 +845,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                             const url = URL.createObjectURL(blob);
                             const audio = new Audio(url);
                             audio.onended = () => URL.revokeObjectURL(url);
-                            await audio.play();
-                            usedApi = true;
+                            window.speechSynthesis.cancel(); // switch to ElevenLabs
+                            audio.play().catch(() => { /* browser TTS already playing on iOS */ });
                           }
-                        } catch { /* fall through */ }
-                        if (!usedApi) {
-                          window.speechSynthesis.cancel();
-                          const u = new SpeechSynthesisUtterance(spellingWord);
-                          u.rate = 0.75; u.lang = "en-US";
-                          window.speechSynthesis.speak(u);
-                        }
+                        } catch { /* keep browser TTS running */ }
                       }}
                       style={{ background: accent + "22", border: `2px solid ${accent}`, borderRadius: 16, padding: "18px 36px", cursor: "pointer", color: "white", fontSize: 28 }}
                     >
