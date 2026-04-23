@@ -174,8 +174,14 @@ function isAnswerCorrect(question: Question, answer: string): boolean {
     return normalize(answer) === normalize(correctOpt);
   }
 
+  // Spelling dictation: extract word from "Spell the word: X" or "Spell: X"
+  const spellingMatch = question.text?.match(/spell(?:\s+the\s+word)?[:\s]+(\S+)/i);
+  if (spellingMatch) {
+    const word = spellingMatch[1].replace(/[^a-zA-Z'-]/g, "");
+    return answer.trim().toLowerCase() === word.toLowerCase();
+  }
+
   // Short answer / fill blank: require matching correctAnswer (if provided)
-  // If no answer key, we can't validate, so treat as unanswered
   if (question.correctAnswer) {
     const normalize = (s: string) => String(s || "").trim().toLowerCase();
     return normalize(answer) === normalize(question.correctAnswer);

@@ -676,14 +676,17 @@ router.post("/tts", async (req: AuthRequest, res: Response) => {
   const voiceId  = isPassage ? EL_VOICE_PASSAGE  : EL_VOICE_SPELLING;
   const modelId  = isPassage ? "eleven_multilingual_v2" : "eleven_turbo_v2_5";
   // Passages: lower stability = more natural expression; higher style = storytelling feel
+  // Spelling: low stability + style boost = warm, natural teacher voice (not robotic)
   const voiceSettings = isPassage
     ? { stability: 0.40, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true }
-    : { stability: 0.75, similarity_boost: 0.80 };
+    : { stability: 0.30, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true };
 
-  // Spelling: repeat the word twice. Passage: read as-is (up to 5000 chars).
+  // Spelling: say "Your spelling word is [word]. [word]." — teacher dictation style
+  // Passage: read as-is (up to 5000 chars)
+  const word = text.trim().slice(0, 200);
   const spoken = isPassage
     ? text.trim().slice(0, 5000)
-    : `${text.trim().slice(0, 200)}. ${text.trim().slice(0, 200)}.`;
+    : `Your spelling word is: ${word}. ${word}.`;
 
   try {
     const response = await fetch(
