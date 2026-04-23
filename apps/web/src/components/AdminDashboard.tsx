@@ -83,8 +83,7 @@ export default function AdminDashboard() {
       .then(r => setAiKeySet(r.status !== 503)).catch(() => setAiKeySet(false));
     fetch("/api/ai-tasks/recent-warnings", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
       .then(r => r.ok ? r.json() : []).then(rows => setGenWarnings(Array.isArray(rows) ? rows : [])).catch(() => setGenWarnings([]));
-    fetch("/api/admin-settings", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
-      .then(r => r.ok ? r.json() : {}).then((s: any) => { if (s.remote_access_pin) setSecPin(s.remote_access_pin); }).catch(() => {});
+    api.getAdminSettings().then((s: any) => { if (s.remote_access_pin) setSecPin(s.remote_access_pin); }).catch(() => {});
   }, []);
 
   const saveSecPin = async () => {
@@ -94,15 +93,10 @@ export default function AdminDashboard() {
       return;
     }
     try {
-      const r = await fetch("/api/admin-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + localStorage.getItem("token") },
-        body: JSON.stringify({ remote_access_pin: secPin }),
-      });
-      if (!r.ok) throw new Error("Save failed");
+      await api.updateAdminSettings({ remote_access_pin: secPin });
       setSecPinSaved(true);
       setTimeout(() => setSecPinSaved(false), 2500);
-    } catch { setSecPinError("Failed to save. Try again."); }
+    } catch (e: any) { setSecPinError(e.message || "Failed to save. Try again."); }
   };
 
   const totalStudents = students.length;
