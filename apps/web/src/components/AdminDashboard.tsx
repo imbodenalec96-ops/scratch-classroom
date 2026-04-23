@@ -59,6 +59,9 @@ export default function AdminDashboard() {
   const [aiKeySet, setAiKeySet]                   = useState<boolean | null>(null);
   const [genWarnings, setGenWarnings]             = useState<any[]>([]);
   const [showWarnings, setShowWarnings]           = useState(false);
+  const [secPin, setSecPin]                       = useState("");
+  const [secPinSaved, setSecPinSaved]             = useState(false);
+  const [secPinError, setSecPinError]             = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -80,7 +83,27 @@ export default function AdminDashboard() {
       .then(r => setAiKeySet(r.status !== 503)).catch(() => setAiKeySet(false));
     fetch("/api/ai-tasks/recent-warnings", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
       .then(r => r.ok ? r.json() : []).then(rows => setGenWarnings(Array.isArray(rows) ? rows : [])).catch(() => setGenWarnings([]));
+    fetch("/api/admin-settings", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } })
+      .then(r => r.ok ? r.json() : {}).then((s: any) => { if (s.remote_access_pin) setSecPin(s.remote_access_pin); }).catch(() => {});
   }, []);
+
+  const saveSecPin = async () => {
+    setSecPinError("");
+    if (secPin && (secPin.length !== 4 || !/^\d{4}$/.test(secPin))) {
+      setSecPinError("PIN must be exactly 4 digits.");
+      return;
+    }
+    try {
+      const r = await fetch("/api/admin-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + localStorage.getItem("token") },
+        body: JSON.stringify({ remote_access_pin: secPin }),
+      });
+      if (!r.ok) throw new Error("Save failed");
+      setSecPinSaved(true);
+      setTimeout(() => setSecPinSaved(false), 2500);
+    } catch { setSecPinError("Failed to save. Try again."); }
+  };
 
   const totalStudents = students.length;
   const totalTeachers = teachers.filter(t => t.role === "teacher").length;
@@ -468,6 +491,47 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Security — Remote Access PIN */}
+            <div style={{ ...cardStyle,padding:"20px 22px" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:16 }}>
+                <KeyRound size={14} style={{ color:"#a78bfa" }} />
+                <div style={{ fontSize:13,fontWeight:800,letterSpacing:"-0.01em",color:text1 }}>Security</div>
+              </div>
+              <div style={{ marginBottom:6,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",color:text2 }}>
+                Assignment Skip PIN (4 digits)
+              </div>
+              <div style={{ fontSize:11,color:text2,marginBottom:12,lineHeight:1.5 }}>
+                Teachers enter this PIN to unlock question navigation on student assignments and quizzes.
+              </div>
+              <div style={{ display:"flex",gap:8 }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={secPin}
+                  onChange={e => setSecPin(e.target.value.replace(/\D/g,"").slice(0,4))}
+                  placeholder="e.g. 1234"
+                  style={{
+                    flex:1,padding:"10px 14px",borderRadius:10,border:`1px solid ${border}`,
+                    background:dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.04)",
+                    color:text1,fontSize:18,fontWeight:700,letterSpacing:"0.2em",
+                    outline:"none",fontFamily:"monospace",
+                  }}
+                />
+                <button
+                  onClick={saveSecPin}
+                  style={{
+                    padding:"10px 20px",borderRadius:10,border:"none",cursor:"pointer",
+                    background: secPinSaved ? "linear-gradient(135deg,#34d399,#059669)" : "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+                    color:"white",fontSize:13,fontWeight:700,whiteSpace:"nowrap",
+                  }}
+                >
+                  {secPinSaved ? "✓ Saved" : "Save PIN"}
+                </button>
+              </div>
+              {secPinError && <div style={{ marginTop:8,fontSize:12,color:"#f87171" }}>{secPinError}</div>}
             </div>
 
             {/* Recent Activity feed */}
