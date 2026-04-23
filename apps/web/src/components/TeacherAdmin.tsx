@@ -49,6 +49,8 @@ interface AdminSettings {
   remote_access_pin?: string;
   default_grade_min?: number;
   default_grade_max?: number;
+  tts_passages_allowed?: string;  // "true" | "false"
+  tts_spelling_allowed?: string;  // "true" | "false"
 }
 
 interface BreakConfig {
@@ -1684,6 +1686,44 @@ function SettingsSection() {
             <input type="number" min={1} max={12} style={T.input} value={settings.default_grade_max || 5}
               onChange={(e) => set("default_grade_max", Number(e.target.value))} />
           </div>
+        </div>
+
+        <div style={card}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "white", margin: "0 0 16px 0" }}>Student Read-Aloud (TTS)</h3>
+          <p style={{ fontSize: 12, color: T.sub, marginBottom: 16 }}>
+            Control whether students can hear passages or spelling words read aloud using AI voice.
+          </p>
+          {([
+            { key: "tts_passages_allowed", label: "🎧 Listen button on reading passages", desc: "Students can tap to hear the passage read aloud" },
+            { key: "tts_spelling_allowed", label: "🔊 Hear the word (spelling)", desc: "Students can hear spelling words spoken automatically" },
+          ] as const).map(({ key, label, desc }) => {
+            const enabled = settings[key] !== "false";
+            return (
+              <div key={key} style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{label}</div>
+                  <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>{desc}</div>
+                </div>
+                <button
+                  onClick={() => set(key, enabled ? "false" : "true")}
+                  style={{
+                    flexShrink: 0,
+                    padding: "6px 18px",
+                    borderRadius: 20,
+                    border: `1px solid ${enabled ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.3)"}`,
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    background: enabled ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.15)",
+                    color: enabled ? "#34d399" : "#f87171",
+                    transition: "all .15s",
+                  }}
+                >
+                  {enabled ? "✓ On" : "✗ Off"}
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         <div style={card}>

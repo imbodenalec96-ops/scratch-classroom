@@ -1390,6 +1390,8 @@ function WorkScreen({
   onBack,
   questionsAnswered,
   setQuestionsAnswered,
+  ttsPassages = true,
+  ttsSpelling = true,
 }: {
   assignment: any;
   parsed: any;
@@ -1398,6 +1400,8 @@ function WorkScreen({
   onBack: () => void;
   questionsAnswered: number;
   setQuestionsAnswered: (n: number) => void;
+  ttsPassages?: boolean;
+  ttsSpelling?: boolean;
 }) {
   const allQuestions: Array<{
     q: any;
@@ -1441,8 +1445,8 @@ function WorkScreen({
       passageAudioRef.current = null;
     }
     setPassageState("idle");
-    // Auto-read spelling words aloud when the question changes
-    if (String(parsed?.subject || "").toLowerCase() === "spelling" && q?.q?.text) {
+    // Auto-read spelling words aloud when the question changes (only if TTS allowed)
+    if (ttsSpelling && String(parsed?.subject || "").toLowerCase() === "spelling" && q?.q?.text) {
       const timer = setTimeout(() => speakSpellingWord(q.q.text), 600);
       return () => clearTimeout(timer);
     }
@@ -1762,7 +1766,7 @@ function WorkScreen({
               >
                 📖 Read this first
               </div>
-              <button
+              {ttsPassages && <button
                 onClick={async () => {
                   if (passageState === "playing") {
                     passageAudioRef.current?.pause();
@@ -1814,7 +1818,7 @@ function WorkScreen({
                   <span style={{ display: "inline-block", width: 10, height: 10, border: `2px solid ${starfall.accent}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
                 )}
                 {passageState === "playing" ? "⏸ Stop" : passageState === "loading" ? "Loading…" : "🎧 Listen"}
-              </button>
+              </button>}
             </div>
             <p
               className="leading-relaxed"
@@ -1886,8 +1890,8 @@ function WorkScreen({
                 <button
                   onClick={() => {
                     const subj = String(parsed?.subject || "").toLowerCase();
-                    if (subj === "spelling") speakSpellingWord(q.q.text);
-                    else speakText(q.q.text);
+                    if (subj === "spelling" && ttsSpelling) speakSpellingWord(q.q.text);
+                    else if (subj !== "spelling") speakText(q.q.text);
                   }}
                   className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
                   style={{
@@ -2447,6 +2451,8 @@ export default function StudentDashboard() {
   const [pendingAssignment, setPendingAssignment] = useState<any>(null);
   const [parsedAssignment, setParsedAssignment] = useState<any>(null);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [ttsPassages, setTtsPassages] = useState(true);
+  const [ttsSpelling, setTtsSpelling] = useState(true);
 
   // Pending quizzes
   const [pendingQuizzes, setPendingQuizzes] = useState<any[]>([]);
@@ -2528,11 +2534,16 @@ export default function StudentDashboard() {
     }, 7000);
     const load = async () => {
       try {
-        const [clsList, subList, lb] = await Promise.all([
+        const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+          (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
+        const [clsList, subList, lb, adminSettings] = await Promise.all([
           api.getClasses().catch(() => [] as any[]),
           api.getMySubmissions().catch(() => [] as any[]),
           api.getLeaderboard().catch(() => [] as any[]),
+          fetch(`${apiBase}/admin-settings`).then(r => r.json()).catch(() => ({})),
         ]);
+        if (adminSettings?.tts_passages_allowed === "false") setTtsPassages(false);
+        if (adminSettings?.tts_spelling_allowed === "false") setTtsSpelling(false);
         if (timedOut) return;
         setClasses(clsList);
         setSubmissions(subList);
@@ -2798,6 +2809,8 @@ export default function StudentDashboard() {
         onBack={() => setPhase("done")}
         questionsAnswered={questionsAnswered}
         setQuestionsAnswered={setQuestionsAnswered}
+        ttsPassages={ttsPassages}
+        ttsSpelling={ttsSpelling}
       />
     );
   }

@@ -194,6 +194,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [assignment, setAssignment] = useState<any>(null);
   const [parsed, setParsed] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [ttsPassages, setTtsPassages] = useState(true);
+  const [passageAudioState, setPassageAudioState] = useState<"idle"|"loading"|"playing">("idle");
+  const passageAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -227,9 +231,13 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   useEffect(() => {
     (async () => {
       try {
-        const clsList = await api.getClasses();
+        const [clsList, settings] = await Promise.all([
+          api.getClasses(),
+          fetch(`${(import.meta as any)?.env?.VITE_API_BASE || (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api")}/admin-settings`).then(r => r.json()).catch(() => ({})),
+        ]);
         setClasses(clsList);
         setClassId(clsList?.[0]?.id ?? null);
+        if (settings?.tts_passages_allowed === "false") setTtsPassages(false);
       } catch {}
     })();
   }, []);
@@ -303,6 +311,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       // Answer is correct — clear feedback and advance
       setFeedback("");
       setCurrentQ(currentQ + 1);
+      // Stop passage audio on question change
+      if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
+      setPassageAudioState("idle");
     }
   };
 
@@ -485,16 +496,27 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 key={a.id}
                 className="ab-card"
                 onClick={async () => {
-                  setAssignment(a);
-                  // Content is stripped from list for perf — fetch full assignment on demand
                   if (a.content) {
+                    // Content already present (e.g. explicit ?id= fetch)
+                    setAssignment(a);
                     try { setParsed(JSON.parse(a.content)); } catch {}
                   } else {
+                    // Content stripped from list for perf — fetch before navigating
+                    setLoadingContent(true);
                     try {
                       const full = await api.getAssignment(a.id);
-                      if (full?.content) setParsed(JSON.parse(full.content));
-                    } catch {}
+                      const content = full?.content ?? null;
+                      const p = content ? (() => { try { return JSON.parse(content); } catch { return null; } })() : null;
+                      // Set both atomically so we never render "no questions"
+                      setParsed(p);
+                      setAssignment({ ...a, content });
+                    } catch {
+                      setAssignment(a); // show assignment even if fetch failed
+                    }
+                    setLoadingContent(false);
                   }
+                  setPassageAudioState("idle");
+                  if (passageAudioRef.current) { passageAudioRef.current.pause(); passageAudioRef.current = null; }
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 18,
@@ -567,6 +589,16 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             );
           })}
         </div>
+      </div>
+    );
+  }
+
+  if (loadingContent) {
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+        <div style={{ width: 40, height: 40, border: "3px solid rgba(124,58,237,0.3)", borderTopColor: "#7c3aed", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14 }}>Loading assignment…</p>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
@@ -666,12 +698,59 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             {/* Passage block */}
             {q.passage && (
               <div style={{
-                background: "rgba(255,255,255,0.05)", border: `1px solid ${accent}30`,
+                background: "linear-gradient(135deg,#1e1b2e 0%,#16132a 100%)",
+                border: `1px solid ${accent}33`, borderLeft: `3px solid ${accent}`,
                 borderRadius: 16, padding: "16px 18px", marginBottom: 16,
-                fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.75)",
               }}>
-                <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent, marginBottom: 8 }}>📖 Read this first</div>
-                {q.passage}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>📖 Read this first</div>
+                  {ttsPassages && (
+                    <button
+                      onClick={async () => {
+                        if (passageAudioState === "playing") {
+                          passageAudioRef.current?.pause();
+                          passageAudioRef.current = null;
+                          setPassageAudioState("idle");
+                          return;
+                        }
+                        setPassageAudioState("loading");
+                        try {
+                          const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+                            (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
+                          const token = localStorage.getItem("token");
+                          const r = await fetch(`${apiBase}/ai/tts`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                            body: JSON.stringify({ text: q.passage, mode: "passage" }),
+                          });
+                          if (!r.ok) throw new Error("tts_failed");
+                          const blob = await r.blob();
+                          const url = URL.createObjectURL(blob);
+                          const audio = new Audio(url);
+                          passageAudioRef.current = audio;
+                          audio.onended = () => { URL.revokeObjectURL(url); setPassageAudioState("idle"); };
+                          audio.onerror = () => setPassageAudioState("idle");
+                          await audio.play();
+                          setPassageAudioState("playing");
+                        } catch { setPassageAudioState("idle"); }
+                      }}
+                      disabled={passageAudioState === "loading"}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "5px 14px", borderRadius: 20, border: `1px solid ${accent}55`,
+                        background: passageAudioState === "playing" ? `${accent}30` : `${accent}18`,
+                        color: accent, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        opacity: passageAudioState === "loading" ? 0.6 : 1,
+                      }}
+                    >
+                      {passageAudioState === "loading" && (
+                        <span style={{ width: 10, height: 10, border: `2px solid ${accent}`, borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                      )}
+                      {passageAudioState === "playing" ? "⏸ Stop" : passageAudioState === "loading" ? "Loading…" : "🎧 Listen"}
+                    </button>
+                  )}
+                </div>
+                <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: 0, whiteSpace: "pre-wrap" }}>{q.passage}</p>
               </div>
             )}
 
