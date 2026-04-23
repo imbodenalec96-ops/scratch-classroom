@@ -241,7 +241,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences, no explanation â
 router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
   if (req.user!.role === "student") return res.status(403).json({ error: "Forbidden" });
 
-  const { title, subject, grade, instructions, passage } = req.body;
+  const { title, subject, grade, instructions, passage, questionCount, questionType, learningObjective, focusKeywords, teacherNotes } = req.body;
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -314,20 +314,30 @@ router.post("/generate-assignment", async (req: AuthRequest, res: Response) => {
       ? `GENERATE a short age-appropriate reading passage (5-8 sentences) and include it as the "passage" field in the first section. All comprehension questions must refer to it.`
       : "";
 
+    const targetCount = questionCount ? Number(questionCount) : null;
+    const qtypeGuide =
+      questionType === "multiple_choice" ? "Use ONLY multiple_choice questions. No short_answer or fill_blank." :
+      questionType === "short_answer"    ? "Use ONLY short_answer questions. No multiple_choice or fill_blank." :
+      questionType === "fill_blank"      ? "Use ONLY fill_blank questions. No multiple_choice or short_answer." :
+      "Mix question types: multiple_choice, short_answer, and fill_blank.";
+
     const prompt = `You are an experienced elementary school teacher creating a printable paper worksheet.
 
 Grade Level: ${grade || "3rd Grade"}
 Subject: ${subject || "General"}
 Worksheet Title: ${title || "Assignment"}
 ${instructions ? `Teacher's special instructions: ${instructions}` : ""}
+${learningObjective ? `Learning objective: ${learningObjective}` : ""}
+${focusKeywords ? `Focus vocabulary/keywords to emphasize: ${focusKeywords}` : ""}
+${teacherNotes ? `Additional teacher context (do not show students): ${teacherNotes}` : ""}
 
 ${subjectGuide}
 
 ${passageInstruction}
 
-Create a thorough, realistic worksheet with 2-3 sections and 8-12 total questions appropriate for ${grade || "3rd grade"} level.
+${targetCount ? `Create EXACTLY ${targetCount} questions total, spread across 2-3 sections.` : "Create a thorough, realistic worksheet with 2-3 sections and 8-12 total questions."} appropriate for ${grade || "3rd grade"} level.
 The worksheet should feel like something a real teacher would hand out in class.
-Mix question types: multiple_choice, short_answer, and fill_blank within each section.
+${qtypeGuide}
 
 CRITICAL RULES:
 1. Every multiple_choice question MUST include a "correctIndex" field (0-based index of the correct answer).

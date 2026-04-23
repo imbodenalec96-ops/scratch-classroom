@@ -1123,7 +1123,16 @@ export default function AssignmentBuilder() {
     setGenError("");
     setGenerated(null);
     try {
-      const result = await api.generateAssignment({ title, subject, grade, instructions, passage: genPassage.trim() || undefined });
+      const result = await api.generateAssignment({
+        title, subject, grade, instructions,
+        passage: genPassage.trim() || undefined,
+        questionCount: customQuestionCount !== "" ? Number(customQuestionCount) : undefined,
+        questionType: customQuestionType || undefined,
+        learningObjective: customLearningObjective || undefined,
+        focusKeywords: customFocusKeywords || undefined,
+        teacherNotes: customTeacherNotes || undefined,
+        hintsAllowed: customHintsAllowed,
+      });
       setGenerated(result);
       setShowForm(true);
     } catch (e: any) {
