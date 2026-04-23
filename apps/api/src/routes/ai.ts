@@ -636,28 +636,41 @@ Return ONLY valid JSON, no markdown, no code fences, no explanation — just thi
  * Text-to-speech (spelling words)
  * POST /api/ai/tts
  * Body: { text: string }
- * Returns: audio/mpeg stream (OpenAI tts-1, voice "nova")
- * Falls back to 503 if no OpenAI key so the client can use Web Speech.
+ * Returns: audio/mpeg — ElevenLabs "Rachel" voice (clear, natural).
+ * Falls back to 503 if no key so the client uses Web Speech API.
  * ───────────────────────────────────────────────────────────────── */
+const ELEVENLABS_VOICE_ID = "21m00Tio1uXcvkmUEBsA"; // Rachel — clear, neutral, great for kids
+
 router.post("/tts", async (req: AuthRequest, res: Response) => {
   const { text } = req.body;
   if (!text || typeof text !== "string") return res.status(400).json({ error: "text required" });
 
-  const OPENAI_KEY = process.env.OPENAI_API_KEY;
-  if (!OPENAI_KEY || OPENAI_KEY === "sk-your-key-here") {
-    return res.status(503).json({ error: "no_tts_key" });
-  }
+  const EL_KEY = process.env.ELEVENLABS_API_KEY;
+  if (!EL_KEY) return res.status(503).json({ error: "no_tts_key" });
 
+  // Say the word twice with a natural pause — spelling bee format
   const word = text.trim().slice(0, 200);
+  const spoken = `${word}. ${word}.`;
+
   try {
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-      body: JSON.stringify({ model: "tts-1", voice: "nova", input: word, speed: 0.85 }),
-    });
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": EL_KEY,
+        },
+        body: JSON.stringify({
+          text: spoken,
+          model_id: "eleven_turbo_v2_5",
+          voice_settings: { stability: 0.75, similarity_boost: 0.80 },
+        }),
+      }
+    );
     if (!response.ok) {
       const err = await response.text();
-      console.error("OpenAI TTS error:", response.status, err);
+      console.error("ElevenLabs TTS error:", response.status, err);
       return res.status(502).json({ error: "tts_failed" });
     }
     res.setHeader("Content-Type", "audio/mpeg");
