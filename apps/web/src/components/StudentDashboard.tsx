@@ -2179,13 +2179,25 @@ function WorkScreen({
         {/* ── Progress dots ── */}
         <ProgressDots total={total} current={currentQ} answers={answers} />
 
-        {/* ── Admin skip link ── */}
-        <div style={{ textAlign: "center" }}>
+        {/* ── Admin skip button ── */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
           <button
             onClick={() => { setShowSkipModal(true); setSkipCode(""); setSkipError(""); }}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "rgba(0,0,0,0.28)", padding: "4px 8px", letterSpacing: "0.02em" }}
+            style={{
+              background: "rgba(0,0,0,0.06)",
+              border: "1px solid rgba(0,0,0,0.12)",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "rgba(0,0,0,0.5)",
+              padding: "7px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
           >
-            🔑 Admin skip
+            🔑 Admin Skip
           </button>
         </div>
 
