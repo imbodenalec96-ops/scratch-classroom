@@ -39,6 +39,7 @@ const TOOLS = [
   { path: "/leaderboard",      icon: Trophy,        label: "Leaderboard",   desc: "Student rankings",    grad: "linear-gradient(135deg,#eab308,#ca8a04)", glow: "rgba(234,179,8,0.3)"  },
   { path: "/lesson-analytics", icon: ClipboardList, label: "Lesson Views",  desc: "Who read what",       grad: "linear-gradient(135deg,#6366f1,#4f46e5)", glow: "rgba(99,102,241,0.3)" },
   { path: "/class-grades",     icon: GraduationCap, label: "Class Grades",  desc: "Per-student levels",  grad: "linear-gradient(135deg,#14b8a6,#0d9488)", glow: "rgba(20,184,166,0.3)" },
+  { path: "/teacher/assignment-schedule", icon: ClipboardList, label: "Schedule",   desc: "Weekly periods",      grad: "linear-gradient(135deg,#7c3aed,#6366f1)", glow: "rgba(124,58,237,0.3)" },
 ];
 
 /* Push-to-page entries with icons and accent colours */

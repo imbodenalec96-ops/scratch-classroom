@@ -41,6 +41,7 @@ import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
 import StudentKiosk from "./components/StudentKiosk.tsx";
 import TeacherAdmin from "./components/TeacherAdmin.tsx";
+import AssignmentSchedulePage from "./components/AssignmentSchedulePage.tsx";
 import ClassroomBoard from "./components/ClassroomBoard.tsx";
 import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
 import TeacherStore from "./components/TeacherStore.tsx";
@@ -172,6 +173,7 @@ export default function App() {
             <Route path="teacher/schedule" element={<TeacherSchedule />} />
             <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
             <Route path="teacher/store" element={<TeacherStore />} />
+            <Route path="teacher/assignment-schedule" element={<AssignmentSchedulePage />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />

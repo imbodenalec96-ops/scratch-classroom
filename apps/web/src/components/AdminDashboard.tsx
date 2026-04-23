@@ -125,6 +125,7 @@ export default function AdminDashboard() {
     { path:"/lesson-analytics", icon:BookOpen,      label:"Lesson Views",   desc:"Who read what",             grad:"linear-gradient(135deg,#6366f1,#4f46e5)", glow:"rgba(99,102,241,0.3)"  },
     { path:"/grading",          icon:CheckSquare,   label:"Grading",        desc:"Review work",               grad:"linear-gradient(135deg,#10b981,#059669)", glow:"rgba(16,185,129,0.3)"  },
     { path:"/quizzes",          icon:HelpCircle,    label:"Quizzes",        desc:"Build & grade",             grad:"linear-gradient(135deg,#3b82f6,#2563eb)", glow:"rgba(59,130,246,0.3)"  },
+    { path:"/teacher/assignment-schedule", icon:ClipboardList, label:"Schedule", desc:"Weekly periods",       grad:"linear-gradient(135deg,#7c3aed,#6366f1)", glow:"rgba(124,58,237,0.3)"  },
   ];
 
   const hour = new Date().getHours();

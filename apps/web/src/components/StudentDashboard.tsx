@@ -1428,6 +1428,10 @@ function WorkScreen({
   );
   const [passageState, setPassageState] = useState<"idle" | "loading" | "playing">("idle");
   const passageAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [showSkipModal, setShowSkipModal] = useState(false);
+  const [skipCode, setSkipCode]           = useState("");
+  const [skipError, setSkipError]         = useState("");
+  const [skipLoading, setSkipLoading]     = useState(false);
   const q = allQuestions[currentQ];
   const currentAnswer = answers[currentQ] ?? "";
   const rm = prefersReducedMotion();
@@ -1487,6 +1491,33 @@ function WorkScreen({
     setMascotState("cheer");
     setSubmitted(true);
     setTimeout(() => onComplete(answers), 2200);
+  };
+
+  const handleAdminSkip = async () => {
+    if (!skipCode.trim()) return;
+    setSkipLoading(true);
+    setSkipError("");
+    try {
+      const r = await fetch(`${TTS_API}/admin-settings/check-skip-code?code=${encodeURIComponent(skipCode.trim())}`);
+      const data = await r.json();
+      if (data.valid) {
+        setAnswers(prev => ({ ...prev, [currentQ]: "__SKIPPED__" }));
+        setShowSkipModal(false);
+        setSkipCode("");
+        if (currentQ < total - 1) {
+          setCurrentQ(currentQ + 1);
+          setCardKey(k => k + 1);
+        } else {
+          handleSubmit();
+        }
+      } else {
+        setSkipError("Incorrect code. Try again.");
+      }
+    } catch {
+      setSkipError("Could not verify. Check connection.");
+    } finally {
+      setSkipLoading(false);
+    }
   };
 
   if (submitted) {
@@ -2147,9 +2178,62 @@ function WorkScreen({
         })()}
         {/* ── Progress dots ── */}
         <ProgressDots total={total} current={currentQ} answers={answers} />
+
+        {/* ── Admin skip link ── */}
+        <div style={{ textAlign: "center" }}>
+          <button
+            onClick={() => { setShowSkipModal(true); setSkipCode(""); setSkipError(""); }}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "rgba(0,0,0,0.28)", padding: "4px 8px", letterSpacing: "0.02em" }}
+          >
+            🔑 Admin skip
+          </button>
+        </div>
+
         <div style={{ height: 80 }} />{" "}
         {/* spacer so mascot doesn't overlap last button */}
       </div>
+
+      {/* ── Admin skip modal ── */}
+      {showSkipModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowSkipModal(false); setSkipCode(""); setSkipError(""); } }}
+        >
+          <div style={{ background: "white", borderRadius: 20, padding: 28, width: "min(360px, 90vw)", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>🔑</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e1b4b", marginBottom: 4 }}>Admin Skip</div>
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", marginBottom: 20 }}>
+              Enter the teacher passcode to skip question {currentQ + 1}.
+            </div>
+            <input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              value={skipCode}
+              onChange={e => { setSkipCode(e.target.value); setSkipError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleAdminSkip()}
+              placeholder="Enter passcode…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 18, letterSpacing: "0.2em", borderRadius: 12, border: skipError ? "1.5px solid #ef4444" : "1.5px solid rgba(0,0,0,0.15)", outline: "none", marginBottom: skipError ? 8 : 16, textAlign: "center" }}
+            />
+            {skipError && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 14, textAlign: "center" }}>{skipError}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => { setShowSkipModal(false); setSkipCode(""); setSkipError(""); }}
+                style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", fontSize: 14, cursor: "pointer", color: "rgba(0,0,0,0.5)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdminSkip}
+                disabled={skipLoading || !skipCode.trim()}
+                style={{ flex: 2, padding: "11px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#7c3aed,#6366f1)", color: "white", fontSize: 14, fontWeight: 700, cursor: skipLoading || !skipCode.trim() ? "default" : "pointer", opacity: skipLoading || !skipCode.trim() ? 0.5 : 1 }}
+              >
+                {skipLoading ? "Checking…" : "Skip Question"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Streak counter */}
       <StreakCounter streak={streak} />

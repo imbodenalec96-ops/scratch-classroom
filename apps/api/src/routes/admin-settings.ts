@@ -53,6 +53,20 @@ router.get("/check-pin", async (req: Request, res: Response) => {
   }
 });
 
+// GET /check-skip-code?code=XXXX — matches remote_access_pin OR teacher_password
+router.get("/check-skip-code", async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code ?? "");
+    const rows = await db
+      .prepare("SELECT key, value FROM admin_settings WHERE key IN ('remote_access_pin','teacher_password')")
+      .all() as { key: string; value: string }[];
+    const valid = rows.some(r => r.value === code);
+    res.json({ valid });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to verify code" });
+  }
+});
+
 // POST /check-password — compare to teacher_password
 router.post("/check-password", async (req: Request, res: Response) => {
   try {
