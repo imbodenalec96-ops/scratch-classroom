@@ -632,4 +632,42 @@ Return ONLY valid JSON, no markdown, no code fences, no explanation — just thi
   }
 });
 
+/* ─────────────────────────────────────────────────────────────────
+ * Text-to-speech (spelling words)
+ * POST /api/ai/tts
+ * Body: { text: string }
+ * Returns: audio/mpeg stream (OpenAI tts-1, voice "nova")
+ * Falls back to 503 if no OpenAI key so the client can use Web Speech.
+ * ───────────────────────────────────────────────────────────────── */
+router.post("/tts", async (req: AuthRequest, res: Response) => {
+  const { text } = req.body;
+  if (!text || typeof text !== "string") return res.status(400).json({ error: "text required" });
+
+  const OPENAI_KEY = process.env.OPENAI_API_KEY;
+  if (!OPENAI_KEY || OPENAI_KEY === "sk-your-key-here") {
+    return res.status(503).json({ error: "no_tts_key" });
+  }
+
+  const word = text.trim().slice(0, 200);
+  try {
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+      body: JSON.stringify({ model: "tts-1", voice: "nova", input: word, speed: 0.85 }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("OpenAI TTS error:", response.status, err);
+      return res.status(502).json({ error: "tts_failed" });
+    }
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    const buf = await response.arrayBuffer();
+    res.end(Buffer.from(buf));
+  } catch (err: any) {
+    console.error("TTS route failed:", err?.message || err);
+    res.status(500).json({ error: "tts_failed" });
+  }
+});
+
 export default router;

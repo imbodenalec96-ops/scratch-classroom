@@ -682,10 +682,32 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   <div style={{ textAlign: "center", margin: "0 0 20px" }}>
                     <p style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>Listen and spell the word:</p>
                     <button
-                      onClick={() => {
-                        const u = new SpeechSynthesisUtterance(spellingWord);
-                        u.rate = 0.8;
-                        window.speechSynthesis.speak(u);
+                      onClick={async () => {
+                        const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ||
+                          (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
+                        const token = localStorage.getItem("token");
+                        let usedApi = false;
+                        try {
+                          const r = await fetch(`${API_BASE}/ai/tts`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                            body: JSON.stringify({ text: spellingWord }),
+                          });
+                          if (r.ok) {
+                            const blob = await r.blob();
+                            const url = URL.createObjectURL(blob);
+                            const audio = new Audio(url);
+                            audio.onended = () => URL.revokeObjectURL(url);
+                            await audio.play();
+                            usedApi = true;
+                          }
+                        } catch { /* fall through */ }
+                        if (!usedApi) {
+                          window.speechSynthesis.cancel();
+                          const u = new SpeechSynthesisUtterance(spellingWord);
+                          u.rate = 0.75; u.lang = "en-US";
+                          window.speechSynthesis.speak(u);
+                        }
                       }}
                       style={{ background: accent + "22", border: `2px solid ${accent}`, borderRadius: 16, padding: "18px 36px", cursor: "pointer", color: "white", fontSize: 28 }}
                     >
@@ -1134,6 +1156,7 @@ export default function AssignmentBuilder() {
       const sections: Section[] = Array.isArray(parsed?.sections)
         ? parsed.sections.map((sec: any) => ({
             title: sec?.title || "Section",
+            passage: sec?.passage || undefined,
             questions: Array.isArray(sec?.questions)
               ? sec.questions.map((q: any) => ({
                   type: (q?.type as Question["type"]) || "short_answer",

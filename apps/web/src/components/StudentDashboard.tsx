@@ -129,33 +129,54 @@ function getStarfallPalette(subject?: string | null) {
   );
 }
 
-/* ── Read-aloud: speak question text via Web Speech API. Cancels any in-flight
- *    utterance first so rapid taps don't queue up. Gracefully no-ops if the
- *    browser doesn't support SpeechSynthesis.
- *
- *    Voices load asynchronously — getVoices() returns [] on first call.
- *    We wait for onvoiceschanged, then pick the clearest available English
- *    voice across macOS, Windows, ChromeOS, iOS, and Android. */
+const TTS_API =
+  (import.meta as any)?.env?.VITE_API_BASE ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:4000/api"
+    : "https://scratch-classroom-api-td1x.vercel.app/api");
+
+let _ttsKeyAvailable: boolean | null = null;
+
+async function speakViaTtsApi(word: string): Promise<boolean> {
+  if (_ttsKeyAvailable === false) return false;
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${TTS_API}/ai/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text: word }),
+    });
+    if (res.status === 503) { _ttsKeyAvailable = false; return false; }
+    if (!res.ok) return false;
+    _ttsKeyAvailable = true;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    await audio.play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getBestVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  // Ordered from clearest/most natural to last resort
   const preferred = [
-    // Chrome on any platform — Google voices are the clearest
     /google us english female/i,
     /google us english/i,
     /google uk english female/i,
-    // macOS / iOS — Apple neural voices
     /samantha/i,
     /karen/i,
     /serena/i,
-    // Windows / Edge — Microsoft neural voices
     /microsoft jenny/i,
     /microsoft aria/i,
     /microsoft zira/i,
-    // Any English female voice
     /en.*female|female.*en/i,
-    // Any English voice
     /.*/,
   ];
   const enVoices = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
@@ -166,7 +187,7 @@ function getBestVoice(): SpeechSynthesisVoice | null {
   return voices[0] ?? null;
 }
 
-function speakText(text: string, rate = 0.82) {
+function speakTextFallback(text: string, rate = 0.82) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const doSpeak = () => {
     try {
@@ -178,14 +199,11 @@ function speakText(text: string, rate = 0.82) {
       const voice = getBestVoice();
       if (voice) u.voice = voice;
       window.speechSynthesis.speak(u);
-    } catch {
-      /* best effort */
-    }
+    } catch { /* best effort */ }
   };
   const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    doSpeak();
-  } else {
+  if (voices.length > 0) doSpeak();
+  else {
     window.speechSynthesis.onvoiceschanged = () => {
       window.speechSynthesis.onvoiceschanged = null;
       doSpeak();
@@ -193,15 +211,57 @@ function speakText(text: string, rate = 0.82) {
   }
 }
 
-/** Spelling questions use clue format ("Spell the word: a small insect") — read slowly and clearly, twice. */
-function speakSpellingWord(text: string) {
-  speakText(text, 0.68);
+function speakText(text: string, rate = 0.82) {
+  speakTextFallback(text, rate);
 }
+
+/** Extract the actual word from a spelling question like "Spell the word: cat" → "cat" */
+function extractSpellingWord(questionText: string): string {
+  const match = questionText.match(/spell(?:\s+the\s+word)?[:\s]+([a-zA-Z''-]+)/i);
+  if (match) return match[1];
+  // If the whole text is just a word (no spaces), use it directly
+  const trimmed = questionText.trim();
+  if (/^[a-zA-Z''-]+$/.test(trimmed)) return trimmed;
+  return questionText.trim();
+}
+
+/** Speak a spelling word using OpenAI TTS if available, otherwise Web Speech API.
+ *  Says the word twice at a clear pace — like a spelling bee announcer. */
+async function speakSpellingWord(questionText: string) {
+  const word = extractSpellingWord(questionText);
+  const usedApi = await speakViaTtsApi(word);
+  if (usedApi) return;
+  // Web Speech fallback: say the word, pause, say it again
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const doSpeak = () => {
+    try {
+      window.speechSynthesis.cancel();
+      const voice = getBestVoice();
+      const say = (text: string, rate: number) => {
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = rate;
+        u.pitch = 1.0;
+        u.lang = "en-US";
+        if (voice) u.voice = voice;
+        return u;
+      };
+      window.speechSynthesis.speak(say(word, 0.75));
+      window.speechSynthesis.speak(say(word, 0.65));
+    } catch { /* best effort */ }
+  };
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) doSpeak();
+  else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    };
+  }
+}
+
 function stopSpeaking() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-  } catch {}
+  try { window.speechSynthesis.cancel(); } catch {}
 }
 
 /* ── Confetti ── */

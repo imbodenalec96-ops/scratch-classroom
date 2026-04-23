@@ -58,6 +58,12 @@ export default function PrintAssignment() {
             <section key={si} className="section">
               {sec.title && <h2>Part {si + 1}: {sec.title}</h2>}
               {sec.instructions && <p className="instr">{sec.instructions}</p>}
+              {sec.passage && (
+                <div className="passage">
+                  <div className="passage-label">📖 Read the passage below, then answer the questions.</div>
+                  <p className="passage-text">{sec.passage}</p>
+                </div>
+              )}
               <ol className="questions">
                 {(sec.questions || []).map((q: any, qi: number) => (
                   <li key={qi} className="q">
@@ -130,6 +136,9 @@ const printStyles = `
   .section { margin-top: 18pt; break-inside: avoid; }
   .section h2 { font-size: 14pt; margin: 0 0 4pt; border-bottom: 1pt solid #000; padding-bottom: 3pt; }
   .section .instr { font-size: 10.5pt; font-style: italic; margin: 4pt 0 8pt; }
+  .passage { border: 1pt solid #aaa; border-left: 4pt solid #555; padding: 8pt 10pt; margin: 8pt 0 12pt; background: #f9f9f9; break-inside: avoid; }
+  .passage-label { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4pt; }
+  .passage-text { font-size: 11.5pt; line-height: 1.6; white-space: pre-wrap; }
   .questions { padding-left: 1.2em; }
   .q { margin-bottom: 14pt; break-inside: avoid; }
   .q-text { font-size: 12pt; font-weight: 600; margin-bottom: 4pt; }
