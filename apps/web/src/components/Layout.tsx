@@ -577,6 +577,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
       { path: "/admin-dashboard", icon: LayoutDashboard, label: "Admin Home" },
       { path: "/monitor",         icon: Monitor,         label: "Monitor"    },
       { path: "/assignments",     icon: ClipboardList,   label: "Assignments"},
+      { path: "/teacher/assignment-schedule", icon: ClipboardList, label: "Assign Schedule" },
       { path: "/quizzes",         icon: HelpCircle,      label: "Quizzes"    },
       { path: "/class-grades",    icon: Medal,           label: "Class Grades"},
       { path: "/teacher/gradebook", icon: CheckSquare,    label: "Gradebook"  },
@@ -594,6 +595,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
   if (role === "teacher") {
     return [...common,
       { path: "/assignments", icon: ClipboardList, label: "Assignments" },
+      { path: "/teacher/assignment-schedule", icon: ClipboardList, label: "Assign Schedule" },
       { path: "/quizzes",     icon: HelpCircle,    label: "Quizzes"     },
       { path: "/teacher/gradebook", icon: CheckSquare, label: "Gradebook" },
       { path: "/teacher/websites", icon: Globe,     label: "Websites"    },

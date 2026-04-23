@@ -1498,7 +1498,10 @@ function WorkScreen({
     setSkipLoading(true);
     setSkipError("");
     try {
-      const r = await fetch(`${TTS_API}/admin-settings/check-skip-code?code=${encodeURIComponent(skipCode.trim())}`);
+      const token = localStorage.getItem("token") || "";
+      const r = await fetch(`${TTS_API}/admin-settings/check-skip-code?code=${encodeURIComponent(skipCode.trim())}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await r.json();
       if (data.valid) {
         setAnswers(prev => ({ ...prev, [currentQ]: "__SKIPPED__" }));
@@ -2153,6 +2156,26 @@ function WorkScreen({
               >
                 ← Back
               </button>
+              {/* Admin skip — always visible in the nav row */}
+              <button
+                onClick={() => { setShowSkipModal(true); setSkipCode(""); setSkipError(""); }}
+                title="Admin skip (requires passcode)"
+                style={{
+                  minHeight: 56,
+                  minWidth: 56,
+                  padding: "0 14px",
+                  borderRadius: 16,
+                  border: "1px solid rgba(0,0,0,0.14)",
+                  background: "#ffffff",
+                  color: "#5A564F",
+                  fontSize: 18,
+                  cursor: "pointer",
+                  touchAction: "manipulation",
+                  flexShrink: 0,
+                }}
+              >
+                🔑
+              </button>
               <button
                 onClick={isLast ? handleSubmit : handleNext}
                 disabled={!answered}
@@ -2178,28 +2201,6 @@ function WorkScreen({
         })()}
         {/* ── Progress dots ── */}
         <ProgressDots total={total} current={currentQ} answers={answers} />
-
-        {/* ── Admin skip button ── */}
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
-          <button
-            onClick={() => { setShowSkipModal(true); setSkipCode(""); setSkipError(""); }}
-            style={{
-              background: "rgba(0,0,0,0.06)",
-              border: "1px solid rgba(0,0,0,0.12)",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "rgba(0,0,0,0.5)",
-              padding: "7px 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            🔑 Admin Skip
-          </button>
-        </div>
 
         <div style={{ height: 80 }} />{" "}
         {/* spacer so mascot doesn't overlap last button */}
