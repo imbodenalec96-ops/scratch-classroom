@@ -998,9 +998,9 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
-        AND (a.scheduled_date IS NULL OR a.scheduled_date = ? OR a.scheduled_date = ?)
+        AND (a.scheduled_date IS NULL OR a.scheduled_date <= ?)
       ORDER BY a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, todayStr, nextDayStr) as any[];
+    `).all(userId, classId, userId, nextDayStr) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;

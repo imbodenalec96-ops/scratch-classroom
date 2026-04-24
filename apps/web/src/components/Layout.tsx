@@ -216,7 +216,7 @@ export default function Layout() {
           pendingMessage={newMessage || classCommands.pendingMessage}
           onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
-        <BreakChoiceModal />
+        {/* BreakChoiceModal removed */}
         {studentOverride && <StudentOverrideOverlay override={studentOverride} />}
       </div>
     );
@@ -286,7 +286,7 @@ export default function Layout() {
           pendingMessage={newMessage || classCommands.pendingMessage}
           onDismissMessage={() => { studentMessageStore.dismiss(); classCommands.dismissMessage(); }}
         />
-        <BreakChoiceModal />
+        {/* BreakChoiceModal removed */}
         {studentOverride && <StudentOverrideOverlay override={studentOverride} />}
       </div>
     );
@@ -558,8 +558,6 @@ export default function Layout() {
         />
       )}
 
-      {/* Break system: modal + countdown banner */}
-      {isStudent && <BreakChoiceModal />}
       {isStudent && studentOverride && <StudentOverrideOverlay override={studentOverride} />}
     </div>
   );

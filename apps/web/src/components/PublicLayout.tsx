@@ -172,8 +172,6 @@ export default function PublicLayout() {
         />
       )}
 
-      {/* Break system — same modal + banner work everywhere */}
-      {isStudent && <BreakChoiceModal />}
     </div>
   );
 }
