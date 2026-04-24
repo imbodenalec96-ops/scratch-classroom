@@ -8,6 +8,7 @@ import {
   isWorkUnlocked,
   isAccessAllowed,
   setWorkUnlocked,
+  clearWorkUnlock,
 } from "../lib/workUnlock.ts";
 import { useClassConfig } from "../lib/useClassConfig.ts";
 import { useBlockInfo } from "../lib/useCurrentBlock.ts";
@@ -2786,6 +2787,8 @@ export default function StudentDashboard() {
         setAllPendingAssignments(collectedPending);
 
         if (found) {
+          clearWorkUnlock();
+          setAccessUnlocked(isAccessAllowed());
           setPendingAssignment(found);
           setParsedAssignment(foundParsed);
         }
