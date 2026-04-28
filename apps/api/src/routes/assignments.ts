@@ -44,6 +44,10 @@ async function ensureGradeCols() {
       "ALTER TABLE assignments ADD COLUMN is_group INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE assignments ADD COLUMN group_name TEXT",
       "ALTER TABLE assignments ADD COLUMN video_url TEXT",
+      // Afternoon work: only shown to students once they've cleared all
+      // morning (default) assignments. Lets the teacher queue up extra work
+      // for kids who finish early.
+      "ALTER TABLE assignments ADD COLUMN is_afternoon INTEGER NOT NULL DEFAULT 0",
     ]) {
       try { await db.exec(col); } catch { /* column already exists */ }
     }
@@ -1104,13 +1108,13 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
              a.target_grade_min, a.target_grade_max, a.target_student_ids,
              a.week_theme, a.hints_allowed, a.video_url, a.attached_pdf_path,
              a.source, a.is_group, a.group_name, a.created_at,
-             a.question_count, a.estimated_minutes
+             a.question_count, a.estimated_minutes, a.is_afternoon
       FROM assignments a
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
         AND (a.scheduled_date IS NULL OR a.scheduled_date = ? OR a.scheduled_date = ?)
-      ORDER BY a.scheduled_date ASC, a.created_at ASC
+      ORDER BY a.is_afternoon ASC, a.scheduled_date ASC, a.created_at ASC
     `).all(userId, classId, userId, todayStr, nextDayStr) as any[];
 
     // Look up this student's grade levels once
@@ -1148,7 +1152,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       return g >= tMin && g <= tMax;
     });
 
-    res.json(filtered);
+    // Afternoon-work gate: only show afternoon assignments once the student
+    // has cleared all their morning (default) work. If any morning assignment
+    // is still pending, hide afternoon ones to keep the list focused.
+    const morning = filtered.filter((r: any) => !Number(r.is_afternoon));
+    const afternoon = filtered.filter((r: any) => Number(r.is_afternoon));
+    res.json(morning.length > 0 ? morning : afternoon);
   } catch (e) {
     console.error('pending assignments error:', e);
     res.status(500).json({ error: 'Failed to fetch pending assignments' });
@@ -2244,6 +2253,89 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
   }
 
   res.json({ created: created.length, assignments: created, errors });
+});
+
+// POST /assignments/class/:classId/generate-afternoon
+// AI-generates 7 class-wide afternoon assignments that students only see
+// AFTER they've cleared all their morning work. Lets the teacher queue up
+// extension activities for kids who finish early. Subjects rotate across
+// math, reading, writing, spelling, science, history, vocabulary so the
+// kids get variety instead of seven copies of the same drill.
+router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const client = await getAnthropic();
+  if (!client) {
+    return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY in Vercel env vars", code: "AI_NOT_CONFIGURED" });
+  }
+  try { await ensureGradeCols(); } catch {}
+
+  const today = new Date().toISOString().slice(0, 10);
+  const subjects = ["math", "reading", "writing", "spelling", "science", "history", "vocabulary"] as const;
+
+  // Fan out: 7 AI calls in parallel. The seed (studentId|date|subject) varies
+  // per subject so each prompt is distinct. We pass classId as the seed
+  // identity since these are class-wide, not per-student.
+  const results = await Promise.allSettled(
+    subjects.map((subject) =>
+      generateDailyAssignmentContent(client, {
+        studentId: classId,
+        date: `${today}|afternoon|${subject}`,
+        subject,
+        gradeMin: 3,
+        gradeMax: 5,
+        recentPrompts: [],
+        questionCount: 3,
+      }),
+    ),
+  );
+
+  const created: any[] = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < subjects.length; i++) {
+    const subject = subjects[i];
+    const r = results[i];
+    if (r.status !== "fulfilled") {
+      errors.push(`${subject}: ${(r.reason as any)?.message || "generation failed"}`);
+      continue;
+    }
+    try {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO assignments
+           (id, class_id, teacher_id, title, description, content, target_subject, scheduled_date, rubric, hints_allowed, is_afternoon)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+      ).run(
+        id,
+        classId,
+        req.user!.id,
+        r.value.title || `${subject.charAt(0).toUpperCase() + subject.slice(1)} — Afternoon`,
+        r.value.content?.instructions || "",
+        JSON.stringify(r.value.content),
+        subject,
+        today,
+        JSON.stringify([{ label: "Correctness", maxPoints: 50 }]),
+      );
+      created.push({ id, title: r.value.title, subject });
+    } catch (e: any) {
+      errors.push(`${subject}: insert failed — ${e?.message}`);
+    }
+  }
+
+  res.json({ created: created.length, assignments: created, errors });
+});
+
+// DELETE /assignments/class/:classId/afternoon
+// Clears all afternoon assignments for the class (so the teacher can regenerate).
+router.delete("/class/:classId/afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    const r = await db.prepare(
+      `DELETE FROM assignments WHERE class_id::text = ? AND is_afternoon = 1`
+    ).run(req.params.classId);
+    res.json({ deleted: (r as any)?.changes ?? 0 });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "delete failed" });
+  }
 });
 
 export default router;

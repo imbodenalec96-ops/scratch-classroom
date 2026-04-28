@@ -69,6 +69,8 @@ export const api = {
   createAssignment: (data: any) => request<any>("/assignments", { method: "POST", body: JSON.stringify(data) }),
   createAssignmentByGrade: (data: any) => request<any>(`/assignments/class/${data.classId}/create-by-grade`, { method: "POST", body: JSON.stringify(data) }),
   generateTodayAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/generate-today`, { method: "POST", body: JSON.stringify({}) }),
+  generateAfternoonAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/generate-afternoon`, { method: "POST", body: JSON.stringify({}) }),
+  clearAfternoonAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/afternoon`, { method: "DELETE" }),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string; questionCount?: number; questionType?: string; learningObjective?: string; focusKeywords?: string; teacherNotes?: string; hintsAllowed?: boolean }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),

@@ -1049,6 +1049,7 @@ export default function AssignmentBuilder() {
   const [studentCheck, setStudentCheck] = useState<any[] | null>(null);
   const [studentCheckLoading, setStudentCheckLoading] = useState(false);
   const [genTodayLoading, setGenTodayLoading] = useState(false);
+  const [genAfternoonLoading, setGenAfternoonLoading] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -1717,6 +1718,40 @@ export default function AssignmentBuilder() {
               style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
             >
               {genTodayLoading ? "⏳ Generating…" : "🎯 Generate Today (All Grades)"}
+            </button>
+            <button
+              disabled={genAfternoonLoading || !classId}
+              title="Generates 7 extra assignments students only see AFTER finishing all their morning work."
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm("Generate 7 AI afternoon assignments for kids who finish their morning work early?\n\nStudents only see these once they've cleared the morning queue. Takes ~30–60 seconds.")) return;
+                setGenAfternoonLoading(true);
+                try {
+                  const result = await api.generateAfternoonAssignments(classId);
+                  await loadAssignments(classId);
+                  alert(`✅ Created ${result.created} afternoon assignments.${result.errors?.length ? "\nErrors: " + result.errors.join(", ") : ""}`);
+                } catch (e: any) { alert("Failed: " + e.message); }
+                finally { setGenAfternoonLoading(false); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+            >
+              {genAfternoonLoading ? "⏳ Generating…" : "🌅 Generate 7 Afternoon Assignments"}
+            </button>
+            <button
+              disabled={!classId}
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm("Delete all afternoon assignments for this class? You can regenerate them.")) return;
+                try {
+                  const r = await api.clearAfternoonAssignments(classId);
+                  await loadAssignments(classId);
+                  alert(`Cleared ${r.deleted ?? 0} afternoon assignments.`);
+                } catch (e: any) { alert("Failed: " + e.message); }
+              }}
+              className="btn-secondary gap-1.5 text-xs"
+            >
+              🗑 Clear Afternoon
             </button>
             <button
               onClick={async () => {
@@ -2738,6 +2773,11 @@ export default function AssignmentBuilder() {
                     {a.scheduled_date && (
                       <span className="stamp" style={{ background: "color-mix(in srgb, var(--warning) 14%, transparent)", color: "var(--warning)", borderLeftColor: "var(--warning)" }}>
                         📅 {a.scheduled_date}
+                      </span>
+                    )}
+                    {Number(a.is_afternoon) === 1 && (
+                      <span className="stamp" style={{ background: "rgba(245,158,11,0.18)", color: "#fbbf24", borderLeftColor: "#f59e0b" }}>
+                        🌅 Afternoon
                       </span>
                     )}
                     {(() => {
