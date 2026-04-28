@@ -278,14 +278,31 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       setLoading(true);
       try {
         // Explicit ?id=<uuid> wins — student picked a specific assignment.
+        // BUT: if the assignment has no questions configured, fall through to
+        // load the pending list so the student isn't stranded on "All set!".
         if (explicitId) {
           try {
             const a = await api.getAssignment(explicitId);
             if (a) {
-              setAssignment(a);
-              if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
-              setLoading(false);
-              return;
+              let hasQuestions = false;
+              if (a.content) {
+                try {
+                  const p = JSON.parse(a.content);
+                  const qCount = (p?.sections ?? []).reduce(
+                    (n: number, s: any) => n + ((s.questions ?? s.q ?? []).length),
+                    0,
+                  );
+                  hasQuestions = qCount > 0;
+                } catch {}
+              }
+              if (hasQuestions) {
+                setAssignment(a);
+                if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+                setLoading(false);
+                return;
+              }
+              // Empty assignment — clear ?id= and fall through to pending list
+              try { window.history.replaceState({}, "", "/assignments"); } catch {}
             }
           } catch {}
         }
@@ -625,9 +642,22 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   if (!parsed || allQuestions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-        <div className="text-6xl">🎉</div>
-        <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>All set!</h2>
-        <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>This assignment has no questions configured yet.</p>
+        <div className="text-6xl">📚</div>
+        <h2 className={`text-xl font-bold ${dk ? "text-white" : "text-gray-900"}`}>This one's empty</h2>
+        <p className={`text-sm ${dk ? "text-white/40" : "text-gray-500"}`}>Your teacher hasn't added questions to this assignment yet — try one of your others.</p>
+        <button
+          onClick={() => {
+            setAssignment(null);
+            setParsed(null);
+            setCurrentQ(0);
+            setAnswers({});
+            try { window.history.replaceState({}, "", "/assignments"); } catch {}
+          }}
+          className="mt-4 px-5 py-2.5 rounded-xl font-bold text-sm text-white"
+          style={{ background: "linear-gradient(135deg,#8b5cf6,#6d28d9)" }}
+        >
+          ← See my other assignments
+        </button>
       </div>
     );
   }
