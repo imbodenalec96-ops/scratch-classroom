@@ -1072,7 +1072,7 @@ export default function AssignmentBuilder() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [fullWeekSubjects, setFullWeekSubjects] = useState<Record<string, boolean>>({
-    reading: true, writing: true, spelling: true, vocabulary: true, math: true, sel: true,
+    reading: true, writing: true, spelling: true, vocabulary: true, math: true, science: true, history: true, sel: true,
   });
   const [fullWeekThemes, setFullWeekThemes] = useState<Record<string, string>>({});
   const [fullWeekDifficulty, setFullWeekDifficulty] = useState<"match"|"easier"|"harder">("match");
@@ -1818,6 +1818,8 @@ export default function AssignmentBuilder() {
                 { key: "spelling",   label: "🔤 Spelling",   hint: "e.g. weekly word list focus" },
                 { key: "vocabulary", label: "📚 Vocabulary", hint: "e.g. tier-2 academic words" },
                 { key: "math",       label: "🔢 Math",       hint: "e.g. single-digit addition" },
+                { key: "science",    label: "🔬 Science",    hint: "e.g. weather, plants, the five senses" },
+                { key: "history",    label: "🏛️ History",    hint: "e.g. community helpers, holidays" },
                 { key: "sel",        label: "💛 SEL",        hint: "e.g. theme: resilience" },
               ].map(s => (
                 <div key={s.key} className="flex items-center gap-2">

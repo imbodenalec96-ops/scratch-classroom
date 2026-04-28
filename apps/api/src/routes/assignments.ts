@@ -124,12 +124,13 @@ async function generateDailyAssignmentContent(_client: any, opts: {
     : "Mix multiple_choice, short_answer, and fill_blank when natural.";
 
   const systemPrompt =
-    "You are a creative elementary teacher. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
+    "You are a kind, encouraging elementary teacher. Aim for the EASIER end of the student's grade level — confidence-building, not challenging. Use simple vocabulary the student already knows, short sentences, and clear answer choices where one option is obviously correct after a moment of thought. For reading passages, keep them under 60 words with familiar words. For math, prefer single-step problems with small numbers. For multiple choice, distractors should be clearly wrong (no near-misses or trick answers). Hints should give a strong nudge toward the answer, not just a vague clue. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
     `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
     `Exactly ${qCount} questions per task. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`;
 
   const userPrompt =
 `Subject: ${opts.subject}. Student grade: ${opts.gradeMin === opts.gradeMax ? opts.gradeMax : `${opts.gradeMin}–${opts.gradeMax}`}. Date: ${opts.date}.
+Difficulty target: gentle / on the easier side of grade ${opts.gradeMax}. Prioritize student confidence over rigor.
 Theme seed: ${theme}.${opts.weekTheme ? `\nThis week's focus: ${opts.weekTheme}.` : ""}
 ${opts.learningObjective ? `Learning objective: ${opts.learningObjective}.` : ""}
 ${opts.focusKeywords ? `Emphasize these topics/keywords: ${opts.focusKeywords}.` : ""}
@@ -290,7 +291,7 @@ async function ensureClassSettings() {
     await db.exec(`
       CREATE TABLE IF NOT EXISTS class_settings (
         class_id TEXT PRIMARY KEY,
-        enabled_subjects TEXT NOT NULL DEFAULT '["reading","writing","spelling","vocabulary","math","sel"]',
+        enabled_subjects TEXT NOT NULL DEFAULT '["reading","writing","spelling","vocabulary","math","science","history","sel"]',
         default_variety_level TEXT NOT NULL DEFAULT 'medium',
         default_question_count INTEGER NOT NULL DEFAULT 3,
         default_estimated_minutes INTEGER NOT NULL DEFAULT 5,
@@ -313,6 +314,8 @@ const DEFAULT_WEEKLY_FOCUS: Record<string, string> = {
   spelling: "weekly word list focus",
   vocabulary: "tier-2 academic words: define, use in a sentence, identify synonyms",
   math: "",                      // "Based Off Grade Level" → no directive
+  science: "everyday observation: weather, plants, animals, the five senses",
+  history: "early American history & community helpers — kid-friendly",
   sel: "theme: resilience",
 };
 
@@ -322,7 +325,7 @@ router.get("/settings/:classId", requireRole("teacher", "admin"), async (req: Au
     const row = await db.prepare("SELECT * FROM class_settings WHERE class_id = ?").get(req.params.classId) as any;
     if (!row) {
       return res.json({
-        enabled_subjects: ["reading", "writing", "spelling", "vocabulary", "math", "sel"],
+        enabled_subjects: ["reading", "writing", "spelling", "vocabulary", "math", "science", "history", "sel"],
         default_variety_level: "medium",
         default_question_count: 3,
         default_estimated_minutes: 5,
@@ -334,7 +337,7 @@ router.get("/settings/:classId", requireRole("teacher", "admin"), async (req: Au
     try { if (row.weekly_focus) focus = JSON.parse(row.weekly_focus); } catch {}
     res.json({
       ...row,
-      enabled_subjects: (() => { try { return JSON.parse(row.enabled_subjects); } catch { return ["reading","writing","spelling","vocabulary","math","sel"]; } })(),
+      enabled_subjects: (() => { try { return JSON.parse(row.enabled_subjects); } catch { return ["reading","writing","spelling","vocabulary","math","science","history","sel"]; } })(),
       default_hints_allowed: !!row.default_hints_allowed,
       weekly_focus: focus,
     });
@@ -359,7 +362,7 @@ router.put("/settings/:classId", requireRole("teacher", "admin"), async (req: Au
          updated_at = excluded.updated_at`
     ).run(
       req.params.classId,
-      JSON.stringify(enabled_subjects || ["reading","writing","spelling","vocabulary","math","sel"]),
+      JSON.stringify(enabled_subjects || ["reading","writing","spelling","vocabulary","math","science","history","sel"]),
       default_variety_level || "medium",
       default_question_count != null ? Number(default_question_count) : 3,
       default_estimated_minutes != null ? Number(default_estimated_minutes) : 5,
@@ -533,7 +536,7 @@ router.post("/weekly", requireRole("teacher", "admin"), async (req: AuthRequest,
 router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const {
     classId, weekStarting,
-    subjects = ["reading", "writing", "spelling", "vocabulary", "math", "sel"],
+    subjects = ["reading", "writing", "spelling", "vocabulary", "math", "science", "history", "sel"],
     themeBySubject = {},
     difficultyTweak = "match",
     varietyLevel = "medium",
@@ -731,7 +734,7 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
 router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const {
     classId, weekStarting,
-    subjects = ["reading", "writing", "spelling", "vocabulary", "math", "sel"],
+    subjects = ["reading", "writing", "spelling", "vocabulary", "math", "science", "history", "sel"],
     themeBySubject = {},
     difficultyTweak = "match",
     varietyLevel = "medium",
