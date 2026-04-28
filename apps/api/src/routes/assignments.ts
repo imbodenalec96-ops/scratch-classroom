@@ -74,15 +74,14 @@ async function ensureGradeCols() {
   try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
 }
 
-// Returns whichever AI provider is configured. Prefers Gemini when its key
-// is present (Google Generative Language API), falls back to OpenRouter so
-// nothing breaks during the migration. Returns null only when BOTH are
+// Returns whichever AI provider is configured. Prefers OpenRouter when its
+// key is present, falls back to Gemini. Returns null only when BOTH are
 // missing — in that case the AI endpoints respond 503.
 function getAnthropic() {
-  const gem = process.env.GEMINI_API_KEY;
-  if (gem) return { key: gem, provider: "gemini" as const };
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) return { key: orKey, provider: "openrouter" as const };
+  const gem = process.env.GEMINI_API_KEY;
+  if (gem) return { key: gem, provider: "gemini" as const };
   return null;
 }
 const AI_MODEL = "openai/gpt-4o-mini";        // OpenRouter fallback model
@@ -200,10 +199,10 @@ ${opts.teacherNotes ? `Private teacher notes (don't expose to student, but use w
 ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different question type):\n${recent}` : ""}
 Make this feel different from other days this week. Return ONLY JSON.`;
 
-  // Prefer Gemini when GEMINI_API_KEY is set; OpenRouter is the legacy
-  // fallback so deploys without Gemini configured keep working.
+  // Prefer OpenRouter when its key is set; Gemini is the fallback when only
+  // GEMINI_API_KEY is configured. Toggling providers = toggling env vars.
   let parsed: any;
-  if (process.env.GEMINI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) {
     parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 4096 });
   } else {
     const orKey = process.env.OPENROUTER_API_KEY!;
@@ -1510,7 +1509,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     const sysAdj = "You are a creative elementary teacher. Return JSON ONLY matching the EXACT same shape as the input. No markdown, no preamble.";
     const userAdj = `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.`;
     let next: any;
-    if (process.env.GEMINI_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) {
       next = await callGeminiJSON(sysAdj, userAdj, { maxTokens: 4096 });
     } else {
       const orKey = process.env.OPENROUTER_API_KEY!;
