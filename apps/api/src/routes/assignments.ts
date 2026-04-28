@@ -1152,12 +1152,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       return g >= tMin && g <= tMax;
     });
 
-    // Afternoon-work gate: only show afternoon assignments once the student
-    // has cleared all their morning (default) work. If any morning assignment
-    // is still pending, hide afternoon ones to keep the list focused.
-    const morning = filtered.filter((r: any) => !Number(r.is_afternoon));
-    const afternoon = filtered.filter((r: any) => Number(r.is_afternoon));
-    res.json(morning.length > 0 ? morning : afternoon);
+    // Show every pending assignment — afternoon/extension work appears in
+    // the same list as morning work, sorted afternoon-last by the SQL ORDER
+    // BY. Keeping a separate "afternoon-only-after-morning" gate caused
+    // assignments to silently vanish for students whose state confused the
+    // gate, so we just hand them the full list.
+    res.json(filtered);
   } catch (e) {
     console.error('pending assignments error:', e);
     res.status(500).json({ error: 'Failed to fetch pending assignments' });
@@ -2256,20 +2256,19 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 });
 
 // POST /assignments/class/:classId/generate-afternoon
-// Creates 7 class-wide afternoon assignments using PREMADE content. Every
-// student in the class sees all 7 once they've cleared their morning work,
-// regardless of grade level — no grade-targeting filter, no per-student
-// grade lookup that could exclude kids whose grades aren't configured. The
-// difficulty mix (grades 3, 4, 5 across subjects) gives kids variety to
-// self-select. is_afternoon=1 keeps them hidden until morning is done.
+// Adds 7 class-wide assignments using PREMADE content. Every student in
+// the class sees all 7 in their pending list regardless of grade — no
+// grade target, no special gate. The teacher can click this multiple
+// times to keep stacking work for kids who blow through everything.
+// scheduled_date is left NULL so the pending query treats them as
+// always-on and shows them every day until submitted.
 router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try { await ensureGradeCols(); } catch {}
 
-  const today = new Date().toISOString().slice(0, 10);
-
   // 7 class-wide assignments spanning subjects + grade levels. NOT grade-
   // targeted (target_grade_min stays NULL) so every kid sees every one.
+  // Mix of grades 3/4/5 lets kids self-pace through the difficulty range.
   const slots: Array<{ subject: "reading" | "math" | "writing" | "spelling"; grade: number }> = [
     { subject: "reading",  grade: 3 },
     { subject: "math",     grade: 3 },
@@ -2291,15 +2290,18 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
     }
     try {
       const id = crypto.randomUUID();
-      const title = `🌅 Afternoon — ${premade.title}`;
-      // target_grade_min/max intentionally NULL → assignment is class-wide.
+      const title = `🌅 Bonus — ${premade.title}`;
+      // target_grade_min/max NULL → class-wide. scheduled_date NULL →
+      // always-on, never excluded by the today/nextDay date filter.
+      // is_afternoon=1 is kept purely as a label so the teacher's list
+      // shows the 🌅 stamp; the pending query no longer filters on it.
       await db.prepare(
-        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, scheduled_date, rubric, hints_allowed, is_afternoon)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, rubric, hints_allowed, is_afternoon)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
       ).run(
         id, classId, req.user!.id, title, premade.description,
         JSON.stringify(premade.content),
-        subject, today,
+        subject,
         JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
       );
       created.push({ id, title, subject, grade });
