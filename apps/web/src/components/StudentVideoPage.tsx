@@ -2,22 +2,20 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { isAccessAllowed } from "../lib/workUnlock.ts";
-import { isOnBreak } from "../lib/breakSystem.ts";
 
 export default function StudentVideoPage() {
   const navigate = useNavigate();
   const [videos, setVideos] = useState<any[]>([]);
   const [playing, setPlaying] = useState<{ videoId: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [unlocked, setUnlocked] = useState(() => isAccessAllowed() || isOnBreak());
+  const [unlocked, setUnlocked] = useState(() => isAccessAllowed());
 
   // Re-check access every second so freetime grant appears without refresh
   useEffect(() => {
-    const check = () => setUnlocked(isAccessAllowed() || isOnBreak());
+    const check = () => setUnlocked(isAccessAllowed());
     check();
     const iv = setInterval(check, 1000);
-    window.addEventListener("breakstate-change", check);
-    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", check); };
+    return () => clearInterval(iv);
   }, []);
 
   useEffect(() => {

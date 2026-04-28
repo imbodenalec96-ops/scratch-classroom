@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { LearningAppTile, LearningAppGrid } from "./LearningAppTile.tsx";
 
-type Phase = "welcome" | "loading" | "working" | "break" | "done";
+type Phase = "welcome" | "loading" | "working" | "done";
 
 /* ── Count-up hook ── */
 function useCountUp(target: number, duration = 900, delay = 0) {
@@ -2588,7 +2588,6 @@ export default function StudentDashboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [lockedScreen, setLockedScreen] = useState(false);
   const [broadcast, setBroadcast] = useState<string | null>(null);
-  const [classVideo, setClassVideo] = useState<any>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{
@@ -2831,25 +2830,6 @@ export default function StudentDashboard() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  // Poll for video
-  useEffect(() => {
-    if (classes.length === 0) return;
-    const fetchVideo = async () => {
-      for (const cls of classes) {
-        try {
-          const v = await api.getClassVideo(cls.id);
-          if (v?.video_id) {
-            setClassVideo(v);
-            return;
-          }
-        } catch {}
-      }
-      setClassVideo(null);
-    };
-    fetchVideo();
-    const iv = setInterval(fetchVideo, 30000);
-    return () => clearInterval(iv);
-  }, [classes]);
 
   // Poll for screen lock
   useEffect(() => {
@@ -2878,9 +2858,7 @@ export default function StudentDashboard() {
         ? "Loading dashboard 🔄"
         : phase === "working"
           ? `Working on assignment 📝${pendingAssignment ? ` — ${pendingAssignment.title}` : ""}`
-          : phase === "break"
-            ? "On break ☕"
-            : "Free time! 🎉";
+          : "Free time! 🎉";
   usePresencePing(phaseActivity);
 
   useSocket("class:lock", (data) => setLockedScreen(data.locked));
@@ -4077,56 +4055,6 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Teacher-shared video inline (shown regardless of free-time state) */}
-        {classVideo && (
-          <div
-            style={{
-              marginTop: 18,
-              borderRadius: 16,
-              overflow: "hidden",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "12px 14px",
-              }}
-            >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#f87171",
-                  animation: "pulse 2s infinite",
-                }}
-              />
-              <span style={{ fontSize: 13, fontWeight: 700 }}>
-                📺 Teacher shared a video
-              </span>
-            </div>
-            <div style={{ position: "relative", paddingTop: "56.25%" }}>
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${classVideo.video_id}?rel=0&modestbranding=1&playsinline=1`}
-                title={classVideo.video_title || "Class Video"}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                allowFullScreen
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "100%",
-                  border: "none",
-                }}
-              />
-            </div>
-          </div>
-        )}
 
 
         {/* ── ACHIEVEMENTS: loot-box cards ── */}

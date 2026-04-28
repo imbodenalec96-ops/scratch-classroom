@@ -4,8 +4,6 @@ import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
 import { getSocket } from "../lib/ws.ts";
 
-const VIDEO_SUBJECTS = new Set(["sel", "video_learning", "ted_talk", "daily_news"]);
-
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return url.trim();
@@ -13,16 +11,6 @@ function extractYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-function getBlockVideoUrl(block: ScheduleBlock | null | undefined, dayName: string): string | null {
-  if (!block?.content_source) return null;
-  try {
-    const cs = JSON.parse(block.content_source);
-    const dayUrl = cs?.byDay?.[dayName]?.videoUrl;
-    if (dayUrl) return dayUrl;
-    if (cs?.videoUrl) return cs.videoUrl;
-  } catch {}
-  return null;
-}
 
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
@@ -111,7 +99,6 @@ export default function ClassroomBoard() {
   const [boardMuted, setBoardMuted] = useState(true);
   const boardIframeRef = useRef<HTMLIFrameElement>(null);
   const boardVideoIdRef = useRef<string | null>(null);
-  const lastBlockRef = useRef<string | null>(null);
 
   // Scale the board to fill any viewport while preserving the 1920×1080 design
   const [scale, setScale] = useState(1);
@@ -239,60 +226,6 @@ export default function ClassroomBoard() {
   const currentBlock = useMemo(() => findCurrentBlock(schedule, now), [schedule, now]);
   const nextBlock    = useMemo(() => findNextBlock(schedule, now), [schedule, now]);
 
-  // Poll HTTP for active video (WS is unavailable on Vercel serverless)
-  useEffect(() => {
-    if (!cls?.id) return;
-    let alive = true;
-    const poll = async () => {
-      try {
-        const row = await api.getClassVideo(cls.id);
-        if (!alive) return;
-        if (row?.video_id) {
-          const vid = row.video_id;
-          setBoardVideo(v => {
-            if (v?.videoId === vid) return v;
-            return { videoId: vid, title: row.video_title || "Class Video" };
-          });
-        } else {
-          setBoardVideo(v => { if (v) boardVideoIdRef.current = null; return v ? null : v; });
-        }
-      } catch {}
-    };
-    poll();
-    const iv = setInterval(poll, 3000);
-    return () => { alive = false; clearInterval(iv); };
-  }, [cls?.id]);
-
-  // Auto-broadcast when a video block goes live; stop when it ends
-  useEffect(() => {
-    if (!cls?.id || !currentBlock) return;
-    const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][now.getDay()];
-    const subj = currentBlock.subject || "";
-    const isVideoBlock = VIDEO_SUBJECTS.has(subj);
-    const blockKey = (currentBlock.id || String(currentBlock.block_number)) + "_" + dayName;
-
-    if (isVideoBlock && lastBlockRef.current !== blockKey) {
-      const url = getBlockVideoUrl(currentBlock, dayName);
-      const videoId = url ? extractYouTubeId(url) : null;
-      lastBlockRef.current = blockKey;
-      if (videoId) {
-        const title = currentBlock.label || subj;
-        setBoardVideo({ videoId, title, url: url || undefined });
-        const socket = getSocket();
-        socket.emit("class:video", { classId: cls.id, videoId, url, title });
-        api.shareClassVideo(cls.id, videoId, title).catch(() => {});
-        if (url) api.broadcastClassVideo(cls.id, url).catch(() => {});
-      }
-    } else if (!isVideoBlock && lastBlockRef.current) {
-      lastBlockRef.current = null;
-      setBoardVideo(null);
-      const socket = getSocket();
-      socket.emit("class:video:stop", { classId: cls.id });
-      api.stopClassVideo(cls.id).catch(() => {});
-      api.endClassBroadcast(cls.id).catch(() => {});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cls?.id, currentBlock?.id, currentBlock?.block_number, now.getDay()]);
 
   const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
@@ -319,7 +252,6 @@ export default function ClassroomBoard() {
       setBoardVideo(null);
       setBoardMuted(true);
       boardVideoIdRef.current = null;
-      lastBlockRef.current = null;
       const s = getSocket();
       s.emit("class:video:stop", { classId: cls.id });
       api.stopClassVideo(cls.id).catch(() => {});

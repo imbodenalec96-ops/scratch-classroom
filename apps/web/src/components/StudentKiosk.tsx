@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useBreakTimer, BreakOverlay, BreakButton } from "./BreakSystem.tsx";
 
 // ─── API base (mirrors lib/api.ts pattern) ───────────────────────────────────
 const BASE =
@@ -314,21 +313,6 @@ function playChime() {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function StudentKiosk() {
-  // Break system — student ID defaults to empty string until student chosen
-  const breakStudentId = (() => {
-    try { const r = sessionStorage.getItem("kiosk_student"); return r ? JSON.parse(r).id : ""; }
-    catch { return ""; }
-  })();
-  const { breakActive, breakSecondsLeft, breakEarned, breakConfig, startBreak, breakPhase, threshold } =
-    useBreakTimer(String(breakStudentId));
-  const [breakGames, setBreakGames] = useState<{ game_id: string }[]>([]);
-  const [breakOptionChosen, setBreakOptionChosen] = useState<string | null>(null);
-
-  // Load break game selections
-  useEffect(() => {
-    req<{ game_id: string }[]>("/breaks/games").then(setBreakGames).catch(() => {});
-  }, []);
-
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [activeStudent, setActiveStudent] = useState<Student | null>(() => {
@@ -770,20 +754,6 @@ export default function StudentKiosk() {
       {/* Toast */}
       {toastMsg && <Toast msg={toastMsg} onDone={() => setToastMsg(null)} />}
 
-      {/* Break overlay (full-screen, student cannot close) */}
-      {activeStudent && breakActive && (
-        <BreakOverlay
-          studentId={activeStudent.id}
-          breakSecondsLeft={breakSecondsLeft}
-          onBreakEnd={() => setBreakOptionChosen(null)}
-          breakGames={breakGames}
-          calmingCornerEnabled={breakConfig?.calming_corner_enabled !== false}
-          optionChosen={breakOptionChosen}
-          onOptionChosen={(opt) => { setBreakOptionChosen(opt); startBreak(opt); }}
-          breakConfig={breakConfig ?? { work_minutes_before_first_break: 10, work_minutes_before_next_break: 15, break_duration_minutes: 10 }}
-        />
-      )}
-
       {/* Iframe modal */}
       {iframeUrl && <IframeModal url={iframeUrl} onClose={() => setIframeUrl(null)} />}
 
@@ -953,18 +923,6 @@ export default function StudentKiosk() {
             {todayDisplay()}
           </div>
         </div>
-
-        {/* ── BREAK BUTTON ─────────────────────────────────────────────────── */}
-        {activeStudent && !isFreeDay && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-            <BreakButton
-              breakEarned={breakEarned}
-              onStartBreak={() => setBreakOptionChosen(null)}
-              workSeconds={0}
-              threshold={threshold}
-            />
-          </div>
-        )}
 
         {/* ── FREE DAY BANNER ──────────────────────────────────────────────── */}
         {isFreeDay && (

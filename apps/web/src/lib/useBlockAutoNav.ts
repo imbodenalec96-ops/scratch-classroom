@@ -19,7 +19,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCurrentBlock, type ScheduleBlock } from "./useCurrentBlock.ts";
-import { chooseBreak, isOnBreak } from "./breakSystem.ts";
 import { isAccessAllowed } from "./workUnlock.ts";
 
 const TEACHER_NAV_KEY = "blockforge:teacher-nav-at";
@@ -155,17 +154,7 @@ export function useBlockAutoNav(
     // Academic block with no content set → don't pull the student away from
     // what they're doing. Only push when there's something to show them.
     const subj = (current.subject || "").toLowerCase();
-    if (!current.is_break && ACADEMIC_SUBJECTS.has(subj) && !blockHasContent(current, studentId, grade)) return;
-
-    // Break blocks → trigger the scheduled break UI (10-min timer) and land
-    // them on /student where BreakChoiceModal + break banner live.
-    if (current.is_break) {
-      if (!isOnBreak()) {
-        try { chooseBreak(); } catch {}
-      }
-      navigate("/student");
-      return;
-    }
+    if (ACADEMIC_SUBJECTS.has(subj) && !blockHasContent(current, studentId, grade)) return;
 
     // coding_art_gym → drop them on the dashboard. Layout handles the
     // conditional unlock (free if work done, lockdown on assignments if not).

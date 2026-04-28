@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { usePresencePing } from "../lib/presence.ts";
-import { isOnBreak, BREAK_ALLOWED_GAME_IDS, breakSecondsRemaining } from "../lib/breakSystem.ts";
 import { useClassConfig, isGameAllowed } from "../lib/useClassConfig.ts";
 import { Play, Star, Zap, Grid3X3, Sword, Puzzle, Trophy, GraduationCap, Wand2, Package, Gamepad2 } from "lucide-react";
 import SnakeGame from "./games/SnakeGame.tsx";
@@ -800,15 +799,6 @@ export default function ArcadePage() {
     : "Browsing Arcade 🎮";
   usePresencePing(user?.role === "student" ? arcadeActivity : "");
 
-  // Break-mode gating: students on a 10-min break only see approved games
-  const [onBreak, setOnBreak] = useState(isOnBreak());
-  useEffect(() => {
-    const iv = setInterval(() => setOnBreak(isOnBreak()), 2000);
-    const onChange = () => setOnBreak(isOnBreak());
-    window.addEventListener("breakstate-change", onChange);
-    return () => { clearInterval(iv); window.removeEventListener("breakstate-change", onChange); };
-  }, []);
-
   // Teacher-set feature flags (allowedGameIds, unityEnabled, blockforgeEnabled)
   const classConfig = useClassConfig();
 
@@ -821,10 +811,6 @@ export default function ArcadePage() {
       return true;
     });
   };
-
-  // During a break, show ALL games (no filter) — break-mode access is
-  // intentionally broad. Class-config gates still apply.
-  void onBreak; // retained for future use (e.g. badge in header)
 
   const filtered = configGated(
     activeCategory === "All" ? GAMES : GAMES.filter(g => g.category === activeCategory)

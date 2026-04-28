@@ -2,7 +2,6 @@
 // Students get arcade + projects unlocked for the rest of the day once they submit all assignments.
 
 import { studentFreetimeStore } from "./studentFreetimeStore.ts";
-import { isOnBreak } from "./breakSystem.ts";
 
 const KEY = "workDoneDate";
 const SKIP_WORK_KEY = "skipWorkDayDate";
@@ -39,7 +38,6 @@ export function clearWorkUnlock(): void {
  *   2. skip_work_day_date === today  → unlocked (teacher-set work-free day)
  *   3. freetime_grant_until > now   → unlocked (teacher granted freetime)
  *   4. all_work_done_today          → unlocked (student finished assignments)
- *   5. on break                     → unlocked (break window active)
  *   else                            → locked
  */
 export function isAccessAllowed(): boolean {
@@ -54,7 +52,5 @@ export function isAccessAllowed(): boolean {
   if (snap.granted) return true;
   // 4. Student completed all work today
   if (isWorkUnlocked()) return true;
-  // 5. Active break window
-  if (isOnBreak()) return true;
   return false;
 }

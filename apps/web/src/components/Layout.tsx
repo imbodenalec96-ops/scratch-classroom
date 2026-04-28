@@ -5,7 +5,6 @@ import { useTheme } from "../lib/theme.tsx";
 import { isWorkUnlocked, isAccessAllowed, clearWorkUnlock, setWorkUnlocked } from "../lib/workUnlock.ts";
 import VideoOverlay from "./VideoOverlay.tsx";
 import ScreenLockOverlay from "./ScreenLockOverlay.tsx";
-import BreakChoiceModal from "./BreakChoiceModal.tsx";
 import CurrentBlockStrip from "./CurrentBlockStrip.tsx";
 import StudentOverrideOverlay from "./StudentOverrideOverlay.tsx";
 import { useClassCommands } from "../lib/useClassCommands.ts";
@@ -19,7 +18,6 @@ import { studentFreetimeStore } from "../lib/studentFreetimeStore.ts";
 import { studentVideoStore } from "../lib/studentVideoStore.ts";
 import { usePresencePing, activityFromPath } from "../lib/presence.ts";
 import { useScreenshotCapture } from "../lib/useScreenshotCapture.ts";
-import { markWorkStart, isOnBreak, setBreakState } from "../lib/breakSystem.ts";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
 import { subjectToRoute } from "../lib/useBlockAutoNav.ts";
 import { useStudentOverride } from "../lib/useStudentOverride.ts";
@@ -81,11 +79,6 @@ export default function Layout() {
       if (!onWebsite) navigate("/assignments");
     },
     END_BREAK: () => {
-      // Clear the localStorage break state so isOnBreak() flips false and the
-      // break modal doesn't immediately re-offer. We set path=fullwork + zero
-      // out the start/end times (matches chooseFullWork's "keep grinding" exit
-      // and won't re-prompt because breakOffered stays true).
-      setBreakState({ path: "fullwork", breakStartAt: 0, breakEndAt: 0, breakOffered: true });
       clearWorkUnlock();
       studentMessageStore.setMessage("Break ended — back to work 📚");
       navigate("/assignments");
@@ -119,9 +112,6 @@ export default function Layout() {
   usePresencePing(user ? activityFromPath(location.pathname) : "");
   // Screenshot thumbnails for teacher monitor (students only)
   useScreenshotCapture(isStudent);
-  // Break system: start the work timer the first time a student loads the app
-  useEffect(() => { if (isStudent) markWorkStart(); }, [isStudent]);
-
   // Schedule auto-nav: at block boundaries, push students to the right page
   // unless the teacher has recently NAVIGATEd them elsewhere (5-min grace).
   const [studentClassId, setStudentClassId] = useState<string | null>(null);
@@ -563,7 +553,7 @@ export default function Layout() {
   );
 }
 
-function getNavItems(role: string, workDone = isWorkUnlocked() || isOnBreak()) {
+function getNavItems(role: string, workDone = isWorkUnlocked()) {
   const common = [
     { path: "/",           icon: LayoutDashboard, label: "Dashboard"   },
     { path: "/projects",   icon: FolderOpen,      label: "Projects"    },
