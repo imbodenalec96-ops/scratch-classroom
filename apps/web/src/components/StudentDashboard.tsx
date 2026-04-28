@@ -1818,6 +1818,34 @@ function WorkScreen({
             — {q.sectionTitle} —
           </div>
         )}
+        {/* ── Lesson — teaches the concept before any questions ── */}
+        {parsed?.lesson && (
+          <div
+            className="rounded-2xl p-6 animate-fade-in"
+            style={{
+              background: "linear-gradient(135deg, #1e1b2e 0%, #16132a 100%)",
+              border: `1px solid ${starfall.accent}33`,
+              borderLeft: `3px solid ${starfall.accent}`,
+            }}
+          >
+            <div
+              className="text-[10px] font-bold uppercase tracking-widest mb-3"
+              style={{ color: starfall.accent }}
+            >
+              💡 Today's lesson
+            </div>
+            <p
+              className="leading-relaxed"
+              style={{
+                color: "#e2e0f0",
+                fontSize: "clamp(1rem, 1.6vw, 1.15rem)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {parsed.lesson}
+            </p>
+          </div>
+        )}
         {/* ── Passage / reading text ── */}
         {q?.passage && (
           <div

@@ -124,9 +124,9 @@ async function generateDailyAssignmentContent(_client: any, opts: {
     : "Mix multiple_choice, short_answer, and fill_blank when natural.";
 
   const systemPrompt =
-    "You are a kind, encouraging elementary teacher. Aim for the EASIER end of the student's grade level — confidence-building, not challenging. Use simple vocabulary the student already knows, short sentences, and clear answer choices where one option is obviously correct after a moment of thought. For reading passages, keep them under 60 words with familiar words. For math, prefer single-step problems with small numbers. For multiple choice, distractors should be clearly wrong (no near-misses or trick answers). Hints should give a strong nudge toward the answer, not just a vague clue. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
-    `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
-    `Exactly ${qCount} questions per task. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`;
+    "You are a kind, encouraging elementary teacher. Every assignment must TEACH the lesson first, THEN ask questions about what was just taught. The student should NEVER need to look anything up — every fact required for an answer must be stated plainly in the lesson. Aim for the EASIER end of the student's grade level — confidence-building, not challenging. Use simple vocabulary the student already knows, short sentences, and clear answer choices where one option is obviously correct after a moment of thought. For reading subjects, the lesson IS the passage — students read it then answer comprehension questions. For math, the lesson shows a worked example with the steps. For science/history/vocabulary/sel, the lesson is a short, clear explanation of the concept with at least one concrete example. For multiple choice, distractors should be clearly wrong (no near-misses or trick answers). Hints should give a strong nudge toward the answer, not just a vague clue. Return JSON ONLY matching this exact shape (no markdown, no preamble):\n" +
+    `{"title":"Short catchy title","instructions":"1–2 sentence intro to read before starting","lesson":"3–6 sentence kid-friendly mini-lesson that teaches everything needed to answer the questions below. For reading: this is the short passage (≤60 words). For math: include a worked example with the answer. For science/history/vocab: define the term + give an example.","sections":[{"title":"Section name","questions":[{"type":"multiple_choice","text":"Question?","options":["A. ...","B. ...","C. ...","D. ..."],"correctIndex":0,"points":5,"hint":"Gentle hint"}]}]}\n` +
+    `Exactly ${qCount} questions per task. Every question must be answerable using ONLY the lesson text — no outside knowledge. ${qTypeDirective} multiple_choice MUST include correctIndex (0-based).`;
 
   const userPrompt =
 `Subject: ${opts.subject}. Student grade: ${opts.gradeMin === opts.gradeMax ? opts.gradeMax : `${opts.gradeMin}–${opts.gradeMax}`}. Date: ${opts.date}.
@@ -872,6 +872,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
     gradeMin, gradeMax, weekTheme, teacherNotes, focusKeywords,
     learningObjective, questionType, questionCount, estimatedMinutes,
     hintsAllowed,
+    force,
   } = req.body;
 
   if (!classId || !studentId || !subject || !date || gradeMin == null) {
@@ -879,20 +880,35 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // Skip if this student already has an assignment for this date+display-subject.
+  // Look up any existing assignment for this (student, date, subject).
+  //   force=false (default): skip — never duplicate, never touch existing.
+  //   force=true: if the student has already SUBMITTED this assignment,
+  //     skip (preserve their work). Otherwise we'll regenerate the content
+  //     in place lower in the handler and UPDATE rather than INSERT.
   // Use title prefix (e.g. "spelling —") not target_subject, because both
   // "spelling" and "writing" map to target_subject="writing" and would
-  // incorrectly block each other. LOWER() on both sides makes the match
-  // case-insensitive on Postgres + SQLite so capitalisation can never let
-  // a duplicate slip through.
+  // incorrectly block each other.
+  let existingIdToUpdate: string | null = null;
   try {
     const subjLower = String(subject).trim().toLowerCase();
     const existing = await db.prepare(
       "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND LOWER(title) LIKE ?"
     ).get(studentId, date, subjLower + " —%") as any;
     if (existing) {
-      console.log(`${tag} SKIP_EXISTING id=${existing.id}`);
-      return res.json({ ok: true, skipped: true, existingId: existing.id });
+      if (!force) {
+        console.log(`${tag} SKIP_EXISTING id=${existing.id}`);
+        return res.json({ ok: true, skipped: true, existingId: existing.id });
+      }
+      // force=true — bail if already submitted, otherwise plan to UPDATE.
+      const sub = await db.prepare(
+        "SELECT id FROM submissions WHERE assignment_id = ? LIMIT 1"
+      ).get(existing.id).catch(() => null) as any;
+      if (sub) {
+        console.log(`${tag} SKIP_SUBMITTED id=${existing.id}`);
+        return res.json({ ok: true, skipped: true, submitted: true, existingId: existing.id });
+      }
+      existingIdToUpdate = existing.id as string;
+      console.log(`${tag} WILL_REGEN id=${existing.id}`);
     }
   } catch (e: any) { console.log(`${tag} SKIP_CHECK_ERR ${e?.message}`); }
 
@@ -919,6 +935,29 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   } catch (e: any) {
     console.error(`${tag} AI_ERR +${Date.now()-T0}ms`, e?.message);
     return res.status(500).json({ error: "Generation failed", detail: e?.message, tag });
+  }
+
+  // force=true + existing unsubmitted assignment → UPDATE in place so the
+  // student sees the new (easier) content next time they open it. We only
+  // touch fields that come from generation; we don't mess with class_id,
+  // teacher_id, student_id, scheduled_date, etc.
+  if (existingIdToUpdate) {
+    try {
+      await db.prepare(
+        `UPDATE assignments SET title = ?, description = ?, content = ?, week_theme = ? WHERE id = ?`
+      ).run(
+        `${String(subject).charAt(0).toUpperCase() + String(subject).slice(1)} — ${dayName}`,
+        gen.content?.instructions || "",
+        JSON.stringify(gen.content),
+        weekTheme || null,
+        existingIdToUpdate,
+      );
+      console.log(`${tag} UPDATE_OK id=${existingIdToUpdate}`);
+      return res.json({ ok: true, regenerated: true, id: existingIdToUpdate, student: studentId, date, subject });
+    } catch (e: any) {
+      console.error(`${tag} UPDATE_ERR`, e?.message);
+      return res.status(500).json({ error: 'Update failed', detail: e?.message, classId, studentId });
+    }
   }
 
   const id = crypto.randomUUID();

@@ -1095,6 +1095,9 @@ export default function AssignmentBuilder() {
   const [fwDefaultHintsAllowed, setFwDefaultHintsAllowed] = useState<boolean>(true);
   const [fwSaveAsDefault, setFwSaveAsDefault] = useState<boolean>(false);
   const [fwSettingsLoaded, setFwSettingsLoaded] = useState<boolean>(false);
+  // Regenerate existing unsubmitted assignments with the (easier, lesson-first)
+  // prompt instead of skipping them. Submitted work is always preserved.
+  const [fwForceRegen, setFwForceRegen] = useState<boolean>(false);
 
   // Edit modal state
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
@@ -1540,6 +1543,7 @@ export default function AssignmentBuilder() {
           questionCount: fwDefaultQuestionCount,
           estimatedMinutes: fwDefaultEstimatedMinutes,
           hintsAllowed: fwDefaultHintsAllowed,
+          force: fwForceRegen,
         };
         const ctrl = new AbortController();
         fwInflightRef.current.add(ctrl);
@@ -1886,6 +1890,18 @@ export default function AssignmentBuilder() {
                 className="cursor-pointer"
               />
               Save these choices as this class's defaults (subjects + variety + counts)
+            </label>
+            <label className="mt-2 flex items-start gap-2 text-xs cursor-pointer" style={{ color: "var(--text-2)" }}>
+              <input
+                type="checkbox"
+                checked={fwForceRegen}
+                onChange={e => setFwForceRegen(e.target.checked)}
+                className="cursor-pointer mt-0.5"
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: "var(--text-1)" }}>Re-generate existing assignments</span>
+                {" — "}rewrite every unsubmitted assignment in this date range with the new (easier, lesson-first) content. Already-submitted work is left alone.
+              </span>
             </label>
           </div>
 
