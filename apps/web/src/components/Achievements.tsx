@@ -4,17 +4,19 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { useNavigate } from "react-router-dom";
 
+// Assignment-only achievements. IDs match what /leaderboard/auto-award
+// awards on the server, so cards light up automatically as kids hit them.
 const ALL_BADGES = [
-  { id: "first_project", icon: "🚀", label: "First Project", desc: "Created your first project" },
-  { id: "10_blocks", icon: "🧱", label: "Block Builder", desc: "Used 10+ blocks in a project" },
-  { id: "3d_explorer", icon: "🌐", label: "3D Explorer", desc: "Created a 3D project" },
-  { id: "quiz_ace", icon: "💯", label: "Quiz Ace", desc: "Scored 100% on a quiz" },
-  { id: "team_player", icon: "🤝", label: "Team Player", desc: "Collaborated on a project" },
-  { id: "streak_7", icon: "🔥", label: "7-Day Streak", desc: "Logged in 7 days in a row" },
-  { id: "debugger", icon: "🐛", label: "Debugger", desc: "Fixed 10+ errors" },
-  { id: "creative", icon: "🎨", label: "Creative Mind", desc: "Used 5+ sprite costumes" },
-  { id: "helper", icon: "💬", label: "Class Helper", desc: "Sent 50+ chat messages" },
-  { id: "speedster", icon: "⚡", label: "Speed Coder", desc: "Completed an assignment early" },
+  { id: "first_assignment",   icon: "🎯", label: "First One Done",      desc: "Finished your first assignment" },
+  { id: "5_assignments",      icon: "🔥", label: "On a Roll",            desc: "Finished 5 assignments" },
+  { id: "10_assignments",     icon: "⭐", label: "Star Student",         desc: "Finished 10 assignments" },
+  { id: "25_assignments",     icon: "🏆", label: "Champion",             desc: "Finished 25 assignments" },
+  { id: "50_assignments",     icon: "💎", label: "Diamond Worker",       desc: "Finished 50 assignments" },
+  { id: "100_assignments",    icon: "👑", label: "Hall of Fame",         desc: "Finished 100 assignments" },
+  { id: "perfect_score",      icon: "💯", label: "Perfect Score",        desc: "Got 100% on an assignment" },
+  { id: "3_in_a_day",         icon: "⚡", label: "Speedster",            desc: "Finished 3 assignments in one day" },
+  { id: "5_in_a_day",         icon: "🚀", label: "Power Day",            desc: "Finished 5 assignments in one day" },
+  { id: "all_subjects",       icon: "🌟", label: "Well Rounded",         desc: "Finished an assignment in every subject" },
 ];
 
 export default function Achievements() {

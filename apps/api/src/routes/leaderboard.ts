@@ -106,22 +106,61 @@ router.post("/badge", async (req: AuthRequest, res: Response) => {
   res.json(updated);
 });
 
-// Auto-award badges based on the calling student's submission count.
-// Idempotent: if the badge already exists in the array, returns without
-// duplicating. Called from the student dashboard after every successful
-// assignment submission. Returns { awarded: [...], badges: [...] } so
-// the client can pop a celebration toast for any newly-earned badges.
+// Auto-award assignment-based achievement badges based on the calling
+// student's submission history. Idempotent: existing badges are not
+// re-awarded. Called from the student dashboard after every successful
+// submission. Badge IDs match Achievements.tsx ALL_BADGES so cards
+// light up automatically. Returns awarded entries with display label +
+// icon so the client can render a nice celebration toast.
 router.post("/auto-award", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   const userId = req.user.id;
   try {
-    // Count this student's total submitted assignments
-    const sub: any = await db.prepare(
+    // Total submissions
+    const totalSub: any = await db.prepare(
       "SELECT COUNT(*)::int AS n FROM submissions WHERE student_id::text = ?"
     ).get(userId).catch(() => ({ n: 0 }));
-    const submittedCount = Number(sub?.n ?? 0);
+    const submittedCount = Number(totalSub?.n ?? 0);
 
-    // Ensure leaderboard row exists for this student
+    // Submissions today (school day, Pacific). Counted via submitted_at
+    // — fall back to created_at if submitted_at column is missing.
+    let todayCount = 0;
+    try {
+      const today: any = await db.prepare(
+        `SELECT COUNT(*)::int AS n FROM submissions
+         WHERE student_id::text = ?
+           AND COALESCE(submitted_at, created_at) >= (CURRENT_DATE - INTERVAL '1 day')`
+      ).get(userId);
+      todayCount = Number(today?.n ?? 0);
+    } catch {}
+
+    // Any submission graded at 100
+    let perfectCount = 0;
+    try {
+      const perfect: any = await db.prepare(
+        `SELECT COUNT(*)::int AS n FROM submissions
+         WHERE student_id::text = ? AND (grade = 100 OR human_grade_score = 100)`
+      ).get(userId);
+      perfectCount = Number(perfect?.n ?? 0);
+    } catch {}
+
+    // Distinct subjects this student has completed
+    let distinctSubjects = new Set<string>();
+    try {
+      const subjects: any[] = await db.prepare(
+        `SELECT DISTINCT LOWER(a.target_subject) AS subject
+         FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE s.student_id::text = ? AND a.target_subject IS NOT NULL`
+      ).all(userId);
+      for (const r of subjects) {
+        if (r?.subject) distinctSubjects.add(r.subject);
+      }
+    } catch {}
+    const hasAllCoreSubjects =
+      ["reading", "math", "writing", "spelling"].every((s) => distinctSubjects.has(s));
+
+    // Ensure leaderboard row exists
     let row: any = await db.prepare("SELECT * FROM leaderboard WHERE user_id = ?").get(userId);
     if (!row) {
       try {
@@ -131,21 +170,27 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     }
     const existing: string[] = row ? JSON.parse(row.badges || "[]") : [];
 
-    // Milestone definitions — each entry: { name, when }
-    const milestones: Array<{ name: string; when: boolean }> = [
-      { name: "🎯 First Assignment",   when: submittedCount >= 1 },
-      { name: "🔥 5 Assignments",      when: submittedCount >= 5 },
-      { name: "⭐ 10 Assignments",      when: submittedCount >= 10 },
-      { name: "🏆 25 Assignments",     when: submittedCount >= 25 },
-      { name: "💎 50 Assignments",     when: submittedCount >= 50 },
-      { name: "👑 100 Assignments",    when: submittedCount >= 100 },
+    // Each milestone: id matches Achievements.tsx ALL_BADGES, label/icon
+    // are returned in the awarded payload so the client can render a
+    // celebratory toast.
+    const milestones: Array<{ id: string; label: string; icon: string; when: boolean }> = [
+      { id: "first_assignment", icon: "🎯", label: "First One Done",     when: submittedCount >= 1 },
+      { id: "5_assignments",    icon: "🔥", label: "On a Roll",          when: submittedCount >= 5 },
+      { id: "10_assignments",   icon: "⭐", label: "Star Student",       when: submittedCount >= 10 },
+      { id: "25_assignments",   icon: "🏆", label: "Champion",           when: submittedCount >= 25 },
+      { id: "50_assignments",   icon: "💎", label: "Diamond Worker",     when: submittedCount >= 50 },
+      { id: "100_assignments",  icon: "👑", label: "Hall of Fame",       when: submittedCount >= 100 },
+      { id: "perfect_score",    icon: "💯", label: "Perfect Score",      when: perfectCount >= 1 },
+      { id: "3_in_a_day",       icon: "⚡", label: "Speedster",          when: todayCount >= 3 },
+      { id: "5_in_a_day",       icon: "🚀", label: "Power Day",          when: todayCount >= 5 },
+      { id: "all_subjects",     icon: "🌟", label: "Well Rounded",       when: hasAllCoreSubjects },
     ];
 
-    const awarded: string[] = [];
+    const awarded: Array<{ id: string; label: string; icon: string }> = [];
     for (const m of milestones) {
-      if (m.when && !existing.includes(m.name)) {
-        existing.push(m.name);
-        awarded.push(m.name);
+      if (m.when && !existing.includes(m.id)) {
+        existing.push(m.id);
+        awarded.push({ id: m.id, label: m.label, icon: m.icon });
       }
     }
 
@@ -154,7 +199,7 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
         JSON.stringify(existing), userId,
       );
     }
-    res.json({ awarded, badges: existing, submittedCount });
+    res.json({ awarded, badges: existing, submittedCount, todayCount, perfectCount });
   } catch (e: any) {
     console.error("[leaderboard auto-award]", e?.message || e);
     res.status(500).json({ error: e?.message || "auto-award failed" });

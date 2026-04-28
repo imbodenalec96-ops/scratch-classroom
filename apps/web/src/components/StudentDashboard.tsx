@@ -1657,7 +1657,7 @@ function WorkScreen({
       >
         {/* ── Editorial header: exit + subject eyebrow + progress strip ── */}
         <div className="animate-slide-up" style={{ animationDelay: "0ms" }}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
             <button
               onClick={() => {
                 // Answers auto-save to localStorage as the student types, so
@@ -1678,19 +1678,31 @@ function WorkScreen({
               <span style={{ color: "#D4CEC2" }}>·</span>
               <span>{todayName}</span>
             </div>
-            {onSkip && (
+            {onSkip ? (
               <button
                 onClick={() => {
                   if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
                   onSkip();
                 }}
-                className="btn-ghost text-xs gap-1.5"
-                style={{ padding: "6px 10px", color: "#a16207" }}
-                title="Try a different assignment"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  color: "#3a2410",
+                  border: "1px solid #fcd34d",
+                  boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  touchAction: "manipulation",
+                }}
+                title="Skip this one — try a different assignment"
+                aria-label="Try a different assignment"
               >
-                Try a different one →
+                🔄 Try a different one
               </button>
-            )}
+            ) : <span />}
           </div>
 
           {/* Masthead */}
@@ -2628,7 +2640,7 @@ export default function StudentDashboard() {
   const [lockedScreen, setLockedScreen] = useState(false);
   const [broadcast, setBroadcast] = useState<string | null>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
-  const [badgeToast, setBadgeToast] = useState<string[] | null>(null);
+  const [badgeToast, setBadgeToast] = useState<Array<{ id: string; label: string; icon: string }> | null>(null);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{
     videoId: string;
@@ -3293,7 +3305,10 @@ export default function StudentDashboard() {
             🎉 Achievement unlocked!
           </div>
           {badgeToast.map((b, i) => (
-            <div key={i} style={{ fontSize: 17, lineHeight: 1.3 }}>{b}</div>
+            <div key={b.id || i} style={{ fontSize: 18, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+              <span style={{ fontSize: 26 }}>{b.icon}</span>
+              <span>{b.label}</span>
+            </div>
           ))}
         </div>
       )}
@@ -3668,43 +3683,99 @@ export default function StudentDashboard() {
 
 
 
-        {/* Progress badge — visible whenever student has any pending work
-            so they know how many more to clear before they're truly done. */}
-        {(pendingAssignment || allPendingAssignments.length > 0) && (() => {
+        {/* Progress badge — visual card with circular progress so kids can
+            tell at a glance how much work is left. Stays visible whenever
+            there's pending work; switches to a celebration state at 100%. */}
+        {(() => {
           const remaining = allPendingAssignments.length;
           const doneToday = statSubmitted;
           const total = doneToday + remaining;
           if (total === 0) return null;
           const pct = Math.max(0, Math.min(100, Math.round((doneToday / total) * 100)));
+          const allDone = remaining === 0;
+          // Circular progress geometry
+          const size = 72;
+          const stroke = 8;
+          const r = (size - stroke) / 2;
+          const c = 2 * Math.PI * r;
+          const offset = c * (1 - pct / 100);
           return (
             <div
               style={{
-                marginBottom: 12,
-                padding: "10px 14px",
-                borderRadius: 14,
-                background: "rgba(139,92,246,0.10)",
-                border: "1px solid rgba(139,92,246,0.25)",
+                marginBottom: 14,
+                padding: "16px 18px",
+                borderRadius: 20,
+                background: allDone
+                  ? "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(22,163,74,0.10))"
+                  : "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(99,102,241,0.10))",
+                border: allDone
+                  ? "1px solid rgba(34,197,94,0.4)"
+                  : "1px solid rgba(139,92,246,0.4)",
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                gap: 16,
                 animation: "dbSlide .4s ease both",
+                boxShadow: allDone
+                  ? "0 8px 24px rgba(34,197,94,0.18)"
+                  : "0 8px 24px rgba(139,92,246,0.18)",
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#c4b5fd", whiteSpace: "nowrap" }}>
-                {doneToday} of {total} done
-              </div>
-              <div style={{ flex: 1, height: 8, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+              {/* Circular progress ring */}
+              <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+                <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+                  <circle
+                    cx={size / 2} cy={size / 2} r={r}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth={stroke}
+                  />
+                  <circle
+                    cx={size / 2} cy={size / 2} r={r}
+                    fill="none"
+                    stroke={allDone ? "#22c55e" : "#a78bfa"}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={c}
+                    strokeDashoffset={offset}
+                    style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.22,1,0.36,1)" }}
+                  />
+                </svg>
                 <div
                   style={{
-                    width: `${pct}%`,
-                    height: "100%",
-                    background: "linear-gradient(90deg,#8b5cf6,#a78bfa)",
-                    transition: "width .4s ease",
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 900,
+                    fontSize: 18,
+                    color: allDone ? "#22c55e" : "#c4b5fd",
                   }}
-                />
+                >
+                  {pct}%
+                </div>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
-                {remaining > 0 ? `${remaining} to go` : "Almost there!"}
+              {/* Stats */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: allDone ? "#86efac" : "#ddd6fe", lineHeight: 1.1 }}>
+                  {allDone
+                    ? "🎉 All done for today!"
+                    : `${doneToday} of ${total} assignments done`}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "rgba(255,255,255,0.65)",
+                    marginTop: 4,
+                  }}
+                >
+                  {allDone
+                    ? "Great work — your bonus and tomorrow's work will appear here."
+                    : remaining === 1
+                    ? "Just 1 more to go — you've got this!"
+                    : `${remaining} more to go — keep it up!`}
+                </div>
               </div>
             </div>
           );
