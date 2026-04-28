@@ -2256,57 +2256,44 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 });
 
 // POST /assignments/class/:classId/generate-afternoon
-// Adds 7 class-wide assignments using PREMADE content. Every student in
-// the class sees all 7 in their pending list regardless of grade — no
-// grade target, no special gate. The teacher can click this multiple
-// times to keep stacking work for kids who blow through everything.
-// scheduled_date is left NULL so the pending query treats them as
-// always-on and shows them every day until submitted.
+// Adds bonus assignments using PREMADE content, one per (subject × grade)
+// pair across grades 1–5. Each is targeted via target_grade_min/max so the
+// pending filter only shows it to students at that grade level — a grade
+// 4 student gets grade 4 content, not grade 3 or grade 5. Students whose
+// grade isn't configured fall through the existing `!studentGrades` gate
+// and see every grade-targeted assignment. scheduled_date stays NULL so
+// the today/nextDay date filter doesn't exclude them. The teacher can
+// click multiple times to keep stacking work.
 router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try { await ensureGradeCols(); } catch {}
 
-  // 7 class-wide assignments spanning subjects + grade levels. NOT grade-
-  // targeted (target_grade_min stays NULL) so every kid sees every one.
-  // Mix of grades 3/4/5 lets kids self-pace through the difficulty range.
-  const slots: Array<{ subject: "reading" | "math" | "writing" | "spelling"; grade: number }> = [
-    { subject: "reading",  grade: 3 },
-    { subject: "math",     grade: 3 },
-    { subject: "reading",  grade: 4 },
-    { subject: "math",     grade: 4 },
-    { subject: "writing",  grade: 4 },
-    { subject: "spelling", grade: 4 },
-    { subject: "math",     grade: 5 },
-  ];
+  const subjects = ["reading", "math", "writing", "spelling"] as const;
+  const grades = [1, 2, 3, 4, 5];
 
   const created: any[] = [];
   const errors: string[] = [];
 
-  for (const { subject, grade } of slots) {
-    const premade = PREMADE[subject]?.[grade];
-    if (!premade) {
-      errors.push(`${subject} G${grade}: no premade content`);
-      continue;
-    }
-    try {
-      const id = crypto.randomUUID();
-      const title = `🌅 Bonus — ${premade.title}`;
-      // target_grade_min/max NULL → class-wide. scheduled_date NULL →
-      // always-on, never excluded by the today/nextDay date filter.
-      // is_afternoon=1 is kept purely as a label so the teacher's list
-      // shows the 🌅 stamp; the pending query no longer filters on it.
-      await db.prepare(
-        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, rubric, hints_allowed, is_afternoon)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
-      ).run(
-        id, classId, req.user!.id, title, premade.description,
-        JSON.stringify(premade.content),
-        subject,
-        JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
-      );
-      created.push({ id, title, subject, grade });
-    } catch (e: any) {
-      errors.push(`${subject} G${grade}: ${e?.message}`);
+  for (const subject of subjects) {
+    for (const grade of grades) {
+      const premade = PREMADE[subject]?.[grade];
+      if (!premade) continue; // not all subjects have content for every grade
+      try {
+        const id = crypto.randomUUID();
+        const title = `🌅 Bonus — ${premade.title}`;
+        await db.prepare(
+          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, rubric, hints_allowed, is_afternoon)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+        ).run(
+          id, classId, req.user!.id, title, premade.description,
+          JSON.stringify(premade.content),
+          subject, grade, grade,
+          JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
+        );
+        created.push({ id, title, subject, grade });
+      } catch (e: any) {
+        errors.push(`${subject} G${grade}: ${e?.message}`);
+      }
     }
   }
 
