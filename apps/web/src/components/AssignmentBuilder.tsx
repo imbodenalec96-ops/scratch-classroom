@@ -1721,22 +1721,25 @@ export default function AssignmentBuilder() {
             </button>
             <button
               disabled={genAfternoonLoading || !classId}
-              title="Generates 7 extra assignments students only see AFTER finishing all their morning work."
+              title="Adds extra grade-targeted assignments students only see AFTER finishing all their morning work."
               onClick={async () => {
                 if (!classId) return;
-                if (!confirm("Generate 7 AI afternoon assignments for kids who finish their morning work early?\n\nStudents only see these once they've cleared the morning queue. Takes ~30–60 seconds.")) return;
+                if (!confirm("Add afternoon assignments for kids who finish their morning work early?\n\nCreates one assignment per grade for reading, math, writing, and spelling — plus an SEL reflection. Students only see these once they've cleared their morning queue.")) return;
                 setGenAfternoonLoading(true);
                 try {
                   const result = await api.generateAfternoonAssignments(classId);
                   await loadAssignments(classId);
-                  alert(`✅ Created ${result.created} afternoon assignments.${result.errors?.length ? "\nErrors: " + result.errors.join(", ") : ""}`);
+                  const summary = (result.assignments || [])
+                    .map((a: any) => `• ${a.subject}${a.grade ? ` G${a.grade}` : ""}: ${a.title}`)
+                    .join("\n");
+                  alert(`✅ Created ${result.created} afternoon assignments.\n\n${summary}${result.errors?.length ? "\n\nErrors: " + result.errors.join(", ") : ""}`);
                 } catch (e: any) { alert("Failed: " + e.message); }
                 finally { setGenAfternoonLoading(false); }
               }}
               className="btn-primary gap-2"
               style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
             >
-              {genAfternoonLoading ? "⏳ Generating…" : "🌅 Generate 7 Afternoon Assignments"}
+              {genAfternoonLoading ? "⏳ Generating…" : "🌅 Add Afternoon Assignments"}
             </button>
             <button
               disabled={!classId}
