@@ -2830,6 +2830,53 @@ export default function StudentDashboard() {
     return () => clearTimeout(timer);
   }, [phase]);
 
+  // Auto-discover new pending assignments while the student is on the
+  // "done" dashboard. Without this, a student who finished morning work
+  // before the teacher added afternoon work is stuck on the celebratory
+  // screen until they manually refresh. Polls every 30s; when new pending
+  // is found, clears the workDone flag and surfaces the assignment hero.
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (pendingAssignment) return;
+    if (classes.length === 0) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const results = await Promise.all(
+          classes.map((c: any) => api.getPendingAssignments(c.id).catch(() => null as any[] | null)),
+        );
+        if (cancelled) return;
+        const anySucceeded = results.some((r) => r !== null);
+        if (!anySucceeded) return;
+        const flat = results.filter(Array.isArray).flat();
+        if (flat.length === 0) return;
+        // New work appeared — fetch content for the first one and surface it
+        let next: any = flat[0];
+        let nextParsed: any = null;
+        if (next.content) {
+          try { const p = JSON.parse(next.content); if (p?.sections?.length > 0) nextParsed = p; } catch {}
+        } else {
+          try {
+            const full = await api.getAssignment(next.id);
+            if (full?.content) {
+              const p = JSON.parse(full.content);
+              if (p?.sections?.length > 0) nextParsed = p;
+              next = { ...next, content: full.content };
+            }
+          } catch {}
+        }
+        if (cancelled) return;
+        clearWorkUnlock();
+        setAccessUnlocked(isAccessAllowed());
+        setAllPendingAssignments(flat);
+        setPendingAssignment(next);
+        setParsedAssignment(nextParsed);
+      } catch { /* network blip — try again next tick */ }
+    };
+    const iv = setInterval(tick, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [phase, pendingAssignment, classes]);
+
 
   // Poll for screen lock
   useEffect(() => {
