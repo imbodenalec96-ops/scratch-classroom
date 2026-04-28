@@ -1152,12 +1152,16 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       return g >= tMin && g <= tMax;
     });
 
-    // Show every pending assignment — afternoon/extension work appears in
-    // the same list as morning work, sorted afternoon-last by the SQL ORDER
-    // BY. Keeping a separate "afternoon-only-after-morning" gate caused
-    // assignments to silently vanish for students whose state confused the
-    // gate, so we just hand them the full list.
-    res.json(filtered);
+    // Bonus / afternoon work expires at the 3:10 PM Pacific bell — if a
+    // student didn't finish it during the school day, drop it from their
+    // list so it doesn't follow them home or carry over into tomorrow.
+    // Detected via is_afternoon flag OR the 🌅 title prefix so older
+    // bonuses without the flag still expire.
+    const isBonus = (r: any) =>
+      Number(r.is_afternoon) === 1 ||
+      (typeof r.title === "string" && r.title.startsWith("🌅"));
+    const final = isAfterRelease ? filtered.filter((r: any) => !isBonus(r)) : filtered;
+    res.json(final);
   } catch (e) {
     console.error('pending assignments error:', e);
     res.status(500).json({ error: 'Failed to fetch pending assignments' });
