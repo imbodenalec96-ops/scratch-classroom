@@ -1072,7 +1072,7 @@ export default function AssignmentBuilder() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [fullWeekSubjects, setFullWeekSubjects] = useState<Record<string, boolean>>({
-    reading: true, writing: true, spelling: true, math: true, sel: true,
+    reading: true, writing: true, spelling: true, vocabulary: true, math: true, sel: true,
   });
   const [fullWeekThemes, setFullWeekThemes] = useState<Record<string, string>>({});
   const [fullWeekDifficulty, setFullWeekDifficulty] = useState<"match"|"easier"|"harder">("match");
@@ -1813,11 +1813,12 @@ export default function AssignmentBuilder() {
             <label className="block text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Subjects + weekly focus (optional)</label>
             <div className="space-y-2">
               {[
-                { key: "reading",  label: "📖 Reading",  hint: "e.g. phonics and beginning sounds" },
-                { key: "writing",  label: "✏️ Writing",  hint: "e.g. sentence structure" },
-                { key: "spelling", label: "🔤 Spelling", hint: "e.g. weekly word list focus" },
-                { key: "math",     label: "🔢 Math",     hint: "e.g. single-digit addition" },
-                { key: "sel",      label: "💛 SEL",      hint: "e.g. theme: resilience" },
+                { key: "reading",    label: "📖 Reading",    hint: "e.g. phonics and beginning sounds" },
+                { key: "writing",    label: "✏️ Writing",    hint: "e.g. sentence structure" },
+                { key: "spelling",   label: "🔤 Spelling",   hint: "e.g. weekly word list focus" },
+                { key: "vocabulary", label: "📚 Vocabulary", hint: "e.g. tier-2 academic words" },
+                { key: "math",       label: "🔢 Math",       hint: "e.g. single-digit addition" },
+                { key: "sel",        label: "💛 SEL",        hint: "e.g. theme: resilience" },
               ].map(s => (
                 <div key={s.key} className="flex items-center gap-2">
                   <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ width: 150, color: "var(--text-1)" }}>
