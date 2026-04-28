@@ -2301,13 +2301,29 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
 });
 
 // DELETE /assignments/class/:classId/afternoon
-// Clears all afternoon assignments for the class (so the teacher can regenerate).
+// Clears every bonus / afternoon assignment for the class. Matches both
+// the is_afternoon flag AND the 🌅 title prefix so older ones inserted
+// before the flag was reliable still get caught. Also kills associated
+// submissions so the row count is honest.
 router.delete("/class/:classId/afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
   try {
-    const r = await db.prepare(
-      `DELETE FROM assignments WHERE class_id::text = ? AND is_afternoon = 1`
-    ).run(req.params.classId);
-    res.json({ deleted: (r as any)?.changes ?? 0 });
+    // Find every matching row first so we can delete dependent submissions.
+    const rows = await db.prepare(
+      `SELECT id FROM assignments
+       WHERE class_id::text = ?
+         AND (is_afternoon = 1 OR title LIKE '🌅%' OR title LIKE '%Bonus%' OR title LIKE '%Afternoon%')`
+    ).all(classId) as any[];
+    const ids = rows.map((r: any) => r.id);
+    if (ids.length === 0) {
+      return res.json({ deleted: 0 });
+    }
+    // Delete submissions first (foreign-key safety), then the assignments.
+    for (const id of ids) {
+      try { await db.prepare(`DELETE FROM submissions WHERE assignment_id::text = ?`).run(id); } catch {}
+      try { await db.prepare(`DELETE FROM assignments WHERE id::text = ?`).run(id); } catch {}
+    }
+    res.json({ deleted: ids.length, ids });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "delete failed" });
   }
