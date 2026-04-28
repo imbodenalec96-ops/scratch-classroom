@@ -74,15 +74,10 @@ async function ensureGradeCols() {
   try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
 }
 
-// Returns whichever AI provider is configured. Prefers OpenRouter when its
-// key is present, falls back to Gemini. Returns null only when BOTH are
-// missing — in that case the AI endpoints respond 503.
+// Returns the OpenRouter API key if configured, else null.
 function getAnthropic() {
   const orKey = process.env.OPENROUTER_API_KEY;
-  if (orKey) return { key: orKey, provider: "openrouter" as const };
-  const gem = process.env.GEMINI_API_KEY;
-  if (gem) return { key: gem, provider: "gemini" as const };
-  return null;
+  return orKey ? { key: orKey, provider: "openrouter" as const } : null;
 }
 const AI_MODEL = "openai/gpt-4o-mini";        // OpenRouter fallback model
 const GEMINI_MODEL = "gemini-2.5-flash";       // Default Gemini model — fast + cheap
@@ -167,9 +162,8 @@ async function generateDailyAssignmentContent(_client: any, opts: {
   questionType?: string;
   learningObjective?: string;
 }): Promise<{ title: string; content: any }> {
-  // At least one provider must be configured; we pick which one further down.
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY nor OPENROUTER_API_KEY is set");
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY not set");
   }
 
   const seed = hashString(`${opts.studentId}|${opts.date}|${opts.subject}`);
@@ -199,12 +193,10 @@ ${opts.teacherNotes ? `Private teacher notes (don't expose to student, but use w
 ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different question type):\n${recent}` : ""}
 Make this feel different from other days this week. Return ONLY JSON.`;
 
-  // Prefer OpenRouter when its key is set; Gemini is the fallback when only
-  // GEMINI_API_KEY is configured. Toggling providers = toggling env vars.
+  // Hard-locked to OpenRouter. (Gemini helper still exists in this file but
+  // is no longer called from the assignment generator.)
   let parsed: any;
-  if (!process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) {
-    parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 4096 });
-  } else {
+  {
     const orKey = process.env.OPENROUTER_API_KEY!;
     const HARD_TIMEOUT_MS = 40_000;
     const fetchCall = fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -803,9 +795,9 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
   await ensureGradeCols();
 
   // Fail fast if no AI provider configured — client shows a clear error
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({
-      error: "AI features not configured. Add GEMINI_API_KEY (or OPENROUTER_API_KEY) in Vercel env vars to enable weekly generation.",
+      error: "AI features not configured. Add OPENROUTER_API_KEY in Vercel env vars to enable weekly generation.",
       code: "AI_NOT_CONFIGURED",
     });
   }
@@ -921,7 +913,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   const client = await getAnthropic();
   if (!client) {
     console.log(`${tag} NO_KEY +${Date.now()-T0}ms`);
-    return res.status(503).json({ error: "AI not configured: set GEMINI_API_KEY (or OPENROUTER_API_KEY) in Vercel env vars", code: "AI_NOT_CONFIGURED" });
+    return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY in Vercel env vars", code: "AI_NOT_CONFIGURED" });
   }
   console.log(`${tag} CLIENT_OK +${Date.now()-T0}ms`);
   try { await ensureGradeCols(); } catch (e: any) { console.log(`${tag} ENSURE_COLS_ERR +${Date.now()-T0}ms ${e?.message}`); }
@@ -1509,9 +1501,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     const sysAdj = "You are a creative elementary teacher. Return JSON ONLY matching the EXACT same shape as the input. No markdown, no preamble.";
     const userAdj = `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.`;
     let next: any;
-    if (!process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) {
-      next = await callGeminiJSON(sysAdj, userAdj, { maxTokens: 4096 });
-    } else {
+    {
       const orKey = process.env.OPENROUTER_API_KEY!;
       const fetchCall2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
