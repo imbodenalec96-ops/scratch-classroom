@@ -648,6 +648,20 @@ router.post("/generate-full-week", requireRole("teacher", "admin"), async (req: 
       const theme = themeBySubject[slot.subject] || themeBySubject[subjectKey(slot.subject)] || "";
       const recentList = recent[`${slot.studentId}|${slot.subject}`] || [];
 
+      // Skip if this student already has an assignment for this date+subject —
+      // lets the teacher rerun "Generate Full Week" to top up missing slots
+      // without creating duplicates or touching student work in progress.
+      try {
+        const subjLowerSlot = String(slot.subject).trim().toLowerCase();
+        const existingSlot = await db.prepare(
+          "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND LOWER(title) LIKE ?"
+        ).get(slot.studentId, slot.dateStr, subjLowerSlot + " —%") as any;
+        if (existingSlot) {
+          created.push({ id: existingSlot.id, student_id: slot.studentId, subject: slot.subject, date: slot.dateStr, skipped: true });
+          return;
+        }
+      } catch { /* if check fails, fall through and let INSERT handle it */ }
+
       let final: { title: string; content: any };
       try {
         final = await generateDailyAssignmentContent(client, {
@@ -863,14 +877,16 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   }
 
   // Skip if this student already has an assignment for this date+display-subject.
-  // Use title prefix (e.g. "Spelling —") not target_subject, because both
+  // Use title prefix (e.g. "spelling —") not target_subject, because both
   // "spelling" and "writing" map to target_subject="writing" and would
-  // incorrectly block each other.
+  // incorrectly block each other. LOWER() on both sides makes the match
+  // case-insensitive on Postgres + SQLite so capitalisation can never let
+  // a duplicate slip through.
   try {
-    const titlePrefix = String(subject).charAt(0).toUpperCase() + String(subject).slice(1) + " —";
+    const subjLower = String(subject).trim().toLowerCase();
     const existing = await db.prepare(
-      "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND title LIKE ?"
-    ).get(studentId, date, titlePrefix + "%") as any;
+      "SELECT id FROM assignments WHERE student_id::text = ? AND scheduled_date = ? AND LOWER(title) LIKE ?"
+    ).get(studentId, date, subjLower + " —%") as any;
     if (existing) {
       console.log(`${tag} SKIP_EXISTING id=${existing.id}`);
       return res.json({ ok: true, skipped: true, existingId: existing.id });
