@@ -200,6 +200,7 @@ export const api = {
   getLeaderboard: () => request<any[]>("/leaderboard"),
   getAssignmentLeaderboard: () => request<any[]>("/leaderboard/assignments"),
   addPoints: (userId: string, points: number) => request<any>("/leaderboard/points", { method: "POST", body: JSON.stringify({ userId, points }) }),
+  autoAwardBadges: () => request<{ awarded: string[]; badges: string[]; submittedCount: number }>("/leaderboard/auto-award", { method: "POST", body: JSON.stringify({}) }),
 
   // Users
   getUsers: () => request<any[]>("/users"),

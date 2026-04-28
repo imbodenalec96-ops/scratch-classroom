@@ -1393,6 +1393,7 @@ function WorkScreen({
   dk,
   onComplete,
   onBack,
+  onSkip,
   questionsAnswered,
   setQuestionsAnswered,
   ttsPassages = true,
@@ -1403,6 +1404,7 @@ function WorkScreen({
   dk: boolean;
   onComplete: (answers: Record<number, string>) => void;
   onBack: () => void;
+  onSkip?: () => void;
   questionsAnswered: number;
   setQuestionsAnswered: (n: number) => void;
   ttsPassages?: boolean;
@@ -1421,8 +1423,37 @@ function WorkScreen({
       })),
     ) ?? [];
   const total = allQuestions.length;
-  const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const draftKey = `assignment-draft-${assignment?.id || "unknown"}`;
+  const [currentQ, setCurrentQ] = useState(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (typeof d?.currentQ === "number") return d.currentQ;
+      }
+    } catch {}
+    return 0;
+  });
+  const [answers, setAnswers] = useState<Record<number, string>>(() => {
+    // Restore mid-assignment progress so kids don't lose work to refresh / battery death.
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d?.answers && typeof d.answers === "object") return d.answers;
+      }
+    } catch {}
+    return {};
+  });
+
+  // Auto-save draft answers + current question to localStorage on every change.
+  // Cleared by handleWorkComplete on submit.
+  useEffect(() => {
+    if (!assignment?.id) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ answers, currentQ, savedAt: Date.now() }));
+    } catch {}
+  }, [answers, currentQ, draftKey, assignment?.id]);
   const [submitted, setSubmitted] = useState(false);
   const [mascotState, setMascotState] = useState<"idle" | "cheer">("idle");
   const [cardKey, setCardKey] = useState(0);
@@ -1629,13 +1660,8 @@ function WorkScreen({
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => {
-                if (
-                  answeredCount > 0 &&
-                  !confirm(
-                    "Leave before finishing? Your answers so far will be lost.",
-                  )
-                )
-                  return;
+                // Answers auto-save to localStorage as the student types, so
+                // leaving and coming back is safe — no warning needed.
                 onBack();
               }}
               className="btn-ghost text-xs gap-1.5"
@@ -1652,6 +1678,19 @@ function WorkScreen({
               <span style={{ color: "#D4CEC2" }}>·</span>
               <span>{todayName}</span>
             </div>
+            {onSkip && (
+              <button
+                onClick={() => {
+                  if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
+                  onSkip();
+                }}
+                className="btn-ghost text-xs gap-1.5"
+                style={{ padding: "6px 10px", color: "#a16207" }}
+                title="Try a different assignment"
+              >
+                Try a different one →
+              </button>
+            )}
           </div>
 
           {/* Masthead */}
@@ -2589,6 +2628,7 @@ export default function StudentDashboard() {
   const [lockedScreen, setLockedScreen] = useState(false);
   const [broadcast, setBroadcast] = useState<string | null>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
+  const [badgeToast, setBadgeToast] = useState<string[] | null>(null);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{
     videoId: string;
@@ -2921,6 +2961,8 @@ export default function StudentDashboard() {
         try {
           await api.submitAssignmentWithAnswers(pendingAssignment.id, answers);
         } catch {}
+        // Clear any saved draft for this assignment — student finished it.
+        try { localStorage.removeItem(`assignment-draft-${pendingAssignment.id}`); } catch {}
       }
       spawnConfetti();
       setMascotCelebrating(true);
@@ -2931,6 +2973,17 @@ export default function StudentDashboard() {
         setStatSubmitted(subs.length);
         setStatGraded(subs.filter((s: any) => s.grade !== null).length);
       } catch {}
+
+      // Auto-award milestone badges (5, 10, 25, 50, 100 assignments). If
+      // the student crossed a threshold, pop a toast so they get the
+      // satisfaction of seeing it.
+      try {
+        const result = await api.autoAwardBadges();
+        if (result.awarded && result.awarded.length > 0) {
+          setBadgeToast(result.awarded);
+          setTimeout(() => setBadgeToast(null), 6000);
+        }
+      } catch { /* non-fatal — milestone might just be off by one this round */ }
 
       // Remove the just-completed assignment from the cached list and check
       // whether there are more to do. Using the locally-cached list avoids any
@@ -3023,6 +3076,46 @@ export default function StudentDashboard() {
     [pendingAssignment, allPendingAssignments, classes],
   );
 
+  // Skip the current assignment without submitting it. Pulls the next one
+  // from the cached pending list so the student keeps working instead of
+  // bailing to Arcade. The skipped assignment stays pending and they can
+  // come back to it later.
+  const handleSkip = useCallback(async () => {
+    if (!pendingAssignment) return;
+    const skippedId = pendingAssignment.id;
+    // Move skipped to the end of the list so we don't immediately re-show it
+    const others = allPendingAssignments.filter((a: any) => a.id !== skippedId);
+    const skipped = allPendingAssignments.find((a: any) => a.id === skippedId);
+    const reordered = skipped ? [...others, skipped] : others;
+    setAllPendingAssignments(reordered);
+
+    let nextAssignment: any = others.length > 0 ? others[0] : null;
+    let nextParsed: any = null;
+    if (nextAssignment) {
+      if (nextAssignment.content) {
+        try { const p = JSON.parse(nextAssignment.content); if (p?.sections?.length > 0) nextParsed = p; } catch {}
+      } else {
+        try {
+          const full = await api.getAssignment(nextAssignment.id);
+          if (full?.content) {
+            const p = JSON.parse(full.content);
+            if (p?.sections?.length > 0) nextParsed = p;
+            nextAssignment = { ...nextAssignment, content: full.content };
+          }
+        } catch {}
+      }
+      setQuestionsAnswered(0);
+      setPendingAssignment(nextAssignment);
+      setParsedAssignment(nextParsed);
+      setPhase("working");
+    } else {
+      // Nothing else to skip to — drop them back to the dashboard
+      setPendingAssignment(null);
+      setParsedAssignment(null);
+      setPhase("done");
+    }
+  }, [pendingAssignment, allPendingAssignments]);
+
 
   const myEntry = leaderboard.find((e: any) => e.user_id === user?.id);
   const rm = prefersReducedMotion();
@@ -3090,6 +3183,7 @@ export default function StudentDashboard() {
         dk={dk}
         onComplete={handleWorkComplete}
         onBack={() => setPhase("done")}
+        onSkip={handleSkip}
         questionsAnswered={questionsAnswered}
         setQuestionsAnswered={setQuestionsAnswered}
         ttsPassages={ttsPassages}
@@ -3168,6 +3262,39 @@ export default function StudentDashboard() {
         >
           <Megaphone size={15} />
           {broadcast}
+        </div>
+      )}
+
+      {/* Achievement toast — shown for ~6s when a milestone badge lands */}
+      {badgeToast && badgeToast.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: 18,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 60,
+            padding: "16px 22px",
+            borderRadius: 18,
+            background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+            color: "#3a2410",
+            fontWeight: 900,
+            fontSize: 16,
+            textAlign: "center",
+            boxShadow: "0 12px 40px rgba(245,158,11,0.55)",
+            border: "2px solid #fef3c7",
+            animation: "dbPop .5s cubic-bezier(0.22,1,0.36,1) both",
+            cursor: "pointer",
+            maxWidth: "92vw",
+          }}
+          onClick={() => setBadgeToast(null)}
+        >
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7, marginBottom: 6 }}>
+            🎉 Achievement unlocked!
+          </div>
+          {badgeToast.map((b, i) => (
+            <div key={i} style={{ fontSize: 17, lineHeight: 1.3 }}>{b}</div>
+          ))}
         </div>
       )}
 
@@ -3540,6 +3667,48 @@ export default function StudentDashboard() {
         </div>
 
 
+
+        {/* Progress badge — visible whenever student has any pending work
+            so they know how many more to clear before they're truly done. */}
+        {(pendingAssignment || allPendingAssignments.length > 0) && (() => {
+          const remaining = allPendingAssignments.length;
+          const doneToday = statSubmitted;
+          const total = doneToday + remaining;
+          if (total === 0) return null;
+          const pct = Math.max(0, Math.min(100, Math.round((doneToday / total) * 100)));
+          return (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: "10px 14px",
+                borderRadius: 14,
+                background: "rgba(139,92,246,0.10)",
+                border: "1px solid rgba(139,92,246,0.25)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                animation: "dbSlide .4s ease both",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#c4b5fd", whiteSpace: "nowrap" }}>
+                {doneToday} of {total} done
+              </div>
+              <div style={{ flex: 1, height: 8, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${pct}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg,#8b5cf6,#a78bfa)",
+                    transition: "width .4s ease",
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
+                {remaining > 0 ? `${remaining} to go` : "Almost there!"}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Today's assignment — prominent hero when there's one to do */}
         {pendingAssignment && (

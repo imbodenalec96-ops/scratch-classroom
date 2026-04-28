@@ -106,4 +106,59 @@ router.post("/badge", async (req: AuthRequest, res: Response) => {
   res.json(updated);
 });
 
+// Auto-award badges based on the calling student's submission count.
+// Idempotent: if the badge already exists in the array, returns without
+// duplicating. Called from the student dashboard after every successful
+// assignment submission. Returns { awarded: [...], badges: [...] } so
+// the client can pop a celebration toast for any newly-earned badges.
+router.post("/auto-award", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  const userId = req.user.id;
+  try {
+    // Count this student's total submitted assignments
+    const sub: any = await db.prepare(
+      "SELECT COUNT(*)::int AS n FROM submissions WHERE student_id::text = ?"
+    ).get(userId).catch(() => ({ n: 0 }));
+    const submittedCount = Number(sub?.n ?? 0);
+
+    // Ensure leaderboard row exists for this student
+    let row: any = await db.prepare("SELECT * FROM leaderboard WHERE user_id = ?").get(userId);
+    if (!row) {
+      try {
+        await db.prepare("INSERT INTO leaderboard (user_id, points) VALUES (?, 0)").run(userId);
+        row = await db.prepare("SELECT * FROM leaderboard WHERE user_id = ?").get(userId);
+      } catch {}
+    }
+    const existing: string[] = row ? JSON.parse(row.badges || "[]") : [];
+
+    // Milestone definitions — each entry: { name, when }
+    const milestones: Array<{ name: string; when: boolean }> = [
+      { name: "🎯 First Assignment",   when: submittedCount >= 1 },
+      { name: "🔥 5 Assignments",      when: submittedCount >= 5 },
+      { name: "⭐ 10 Assignments",      when: submittedCount >= 10 },
+      { name: "🏆 25 Assignments",     when: submittedCount >= 25 },
+      { name: "💎 50 Assignments",     when: submittedCount >= 50 },
+      { name: "👑 100 Assignments",    when: submittedCount >= 100 },
+    ];
+
+    const awarded: string[] = [];
+    for (const m of milestones) {
+      if (m.when && !existing.includes(m.name)) {
+        existing.push(m.name);
+        awarded.push(m.name);
+      }
+    }
+
+    if (awarded.length > 0 && row) {
+      await db.prepare("UPDATE leaderboard SET badges = ? WHERE user_id = ?").run(
+        JSON.stringify(existing), userId,
+      );
+    }
+    res.json({ awarded, badges: existing, submittedCount });
+  } catch (e: any) {
+    console.error("[leaderboard auto-award]", e?.message || e);
+    res.status(500).json({ error: e?.message || "auto-award failed" });
+  }
+});
+
 export default router;

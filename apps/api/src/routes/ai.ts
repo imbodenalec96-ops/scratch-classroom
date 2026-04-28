@@ -419,6 +419,30 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no code fences — just the JSON
       for (let i = 0; i < openBraces; i++) jsonStr += "}";
     }
     const assignment = JSON.parse(jsonStr);
+    // Same shape validation the daily generator runs — reject empty / subject-
+    // mismatched output before it reaches the teacher's UI.
+    if (!assignment || !Array.isArray(assignment.sections) || assignment.sections.length === 0) {
+      throw new Error("AI returned empty/invalid sections");
+    }
+    const allQs: any[] = assignment.sections.flatMap((s: any) => s.questions ?? s.q ?? []);
+    if (allQs.length === 0) throw new Error("AI returned no questions");
+    for (const q of allQs) {
+      const t = (q.text ?? q.prompt ?? "").toString().trim();
+      if (!t) throw new Error("AI returned a question with empty text");
+    }
+    const subj = String(subject || "").toLowerCase();
+    if (subj === "spelling") {
+      const ok = allQs.every((q: any) => {
+        const text = (q.text ?? q.prompt ?? "").toString().toLowerCase();
+        const type = (q.type ?? "").toString().toLowerCase();
+        if (/spell(ed|ing)?\b/.test(text)) return true;
+        if (type === "fill_blank") return true;
+        if (/_{2,}|\b[a-z]_+[a-z]?\b/.test(text)) return true;
+        if (/correct(?:ly)?\s+spell/.test(text)) return true;
+        return false;
+      });
+      if (!ok) throw new Error("AI returned non-spelling questions on a spelling worksheet");
+    }
     res.json(assignment);
   } catch (err: any) {
     console.error("generate-assignment failed:", err?.message || err);

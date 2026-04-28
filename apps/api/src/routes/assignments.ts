@@ -226,7 +226,42 @@ Make this feel different from other days this week. Return ONLY JSON.`;
     parsed = JSON.parse(raw);
   }
   if (!parsed.sections || !Array.isArray(parsed.sections)) throw new Error("bad shape: no sections array");
+  validateAssignmentContent(parsed, opts.subject);
   return { title: parsed.title || "Assignment", content: parsed };
+}
+
+// Reject malformed AI output before it reaches the DB. Blocks empty
+// assignments (which strand kids on "All set!") and subject-mismatched
+// content (e.g. spelling worksheets that ask "who invented the light bulb").
+function validateAssignmentContent(content: any, subject: string): void {
+  if (!content || typeof content !== "object") throw new Error("validation: content not an object");
+  if (!Array.isArray(content.sections) || content.sections.length === 0) {
+    throw new Error("validation: no sections");
+  }
+  const allQs: any[] = content.sections.flatMap((s: any) => s.questions ?? s.q ?? []);
+  if (allQs.length === 0) throw new Error("validation: no questions in any section");
+  // Every question must have non-empty prompt text
+  for (const q of allQs) {
+    const text = (q.text ?? q.prompt ?? "").toString().trim();
+    if (!text) throw new Error("validation: question with empty text");
+  }
+  // Subject-specific sanity checks
+  const subj = String(subject || "").toLowerCase();
+  if (subj === "spelling") {
+    // Spelling work must actually quiz spelling — reject trivia/history drift.
+    // We accept a question if it: contains 'spell' / 'spelled' / 'spelling',
+    // OR is a fill_blank, OR has a missing-letter pattern (___, blanks).
+    const looksLikeSpelling = allQs.every((q: any) => {
+      const text = (q.text ?? q.prompt ?? "").toString().toLowerCase();
+      const type = (q.type ?? "").toString().toLowerCase();
+      if (/spell(ed|ing)?\b/.test(text)) return true;
+      if (type === "fill_blank") return true;
+      if (/_{2,}|\b[a-z]_+[a-z]?\b/.test(text)) return true; // "fri___nd" / "p_pp_"
+      if (/correct(?:ly)?\s+spell/.test(text)) return true;
+      return false;
+    });
+    if (!looksLikeSpelling) throw new Error("validation: spelling content has non-spelling questions");
+  }
 }
 
 // Create assignment with full custom fields (Feature 29 rich customization)
