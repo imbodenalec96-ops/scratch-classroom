@@ -74,12 +74,64 @@ async function ensureGradeCols() {
   try { await gradeColsInFlight; } finally { gradeColsInFlight = null; }
 }
 
-// Returns the OpenRouter API key, or null if not configured.
+// Returns whichever AI provider is configured. Prefers Gemini when its key
+// is present (Google Generative Language API), falls back to OpenRouter so
+// nothing breaks during the migration. Returns null only when BOTH are
+// missing — in that case the AI endpoints respond 503.
 function getAnthropic() {
-  const key = process.env.OPENROUTER_API_KEY;
-  return key ? { key } : null;
+  const gem = process.env.GEMINI_API_KEY;
+  if (gem) return { key: gem, provider: "gemini" as const };
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (orKey) return { key: orKey, provider: "openrouter" as const };
+  return null;
 }
-const AI_MODEL = "openai/gpt-4o-mini";
+const AI_MODEL = "openai/gpt-4o-mini";        // OpenRouter fallback model
+const GEMINI_MODEL = "gemini-2.5-flash";       // Default Gemini model — fast + cheap
+
+// Single JSON-mode helper for Gemini. Returns parsed JSON or throws.
+// systemInstruction lets us reuse the existing OpenAI-shaped prompts as-is.
+async function callGeminiJSON(systemPrompt: string, userPrompt: string, opts?: {
+  model?: string; maxTokens?: number; timeoutMs?: number; temperature?: number;
+}): Promise<any> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY not set");
+  const model = opts?.model || GEMINI_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const body = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: opts?.maxTokens ?? 1500,
+      temperature: opts?.temperature ?? 0.85,
+    },
+  };
+  const HARD_TIMEOUT_MS = opts?.timeoutMs ?? 40_000;
+  const fetchCall = fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(async r => {
+    if (!r.ok) {
+      const errTxt = await r.text().catch(() => "");
+      throw new Error(`gemini ${r.status}: ${errTxt.slice(0, 200)}`);
+    }
+    return r.json() as Promise<any>;
+  });
+  const data: any = await Promise.race([
+    fetchCall,
+    new Promise<never>((_r, rej) => setTimeout(() => rej(new Error(`gemini hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
+  ]);
+  const cand = data?.candidates?.[0];
+  if (!cand) throw new Error(`gemini empty response: ${JSON.stringify(data).slice(0, 200)}`);
+  if (cand.finishReason && cand.finishReason !== "STOP" && cand.finishReason !== "MAX_TOKENS") {
+    throw new Error(`gemini finishReason=${cand.finishReason}`);
+  }
+  let raw: string = (cand.content?.parts || []).map((p: any) => p?.text || "").join("").trim();
+  if (!raw) throw new Error("gemini blank text");
+  if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
+  return JSON.parse(raw);
+}
 
 function hashString(s: string): number {
   let h = 2166136261 >>> 0;
@@ -138,37 +190,35 @@ ${opts.teacherNotes ? `Private teacher notes (don't expose to student, but use w
 ${recent ? `AVOID repeating these recent prompts (choose fresh angle, different question type):\n${recent}` : ""}
 Make this feel different from other days this week. Return ONLY JSON.`;
 
-  const HARD_TIMEOUT_MS = 40_000;
-  const fetchCall = fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      max_tokens: 900,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
-  }).then(async r => {
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      throw new Error(`${r.status} ${JSON.stringify(err)}`);
-    }
-    return r.json() as Promise<any>;
-  });
-
-  const data = await Promise.race([
-    fetchCall,
-    new Promise<never>((_r, rej) => setTimeout(() => rej(new Error(`openrouter hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
-  ]);
-
-  let raw: string = data.choices[0].message.content.trim();
-  if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
-  const parsed = JSON.parse(raw);
+  // Prefer Gemini when GEMINI_API_KEY is set; OpenRouter is the legacy
+  // fallback so deploys without Gemini configured keep working.
+  let parsed: any;
+  if (process.env.GEMINI_API_KEY) {
+    parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 1500 });
+  } else {
+    const HARD_TIMEOUT_MS = 40_000;
+    const fetchCall = fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: AI_MODEL, max_tokens: 900,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    }).then(async r => {
+      if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(`${r.status} ${JSON.stringify(err)}`); }
+      return r.json() as Promise<any>;
+    });
+    const data = await Promise.race([
+      fetchCall,
+      new Promise<never>((_r, rej) => setTimeout(() => rej(new Error(`openrouter hard-timeout ${HARD_TIMEOUT_MS}ms`)), HARD_TIMEOUT_MS)),
+    ]);
+    let raw: string = data.choices[0].message.content.trim();
+    if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
+    parsed = JSON.parse(raw);
+  }
   if (!parsed.sections || !Array.isArray(parsed.sections)) throw new Error("bad shape: no sections array");
   return { title: parsed.title || "Assignment", content: parsed };
 }
@@ -742,10 +792,10 @@ router.post("/plan-full-week", requireRole("teacher", "admin"), async (req: Auth
   } = req.body;
   await ensureGradeCols();
 
-  // Fail fast if no API key — client shows a clear error instead of grinding
-  if (!process.env.OPENROUTER_API_KEY) {
+  // Fail fast if no AI provider configured — client shows a clear error
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({
-      error: "AI features not configured. Add OPENROUTER_API_KEY in Vercel env vars to enable weekly generation.",
+      error: "AI features not configured. Add GEMINI_API_KEY (or OPENROUTER_API_KEY) in Vercel env vars to enable weekly generation.",
       code: "AI_NOT_CONFIGURED",
     });
   }
@@ -1446,25 +1496,32 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     : "Rewrite this to be MORE CHALLENGING. Use longer sentences, more advanced vocabulary, larger numbers, questions that require multi-step reasoning. Keep the same general topic and the same question count.";
 
   try {
-    const orKey = process.env.OPENROUTER_API_KEY!;
-    const fetchCall2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${orKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: AI_MODEL, max_tokens: 900,
-        messages: [
-          { role: "system", content: "You are a creative elementary teacher. Return JSON ONLY matching the EXACT same shape as the input. No markdown, no preamble." },
-          { role: "user", content: `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.` },
-        ],
-      }),
-    }).then(async r => { if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(`${r.status} ${JSON.stringify(e)}`); } return r.json() as Promise<any>; });
-    const data: any = await Promise.race([
-      fetchCall2,
-      new Promise<never>((_r, rej) => setTimeout(() => rej(new Error("openrouter hard-timeout 40000ms")), 40_000)),
-    ]);
-    let raw: string = data.choices[0].message.content.trim();
-    if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
-    const next = JSON.parse(raw);
+    const sysAdj = "You are a creative elementary teacher. Return JSON ONLY matching the EXACT same shape as the input. No markdown, no preamble.";
+    const userAdj = `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.`;
+    let next: any;
+    if (process.env.GEMINI_API_KEY) {
+      next = await callGeminiJSON(sysAdj, userAdj, { maxTokens: 1500 });
+    } else {
+      const orKey = process.env.OPENROUTER_API_KEY!;
+      const fetchCall2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${orKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: AI_MODEL, max_tokens: 900,
+          messages: [
+            { role: "system", content: sysAdj },
+            { role: "user", content: userAdj },
+          ],
+        }),
+      }).then(async r => { if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(`${r.status} ${JSON.stringify(e)}`); } return r.json() as Promise<any>; });
+      const data: any = await Promise.race([
+        fetchCall2,
+        new Promise<never>((_r, rej) => setTimeout(() => rej(new Error("openrouter hard-timeout 40000ms")), 40_000)),
+      ]);
+      let raw: string = data.choices[0].message.content.trim();
+      if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
+      next = JSON.parse(raw);
+    }
     if (!next?.sections) throw new Error("bad shape");
 
     await db.prepare("UPDATE assignments SET content = ? WHERE id = ?")
