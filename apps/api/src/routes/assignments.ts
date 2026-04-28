@@ -2256,82 +2256,56 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 });
 
 // POST /assignments/class/:classId/generate-afternoon
-// Creates per-grade afternoon assignments using the proven PREMADE content
-// path (same as Generate Today). Each subject gets one assignment per grade
-// level present in the class, targeted to that grade so kids see content
-// matched to their level. is_afternoon=1 keeps them hidden until morning is
-// done. AI is intentionally NOT used here — premade content is reliable and
-// instant, which is what teachers need for "kids finished early, give me
-// something now" moments.
+// Creates 7 class-wide afternoon assignments using PREMADE content. Every
+// student in the class sees all 7 once they've cleared their morning work,
+// regardless of grade level — no grade-targeting filter, no per-student
+// grade lookup that could exclude kids whose grades aren't configured. The
+// difficulty mix (grades 3, 4, 5 across subjects) gives kids variety to
+// self-select. is_afternoon=1 keeps them hidden until morning is done.
 router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try { await ensureGradeCols(); } catch {}
 
   const today = new Date().toISOString().slice(0, 10);
-  const subjectCol: Record<string, string> = {
-    math: "math_grade", writing: "writing_grade", reading: "reading_grade", spelling: "reading_grade",
-  };
+
+  // 7 class-wide assignments spanning subjects + grade levels. NOT grade-
+  // targeted (target_grade_min stays NULL) so every kid sees every one.
+  const slots: Array<{ subject: "reading" | "math" | "writing" | "spelling"; grade: number }> = [
+    { subject: "reading",  grade: 3 },
+    { subject: "math",     grade: 3 },
+    { subject: "reading",  grade: 4 },
+    { subject: "math",     grade: 4 },
+    { subject: "writing",  grade: 4 },
+    { subject: "spelling", grade: 4 },
+    { subject: "math",     grade: 5 },
+  ];
 
   const created: any[] = [];
   const errors: string[] = [];
 
-  // For each core subject, find the grade levels actually present in this
-  // class and insert a PREMADE assignment per grade. Mirrors generate-today.
-  for (const subject of ["reading", "math", "writing", "spelling"] as const) {
-    const col = subjectCol[subject];
-    try {
-      const gradeLevels = await db.prepare(
-        `SELECT DISTINCT ${col} AS grade_level
-         FROM user_grade_levels ugl
-         JOIN class_members cm ON cm.user_id::text = ugl.user_id::text
-         WHERE cm.class_id::text = ? AND ${col} IS NOT NULL
-         ORDER BY grade_level`
-      ).all(classId) as any[];
-
-      // Fallback: if no grade levels are configured, default to grades 3, 4, 5
-      // so the teacher still gets work to hand out.
-      const grades = gradeLevels.length > 0
-        ? gradeLevels.map((r) => Number(r.grade_level)).filter((n) => Number.isFinite(n))
-        : [3, 4, 5];
-
-      for (const gradeNum of grades) {
-        const premade = PREMADE[subject]?.[gradeNum];
-        if (!premade) continue;
-        const id = crypto.randomUUID();
-        // Title prefix marks it as afternoon so teachers can spot dupes.
-        const title = `🌅 Afternoon — ${premade.title}`;
-        await db.prepare(
-          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed, is_afternoon)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
-        ).run(
-          id, classId, req.user!.id, title, premade.description,
-          JSON.stringify(premade.content),
-          subject, gradeNum, gradeNum, today,
-          JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
-        );
-        created.push({ id, title, subject, grade: gradeNum });
-      }
-    } catch (e: any) {
-      errors.push(`${subject}: ${e?.message}`);
+  for (const { subject, grade } of slots) {
+    const premade = PREMADE[subject]?.[grade];
+    if (!premade) {
+      errors.push(`${subject} G${grade}: no premade content`);
+      continue;
     }
-  }
-
-  // Add one class-wide SEL afternoon assignment for variety. Uses the same
-  // SEL_CONTENT bundle as generate-today.
-  try {
-    const id = crypto.randomUUID();
-    const title = `🌅 Afternoon — ${SEL_CONTENT.title}`;
-    await db.prepare(
-      `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed, is_afternoon)
-       VALUES (?, ?, ?, ?, ?, ?, 'sel', 1, 5, ?, ?, 1, 1)`
-    ).run(
-      id, classId, req.user!.id, title, SEL_CONTENT.description,
-      JSON.stringify(SEL_CONTENT.content), today,
-      JSON.stringify([{ label: "Reflection", maxPoints: 40 }]),
-    );
-    created.push({ id, title, subject: "sel" });
-  } catch (e: any) {
-    errors.push(`sel: ${e?.message}`);
+    try {
+      const id = crypto.randomUUID();
+      const title = `🌅 Afternoon — ${premade.title}`;
+      // target_grade_min/max intentionally NULL → assignment is class-wide.
+      await db.prepare(
+        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, scheduled_date, rubric, hints_allowed, is_afternoon)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+      ).run(
+        id, classId, req.user!.id, title, premade.description,
+        JSON.stringify(premade.content),
+        subject, today,
+        JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
+      );
+      created.push({ id, title, subject, grade });
+    } catch (e: any) {
+      errors.push(`${subject} G${grade}: ${e?.message}`);
+    }
   }
 
   res.json({ created: created.length, assignments: created, errors });
