@@ -160,8 +160,10 @@ async function generateDailyAssignmentContent(_client: any, opts: {
   questionType?: string;
   learningObjective?: string;
 }): Promise<{ title: string; content: any }> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) throw new Error("OPENROUTER_API_KEY not set");
+  // At least one provider must be configured; we pick which one further down.
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    throw new Error("Neither GEMINI_API_KEY nor OPENROUTER_API_KEY is set");
+  }
 
   const seed = hashString(`${opts.studentId}|${opts.date}|${opts.subject}`);
   const theme = WEEKLY_THEMES[seed % WEEKLY_THEMES.length];
@@ -196,10 +198,11 @@ Make this feel different from other days this week. Return ONLY JSON.`;
   if (process.env.GEMINI_API_KEY) {
     parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 1500 });
   } else {
+    const orKey = process.env.OPENROUTER_API_KEY!;
     const HARD_TIMEOUT_MS = 40_000;
     const fetchCall = fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { "Authorization": `Bearer ${orKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: AI_MODEL, max_tokens: 900,
         messages: [
@@ -911,7 +914,7 @@ router.post("/generate-slot", requireRole("teacher", "admin"), async (req: AuthR
   const client = await getAnthropic();
   if (!client) {
     console.log(`${tag} NO_KEY +${Date.now()-T0}ms`);
-    return res.status(503).json({ error: "OPENROUTER_API_KEY not set", code: "AI_NOT_CONFIGURED" });
+    return res.status(503).json({ error: "AI not configured: set GEMINI_API_KEY (or OPENROUTER_API_KEY) in Vercel env vars", code: "AI_NOT_CONFIGURED" });
   }
   console.log(`${tag} CLIENT_OK +${Date.now()-T0}ms`);
   try { await ensureGradeCols(); } catch (e: any) { console.log(`${tag} ENSURE_COLS_ERR +${Date.now()-T0}ms ${e?.message}`); }
