@@ -102,7 +102,7 @@ async function callGeminiJSON(systemPrompt: string, userPrompt: string, opts?: {
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     generationConfig: {
       responseMimeType: "application/json",
-      maxOutputTokens: opts?.maxTokens ?? 1500,
+      maxOutputTokens: opts?.maxTokens ?? 4096,
       temperature: opts?.temperature ?? 0.85,
     },
   };
@@ -130,7 +130,15 @@ async function callGeminiJSON(systemPrompt: string, userPrompt: string, opts?: {
   let raw: string = (cand.content?.parts || []).map((p: any) => p?.text || "").join("").trim();
   if (!raw) throw new Error("gemini blank text");
   if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (e: any) {
+    // Truncation tells us we hit the token cap before the JSON closed.
+    if (cand.finishReason === "MAX_TOKENS") {
+      throw new Error(`gemini hit MAX_TOKENS (${opts?.maxTokens ?? 4096}) before JSON closed; raise the cap`);
+    }
+    throw new Error(`gemini bad JSON: ${e?.message}; raw_len=${raw.length}`);
+  }
 }
 
 function hashString(s: string): number {
@@ -196,7 +204,7 @@ Make this feel different from other days this week. Return ONLY JSON.`;
   // fallback so deploys without Gemini configured keep working.
   let parsed: any;
   if (process.env.GEMINI_API_KEY) {
-    parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 1500 });
+    parsed = await callGeminiJSON(systemPrompt, userPrompt, { maxTokens: 4096 });
   } else {
     const orKey = process.env.OPENROUTER_API_KEY!;
     const HARD_TIMEOUT_MS = 40_000;
@@ -1503,7 +1511,7 @@ router.post("/:id/adjust-difficulty", requireRole("teacher", "admin"), async (re
     const userAdj = `Current task JSON:\n${JSON.stringify(current)}\n\n${directive}\nFor every multiple_choice question, keep the correctIndex field valid. Return ONLY the new JSON.`;
     let next: any;
     if (process.env.GEMINI_API_KEY) {
-      next = await callGeminiJSON(sysAdj, userAdj, { maxTokens: 1500 });
+      next = await callGeminiJSON(sysAdj, userAdj, { maxTokens: 4096 });
     } else {
       const orKey = process.env.OPENROUTER_API_KEY!;
       const fetchCall2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
