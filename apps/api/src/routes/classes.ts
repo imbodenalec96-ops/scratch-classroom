@@ -1421,15 +1421,28 @@ router.post("/:classId/timer/set", requireRole("teacher", "admin"), async (req: 
     let ends_at: string | null = null;
     let remaining_ms: number | null = null;
     const now = Date.now();
-    const usedDuration = action === "set" || !existing ? durationMs : existing.duration_ms;
+    // For 'set' AND 'start', the teacher is explicitly choosing how long
+    // the timer should run, so use the minutes they just passed. Old code
+    // only honored the new minutes for 'set', meaning clicking Start with
+    // a different slider value silently reused the previous duration.
+    const usedDuration = (action === "set" || action === "start" || !existing)
+      ? durationMs
+      : existing.duration_ms;
 
     if (action === "start") {
       state = "running";
       ends_at = new Date(now + usedDuration).toISOString();
       remaining_ms = null;
-    } else if (action === "resume" && existing?.remaining_ms != null) {
+    } else if (action === "resume" && existing?.remaining_ms != null && existing.remaining_ms > 0) {
+      // Resume from where we paused
       state = "running";
       ends_at = new Date(now + existing.remaining_ms).toISOString();
+      remaining_ms = null;
+    } else if (action === "resume") {
+      // No paused state to resume from — treat as a fresh start using
+      // the slider value
+      state = "running";
+      ends_at = new Date(now + usedDuration).toISOString();
       remaining_ms = null;
     } else if (action === "pause" && existing?.ends_at) {
       const left = Math.max(0, new Date(existing.ends_at).getTime() - now);
