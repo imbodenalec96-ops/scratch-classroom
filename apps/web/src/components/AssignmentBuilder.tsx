@@ -387,20 +387,47 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     setAnswers((prev) => ({ ...prev, [currentQ]: value }));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentQ < total - 1) {
       // Check if current answer is correct before advancing
       const q = allQuestions[currentQ]?.q;
       const currentAnswer = answers[currentQ] ?? "";
 
-      if (!isAnswerCorrect(q, currentAnswer)) {
-        // Answer is wrong or unanswered — show feedback
-        if (!currentAnswer || !currentAnswer.trim()) {
-          setFeedback("Please answer the question before continuing.");
-        } else {
-          setFeedback("That answer is not quite right. Try again!");
+      if (!currentAnswer || !currentAnswer.trim()) {
+        setFeedback("Please answer the question before continuing.");
+        setTimeout(() => setFeedback(""), 3000);
+        return;
+      }
+
+      let pass = isAnswerCorrect(q, currentAnswer);
+
+      // For short-answer / fill-in questions where the literal match
+      // failed, ask Claude whether the student's wording captures the
+      // same idea. Multiple choice and spelling stay strict — those
+      // have a single right answer. We only ask the AI when there's
+      // a meaningful sentence to evaluate (3+ words).
+      const isMC = q?.type === "multiple_choice" && Array.isArray(q?.options);
+      const isSpelling = !isMC && /spell(?:\s+the\s+word)?[:\s]+\S+/i.test(q?.text || "");
+      const wordCount = currentAnswer.trim().split(/\s+/).filter(Boolean).length;
+
+      if (!pass && !isMC && !isSpelling && wordCount >= 3) {
+        try {
+          setFeedback("Checking your answer…");
+          const verdict = await api.aiVerifyAnswer(
+            String(q?.text || ""),
+            String(q?.correctAnswer || ""),
+            currentAnswer,
+          );
+          if (verdict?.close) pass = true;
+        } catch {
+          // AI unreachable → be lenient; long-form answers shouldn't
+          // wedge a kid because the API is flaky.
+          if (wordCount >= 5) pass = true;
         }
-        // Clear feedback after 3 seconds
+      }
+
+      if (!pass) {
+        setFeedback("That answer is not quite right. Try again!");
         setTimeout(() => setFeedback(""), 3000);
         return;
       }

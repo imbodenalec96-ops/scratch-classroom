@@ -2247,10 +2247,29 @@ const PREMADE: Record<string, Record<number, { title: string; description: strin
   },
 };
 
+// SEL — text-based lesson, no embedded YouTube. The previous video_url
+// (YouTube ID 2zrtHt3bBmQ) was showing students unrelated content
+// (off-topic clip / recommendation surface), so the SEL bundle now mirrors
+// the History/Science/Vocab format: short reading + 5 questions, all
+// elementary-readable and on-topic.
 const SEL_CONTENT = {
   title: "Growth Mindset: Learning from Challenges",
-  description: "Watch a video about growth mindset and reflect on learning.",
-  content: { title: "Growth Mindset: Learning from Challenges", subject: "Social-Emotional Learning", grade: "All Grades", instructions: "Watch the video about growth mindset. Then answer the reflection questions.", totalPoints: 40, video_url: "https://www.youtube.com/watch?v=2zrtHt3bBmQ", sections: [{ title: "Growth Mindset Reflection", questions: [{ type: "multiple_choice", text: "What is a growth mindset?", options: ["A. Believing you can't change", "B. Believing you can learn and grow with effort", "C. Giving up when something is hard", "D. Being afraid of mistakes"], correctIndex: 1, points: 10 }, { type: "short_answer", text: "Describe a time when you faced a challenge and learned from it.", lines: 4, points: 15 }, { type: "short_answer", text: "What's one thing you want to get better at? How will you use a growth mindset to help?", lines: 4, points: 15 }] }] },
+  description: "Read about growth mindset and reflect on how you learn.",
+  content: {
+    title: "Growth Mindset: Learning from Challenges",
+    subject: "Social-Emotional Learning",
+    grade: "All Grades",
+    instructions: "Read the lesson, then answer the questions.",
+    totalPoints: 50,
+    lesson: "Your brain is like a muscle — it gets stronger when you use it. People with a GROWTH MINDSET believe they can get smarter and better at things by practicing, even when something feels hard. People with a FIXED MINDSET think they're either good or bad at something and that won't change. The truth is, when you make mistakes, your brain is actually growing. The word 'YET' is powerful: instead of saying 'I can't do this,' say 'I can't do this YET.' Trying hard things, asking for help, and learning from mistakes are exactly how growth happens.",
+    sections: [{ title: "Growth Mindset Practice", questions: [
+      { type: "multiple_choice", text: "What is a growth mindset?", options: ["A. Believing you can't change", "B. Believing you can learn and grow with effort", "C. Giving up when something is hard", "D. Being afraid of mistakes"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What happens to your brain when you make a mistake and try again?", options: ["A. It gets weaker", "B. Nothing happens", "C. It grows stronger", "D. It forgets"], correctIndex: 2, points: 10, hint: "Re-read the part about your brain being a muscle." },
+      { type: "multiple_choice", text: "Which sentence shows a growth mindset?", options: ["A. I'm bad at math.", "B. I can't do this.", "C. I'll never learn this.", "D. I can't do this YET."], correctIndex: 3, points: 10, hint: "Look for the magic word." },
+      { type: "short_answer", text: "Describe a time you faced a challenge and learned from it. (1–2 sentences)", correctAnswer: "any specific personal story about overcoming a challenge", points: 10, lines: 3 },
+      { type: "short_answer", text: "What's one thing you want to get better at, and how will you practice it?", correctAnswer: "any specific goal with a practice plan", points: 10, lines: 3 },
+    ] }],
+  },
 };
 
 // History / Science / Vocabulary — class-wide assignments (grades 1–5)
@@ -2369,11 +2388,37 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 
   for (const cw of classWideSubjects) {
     try {
+      // Refresh-in-place rather than skip: the bundle definitions are
+      // edited from time to time (e.g. SEL switching from YouTube to a
+      // text lesson) and we want clicking Generate Today to actually
+      // pull in the new content for un-submitted rows. We only update
+      // rows that have NO submissions yet, so we never overwrite work
+      // a student already turned in.
       const existing: any = await db.prepare(
-        `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND scheduled_date IS NULL LIMIT 1`
+        `SELECT id::text AS id FROM assignments
+         WHERE class_id::text = ? AND target_subject = ? AND scheduled_date IS NULL
+         LIMIT 1`
       ).get(classId, cw.key);
       if (existing) {
-        created.push({ title: cw.bundle.title, subject: cw.key, skipped: true });
+        const hasSubs: any = await db.prepare(
+          `SELECT 1 AS x FROM submissions WHERE assignment_id::text = ? LIMIT 1`
+        ).get(existing.id);
+        if (hasSubs) {
+          created.push({ title: cw.bundle.title, subject: cw.key, skipped: "has submissions" });
+          continue;
+        }
+        await db.prepare(
+          `UPDATE assignments
+             SET title = ?, description = ?, content = ?, rubric = ?
+           WHERE id::text = ?`
+        ).run(
+          cw.bundle.title,
+          cw.bundle.description,
+          JSON.stringify(cw.bundle.content),
+          JSON.stringify([{ label: cw.key === "sel" ? "Reflection" : "Correctness", maxPoints: cw.rubric }]),
+          existing.id,
+        );
+        created.push({ id: existing.id, title: cw.bundle.title, subject: cw.key, refreshed: true });
         continue;
       }
       const id = crypto.randomUUID();

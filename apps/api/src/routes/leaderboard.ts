@@ -144,21 +144,49 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       perfectCount = Number(perfect?.n ?? 0);
     } catch {}
 
-    // Distinct subjects this student has completed
+    // Distinct subjects this student has completed AND per-subject counts
+    // for the four "_master" badges (10 in a single subject = mastery).
     let distinctSubjects = new Set<string>();
+    const subjectCounts: Record<string, number> = { reading: 0, math: 0, writing: 0, spelling: 0 };
     try {
       const subjects: any[] = await db.prepare(
-        `SELECT DISTINCT LOWER(a.target_subject) AS subject
+        `SELECT LOWER(a.target_subject) AS subject, COUNT(*)::int AS n
          FROM submissions s
          JOIN assignments a ON a.id::text = s.assignment_id::text
-         WHERE s.student_id::text = ? AND a.target_subject IS NOT NULL`
+         WHERE s.student_id::text = ? AND a.target_subject IS NOT NULL
+         GROUP BY 1`
       ).all(userId);
       for (const r of subjects) {
-        if (r?.subject) distinctSubjects.add(r.subject);
+        if (r?.subject) {
+          distinctSubjects.add(r.subject);
+          if (r.subject in subjectCounts) subjectCounts[r.subject] = Number(r.n) || 0;
+        }
       }
     } catch {}
     const hasAllCoreSubjects =
       ["reading", "math", "writing", "spelling"].every((s) => distinctSubjects.has(s));
+
+    // Submission-day streak (consecutive Pacific school days with at
+    // least one submission, ending today or yesterday). Cheap calc:
+    // pull the last 14 distinct submission dates and walk backward.
+    let streakDays = 0;
+    try {
+      const dates: any[] = await db.prepare(
+        `SELECT DISTINCT SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) AS d
+         FROM submissions WHERE student_id::text = ?
+         ORDER BY d DESC LIMIT 14`
+      ).all(userId);
+      const set = new Set(dates.map((r: any) => r.d));
+      const todayStr = new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 7 * 3600_000 - 86_400_000).toISOString().slice(0, 10);
+      let cursor = set.has(todayStr) ? todayStr : (set.has(yesterday) ? yesterday : null);
+      while (cursor && set.has(cursor)) {
+        streakDays += 1;
+        const d = new Date(cursor + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 1);
+        cursor = d.toISOString().slice(0, 10);
+      }
+    } catch {}
 
     // Ensure leaderboard row exists
     let row: any = await db.prepare("SELECT * FROM leaderboard WHERE user_id = ?").get(userId);
@@ -174,16 +202,31 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     // are returned in the awarded payload so the client can render a
     // celebratory toast.
     const milestones: Array<{ id: string; label: string; icon: string; when: boolean }> = [
+      // Volume tier
       { id: "first_assignment", icon: "🎯", label: "First One Done",     when: submittedCount >= 1 },
       { id: "5_assignments",    icon: "🔥", label: "On a Roll",          when: submittedCount >= 5 },
       { id: "10_assignments",   icon: "⭐", label: "Star Student",       when: submittedCount >= 10 },
       { id: "25_assignments",   icon: "🏆", label: "Champion",           when: submittedCount >= 25 },
       { id: "50_assignments",   icon: "💎", label: "Diamond Worker",     when: submittedCount >= 50 },
       { id: "100_assignments",  icon: "👑", label: "Hall of Fame",       when: submittedCount >= 100 },
+      // Quality tier
       { id: "perfect_score",    icon: "💯", label: "Perfect Score",      when: perfectCount >= 1 },
+      { id: "3_perfect",        icon: "✨", label: "Triple Perfect",     when: perfectCount >= 3 },
+      { id: "10_perfect",       icon: "🥇", label: "Always Right",       when: perfectCount >= 10 },
+      { id: "all_subjects",     icon: "🌟", label: "Well Rounded",       when: hasAllCoreSubjects },
+      // Daily push
       { id: "3_in_a_day",       icon: "⚡", label: "Speedster",          when: todayCount >= 3 },
       { id: "5_in_a_day",       icon: "🚀", label: "Power Day",          when: todayCount >= 5 },
-      { id: "all_subjects",     icon: "🌟", label: "Well Rounded",       when: hasAllCoreSubjects },
+      { id: "7_in_a_day",       icon: "🌪️", label: "Tornado Day",       when: todayCount >= 7 },
+      // Subject masters (10 in a single subject)
+      { id: "reading_master",   icon: "📚", label: "Reading Master",     when: subjectCounts.reading  >= 10 },
+      { id: "math_master",      icon: "🔢", label: "Math Master",        when: subjectCounts.math     >= 10 },
+      { id: "writing_master",   icon: "✍️", label: "Writing Master",     when: subjectCounts.writing  >= 10 },
+      { id: "spelling_master",  icon: "🔤", label: "Spelling Master",    when: subjectCounts.spelling >= 10 },
+      // Streaks
+      { id: "streak_3",         icon: "📅", label: "3-Day Streak",       when: streakDays >= 3 },
+      { id: "streak_5",         icon: "🔥", label: "5-Day Streak",       when: streakDays >= 5 },
+      { id: "streak_10",        icon: "🏅", label: "10-Day Streak",      when: streakDays >= 10 },
     ];
 
     const awarded: Array<{ id: string; label: string; icon: string }> = [];
@@ -225,21 +268,37 @@ async function ensureBadgeClaims() {
   } catch { badgeClaimsReady = true; }
 }
 
-// Per-badge point payouts. Tiered by milestone difficulty so kids feel
-// the bigger achievements are worth more without 25 being the floor.
+// Per-badge point payouts. Capped at 10 so badges don't dwarf the
+// classroom-points teachers hand out manually for behavior. Smaller
+// milestones pay less; bigger ones still cap at the ceiling.
 const BADGE_POINTS: Record<string, number> = {
-  first_assignment: 5,
+  // Volume
+  first_assignment:  3,
   "5_assignments":   5,
-  "3_in_a_day":      5,
-  perfect_score:    10,
-  "10_assignments": 10,
-  "5_in_a_day":     10,
-  "25_assignments": 15,
-  all_subjects:     15,
-  "50_assignments": 20,
-  "100_assignments":25,
+  "10_assignments":  6,
+  "25_assignments":  8,
+  "50_assignments": 10,
+  "100_assignments":10,
+  // Quality / variety
+  perfect_score:     5,
+  "3_perfect":       8,
+  "10_perfect":     10,
+  all_subjects:      8,
+  // Daily push
+  "3_in_a_day":      4,
+  "5_in_a_day":      6,
+  "7_in_a_day":      8,
+  // Subject mastery
+  reading_master:    8,
+  math_master:       8,
+  writing_master:    8,
+  spelling_master:   8,
+  // Streak
+  streak_3:          5,
+  streak_5:          8,
+  streak_10:        10,
 };
-const DEFAULT_BADGE_POINTS = 5;
+const DEFAULT_BADGE_POINTS = 3;
 
 router.post("/claim-badge", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });

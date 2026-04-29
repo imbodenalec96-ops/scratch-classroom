@@ -269,6 +269,11 @@ export const api = {
   aiGenerateProject: (prompt: string) => request<any>("/ai/generate-project", { method: "POST", body: JSON.stringify({ prompt }) }),
   aiGenerateQuiz: (topic: string, count = 5, subject?: string, grade?: string) =>
     request<any>("/ai/generate-quiz", { method: "POST", body: JSON.stringify({ topic, count, subject, grade }) }),
+  aiVerifyAnswer: (question: string, expected: string, answer: string) =>
+    request<{ close: boolean; reason: string }>("/ai/verify-answer", {
+      method: "POST",
+      body: JSON.stringify({ question, expected, answer }),
+    }),
 
   // Upload
   upload: async (file: File) => {

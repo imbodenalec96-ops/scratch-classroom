@@ -158,6 +158,96 @@ router.post("/generate-blocks", async (req: AuthRequest, res: Response) => {
   res.json({ blocks: blocks.slice(0, 10) });
 });
 
+// AI-lenient short-answer verification. Used by the student work flow
+// when the literal exact-match check fails: instead of telling a kid
+// they're wrong because they wrote "the bald eagle is strong and free"
+// vs the canonical "strong free lives only in north america", we ask
+// Claude whether the meaning matches and let them advance if it does.
+//
+// Body: { question, expected, answer }
+// Returns: { close: boolean, reason: string }
+router.post("/verify-answer", async (req: AuthRequest, res: Response) => {
+  const question = String(req.body?.question || "").trim().slice(0, 500);
+  const expected = String(req.body?.expected || "").trim().slice(0, 500);
+  const answer   = String(req.body?.answer   || "").trim().slice(0, 1000);
+  if (!question || !answer) {
+    return res.json({ close: false, reason: "missing question or answer" });
+  }
+
+  // Cheap shortcuts before paying for AI:
+  //  - empty answer → not close
+  //  - exact normalized match → already would have passed client-side,
+  //    but be safe in case caller hits this directly.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  if (norm(answer) === norm(expected)) return res.json({ close: true, reason: "exact" });
+  // For "any sentence using X" prompts (used by vocab/SEL), accept any
+  // answer of at least 3 words that contains the keyword if obvious.
+  const anyMatch = /^any sentence using (\S+)/i.exec(expected);
+  if (anyMatch) {
+    const w = anyMatch[1].toLowerCase();
+    const wordOK = norm(answer).split(" ").includes(w);
+    const longEnough = norm(answer).split(" ").length >= 3;
+    if (wordOK && longEnough) return res.json({ close: true, reason: "uses keyword in a sentence" });
+  }
+
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_KEY) {
+    // No AI available — be lenient on anything 5+ words long, since
+    // we'd rather let kids advance than get them stuck. Teachers still
+    // grade for real on the gradebook side.
+    const wordCount = norm(answer).split(" ").filter(Boolean).length;
+    return res.json({
+      close: wordCount >= 5,
+      reason: wordCount >= 5 ? "no AI; long enough to pass" : "no AI; too short",
+    });
+  }
+
+  try {
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    const prompt = [
+      "You are grading an elementary-school short-answer question.",
+      "Decide whether the student's answer demonstrates the same understanding as the expected answer.",
+      "Be GENEROUS: kids' spelling, grammar, and word choice are imperfect. If the meaning is right, accept it.",
+      "Reject only if the answer is off-topic, blank, gibberish, or factually wrong.",
+      "",
+      `QUESTION: ${question}`,
+      `EXPECTED: ${expected || "(any thoughtful, on-topic answer is acceptable)"}`,
+      `STUDENT ANSWER: ${answer}`,
+      "",
+      'Respond with strict JSON: {"close": true|false, "reason": "<one short sentence>"}',
+    ].join("\n");
+
+    const result = await Promise.race([
+      client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 120,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("verify timeout")), 8000)),
+    ]);
+
+    const text = (result as any).content?.[0]?.text || "";
+    let parsed: any = null;
+    try {
+      const m = text.match(/\{[\s\S]*\}/);
+      parsed = m ? JSON.parse(m[0]) : null;
+    } catch {}
+    if (!parsed) {
+      // Default to lenient on parse failure — better to let a kid through
+      // than to wedge them on a vague answer.
+      return res.json({ close: true, reason: "ai parse failed, accepted" });
+    }
+    return res.json({
+      close: !!parsed.close,
+      reason: String(parsed.reason || "").slice(0, 160),
+    });
+  } catch (e: any) {
+    console.error("[ai/verify-answer]", e?.message || e);
+    // Fail open — same reasoning as parse-failure above.
+    return res.json({ close: true, reason: "ai unavailable, accepted" });
+  }
+});
+
 // AI quiz generator
 router.post("/generate-quiz", async (req: AuthRequest, res: Response) => {
   const { topic, count, subject, grade } = req.body;

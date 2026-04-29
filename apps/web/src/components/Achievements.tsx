@@ -7,16 +7,31 @@ import { useNavigate } from "react-router-dom";
 // Assignment-only achievements. IDs match what /leaderboard/auto-award
 // awards on the server, so cards light up automatically as kids hit them.
 const ALL_BADGES = [
-  { id: "first_assignment",   icon: "🎯", label: "First One Done",      desc: "Finished your first assignment" },
-  { id: "5_assignments",      icon: "🔥", label: "On a Roll",            desc: "Finished 5 assignments" },
-  { id: "10_assignments",     icon: "⭐", label: "Star Student",         desc: "Finished 10 assignments" },
-  { id: "25_assignments",     icon: "🏆", label: "Champion",             desc: "Finished 25 assignments" },
-  { id: "50_assignments",     icon: "💎", label: "Diamond Worker",       desc: "Finished 50 assignments" },
-  { id: "100_assignments",    icon: "👑", label: "Hall of Fame",         desc: "Finished 100 assignments" },
-  { id: "perfect_score",      icon: "💯", label: "Perfect Score",        desc: "Got 100% on an assignment" },
-  { id: "3_in_a_day",         icon: "⚡", label: "Speedster",            desc: "Finished 3 assignments in one day" },
-  { id: "5_in_a_day",         icon: "🚀", label: "Power Day",            desc: "Finished 5 assignments in one day" },
-  { id: "all_subjects",       icon: "🌟", label: "Well Rounded",         desc: "Finished an assignment in every subject" },
+  // Volume
+  { id: "first_assignment",   icon: "🎯",  label: "First One Done",  desc: "Finished your first assignment" },
+  { id: "5_assignments",      icon: "🔥",  label: "On a Roll",        desc: "Finished 5 assignments" },
+  { id: "10_assignments",     icon: "⭐",  label: "Star Student",     desc: "Finished 10 assignments" },
+  { id: "25_assignments",     icon: "🏆",  label: "Champion",         desc: "Finished 25 assignments" },
+  { id: "50_assignments",     icon: "💎",  label: "Diamond Worker",   desc: "Finished 50 assignments" },
+  { id: "100_assignments",    icon: "👑",  label: "Hall of Fame",     desc: "Finished 100 assignments" },
+  // Quality
+  { id: "perfect_score",      icon: "💯",  label: "Perfect Score",    desc: "Got 100% on an assignment" },
+  { id: "3_perfect",          icon: "✨",  label: "Triple Perfect",   desc: "Got 100% three times" },
+  { id: "10_perfect",         icon: "🥇",  label: "Always Right",     desc: "Got 100% ten times" },
+  { id: "all_subjects",       icon: "🌟",  label: "Well Rounded",     desc: "Finished an assignment in every subject" },
+  // Daily push
+  { id: "3_in_a_day",         icon: "⚡",  label: "Speedster",        desc: "Finished 3 assignments in one day" },
+  { id: "5_in_a_day",         icon: "🚀",  label: "Power Day",        desc: "Finished 5 assignments in one day" },
+  { id: "7_in_a_day",         icon: "🌪️", label: "Tornado Day",      desc: "Finished 7 assignments in one day" },
+  // Subject masters
+  { id: "reading_master",     icon: "📚",  label: "Reading Master",   desc: "Finished 10 reading assignments" },
+  { id: "math_master",        icon: "🔢",  label: "Math Master",      desc: "Finished 10 math assignments" },
+  { id: "writing_master",     icon: "✍️",  label: "Writing Master",   desc: "Finished 10 writing assignments" },
+  { id: "spelling_master",    icon: "🔤",  label: "Spelling Master",  desc: "Finished 10 spelling assignments" },
+  // Streaks
+  { id: "streak_3",           icon: "📅",  label: "3-Day Streak",     desc: "Submitted on 3 days in a row" },
+  { id: "streak_5",           icon: "🔥",  label: "5-Day Streak",     desc: "Submitted on 5 days in a row" },
+  { id: "streak_10",          icon: "🏅",  label: "10-Day Streak",    desc: "Submitted on 10 days in a row" },
 ];
 
 export default function Achievements() {
