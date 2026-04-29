@@ -2213,6 +2213,7 @@ const PREMADE: Record<string, Record<number, { title: string; description: strin
     1: { title: "1st Grade Reading: Simple Words", description: "Read simple sight words and answer questions.", content: { title: "Simple Words", subject: "Reading", grade: "1st Grade", instructions: "Read each question carefully and choose the best answer.", totalPoints: 30, sections: [{ title: "Sight Word Practice", questions: [{ type: "multiple_choice", text: "Which word names a furry pet that says 'meow'?", options: ["A. dog", "B. cat", "C. bird", "D. fish"], correctIndex: 1, points: 6 }, { type: "multiple_choice", text: "Which word names a fruit that is red and grows on trees?", options: ["A. orange", "B. apple", "C. banana", "D. grape"], correctIndex: 1, points: 6 }, { type: "multiple_choice", text: "Which word names the color of fire trucks and stop signs?", options: ["A. blue", "B. green", "C. red", "D. yellow"], correctIndex: 2, points: 6 }, { type: "multiple_choice", text: "Which animal is the smallest?", options: ["A. elephant", "B. whale", "C. ant", "D. giraffe"], correctIndex: 2, points: 6 }, { type: "short_answer", text: "What color is the sun?", correctAnswer: "yellow or gold", points: 6 }] }] } },
     2: { title: "2nd Grade Reading: CVC Words", description: "Read consonant-vowel-consonant words.", content: { title: "CVC Words", subject: "Reading", grade: "2nd Grade", instructions: "Read each CVC word and answer the question.", totalPoints: 40, sections: [{ title: "CVC Word Reading", questions: [{ type: "multiple_choice", text: "What does 'cat' rhyme with?", options: ["A. dog", "B. bat", "C. tree", "D. run"], correctIndex: 1, points: 8 }, { type: "multiple_choice", text: "What is a 'hat'?", options: ["A. you wear on your foot", "B. you wear on your head", "C. you sit on", "D. you eat"], correctIndex: 1, points: 8 }, { type: "fill_blank", text: "A 'pot' is something you use to ___.", correctAnswer: "cook", points: 8 }, { type: "fill_blank", text: "When you 'run' you are moving ___.", correctAnswer: "fast or quickly", points: 8 }, { type: "short_answer", text: "What does 'sit' mean?", correctAnswer: "to be in a chair or down", points: 8 }] }] } },
     3: { title: "3rd Grade Reading: Short Stories", description: "Read and comprehend a short story.", content: { title: "Short Story: Max's Adventure", subject: "Reading", grade: "3rd Grade", instructions: "Read the story and answer the questions.", totalPoints: 50, sections: [{ title: "Story Comprehension", questions: [{ type: "multiple_choice", text: "Who is the main character in the story?", options: ["A. Sarah", "B. Max", "C. Tom", "D. Lisa"], correctIndex: 1, points: 10 }, { type: "multiple_choice", text: "What does Max find in the forest?", options: ["A. a key", "B. a map", "C. a treasure", "D. a friend"], correctIndex: 1, points: 10 }, { type: "fill_blank", text: "Max was _____ when he found something interesting.", correctAnswer: "excited or happy", points: 10 }, { type: "short_answer", text: "What did Max do after finding the treasure?", correctAnswer: "shared it or brought it home", points: 10 }, { type: "short_answer", text: "What is the lesson of this story?", correctAnswer: "adventure or exploration or curiosity", points: 10 }] }] } },
+    4: { title: "4th Grade Reading: Main Idea & Details", description: "Identify the main idea and supporting details in a passage.", content: { title: "The Lighthouse Keeper", subject: "Reading", grade: "4th Grade", instructions: "Read the passage carefully, then answer the questions.", totalPoints: 50, sections: [{ title: "Main Idea Practice", passage: "Mr. Davis was the lighthouse keeper on Stormy Point. Every night, no matter the weather, he climbed the 87 stone steps to light the great lamp. The bright beam swept across the sea, warning ships about the rocky shore below. Sailors said his steady light had saved hundreds of boats over the years. Mr. Davis was proud of his work, but what he loved most was hearing the captains shout 'Thank you!' from their decks as they passed safely by.", questions: [{ type: "multiple_choice", text: "What is the main idea of this passage?", options: ["A. Lighthouses have many steps", "B. Mr. Davis works as a lighthouse keeper and helps sailors", "C. Stormy Point has rocky shores", "D. Captains like to shout"], correctIndex: 1, points: 10, hint: "What is the WHOLE passage mostly about?" }, { type: "multiple_choice", text: "How many steps does Mr. Davis climb each night?", options: ["A. 7", "B. 47", "C. 87", "D. 187"], correctIndex: 2, points: 10, hint: "Look in the second sentence." }, { type: "multiple_choice", text: "Why does the lighthouse light matter?", options: ["A. It looks pretty", "B. It warns ships about rocks", "C. It heats Mr. Davis's house", "D. It scares away seagulls"], correctIndex: 1, points: 10 }, { type: "short_answer", text: "What does Mr. Davis love most about his job?", correctAnswer: "hearing captains shout thank you", points: 10, lines: 2 }, { type: "short_answer", text: "Use one detail from the passage to support the main idea.", correctAnswer: "any supporting detail", points: 10, lines: 2 }] }] } },
     5: { title: "5th Grade Reading: Complex Passage", description: "Read and analyze a complex narrative.", content: { title: "Complex Passage: The Island Mystery", subject: "Reading", grade: "5th Grade", instructions: "Read the passage carefully. Answer the questions based on details from the text.", totalPoints: 60, sections: [{ title: "Reading Comprehension & Analysis", questions: [{ type: "multiple_choice", text: "What was the narrator's primary motivation for exploring the island?", options: ["A. to find treasure", "B. to discover an ancient civilization", "C. curiosity and adventure", "D. to escape from society"], correctIndex: 2, points: 12 }, { type: "multiple_choice", text: "How did the environment of the island affect the story?", options: ["A. it had no effect", "B. it created challenges and mysteries", "C. it was purely decorative", "D. it was hostile"], correctIndex: 1, points: 12 }, { type: "fill_blank", text: "The ancient structures suggested that the island was once _____ by a civilization.", correctAnswer: "inhabited or occupied", points: 12 }, { type: "short_answer", text: "What is the author's tone in describing the discovery?", correctAnswer: "curious, thoughtful, or reverent", points: 12 }, { type: "short_answer", text: "What does this story suggest about human curiosity and exploration?", correctAnswer: "it drives discovery or it reveals history", points: 12 }] }] } },
   },
   math: {
@@ -2315,35 +2316,25 @@ const VOCABULARY_CONTENT = {
 // based on each student's grade level. Uses pre-written content — no AI required.
 router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
-  const subjectCol: Record<string, string> = { math: "math_grade", writing: "writing_grade", reading: "reading_grade", spelling: "reading_grade" };
 
   const created: any[] = [];
   const errors: string[] = [];
 
-  // Insert per-grade assignments for reading, math, writing, spelling
+  // Iterate ALL grades 1–5 for each core subject. Previously we only
+  // generated for grades that already had a student row in
+  // user_grade_levels — so if a student's grade was changed AFTER the
+  // first Generate Today run, no assignment ever got created for their
+  // new grade. Now we cover the full elementary range up front; grade
+  // targeting still ensures only matching students see each row.
   for (const subject of ["reading", "math", "writing", "spelling"] as const) {
-    const col = subjectCol[subject];
-    try {
-      const gradeLevels = await db.prepare(
-        `SELECT DISTINCT ${col} AS grade_level
-         FROM user_grade_levels ugl
-         JOIN class_members cm ON cm.user_id::text = ugl.user_id::text
-         WHERE cm.class_id::text = ? AND ${col} IS NOT NULL
-         ORDER BY grade_level`
-      ).all(classId) as any[];
-
-      for (const { grade_level } of gradeLevels) {
-        if (grade_level === null || grade_level === undefined) continue;
-        const gradeNum = Number(grade_level);
+    for (const gradeNum of [1, 2, 3, 4, 5]) {
+      try {
         const premade = PREMADE[subject]?.[gradeNum];
-        if (!premade) continue; // no pre-made content for this grade
-
-        // Skip if already exists (no scheduled_date = always-on)
+        if (!premade) continue;
         const existing: any = await db.prepare(
           `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
         ).get(classId, subject, gradeNum);
         if (existing) { created.push({ title: premade.title, skipped: true }); continue; }
-
         const id = crypto.randomUUID();
         await db.prepare(
           `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
@@ -2354,9 +2345,9 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
           JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
         );
         created.push({ id, title: premade.title, grade: gradeNum, subject });
+      } catch (e: any) {
+        errors.push(`${subject} G${gradeNum}: ${e?.message}`);
       }
-    } catch (e: any) {
-      errors.push(`${subject}: ${e?.message}`);
     }
   }
 
