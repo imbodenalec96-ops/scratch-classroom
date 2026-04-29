@@ -282,64 +282,83 @@ router.get("/me/stars", async (req: AuthRequest, res: Response) => {
 router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try {
+    // Pacific day for today/today-only queries
+    const todayStr = new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10);
+
     // All students in this class
-    const students = await db.prepare(
-      `SELECT u.id, u.name FROM users u
-       JOIN class_members cm ON cm.user_id::text = u.id::text
-       WHERE cm.class_id::text = ? AND u.role = 'student'`
-    ).all(classId) as any[];
+    let students: any[] = [];
+    try {
+      students = await db.prepare(
+        `SELECT u.id, u.name FROM users u
+         JOIN class_members cm ON cm.user_id::text = u.id::text
+         WHERE cm.class_id::text = ? AND u.role = 'student'`
+      ).all(classId) as any[];
+    } catch (e: any) {
+      console.error("[live-progress students]", e?.message);
+    }
     const totalStudents = students.length;
 
-    // Today's submissions per student (Pacific day)
-    const todayStr = new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10);
-    const subRows = await db.prepare(
-      `SELECT s.student_id::text AS student_id, COUNT(*)::int AS n
-       FROM submissions s
-       JOIN assignments a ON a.id::text = s.assignment_id::text
-       WHERE a.class_id::text = ?
-         AND COALESCE(s.submitted_at, s.created_at) >= ?
-       GROUP BY s.student_id`
-    ).all(classId, `${todayStr}T00:00:00`).catch(() => []) as any[];
-    const subsByStudent = new Map<string, number>();
-    for (const r of subRows) subsByStudent.set(String(r.student_id), Number(r.n));
+    // Today's submission count per student (any class assignment)
+    let subsByStudent = new Map<string, number>();
+    try {
+      const subRows = await db.prepare(
+        `SELECT s.student_id::text AS student_id, COUNT(*)::int AS n
+         FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE a.class_id::text = ?
+           AND SUBSTR(COALESCE(s.submitted_at, s.created_at)::text, 1, 10) = ?
+         GROUP BY s.student_id`
+      ).all(classId, todayStr) as any[];
+      for (const r of subRows) subsByStudent.set(String(r.student_id), Number(r.n));
+    } catch (e: any) {
+      console.error("[live-progress subs]", e?.message);
+    }
 
-    // A student is "done" if they have no rows in the pending query result.
-    // Rather than re-running the full pending logic per student here, we
-    // approximate with: at least one submission today AND no class-wide
-    // assignment without a submission. The board only needs a directional
-    // progress %, not exactness — keep the query cheap.
-    const openAssignments = await db.prepare(
-      `SELECT id::text AS id FROM assignments
-       WHERE class_id::text = ?
-         AND (scheduled_date IS NULL OR scheduled_date = ?)
-         AND COALESCE(is_afternoon, 0) = 0`
-    ).all(classId, todayStr).catch(() => []) as any[];
+    // Open (pending-eligible) assignments today. SUBSTR(...) normalizes
+    // ISO timestamps so the date comparison works whether scheduled_date
+    // is stored as 'YYYY-MM-DD' or '2026-04-29T00:00:00'.
+    let openAssignments: any[] = [];
+    try {
+      openAssignments = await db.prepare(
+        `SELECT id::text AS id FROM assignments
+         WHERE class_id::text = ?
+           AND (scheduled_date IS NULL OR SUBSTR(scheduled_date::text, 1, 10) = ?)
+           AND COALESCE(is_afternoon, 0) = 0`
+      ).all(classId, todayStr) as any[];
+    } catch (e: any) {
+      console.error("[live-progress open]", e?.message);
+    }
     const totalOpen = openAssignments.length;
 
     let studentsDone = 0;
     if (totalOpen > 0 && totalStudents > 0) {
-      // For each student, count their submissions for today's assignments
       const ids = openAssignments.map((a) => a.id);
       const placeholders = ids.map(() => "?").join(",");
-      const submittedPerStudent = await db.prepare(
-        `SELECT student_id::text AS student_id, COUNT(*)::int AS n
-         FROM submissions
-         WHERE assignment_id::text IN (${placeholders || "''"})
-         GROUP BY student_id`
-      ).all(...ids).catch(() => []) as any[];
-      const doneMap = new Map<string, number>();
-      for (const r of submittedPerStudent) doneMap.set(String(r.student_id), Number(r.n));
-      for (const s of students) {
-        if ((doneMap.get(String(s.id)) || 0) >= totalOpen) studentsDone += 1;
+      try {
+        const submittedPerStudent = await db.prepare(
+          `SELECT student_id::text AS student_id, COUNT(*)::int AS n
+           FROM submissions
+           WHERE assignment_id::text IN (${placeholders})
+           GROUP BY student_id`
+        ).all(...ids) as any[];
+        const doneMap = new Map<string, number>();
+        for (const r of submittedPerStudent) doneMap.set(String(r.student_id), Number(r.n));
+        for (const s of students) {
+          if ((doneMap.get(String(s.id)) || 0) >= totalOpen) studentsDone += 1;
+        }
+      } catch (e: any) {
+        console.error("[live-progress submittedPerStudent]", e?.message);
       }
-    } else {
-      // No open assignments today — everyone counts as "done" (board says 100%)
-      studentsDone = totalStudents;
+    } else if (totalOpen === 0) {
+      // No open assignments today — show 0/N pending instead of pretending
+      // everyone is "done". This prevents the misleading 100% on a fresh
+      // class with no work yet.
+      studentsDone = 0;
     }
 
     const pct = totalStudents > 0 ? Math.round((studentsDone / totalStudents) * 100) : 0;
 
-    // Top finishers today (by today's submission count)
+    // Top finishers today
     const topToday = students
       .map((s) => ({ student_id: s.id, name: s.name, count: subsByStudent.get(String(s.id)) || 0 }))
       .filter((s) => s.count > 0)
@@ -347,19 +366,24 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       .slice(0, 5);
 
     // Last 5 submissions in the class (for the ticker)
-    const recent = await db.prepare(
-      `SELECT u.name, a.title, COALESCE(s.submitted_at, s.created_at) AS ts
-       FROM submissions s
-       JOIN assignments a ON a.id::text = s.assignment_id::text
-       JOIN users u ON u.id::text = s.student_id::text
-       WHERE a.class_id::text = ?
-       ORDER BY COALESCE(s.submitted_at, s.created_at) DESC
-       LIMIT 5`
-    ).all(classId).catch(() => []) as any[];
+    let recent: any[] = [];
+    try {
+      recent = await db.prepare(
+        `SELECT u.name, a.title, COALESCE(s.submitted_at, s.created_at) AS ts
+         FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         JOIN users u ON u.id::text = s.student_id::text
+         WHERE a.class_id::text = ?
+         ORDER BY COALESCE(s.submitted_at, s.created_at) DESC
+         LIMIT 5`
+      ).all(classId) as any[];
+    } catch (e: any) {
+      console.error("[live-progress recent]", e?.message);
+    }
 
     res.json({ pct, studentsDone, totalStudents, totalOpen, topToday, recent });
   } catch (e: any) {
-    console.error("[board live-progress]", e?.message || e);
+    console.error("[board live-progress TOP]", e?.message || e);
     res.status(500).json({ error: e?.message || "live progress failed" });
   }
 });
