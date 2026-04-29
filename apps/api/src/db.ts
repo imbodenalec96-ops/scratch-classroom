@@ -39,16 +39,19 @@ if (process.env.DATABASE_URL) {
   if (isNeonUrl) {
     // Use neon()'s HTTP-fetch SQL function instead of Pool.
     // Pool requires WebSockets, which aren't available in Vercel Node.js
-    // functions out of the box — that's what was returning {ok:false} from
-    // /api/ping in prod and breaking student login. neon() goes over plain
-    // HTTPS and works everywhere fetch works.
+    // functions out of the box. neon() goes over plain HTTPS and works
+    // everywhere fetch works.
+    //
+    // fullResults: true makes .query() return a pg-style {rows, rowCount}
+    // object instead of just the row array. We rely on rowCount for
+    // INSERT/UPDATE/DELETE (it becomes "changes" in our DB layer) — without
+    // it, write queries report 0 changes and generate-today looks like a no-op.
     const { neon } = await import("@neondatabase/serverless");
-    const sql = neon(process.env.DATABASE_URL!);
+    const sql = neon(process.env.DATABASE_URL!, { fullResults: true });
     pool = {
       async query(sqlText: string, params?: any[]) {
-        // neon's .query() accepts an array of params and returns rows directly
-        const rows = await (sql as any).query(sqlText, params || []);
-        return { rows: rows as any[], rowCount: Array.isArray(rows) ? rows.length : 0 };
+        const r: any = await (sql as any).query(sqlText, params || []);
+        return { rows: r.rows || [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) };
       },
     };
   } else {
