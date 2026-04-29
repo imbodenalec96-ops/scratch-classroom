@@ -1208,21 +1208,20 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       return g >= tMin && g <= tMax;
     });
 
-    // Bonus / afternoon work expires at the 3:10 PM Pacific bell — if a
-    // student didn't finish it during the school day, drop it from their
-    // list so it doesn't follow them home or carry over into tomorrow.
-    // Detected via is_afternoon flag OR the 🌅 title prefix so older
-    // bonuses without the flag still expire.
-    // Now that the date filter rolls back 14 days, also drop ANY bonus
-    // whose scheduled_date is from a previous calendar day — bonus
-    // assignments don't roll over even if past-due regular work does.
+    // Bonus / afternoon rules (per teacher):
+    //   - bonus only ever appears on the day a teacher created it
+    //   - bonus disappears at the 3:10 PM Pacific bell
+    //   - bonus without scheduled_date OR with a different date is dropped
+    //     (defensive against old NULL-dated bonus rows still in the DB)
     const isBonus = (r: any) =>
       Number(r.is_afternoon) === 1 ||
       (typeof r.title === "string" && r.title.startsWith("🌅"));
     const final = filtered.filter((r: any) => {
-      const bonus = isBonus(r);
-      if (bonus && isAfterRelease) return false;
-      if (bonus && r.scheduled_date && r.scheduled_date < todayStr) return false;
+      if (!isBonus(r)) return true;
+      // Bonus rules
+      if (isAfterRelease) return false;
+      const sd = r.scheduled_date ? String(r.scheduled_date).slice(0, 10) : null;
+      if (sd !== todayStr) return false;
       return true;
     });
     res.json(final);
@@ -2336,8 +2335,21 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
   const classId = req.params.classId;
   try { await ensureGradeCols(); } catch {}
 
+  // Bonus is single-day only — wipe yesterday's leftovers before creating
+  // today's set so old bonus rows never pile up. The pending filter also
+  // rejects bonus not dated today as a defensive belt-and-suspenders.
+  try {
+    await db.prepare(
+      `DELETE FROM assignments WHERE class_id::text = ? AND is_afternoon = 1`
+    ).run(classId);
+  } catch {}
+
   const subjects = ["reading", "math", "writing", "spelling"] as const;
   const grades = [1, 2, 3, 4, 5];
+
+  const PT_OFFSET = -7 * 3600_000;
+  const schoolNow = new Date(Date.now() + PT_OFFSET);
+  const todayStr = schoolNow.toISOString().slice(0, 10);
 
   const created: any[] = [];
   const errors: string[] = [];
@@ -2349,13 +2361,15 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
       try {
         const id = crypto.randomUUID();
         const title = `🌅 Bonus — ${premade.title}`;
+        // scheduled_date = today so the strict date filter and the
+        // bonus-expiry rules can both rely on it.
         await db.prepare(
-          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, rubric, hints_allowed, is_afternoon)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed, is_afternoon)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
         ).run(
           id, classId, req.user!.id, title, premade.description,
           JSON.stringify(premade.content),
-          subject, grade, grade,
+          subject, grade, grade, todayStr,
           JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }]),
         );
         created.push({ id, title, subject, grade });
