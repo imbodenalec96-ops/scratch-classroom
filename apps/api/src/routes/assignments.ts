@@ -1168,31 +1168,39 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
         "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?"
       ).get(userId);
     } catch { /* grades table may not exist yet */ }
-    const gradeFor = (subject: string | null): number => {
-      if (!studentGrades) return 3; // reasonable default
+    // Returns the student's grade for a subject, or null if unknown.
+    // Previously defaulted to 3, which silently excluded every student
+    // without a configured grade from grade-4/grade-5 assignments. Now
+    // unknowns are explicit so the filter can show them everything.
+    const gradeForOrNull = (subject: string | null): number | null => {
+      if (!studentGrades) return null;
       const col = subject === 'math' ? 'math_grade'
                 : subject === 'writing' ? 'writing_grade'
                 : 'reading_grade';
-      return Number(studentGrades[col] ?? 3);
+      const v = studentGrades[col];
+      if (v === null || v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
     };
 
     const filtered = rows.filter((r: any) => {
       r.rubric = JSON.parse(r.rubric || "[]");
       // Direct-assign to specific students takes precedence: if the column is
-      // populated, ONLY those student_ids see this assignment. NULL/empty =>
-      // fall through to the legacy class/grade rules below.
+      // populated, ONLY those student_ids see this assignment.
       if (r.target_student_ids) {
         let ids: string[] = [];
         try { const parsed = JSON.parse(r.target_student_ids); if (Array.isArray(parsed)) ids = parsed; } catch {}
         if (ids.length > 0) return ids.includes(userId);
       }
-      // If no grade target set, assignment is for everyone in class
+      // No grade target set → assignment is for everyone in class
       if (r.target_grade_min == null) return true;
-      // If student has no grade levels configured, show them all grade-targeted assignments
-      if (!studentGrades) return true;
+      // Student's grade for this subject is unknown → show them everything.
+      // This is a hard requirement: missing grade config must NOT silently
+      // exclude kids from their work.
+      const g = gradeForOrNull(r.target_subject);
+      if (g == null) return true;
       const tMin = Number(r.target_grade_min);
       const tMax = r.target_grade_max != null ? Number(r.target_grade_max) : tMin;
-      const g = gradeFor(r.target_subject);
       return g >= tMin && g <= tMax;
     });
 
