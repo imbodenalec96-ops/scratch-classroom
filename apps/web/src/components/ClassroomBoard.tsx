@@ -205,6 +205,7 @@ export default function ClassroomBoard() {
     totalStudents: number;
     topToday: Array<{ student_id: string; name: string; count: number }>;
     recent: Array<{ name: string; title: string; ts: string }>;
+    byStudent?: Record<string, { open: number; done: number; pct: number }>;
   } | null>(null);
   useEffect(() => {
     if (!cls?.id || !isTeacher) return;
@@ -1091,6 +1092,53 @@ export default function ClassroomBoard() {
                         }}>★</span>
                       ))}
                     </div>
+
+                    {/* Per-student daily progress — done/open assignments visible
+                        to this kid today. Hairline rail w/ filled bar, mirrors
+                        the styling of the class-wide progress bar at the bottom
+                        of the board. Only renders if there is work to do. */}
+                    {(() => {
+                      const sp = classProgress?.byStudent?.[String(s.id)];
+                      if (!sp || sp.open <= 0) return null;
+                      const fillsClass = sp.pct >= 100;
+                      return (
+                        <div style={{
+                          width: "82%",
+                          display: "flex", flexDirection: "column", alignItems: "stretch", gap: 3,
+                          padding: "2px 0 0",
+                        }}>
+                          <div style={{
+                            height: 4,
+                            background: "rgba(245,241,232,0.10)",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                            position: "relative",
+                          }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${sp.pct}%`,
+                              background: fillsClass
+                                ? "linear-gradient(90deg, #5b8a6e 0%, #7dd3c5 100%)"
+                                : "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
+                              borderRadius: 2,
+                              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+                              boxShadow: fillsClass
+                                ? "0 0 6px rgba(125,211,197,0.55)"
+                                : "0 0 5px rgba(251,191,36,0.45)",
+                            }} />
+                          </div>
+                          <div style={{
+                            fontFamily: serif, fontStyle: "italic",
+                            fontSize: 10, lineHeight: 1,
+                            color: fillsClass ? "#7dd3c5" : "rgba(253,230,138,0.85)",
+                            fontVariantNumeric: "tabular-nums",
+                            textAlign: "center",
+                          }}>
+                            {sp.done}/{sp.open}{fillsClass ? " ✓" : ""}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Points — ClassDojo-style amber chip with coin icon */}
                     {typeof s.dojo_points === "number" && (
