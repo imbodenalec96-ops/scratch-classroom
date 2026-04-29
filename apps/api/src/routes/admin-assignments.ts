@@ -1190,6 +1190,19 @@ router.get("/assignment-stats", async (_req, res) => {
   }
 });
 
+// GET /admin/paper-flag-check — see if any student got paper_only=1
+// flipped on, which makes /pending return [] regardless of data.
+router.get("/paper-flag-check", async (_req, res) => {
+  try {
+    const rows: any[] = await db.prepare(
+      `SELECT id::text, name, COALESCE(paper_only, 0) AS paper_only FROM users WHERE role='student' ORDER BY name`
+    ).all();
+    res.json(rows);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/strict-pending?name=Ameer — runs the exact same strict
 // filter the student dashboard uses, so we can tell whether the issue
 // is data or filtering.
