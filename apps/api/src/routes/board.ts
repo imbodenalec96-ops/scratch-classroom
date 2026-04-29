@@ -341,7 +341,7 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       dayAssignments = await db.prepare(
         `SELECT id::text AS id, title, target_subject,
                 target_grade_min, target_grade_max, target_student_ids,
-                scheduled_date, is_afternoon
+                scheduled_date, is_afternoon, student_id::text AS student_id
          FROM assignments
          WHERE class_id::text = ?
            AND (
@@ -385,8 +385,11 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       }
     }
 
-    // Visibility: target_student_ids wins, otherwise grade range, otherwise visible-to-all.
+    // Visibility: legacy student_id column (a single student lock) takes
+    // precedence; then target_student_ids; then target_grade range; then
+    // visible-to-all if no targeting at all.
     const isVisibleTo = (a: any, s: any): boolean => {
+      if (a.student_id && String(a.student_id) !== String(s.id)) return false;
       if (a.target_student_ids) {
         try {
           const ids = JSON.parse(a.target_student_ids);
