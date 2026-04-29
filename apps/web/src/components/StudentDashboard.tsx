@@ -3100,7 +3100,7 @@ export default function StudentDashboard() {
         setParsedAssignment(nextParsed);
       } catch { /* network blip — try again next tick */ }
     };
-    const iv = setInterval(tick, 30_000);
+    const iv = setInterval(tick, 10_000);
     return () => { cancelled = true; clearInterval(iv); };
   }, [phase, pendingAssignment, classes]);
 
@@ -3920,15 +3920,19 @@ export default function StudentDashboard() {
 
 
         {/* Progress badge — visual card with circular progress so kids can
-            tell at a glance how much work is left. Stays visible whenever
-            there's pending work; switches to a celebration state at 100%. */}
+            tell at a glance how much work is left. Only renders when
+            there IS pending work — we no longer show '100% All done!' when
+            remaining is 0, because that was misleading on stale data
+            (kid had submitted in the past, server had 0 pending, badge
+            said 100% done even when work existed). */}
         {(() => {
           const remaining = allPendingAssignments.length;
+          if (remaining === 0) return null; // no pending → don't show the card
           const doneToday = statSubmitted;
           const total = doneToday + remaining;
           if (total === 0) return null;
           const pct = Math.max(0, Math.min(100, Math.round((doneToday / total) * 100)));
-          const allDone = remaining === 0;
+          const allDone = false; // never shown in this branch
           // Circular progress geometry
           const size = 72;
           const stroke = 8;

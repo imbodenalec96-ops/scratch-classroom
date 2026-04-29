@@ -81,6 +81,10 @@ export const api = {
       `/assignments/class/${classId}/generate-from-passage`,
       { method: "POST", body: JSON.stringify(opts) },
     ),
+  rollForwardAssignments: (classId: string) =>
+    request<{ moved: number; today: string }>(`/assignments/class/${classId}/roll-forward`, {
+      method: "POST", body: JSON.stringify({}),
+    }),
   regenerateWeek: (classId: string) =>
     request<{ regenerated: number; skipped: number; total: number; weekStart: string; weekEnd: string; errors: string[]; note?: string }>(
       `/assignments/class/${classId}/regenerate-week`,

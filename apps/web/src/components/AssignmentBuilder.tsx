@@ -2444,6 +2444,23 @@ export default function AssignmentBuilder() {
                 : "♻️ Regenerate This Week"}
             </button>
             <button
+              disabled={!classId}
+              title="Move every unsubmitted assignment in this class to today's date so kids see them"
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm("Bump every unsubmitted assignment to TODAY's date so they all appear in students' queues?\n\nUseful when assignments were created with an old date and got hidden.")) return;
+                try {
+                  const r = await api.rollForwardAssignments(classId);
+                  await loadAssignments(classId);
+                  alert(`✅ Moved ${r.moved} assignment${r.moved === 1 ? "" : "s"} to ${r.today}.\n\nAll students should now see them.`);
+                } catch (e: any) { alert("Roll-forward failed: " + (e?.message || e)); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #14b8a6, #0d9488)" }}
+            >
+              📅 Bring Forward to Today
+            </button>
+            <button
               onClick={async () => {
                 if (studentCheck) { setStudentCheck(null); return; }
                 if (!classId || classStudents.length === 0) { alert("Select a class with students first."); return; }

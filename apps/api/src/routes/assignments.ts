@@ -1141,12 +1141,11 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
       : todayStr; // same date → harmless duplicate in OR clause
 
-    // Show every unsubmitted assignment in this class — date filter
-    // dropped entirely after repeat reports of kids not seeing their
-    // work on the day it was assigned. The bonus-expiry rule is still
-    // enforced in the JS post-filter so 🌅 cards still drop at 3:10 PM
-    // and don't roll into the next day. Per-student / per-grade
-    // targeting is still respected below.
+    // Strict date filter (per teacher request): only show assignments
+    // scheduled for TODAY or with no scheduled_date (always-on). Past-
+    // dated work (Monday, Tuesday, etc) doesn't show on Wednesday — kids
+    // see only today's queue, not a backlog. SUBSTR normalizes ISO
+    // timestamps to YYYY-MM-DD so the comparison works either way.
     const rows = await db.prepare(`
       SELECT a.id, a.class_id, a.teacher_id, a.student_id, a.title, a.description,
              a.due_date, a.rubric, a.scheduled_date, a.target_subject,
@@ -1158,8 +1157,13 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
+        AND (
+          a.scheduled_date IS NULL
+          OR SUBSTR(a.scheduled_date::text, 1, 10) = ?
+          OR SUBSTR(a.scheduled_date::text, 1, 10) = ?
+        )
       ORDER BY a.is_afternoon ASC, a.scheduled_date ASC NULLS LAST, a.created_at ASC
-    `).all(userId, classId, userId) as any[];
+    `).all(userId, classId, userId, todayStr, nextDayStr) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
@@ -2362,6 +2366,33 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
   }
 
   res.json({ created: created.length, assignments: created, errors });
+});
+
+// POST /assignments/class/:classId/roll-forward
+// Bumps every unsubmitted assignment in the class to today's date so it
+// shows up in students' Today queue. Use when assignments were created
+// with an old scheduled_date and are now hidden by the strict date
+// filter, or when you want to carry yesterday's leftovers into today.
+router.post("/class/:classId/roll-forward", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  try {
+    const PT_OFFSET = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PT_OFFSET);
+    const todayStr = schoolNow.toISOString().slice(0, 10);
+    const r = await db.prepare(
+      `UPDATE assignments
+       SET scheduled_date = ?
+       WHERE class_id::text = ?
+         AND scheduled_date IS NOT NULL
+         AND SUBSTR(scheduled_date::text, 1, 10) <> ?
+         AND COALESCE(is_afternoon, 0) = 0
+         AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id::text = id::text)`
+    ).run(todayStr, classId, todayStr);
+    res.json({ moved: (r as any)?.changes ?? 0, today: todayStr });
+  } catch (e: any) {
+    console.error("[roll-forward]", e?.message || e);
+    res.status(500).json({ error: e?.message || "roll-forward failed" });
+  }
 });
 
 // POST /assignments/class/:classId/regenerate-week
