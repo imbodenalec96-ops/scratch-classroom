@@ -1228,9 +1228,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       return true;
     });
     res.json(final);
-  } catch (e) {
+  } catch (e: any) {
     console.error('pending assignments error:', e);
-    res.status(500).json({ error: 'Failed to fetch pending assignments' });
+    // Expose the actual error message so we can diagnose prod issues
+    // without scraping Vercel logs. Safe to surface — the only consumers
+    // are authenticated students/teachers in this class.
+    res.status(500).json({ error: 'Failed to fetch pending assignments', detail: String(e?.message || e), stack: e?.stack ? String(e.stack).split('\n').slice(0, 3).join(' | ') : undefined });
   }
 });
 
