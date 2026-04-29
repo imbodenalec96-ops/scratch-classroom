@@ -139,13 +139,27 @@ export default function ClassroomBoard() {
     return map;
   }, [helpRequests]);
 
-  // Quick-action modal state for teachers
-  const [showLockModal, setShowLockModal] = useState(false);
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [actionMessage, setActionMessage] = useState("");
-  const [actionVideo, setActionVideo] = useState("");
-  const [actionBusy, setActionBusy] = useState(false);
+  // Live class progress (teacher-only widget on the board)
+  const [classProgress, setClassProgress] = useState<{
+    pct: number;
+    studentsDone: number;
+    totalStudents: number;
+    topToday: Array<{ student_id: string; name: string; count: number }>;
+    recent: Array<{ name: string; title: string; ts: string }>;
+  } | null>(null);
+  useEffect(() => {
+    if (!cls?.id || !isTeacher) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const d = await api.getBoardLiveProgress(cls.id);
+        if (!cancelled) setClassProgress(d);
+      } catch {}
+    };
+    tick();
+    const iv = setInterval(tick, 15_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [cls?.id, isTeacher]);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
@@ -469,158 +483,83 @@ export default function ClassroomBoard() {
         </div>
       )}
 
-      {/* ── TEACHER QUICK-ACTIONS: only visible to teachers/admins on the board ── */}
-      {isTeacher && (
+      {/* ── LIVE CLASS PROGRESS panel (top-right, teachers only) ──
+          New board widget that surfaces real-time classroom state without
+          duplicating the existing teacher controls in TeacherDashboard.
+          Shows: % of class done with morning work, top 3 by today's
+          submissions, and a rolling ticker of just-finished submissions. */}
+      {isTeacher && classProgress && (
         <div
           style={{
             position: "absolute",
             top: 8, right: 12,
             zIndex: 40,
-            display: "flex", gap: 6,
+            background: "rgba(7,8,15,0.85)",
+            border: `1px solid ${g(0.18)}`,
+            borderRadius: 14,
+            padding: "12px 16px",
+            backdropFilter: "blur(12px)",
+            color: "white",
+            minWidth: 280,
+            maxWidth: 360,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
           }}
         >
-          {[
-            { id: "lock",      icon: "🔒", label: "Lock all",     bg: "#374151" },
-            { id: "freetime",  icon: "🎉", label: "Free time",    bg: "#7c3aed" },
-            { id: "broadcast", icon: "📺", label: "Broadcast",    bg: "#dc2626" },
-            { id: "message",   icon: "📢", label: "Message",      bg: "#2563eb" },
-          ].map((b) => (
-            <button
-              key={b.id}
-              onClick={() => {
-                if (b.id === "lock") setShowLockModal(true);
-                if (b.id === "freetime") {
-                  if (!confirm("Grant free time to ALL students in this class?")) return;
-                  setActionBusy(true);
-                  api.grantFreeTimeAll(cls.id).catch(() => {}).finally(() => setActionBusy(false));
-                }
-                if (b.id === "broadcast") setShowVideoModal(true);
-                if (b.id === "message") setShowMessageModal(true);
-              }}
-              disabled={actionBusy}
-              style={{
-                background: b.bg,
-                color: "white",
-                border: "1px solid rgba(255,255,255,0.15)",
-                borderRadius: 10,
-                padding: "8px 12px",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: actionBusy ? "wait" : "pointer",
-                display: "flex", alignItems: "center", gap: 6,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                touchAction: "manipulation",
-              }}
-              title={b.label}
-            >
-              <span style={{ fontSize: 16 }}>{b.icon}</span>
-              <span>{b.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Quick-action modals */}
-      {isTeacher && showLockModal && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowLockModal(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
-            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>🔒 Lock all student screens</h2>
-            <textarea
-              value={actionMessage}
-              onChange={(e) => setActionMessage(e.target.value)}
-              placeholder="Optional message to show on locked screens (e.g. 'Eyes on me!')"
-              style={{ width: "100%", minHeight: 80, padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
-            />
-            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-              <button onClick={() => setShowLockModal(false)} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
-              <button
-                disabled={actionBusy}
-                onClick={async () => {
-                  setActionBusy(true);
-                  try { await api.lockClass(cls.id, actionMessage || undefined); setShowLockModal(false); setActionMessage(""); }
-                  catch {} finally { setActionBusy(false); }
-                }}
-                style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 800 }}
-              >
-                Lock all screens
-              </button>
-              <button
-                disabled={actionBusy}
-                onClick={async () => {
-                  setActionBusy(true);
-                  try { await api.unlockClass(cls.id); setShowLockModal(false); }
-                  catch {} finally { setActionBusy(false); }
-                }}
-                style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 800 }}
-              >
-                Unlock all
-              </button>
-            </div>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
+            📊 Class progress today
           </div>
-        </div>
-      )}
-      {isTeacher && showMessageModal && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowMessageModal(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
-            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>📢 Send message to class</h2>
-            <textarea
-              value={actionMessage}
-              onChange={(e) => setActionMessage(e.target.value)}
-              placeholder="Type your message — appears on every student's screen"
-              style={{ width: "100%", minHeight: 100, padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
-            />
-            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-              <button onClick={() => { setShowMessageModal(false); setActionMessage(""); }} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
-              <button
-                disabled={actionBusy || !actionMessage.trim()}
-                onClick={async () => {
-                  setActionBusy(true);
-                  try { await api.sendClassCommand(cls.id, "MESSAGE", actionMessage); setShowMessageModal(false); setActionMessage(""); }
-                  catch {} finally { setActionBusy(false); }
-                }}
-                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: actionBusy ? "wait" : "pointer", fontWeight: 800 }}
-              >
-                Send to all
-              </button>
-            </div>
+          {/* Big progress number + bar */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 28, fontWeight: 900, color: classProgress.pct >= 100 ? "#86efac" : "#fde68a", fontFamily: serif }}>
+              {classProgress.pct}%
+            </span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", fontWeight: 600 }}>
+              ({classProgress.studentsDone}/{classProgress.totalStudents} students done)
+            </span>
           </div>
-        </div>
-      )}
-      {isTeacher && showVideoModal && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowVideoModal(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
-            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>📺 Broadcast YouTube video</h2>
-            <input
-              type="url"
-              value={actionVideo}
-              onChange={(e) => setActionVideo(e.target.value)}
-              placeholder="Paste YouTube URL or video ID"
-              style={{ width: "100%", padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
-            />
-            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-              <button onClick={() => { setShowVideoModal(false); setActionVideo(""); }} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
-              <button
-                disabled={actionBusy || !actionVideo.trim()}
-                onClick={async () => {
-                  setActionBusy(true);
-                  try { await api.broadcastClassVideo(cls.id, actionVideo); setShowVideoModal(false); setActionVideo(""); }
-                  catch {} finally { setActionBusy(false); }
-                }}
-                style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: actionBusy ? "wait" : "pointer", fontWeight: 800 }}
-              >
-                Broadcast to all students
-              </button>
-            </div>
+          <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginBottom: 12 }}>
+            <div style={{
+              width: `${classProgress.pct}%`,
+              height: "100%",
+              background: classProgress.pct >= 100 ? "linear-gradient(90deg,#22c55e,#16a34a)" : "linear-gradient(90deg,#fbbf24,#f59e0b)",
+              transition: "width .6s ease",
+            }} />
           </div>
+          {/* Top 3 today */}
+          {classProgress.topToday.length > 0 && (
+            <>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>
+                🏆 Top finishers today
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+                {classProgress.topToday.slice(0, 3).map((t, i) => (
+                  <div key={t.student_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span style={{ width: 18, color: ["#fbbf24","#d1d5db","#d97706"][i], fontWeight: 900 }}>
+                      {["1st","2nd","3rd"][i]}
+                    </span>
+                    <span style={{ flex: 1, fontWeight: 700 }}>{(t.name || "?").split(" ")[0]}</span>
+                    <span style={{ fontWeight: 800, color: "#fde68a" }}>{t.count}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {/* Recent submissions ticker */}
+          {classProgress.recent.length > 0 && (
+            <>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>
+                ⚡ Just finished
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
+                {classProgress.recent.slice(0, 4).map((r, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontWeight: 700 }}>{(r.name || "?").split(" ")[0]}</span>
+                    <span style={{ fontStyle: "italic", opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>{r.title}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -853,22 +792,18 @@ export default function ClassroomBoard() {
                     );
                   })()}
 
-                  {/* Help-request alert overlay — pulsing red badge when this
-                      student raised their hand. Tap clears it (teachers only). */}
+                  {/* Help-request alert overlay — display only. Kids can
+                      walk up and touch the projector; nothing should
+                      respond to that. Teachers clear from their own
+                      device's TeacherDashboard or the help-list endpoint. */}
                   {helpByStudent[s.id] && (
-                    <button
-                      onClick={() => {
-                        if (!isTeacher || !cls?.id) return;
-                        api.clearStudentHelp(cls.id, s.id).catch(() => {});
-                        setHelpRequests((prev) => prev.filter((r) => r.student_id !== s.id));
-                      }}
-                      title={isTeacher ? "Tap to mark as helped" : "This student raised their hand"}
+                    <div
                       style={{
                         position: "absolute", inset: 0, zIndex: 5,
                         background: "linear-gradient(135deg, rgba(239,68,68,0.85), rgba(220,38,38,0.65))",
                         border: "3px solid #fca5a5",
                         borderRadius: 4,
-                        cursor: isTeacher ? "pointer" : "default",
+                        pointerEvents: "none",
                         display: "flex", flexDirection: "column",
                         alignItems: "center", justifyContent: "center",
                         animation: "helpPulse 1s ease-in-out infinite",
@@ -882,7 +817,7 @@ export default function ClassroomBoard() {
                       <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
                         {firstName}
                       </div>
-                    </button>
+                    </div>
                   )}
 
                   {/* Card body */}

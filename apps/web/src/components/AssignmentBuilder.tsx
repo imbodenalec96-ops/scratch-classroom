@@ -213,6 +213,24 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
 
+  // "I'm stuck — call my teacher" state. Mirrors WorkScreen's behavior.
+  const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
+  const handleRaiseHand = async () => {
+    if (!classId || helpState !== "idle") return;
+    setHelpState("raising");
+    try {
+      await api.raiseHand(classId, `Stuck on question ${currentQ + 1}`);
+      setHelpState("raised");
+    } catch {
+      setHelpState("idle");
+    }
+  };
+  const handleCancelHelp = async () => {
+    if (!classId || helpState !== "raised") return;
+    try { await api.cancelMyHelp(classId); } catch {}
+    setHelpState("idle");
+  };
+
   // Auto-save: when the assignment loads, restore any in-progress draft
   // for this assignment ID. When answers/currentQ change, persist the draft.
   // Cleared on submit.
@@ -390,6 +408,11 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       setFeedback("");
       setCurrentQ(currentQ + 1);
       stopPassageAudio();
+      // Auto-cancel raised hand — student moved on, they figured it out
+      if (helpState === "raised" && classId) {
+        api.cancelMyHelp(classId).catch(() => {});
+        setHelpState("idle");
+      }
     }
   };
 
@@ -833,6 +856,31 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         >
           🔄 Try a different one
         </button>
+        {classId && (
+          <button
+            onClick={helpState === "raised" ? handleCancelHelp : handleRaiseHand}
+            disabled={helpState === "raising"}
+            style={{
+              background: helpState === "raised"
+                ? "linear-gradient(135deg, #ef4444, #dc2626)"
+                : "linear-gradient(135deg, #fb7185, #e11d48)",
+              color: "white",
+              border: helpState === "raised" ? "2px solid #fca5a5" : "1px solid #fb7185",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 800,
+              padding: "8px 14px",
+              cursor: helpState === "raising" ? "wait" : "pointer",
+              boxShadow: "0 4px 12px rgba(239,68,68,0.35)",
+              whiteSpace: "nowrap",
+              touchAction: "manipulation",
+              animation: helpState === "raised" ? "pulse 1.5s ease-in-out infinite" : undefined,
+            }}
+            title={helpState === "raised" ? "Tap to cancel — your teacher knows" : "I need help"}
+          >
+            {helpState === "raised" ? "✋ Help on the way!" : "🆘 I need help"}
+          </button>
+        )}
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
           {currentQ + 1} / {total}
         </div>
@@ -1164,6 +1212,9 @@ export default function AssignmentBuilder() {
   const [genTodayLoading, setGenTodayLoading] = useState(false);
   const [genAfternoonLoading, setGenAfternoonLoading] = useState(false);
   const [genTopicLoading, setGenTopicLoading] = useState(false);
+  const [genPassageLoading, setGenPassageLoading] = useState(false);
+  const [showPassageModal, setShowPassageModal] = useState(false);
+  const [passageDraft, setPassageDraft] = useState({ title: "", text: "", grade: 3, questionCount: 5 });
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -1787,8 +1838,124 @@ export default function AssignmentBuilder() {
     finally { setAdjusting(a => { const n = { ...a }; delete n[id]; return n; }); }
   };
 
+  // Duplicate an existing assignment — useful when the teacher wants a
+  // similar one (e.g. another reading passage at the same level) without
+  // re-running AI. Loads the source's full content + metadata, posts a new
+  // assignment with the same shape and a "(copy)" suffix on the title.
+  const handleDuplicate = async (a: any) => {
+    setAdjusting(s => ({ ...s, [a.id]: "dup" }));
+    try {
+      const src = await api.getAssignment(a.id);
+      await api.createAssignment({
+        classId,
+        title: `${src.title || a.title} (copy)`,
+        description: src.description || "",
+        dueDate: src.due_date || null,
+        rubric: typeof src.rubric === "string" ? JSON.parse(src.rubric || "[]") : (src.rubric || []),
+        content: src.content || null,
+        scheduledDate: src.scheduled_date || null,
+        targetGradeMin: src.target_grade_min ?? null,
+        targetGradeMax: src.target_grade_max ?? null,
+        targetSubject: src.target_subject || null,
+        teacherNotes: src.teacher_notes || null,
+        questionCount: src.question_count ?? null,
+        estimatedMinutes: src.estimated_minutes ?? null,
+        focusKeywords: src.focus_keywords || null,
+        learningObjective: src.learning_objective || null,
+        hintsAllowed: src.hints_allowed ?? 1,
+        questionType: src.question_type || null,
+      });
+      await loadAssignments(classId);
+    } catch (e: any) { alert("Duplicate failed: " + (e?.message || e)); }
+    finally { setAdjusting(s => { const n = { ...s }; delete n[a.id]; return n; }); }
+  };
+
   return (
     <div className="p-6 space-y-5 animate-page-enter max-w-screen-xl mx-auto">
+      {/* "Generate from text" modal — paste any passage, AI builds questions */}
+      {showPassageModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => !genPassageLoading && setShowPassageModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 640, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+            <h2 style={{ color: "white", marginTop: 0, fontSize: 22, fontWeight: 800 }}>📰 Generate assignment from text</h2>
+            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, marginBottom: 16 }}>
+              Paste an article, story chapter, or any text — the AI builds a comprehension assignment around it. The passage stays exactly as you pasted; only the questions are AI-generated.
+            </p>
+            <label style={{ display: "block", color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Title</label>
+            <input
+              value={passageDraft.title}
+              onChange={(e) => setPassageDraft({ ...passageDraft, title: e.target.value })}
+              placeholder="e.g. The Water Cycle"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14, marginBottom: 14 }}
+            />
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Grade</label>
+                <select
+                  value={passageDraft.grade}
+                  onChange={(e) => setPassageDraft({ ...passageDraft, grade: Number(e.target.value) })}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
+                >
+                  {[1,2,3,4,5,6,7,8].map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Questions</label>
+                <select
+                  value={passageDraft.questionCount}
+                  onChange={(e) => setPassageDraft({ ...passageDraft, questionCount: Number(e.target.value) })}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
+                >
+                  {[3,4,5,6,7,8].map((n) => <option key={n} value={n}>{n} questions</option>)}
+                </select>
+              </div>
+            </div>
+            <label style={{ display: "block", color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Passage text</label>
+            <textarea
+              value={passageDraft.text}
+              onChange={(e) => setPassageDraft({ ...passageDraft, text: e.target.value })}
+              placeholder="Paste your text here — article, story, primary source, etc. (40–4000 chars)"
+              style={{ width: "100%", minHeight: 200, padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14, fontFamily: "system-ui", resize: "vertical" }}
+            />
+            <div style={{ marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+              {passageDraft.text.length} / 4000 characters
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowPassageModal(false)}
+                disabled={genPassageLoading}
+                style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}
+              >Cancel</button>
+              <button
+                disabled={genPassageLoading || !passageDraft.text.trim() || passageDraft.text.trim().length < 40}
+                onClick={async () => {
+                  if (!classId) return;
+                  setGenPassageLoading(true);
+                  try {
+                    const result = await api.generateFromPassage(classId, {
+                      passage: passageDraft.text.trim(),
+                      title: passageDraft.title.trim() || "Reading practice",
+                      grade: passageDraft.grade,
+                      questionCount: passageDraft.questionCount,
+                    });
+                    await loadAssignments(classId);
+                    setShowPassageModal(false);
+                    setPassageDraft({ title: "", text: "", grade: 3, questionCount: 5 });
+                    alert(`✅ Created: ${result.title}`);
+                  } catch (e: any) { alert("Failed: " + e.message); }
+                  finally { setGenPassageLoading(false); }
+                }}
+                style={{ background: "linear-gradient(135deg, #ec4899, #db2777)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: genPassageLoading ? "wait" : "pointer", fontWeight: 800 }}
+              >
+                {genPassageLoading ? "⏳ Generating…" : "Generate assignment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b pb-5" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center justify-between mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
@@ -1898,6 +2065,15 @@ export default function AssignmentBuilder() {
               style={{ background: "linear-gradient(135deg, #06b6d4, #0891b2)" }}
             >
               {genTopicLoading ? "⏳ Generating…" : "📚 Topic Pack (AI)"}
+            </button>
+            <button
+              disabled={!classId}
+              title="Paste any text — AI builds a comprehension assignment from it"
+              onClick={() => setShowPassageModal(true)}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #ec4899, #db2777)" }}
+            >
+              📰 From Text
             </button>
             <button
               onClick={async () => {
@@ -3044,6 +3220,14 @@ export default function AssignmentBuilder() {
                   className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
                   style={{ border: "1px solid rgba(139,92,246,0.3)", color: "#a78bfa", background: "rgba(139,92,246,0.08)" }}>
                   {adjusting[a.id] === "regen" ? "Regenerating…" : "Regenerate"}
+                </button>
+                <button
+                  onClick={() => handleDuplicate(a)}
+                  disabled={!!adjusting[a.id]}
+                  title="Make a copy of this assignment"
+                  className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ border: "1px solid rgba(56,189,248,0.3)", color: "#7dd3fc", background: "rgba(56,189,248,0.08)" }}>
+                  {adjusting[a.id] === "dup" ? "Copying…" : "📋 Duplicate"}
                 </button>
                 <button
                   onClick={() => window.open(`/print/assignment/${a.id}`, "_blank", "noopener")}

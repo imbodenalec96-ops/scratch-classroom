@@ -2339,6 +2339,70 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
   res.json({ created: created.length, assignments: created, errors });
 });
 
+// POST /assignments/class/:classId/generate-from-passage
+// Teacher pastes any block of text (article, story, primary source) and the
+// AI generates a comprehension assignment around it: passage stays verbatim,
+// 4-6 multiple-choice + short-answer questions are generated. Useful for
+// grade-level current-events articles, novel chapters, primary sources.
+router.post("/class/:classId/generate-from-passage", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const passage = String(req.body?.passage || "").trim();
+  const title = String(req.body?.title || "Reading practice").trim() || "Reading practice";
+  const grade = Math.max(1, Math.min(8, Number(req.body?.grade ?? 3)));
+  const questionCount = Math.max(2, Math.min(10, Number(req.body?.questionCount ?? 5)));
+
+  if (!passage) return res.status(400).json({ error: "passage required" });
+  if (passage.length < 40) return res.status(400).json({ error: "passage too short — paste at least 40 characters" });
+  if (passage.length > 4000) return res.status(400).json({ error: "passage too long — keep under 4000 chars" });
+
+  const client = await getAnthropic();
+  if (!client) return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY" });
+  try { await ensureGradeCols(); } catch {}
+
+  // Reuse the daily generator with the passage forced into recentPrompts so
+  // the AI builds questions about THIS text rather than inventing one.
+  let gen: { title: string; content: any };
+  try {
+    gen = await generateDailyAssignmentContent(client, {
+      studentId: classId,
+      date: `passage|${Date.now()}`,
+      subject: "reading",
+      gradeMin: grade,
+      gradeMax: grade,
+      recentPrompts: [],
+      questionCount,
+      learningObjective: `Reading comprehension on the passage titled "${title}"`,
+      teacherNotes: `USE THIS EXACT PASSAGE (do NOT invent your own): ---\n${passage}\n---\nPlace this passage verbatim in sections[0].passage. All questions must be answerable using ONLY this passage.`,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: `AI generation failed: ${e?.message}` });
+  }
+
+  // Force the passage into the first section so the student sees it
+  if (gen.content?.sections?.[0]) {
+    gen.content.sections[0].passage = passage;
+  }
+
+  try {
+    const id = crypto.randomUUID();
+    const today = new Date().toISOString().slice(0, 10);
+    const finalTitle = `📰 ${title} (G${grade})`;
+    await db.prepare(
+      `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+    ).run(
+      id, classId, req.user!.id, finalTitle,
+      gen.content?.instructions || "Read the passage and answer the questions.",
+      JSON.stringify(gen.content),
+      "reading", grade, grade, today,
+      JSON.stringify([{ label: "Comprehension", maxPoints: 50 }]),
+    );
+    res.json({ id, title: finalTitle, grade });
+  } catch (e: any) {
+    res.status(500).json({ error: `Insert failed: ${e?.message}` });
+  }
+});
+
 // POST /assignments/class/:classId/generate-topic-pack
 // Teacher-driven AI generation: creates N grade-targeted assignments on a
 // specific topic (e.g. "fractions", "the water cycle", "verb tenses"). One

@@ -76,6 +76,11 @@ export const api = {
       `/assignments/class/${classId}/generate-topic-pack`,
       { method: "POST", body: JSON.stringify(opts) },
     ),
+  generateFromPassage: (classId: string, opts: { passage: string; title?: string; grade?: number; questionCount?: number }) =>
+    request<{ id: string; title: string; grade: number }>(
+      `/assignments/class/${classId}/generate-from-passage`,
+      { method: "POST", body: JSON.stringify(opts) },
+    ),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string; questionCount?: number; questionType?: string; learningObjective?: string; focusKeywords?: string; teacherNotes?: string; hintsAllowed?: boolean }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),
@@ -430,6 +435,15 @@ export const api = {
 
   // ── Classroom Board (central control) ──
   getBoardData: (classId: string) => request<any>(`/board/classes/${classId}/data`),
+  getBoardLiveProgress: (classId: string) =>
+    request<{
+      pct: number;
+      studentsDone: number;
+      totalStudents: number;
+      totalOpen: number;
+      topToday: Array<{ student_id: string; name: string; count: number }>;
+      recent: Array<{ name: string; title: string; ts: string }>;
+    }>(`/board/classes/${classId}/live-progress`),
   bumpStudentStars: (studentId: string, delta: number) =>
     request<any>(`/board/students/${studentId}/stars`, { method: "POST", body: JSON.stringify({ delta }) }),
   setStudentLevel: (studentId: string, level: number) =>
