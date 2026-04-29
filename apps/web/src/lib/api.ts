@@ -203,6 +203,11 @@ export const api = {
   autoAwardBadges: () => request<{ awarded: Array<{ id: string; label: string; icon: string }>; badges: string[]; submittedCount: number }>("/leaderboard/auto-award", { method: "POST", body: JSON.stringify({}) }),
   claimBadge: (badgeId: string) => request<{ alreadyClaimed: boolean; pointsAwarded: number; dojo_points: number }>("/leaderboard/claim-badge", { method: "POST", body: JSON.stringify({ badgeId }) }),
   getMyBadgeClaims: () => request<{ claims: string[]; details: Array<{ badge_id: string; points_awarded: number; claimed_at: string }> }>("/leaderboard/my-claims"),
+  defineWord: (word: string, gradeLevel?: number, context?: string) =>
+    request<{ definition: string; example: string; cached: boolean }>("/ai/define", {
+      method: "POST",
+      body: JSON.stringify({ word, gradeLevel, context }),
+    }),
 
   // Users
   getUsers: () => request<any[]>("/users"),

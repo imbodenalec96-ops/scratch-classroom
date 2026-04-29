@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
 import { useSocket } from "../lib/ws.ts";
+import ClickableText from "./ClickableText.tsx";
 import {
   isWorkUnlocked,
   isAccessAllowed,
@@ -1976,7 +1977,7 @@ function WorkScreen({
                 whiteSpace: "pre-wrap",
               }}
             >
-              {q.passage}
+              <ClickableText text={q.passage} contextForDefine={q.passage} />
             </p>
           </div>
         )}
@@ -2020,7 +2021,7 @@ function WorkScreen({
                       lineHeight: 1.7,
                     }}
                   >
-                    {q.q.context}
+                    <ClickableText text={q.q.context} contextForDefine={q.q.context} />
                   </p>
                 </div>
               )}
@@ -2033,7 +2034,7 @@ function WorkScreen({
                     fontSize: "clamp(1.75rem, 2.4vw, 2.25rem)",
                   }}
                 >
-                  <TypewriterText text={q.q.text} speed={28} />
+                  <ClickableText text={q.q.text} contextForDefine={q.q.text} />
                 </p>
                 <button
                   onClick={() => {

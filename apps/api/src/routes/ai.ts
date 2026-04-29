@@ -736,4 +736,103 @@ router.post("/tts", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// In-process LRU cache so kids tapping the same word twice don't burn
+// a fresh API call. Bounded to 500 entries; oldest evicted first. Survives
+// per-instance for the lifetime of the function — good enough for a
+// classroom session.
+const defCache = new Map<string, { definition: string; example: string }>();
+const DEF_CACHE_MAX = 500;
+
+// POST /api/ai/define — kid-friendly definition for any word the student
+// taps in question/passage text. Tier'd to grade level so a 3rd grader
+// gets a 3rd-grade-friendly explanation, not a dictionary.com paragraph.
+router.post("/define", async (req: AuthRequest, res: Response) => {
+  const word = String(req.body?.word || "").trim();
+  const gradeLevel = Number(req.body?.gradeLevel ?? 3);
+  const context = String(req.body?.context || "").slice(0, 280);
+
+  if (!word) return res.status(400).json({ error: "word required" });
+  if (word.length > 40) return res.status(400).json({ error: "word too long" });
+  // Strip punctuation, normalize case for cache key
+  const cleanWord = word.replace(/[^A-Za-z'-]/g, "").toLowerCase();
+  if (!cleanWord) return res.status(400).json({ error: "no letters in word" });
+
+  const cacheKey = `${gradeLevel}:${cleanWord}`;
+  const cached = defCache.get(cacheKey);
+  if (cached) {
+    // Move to end (LRU touch)
+    defCache.delete(cacheKey);
+    defCache.set(cacheKey, cached);
+    return res.json({ ...cached, cached: true });
+  }
+
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (!orKey) {
+    // Graceful fallback so the popup still shows something useful
+    return res.json({
+      definition: `${cleanWord} — ask your teacher to add an AI key to enable definitions.`,
+      example: "",
+      cached: false,
+    });
+  }
+
+  try {
+    const systemPrompt =
+      `You are a kind elementary school teacher. A grade ${gradeLevel} student tapped a word they didn't understand. Give them a short, simple definition in words a grade ${gradeLevel} student already knows. Then give one concrete example sentence using the word. Return JSON only:\n` +
+      `{"definition":"<one sentence, ≤20 words, no jargon>","example":"<one short sentence using the word>"}`;
+    const userPrompt = context
+      ? `Word: "${cleanWord}"\nThe student saw it in this sentence (use this for context only): "${context}"`
+      : `Word: "${cleanWord}"`;
+
+    const HARD_TIMEOUT_MS = 8_000;
+    const fetchCall = fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${orKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "anthropic/claude-3.5-haiku",
+        max_tokens: 200,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(`${r.status} ${JSON.stringify(err)}`);
+      }
+      return r.json() as Promise<any>;
+    });
+
+    const data: any = await Promise.race([
+      fetchCall,
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(() => reject(new Error("define timeout")), HARD_TIMEOUT_MS),
+      ),
+    ]);
+
+    let raw: string = data?.choices?.[0]?.message?.content?.trim() || "";
+    if (raw.startsWith("```")) raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "").trim();
+    const parsed = JSON.parse(raw);
+    const definition = String(parsed?.definition || "").trim() || `Sorry — couldn't find a definition for "${cleanWord}".`;
+    const example = String(parsed?.example || "").trim();
+    const out = { definition, example };
+
+    // LRU insert
+    if (defCache.size >= DEF_CACHE_MAX) {
+      const firstKey = defCache.keys().next().value;
+      if (firstKey) defCache.delete(firstKey);
+    }
+    defCache.set(cacheKey, out);
+    res.json({ ...out, cached: false });
+  } catch (e: any) {
+    console.error("[ai/define]", e?.message || e);
+    res.json({
+      definition: `Sorry — couldn't define "${cleanWord}" right now. Ask your teacher!`,
+      example: "",
+      cached: false,
+    });
+  }
+});
+
 export default router;

@@ -5,6 +5,7 @@ import { api } from "../lib/api.ts";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
+import ClickableText from "./ClickableText.tsx";
 
 const ASSIGN_DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 function resolveBlockAssignmentId(
@@ -936,7 +937,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                     </button>
                   )}
                 </div>
-                <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: 0, whiteSpace: "pre-wrap" }}>{q.passage}</p>
+                <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: 0, whiteSpace: "pre-wrap" }}>
+                  <ClickableText text={q.passage} contextForDefine={q.passage} />
+                </p>
               </div>
             )}
 
@@ -992,7 +995,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   </div>
                 ) : (
                   <p style={{ fontSize: 18, fontWeight: 700, color: "white", lineHeight: 1.5, margin: "0 0 20px", whiteSpace: "pre-wrap" }}>
-                    {q.q.text}
+                    <ClickableText text={q.q.text} contextForDefine={q.passage || q.q.text} />
                   </p>
                 );
               })()}
