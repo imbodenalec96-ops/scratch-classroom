@@ -69,18 +69,17 @@
 }
 
 .light, .starfall {
-  /* Starfall-style warm cream palette — used for students AND for
-     teachers who toggle to light mode. Soft on kid eyes, low contrast,
-     friendly. Replaces the previous cool blue-grey light palette so
-     every existing var(--bg) / var(--text-1) / var(--accent) pickup
-     gets the new look automatically without per-component edits. */
-  --bg:          #f6efde;
-  --bg-sidebar:  #fffaed;
+  /* Starfall-style warm cream palette — toned down to be subtle and
+     easy on the eyes. Near-white with a faint warm tint rather than
+     a pronounced cream, so the look feels paper-warm without
+     yellowing the whole screen. */
+  --bg:          #faf7ef;
+  --bg-sidebar:  #ffffff;
   --bg-surface:  #ffffff;
-  --bg-raised:   #fef5dc;
-  --bg-hover:    rgba(178,58,72,0.06);
+  --bg-raised:   #fcf8ee;
+  --bg-hover:    rgba(178,58,72,0.04);
   --bg-input:    #ffffff;
-  --bg-muted:    rgba(58,36,16,0.03);
+  --bg-muted:    rgba(58,36,16,0.02);
 
   /* Borders — warm brown, low-contrast */
   --border:      rgba(58,36,16,0.10);

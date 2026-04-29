@@ -3414,20 +3414,77 @@ export default function StudentDashboard() {
     @keyframes lootOpen { from{transform:scaleY(0);opacity:0;transform-origin:top} to{transform:scaleY(1);opacity:1;transform-origin:top} }
   `;
 
+  // Pick palette per role: students always get the soft-cream Starfall
+  // tones, teachers/admins keep the dark editorial look they're used to.
+  const isStudentDb = user?.role === "student";
+  const dbBg = isStudentDb
+    ? "#faf7ef"
+    : "#0f1628";
+  const dbBgImage = isStudentDb
+    ? "radial-gradient(circle at 15% 0%, rgba(178,58,72,0.05), transparent 60%), radial-gradient(circle at 95% 30%, rgba(217,119,6,0.04), transparent 55%)"
+    : "radial-gradient(circle at 15% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(circle at 95% 30%, rgba(245,158,11,0.08), transparent 55%)";
+  const dbInk = isStudentDb ? "#3a2410" : "white";
+
   return (
     <div
+      className={isStudentDb ? "starfall-dash" : ""}
       style={{
         minHeight: "100dvh",
-        background: "#0f1628",
-        backgroundImage:
-          "radial-gradient(circle at 15% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(circle at 95% 30%, rgba(245,158,11,0.08), transparent 55%)",
-        color: "white",
+        background: dbBg,
+        backgroundImage: dbBgImage,
+        color: dbInk,
         fontFamily: "'Baloo 2', 'Inter', system-ui, sans-serif",
         paddingBottom: 80,
         position: "relative",
       }}
     >
       <style>{DB_ANIM}</style>
+      {isStudentDb && (
+        <style>{`
+          /* Scoped Starfall overrides — converts the dark-glass card style
+             everywhere on the dashboard to soft white-on-cream paper cards
+             without per-element edits. The screenshot the teacher sent
+             showed the dashboard still in dark theme; this fixes that. */
+          .starfall-dash * { color: inherit; }
+          .starfall-dash a { color: inherit; }
+          .starfall-dash [style*="color: white"],
+          .starfall-dash [style*="color:#fff"],
+          .starfall-dash [style*="color: \\"white\\""],
+          .starfall-dash [style*="color: rgb(255, 255, 255)"] {
+            color: #3a2410 !important;
+          }
+          .starfall-dash [style*="rgba(255,255,255,0.04)"],
+          .starfall-dash [style*="rgba(255,255,255,0.05)"],
+          .starfall-dash [style*="rgba(255,255,255,0.06)"],
+          .starfall-dash [style*="rgba(255,255,255,0.07)"],
+          .starfall-dash [style*="rgba(255,255,255,0.08)"] {
+            background: white !important;
+            border-color: rgba(58,36,16,0.10) !important;
+          }
+          .starfall-dash [style*="rgba(255,255,255,0.6)"],
+          .starfall-dash [style*="rgba(255,255,255,0.5)"],
+          .starfall-dash [style*="rgba(255,255,255,0.55)"],
+          .starfall-dash [style*="rgba(255,255,255,0.65)"] {
+            color: #5a4632 !important;
+          }
+          .starfall-dash [style*="rgba(255,255,255,0.4)"],
+          .starfall-dash [style*="rgba(255,255,255,0.45)"],
+          .starfall-dash [style*="rgba(255,255,255,0.35)"] {
+            color: #8a7a5e !important;
+          }
+          .starfall-dash [style*="rgba(255,255,255,0.2)"],
+          .starfall-dash [style*="rgba(255,255,255,0.25)"],
+          .starfall-dash [style*="rgba(255,255,255,0.3)"] {
+            color: rgba(58,36,16,0.45) !important;
+          }
+          /* Soft shadow so cards lift gently off cream */
+          .starfall-dash [style*="rgba(0,0,0,0.4)"],
+          .starfall-dash [style*="rgba(0,0,0,0.5)"],
+          .starfall-dash [style*="rgba(0,0,0,0.6)"] {
+            box-shadow: 0 4px 14px rgba(58,36,16,0.08) !important;
+          }
+        `}</style>
+      )}
 
       {lockBanner}
 
