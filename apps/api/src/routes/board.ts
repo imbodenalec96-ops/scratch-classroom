@@ -339,6 +339,9 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
     const totalOpen = openAssignments.length;
 
     // submissionSet: which (student_id, assignment_id) pairs are turned in
+    // *today*. Without the date filter, any submission ever recorded for a
+    // null-scheduled assignment would mark a kid as "done" forever — that's
+    // why the board was showing yesterday-finished students at 100% today.
     const submittedPairs = new Set<string>();
     if (totalOpen > 0) {
       const ids = openAssignments.map((a) => a.id);
@@ -346,8 +349,10 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       try {
         const subs = await db.prepare(
           `SELECT student_id::text AS student_id, assignment_id::text AS assignment_id
-           FROM submissions WHERE assignment_id::text IN (${placeholders})`
-        ).all(...ids) as any[];
+           FROM submissions
+           WHERE assignment_id::text IN (${placeholders})
+             AND SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) = ?`
+        ).all(...ids, todayStr) as any[];
         for (const r of subs) submittedPairs.add(`${r.student_id}|${r.assignment_id}`);
       } catch (e: any) {
         console.error("[live-progress submittedPairs]", e?.message);
