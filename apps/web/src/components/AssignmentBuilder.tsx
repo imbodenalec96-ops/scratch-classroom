@@ -777,21 +777,45 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   return (
     <div style={{
       minHeight: "100dvh",
-      background: "linear-gradient(160deg,#0f0826 0%,#0a0b1e 60%,#0c1030 100%)",
+      // Starfall-style warm cream backdrop with subtle texture — much
+      // gentler on kid eyes than the previous dark gradient.
+      background: "radial-gradient(ellipse at top, #fdf9ef 0%, #f6efde 60%, #efe6d0 100%)",
       fontFamily: "'Baloo 2','Inter',system-ui,sans-serif",
       display: "flex", flexDirection: "column",
+      color: "#3a2410",
     }}>
-      <style>{`@keyframes wsPop { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }`}</style>
+      <style>{`
+        @keyframes wsPop { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }
+        @keyframes sfFadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+        @keyframes sfBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+      `}</style>
 
-      {/* Top bar */}
-      <div style={{ padding: "16px 20px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 680, margin: "0 auto", width: "100%" }}>
-        <button
-          onClick={() => setAssignment(null)}
-          style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, padding: "6px 14px", cursor: "pointer" }}
-        >
-          ← Back
-        </button>
-        <div style={{ flex: 1 }} />
+      {/* Top bar — friendly soft-white card sitting on cream */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 10,
+        background: "rgba(253,249,239,0.92)",
+        backdropFilter: "blur(8px)",
+        borderBottom: "1px solid rgba(58,36,16,0.08)",
+        padding: "14px 20px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 720, margin: "0 auto", width: "100%", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setAssignment(null)}
+            style={{
+              background: "white",
+              border: "1px solid rgba(58,36,16,0.15)",
+              borderRadius: 999,
+              color: "#5a4632",
+              fontSize: 14, fontWeight: 700,
+              padding: "8px 16px",
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(58,36,16,0.06)",
+              touchAction: "manipulation",
+            }}
+          >
+            ← Back
+          </button>
+          <div style={{ flex: 1 }} />
         <button
           onClick={async () => {
             // Always-visible skip. Find the next assignment from the cached
@@ -881,45 +905,79 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             {helpState === "raised" ? "✋ Help on the way!" : "🆘 I need help"}
           </button>
         )}
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
-          {currentQ + 1} / {total}
+          <div style={{
+            fontSize: 13, color: "#8a7a5e", fontWeight: 800,
+            background: "white",
+            border: "1px solid rgba(58,36,16,0.12)",
+            borderRadius: 999,
+            padding: "6px 14px",
+            fontFamily: "'Baloo 2', system-ui, sans-serif",
+          }}>
+            {currentQ + 1} / {total}
+          </div>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div style={{ padding: "12px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%" }}>
-        <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: 99, background: grad, width: `${progress}%`, transition: "width .5s ease" }} />
+      {/* Progress bar — soft cream rail with subject-color fill */}
+      <div style={{ padding: "16px 20px 0", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+        <div style={{ height: 10, borderRadius: 99, background: "rgba(58,36,16,0.08)", overflow: "hidden", boxShadow: "inset 0 1px 2px rgba(58,36,16,0.06)" }}>
+          <div style={{
+            height: "100%", borderRadius: 99,
+            background: grad,
+            width: `${progress}%`,
+            transition: "width .5s cubic-bezier(0.22,1,0.36,1)",
+            boxShadow: `0 0 12px ${accent}55`,
+          }} />
         </div>
       </div>
 
-      {/* Assignment title strip */}
-      <div style={{ padding: "16px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>
+      {/* Assignment title strip — magazine-style label */}
+      <div style={{ padding: "18px 20px 0", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{
+            fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.16em",
+            color: accent,
+            background: `${accent}18`,
+            border: `1px solid ${accent}44`,
+            padding: "4px 10px",
+            borderRadius: 999,
+          }}>
             {assignment.target_subject || "Assignment"}
           </span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>·</span>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{
+            fontSize: 16, fontWeight: 700,
+            color: "#3a2410",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
             {assignment.title}
           </span>
         </div>
       </div>
 
-      {/* Question dot nav — requires passcode to jump */}
-      <div style={{ padding: "14px 20px 0", maxWidth: 680, margin: "0 auto", width: "100%", display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {allQuestions.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => { if (i !== currentQ) { setNavTarget(i); setNavCode(""); setNavError(""); setShowNavModal(true); } }}
-            style={{
-              height: 8, width: i === currentQ ? 24 : 8,
-              borderRadius: 99, border: "none", cursor: i !== currentQ ? "pointer" : "default",
-              background: i === currentQ ? accent : answers[i] !== undefined ? "#34d399" : "rgba(255,255,255,0.15)",
-              transition: "all .2s",
-            }}
-          />
-        ))}
+      {/* Question dot nav — bigger, friendlier circles. Tap any non-current
+          dot to jump (passcode-protected). Greens = answered, accent = current. */}
+      <div style={{ padding: "16px 20px 0", maxWidth: 720, margin: "0 auto", width: "100%", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {allQuestions.map((_, i) => {
+          const isCurrent = i === currentQ;
+          const isAnswered = answers[i] !== undefined;
+          return (
+            <button
+              key={i}
+              onClick={() => { if (!isCurrent) { setNavTarget(i); setNavCode(""); setNavError(""); setShowNavModal(true); } }}
+              title={`Question ${i + 1}${isAnswered ? " (answered)" : ""}`}
+              style={{
+                width: isCurrent ? 36 : 16, height: 16,
+                borderRadius: 999,
+                border: isCurrent ? `2px solid ${accent}` : "1px solid rgba(58,36,16,0.18)",
+                cursor: isCurrent ? "default" : "pointer",
+                background: isCurrent ? accent : isAnswered ? "#86efac" : "white",
+                boxShadow: isCurrent ? `0 2px 8px ${accent}55` : "0 1px 3px rgba(58,36,16,0.08)",
+                transition: "all .25s cubic-bezier(0.22,1,0.36,1)",
+                touchAction: "manipulation",
+              }}
+            />
+          );
+        })}
       </div>
 
       {/* Question card */}
@@ -927,17 +985,27 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         {q && (
           <div style={{ animation: "wsPop .35s ease both" }} key={currentQ}>
 
-            {/* Passage block */}
+            {/* Passage block — storybook cream card */}
             {q.passage && (
               <div style={{
-                background: "linear-gradient(135deg,#1e1b2e 0%,#16132a 100%)",
-                border: `1px solid ${accent}33`, borderLeft: `3px solid ${accent}`,
-                borderRadius: 16, padding: "16px 18px", marginBottom: 16,
+                background: "linear-gradient(180deg, #fffaed 0%, #fef5dc 100%)",
+                border: "1px solid rgba(58,36,16,0.10)",
+                borderLeft: `4px solid ${accent}`,
+                borderRadius: 18,
+                padding: "18px 22px",
+                marginBottom: 18,
+                boxShadow: "0 4px 16px rgba(58,36,16,0.06)",
+                animation: "sfFadeUp .35s ease both",
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>📖 Read this first</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>💡 Tap any word to see what it means</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{
+                      fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.16em",
+                      color: accent,
+                    }}>📖 Read this first</div>
+                    <div style={{ fontSize: 11, color: "#8a7a5e", fontWeight: 600, fontStyle: "italic" }}>
+                      💡 Tap any word to see what it means
+                    </div>
                   </div>
                   {ttsPassages && (
                     <button
@@ -980,27 +1048,39 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                           .catch(() => { /* browser TTS keeps playing as fallback */ });
                       }}
                       style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "5px 14px", borderRadius: 20, border: `1px solid ${accent}55`,
-                        background: passageAudioState === "playing" ? `${accent}30` : `${accent}18`,
-                        color: accent, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        padding: "8px 16px", borderRadius: 999,
+                        border: `1px solid ${accent}55`,
+                        background: passageAudioState === "playing" ? `${accent}30` : "white",
+                        color: accent, fontSize: 12, fontWeight: 800, cursor: "pointer",
+                        boxShadow: "0 2px 6px rgba(58,36,16,0.06)",
+                        touchAction: "manipulation",
                       }}
                     >
                       {passageAudioState === "playing" ? "⏸ Stop" : "🎧 Listen"}
                     </button>
                   )}
                 </div>
-                <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: 0, whiteSpace: "pre-wrap" }}>
+                <p style={{
+                  fontSize: 16, lineHeight: 1.75,
+                  color: "#3a2410",
+                  margin: 0, whiteSpace: "pre-wrap",
+                  fontFamily: "'Source Serif Pro', Georgia, serif",
+                }}>
                   <ClickableText text={q.passage} contextForDefine={q.passage} />
                 </p>
               </div>
             )}
 
-            {/* Question text */}
+            {/* Question card — clean white with subject-color accent stripe */}
             <div style={{
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 20, padding: "22px 22px 20px",
-              boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)`,
+              background: "white",
+              border: "1px solid rgba(58,36,16,0.08)",
+              borderLeft: `4px solid ${accent}`,
+              borderRadius: 20,
+              padding: "26px 26px 22px",
+              boxShadow: "0 6px 24px rgba(58,36,16,0.08)",
+              animation: "sfFadeUp .35s ease .05s both",
             }}>
               {(() => {
                 const isSpelling = (assignment.target_subject || "").toLowerCase() === "spelling";
@@ -1009,7 +1089,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 const spellingWord = spellingMatch ? spellingMatch[1].replace(/[^a-zA-Z'-]/g, "") : null;
                 return isSpelling && spellingWord ? (
                   <div style={{ textAlign: "center", margin: "0 0 20px" }}>
-                    <p style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>Listen and spell the word:</p>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "#5a4632", margin: "0 0 14px" }}>Listen and spell the word:</p>
                     <button
                       onClick={() => {
                         const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ||
@@ -1041,13 +1121,30 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                           })
                           .catch(() => { /* browser TTS keeps playing as fallback */ });
                       }}
-                      style={{ background: accent + "22", border: `2px solid ${accent}`, borderRadius: 16, padding: "18px 36px", cursor: "pointer", color: "white", fontSize: 28 }}
+                      style={{
+                        background: `linear-gradient(135deg, ${accent}, ${accent}dd)`,
+                        border: "none",
+                        borderRadius: 999,
+                        padding: "20px 40px",
+                        cursor: "pointer",
+                        color: "white",
+                        fontSize: 24, fontWeight: 800,
+                        boxShadow: `0 8px 24px ${accent}55`,
+                        touchAction: "manipulation",
+                      }}
                     >
                       🔊 Hear the word
                     </button>
                   </div>
                 ) : (
-                  <p style={{ fontSize: 18, fontWeight: 700, color: "white", lineHeight: 1.5, margin: "0 0 20px", whiteSpace: "pre-wrap" }}>
+                  <p style={{
+                    fontSize: 22, fontWeight: 700,
+                    color: "#3a2410",
+                    lineHeight: 1.4,
+                    margin: "0 0 20px",
+                    whiteSpace: "pre-wrap",
+                    fontFamily: "'Source Serif Pro', Georgia, serif",
+                  }}>
                     <ClickableText text={q.q.text} contextForDefine={q.passage || q.q.text} />
                   </p>
                 );
@@ -1064,15 +1161,17 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "8px 14px",
-                    borderRadius: 10,
+                    padding: "10px 16px",
+                    borderRadius: 999,
                     fontSize: 13,
-                    fontWeight: 700,
-                    background: "rgba(125,211,197,0.10)",
-                    color: "#5eead4",
-                    border: "1px solid rgba(125,211,197,0.30)",
+                    fontWeight: 800,
+                    background: "white",
+                    color: "#0f766e",
+                    border: "1px solid rgba(15,118,110,0.25)",
                     textDecoration: "none",
-                    marginBottom: 16,
+                    marginBottom: 18,
+                    boxShadow: "0 2px 6px rgba(15,118,110,0.10)",
+                    touchAction: "manipulation",
                   }}
                   title="Open your lesson notes in a new tab — your answers stay saved"
                 >
@@ -1080,9 +1179,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 </a>
               )}
 
-              {/* Multiple choice */}
+              {/* Multiple choice — big tappable cards with letter chips */}
               {(q.q.type === "multiple_choice" || q.q.type === "mc") && (q.q.options || q.q.o) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {(q.q.options || q.q.o).map((opt: string, oi: number) => {
                     const isSelected = currentAnswer === opt || currentAnswer === String(oi);
                     return (
@@ -1090,23 +1189,33 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                         key={oi}
                         onClick={() => handleSelect(opt)}
                         style={{
-                          display: "flex", alignItems: "center", gap: 14,
+                          display: "flex", alignItems: "center", gap: 16,
                           width: "100%", textAlign: "left", cursor: "pointer",
-                          padding: "14px 16px", borderRadius: 14,
-                          border: `2px solid ${isSelected ? accent : "rgba(255,255,255,0.1)"}`,
-                          background: isSelected ? accent + "20" : "rgba(255,255,255,0.03)",
-                          transition: "all .15s", color: isSelected ? accent : "rgba(255,255,255,0.75)",
-                          fontWeight: isSelected ? 700 : 500, fontSize: 15,
+                          padding: "18px 20px",
+                          minHeight: 68,
+                          borderRadius: 16,
+                          border: `2px solid ${isSelected ? accent : "rgba(58,36,16,0.10)"}`,
+                          background: isSelected ? `${accent}10` : "white",
+                          transition: "all .2s cubic-bezier(0.22,1,0.36,1)",
+                          color: "#3a2410",
+                          fontWeight: isSelected ? 800 : 600, fontSize: 17,
+                          boxShadow: isSelected
+                            ? `0 6px 20px ${accent}33`
+                            : "0 2px 8px rgba(58,36,16,0.05)",
+                          touchAction: "manipulation",
+                          animation: `sfFadeUp .25s ease ${oi * 0.04}s both`,
                         }}
-                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                        onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "#fffaed"; }}
+                        onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "white"; }}
                       >
                         <span style={{
-                          width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                          border: `2px solid ${isSelected ? accent : "rgba(255,255,255,0.2)"}`,
-                          background: isSelected ? accent : "transparent",
+                          width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                          border: `2px solid ${isSelected ? accent : "rgba(58,36,16,0.18)"}`,
+                          background: isSelected ? accent : "white",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, fontWeight: 800, color: isSelected ? "#0f0826" : "rgba(255,255,255,0.4)",
+                          fontSize: 14, fontWeight: 900,
+                          color: isSelected ? "white" : "#5a4632",
+                          transition: "all .2s",
                         }}>
                           {isSelected ? "✓" : String.fromCharCode(65 + oi)}
                         </span>
@@ -1125,37 +1234,50 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   placeholder="Write your answer here…"
                   rows={q.q.type === "short_answer" || q.q.type === "sa" ? (q.q.lines || 3) : 1}
                   style={{
-                    width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 15,
-                    background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
-                    color: "white", resize: "none", fontFamily: "inherit", outline: "none",
+                    width: "100%", padding: "16px 18px", borderRadius: 14, fontSize: 17,
+                    background: "white",
+                    border: "2px solid rgba(58,36,16,0.12)",
+                    color: "#3a2410",
+                    resize: "vertical",
+                    fontFamily: "'Source Serif Pro', Georgia, serif",
+                    outline: "none",
                     boxSizing: "border-box",
+                    boxShadow: "inset 0 2px 4px rgba(58,36,16,0.04)",
+                    minHeight: 64,
                   }}
+                  onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = accent; }}
+                  onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(58,36,16,0.12)"; }}
                 />
               )}
             </div>
 
-            {/* Feedback */}
+            {/* Feedback toast */}
             {feedback && (
               <div style={{
-                marginTop: 12, padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-                background: feedback.includes("not quite") ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
-                border: `1px solid ${feedback.includes("not quite") ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.3)"}`,
-                color: feedback.includes("not quite") ? "#fca5a5" : "#fcd34d",
+                marginTop: 14, padding: "14px 18px", borderRadius: 14, fontSize: 14, fontWeight: 700,
+                background: feedback.includes("not quite") ? "#fef2f2" : "#fffbeb",
+                border: `1px solid ${feedback.includes("not quite") ? "#fecaca" : "#fde68a"}`,
+                color: feedback.includes("not quite") ? "#991b1b" : "#92400e",
+                animation: "sfFadeUp .25s ease both",
               }}>
                 {feedback}
               </div>
             )}
 
-            {/* Nav buttons */}
-            <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+            {/* Nav buttons — big friendly cream + accent pills */}
+            <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
               <button
                 onClick={handlePrev}
                 disabled={currentQ === 0}
                 style={{
-                  flex: "0 0 auto", padding: "14px 22px", borderRadius: 14, fontSize: 15, fontWeight: 600,
-                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "rgba(255,255,255,0.5)", cursor: currentQ === 0 ? "not-allowed" : "pointer",
-                  opacity: currentQ === 0 ? 0.35 : 1,
+                  flex: "0 0 auto", padding: "16px 24px", borderRadius: 999, fontSize: 15, fontWeight: 800,
+                  background: "white",
+                  border: "1px solid rgba(58,36,16,0.15)",
+                  color: "#5a4632",
+                  cursor: currentQ === 0 ? "not-allowed" : "pointer",
+                  opacity: currentQ === 0 ? 0.4 : 1,
+                  boxShadow: currentQ === 0 ? "none" : "0 2px 6px rgba(58,36,16,0.06)",
+                  touchAction: "manipulation",
                 }}
               >
                 ← Back
@@ -1164,9 +1286,10 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 <button
                   onClick={handleNext}
                   style={{
-                    flex: 1, padding: "14px 22px", borderRadius: 14, fontSize: 16, fontWeight: 800,
+                    flex: 1, padding: "16px 24px", borderRadius: 999, fontSize: 17, fontWeight: 900,
                     background: grad, color: "white", border: "none", cursor: "pointer",
-                    boxShadow: `0 8px 24px ${accent}40`,
+                    boxShadow: `0 8px 24px ${accent}55`,
+                    touchAction: "manipulation",
                   }}
                 >
                   Next →
@@ -1176,9 +1299,12 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   onClick={handleSubmit}
                   disabled={submitting}
                   style={{
-                    flex: 1, padding: "14px 22px", borderRadius: 14, fontSize: 16, fontWeight: 800,
-                    background: "linear-gradient(135deg,#10b981,#059669)", color: "white", border: "none", cursor: "pointer",
-                    boxShadow: "0 8px 24px rgba(16,185,129,0.4)", opacity: submitting ? 0.7 : 1,
+                    flex: 1, padding: "16px 24px", borderRadius: 999, fontSize: 17, fontWeight: 900,
+                    background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "white", border: "none",
+                    cursor: submitting ? "wait" : "pointer",
+                    boxShadow: "0 8px 24px rgba(34,197,94,0.45)",
+                    opacity: submitting ? 0.7 : 1,
+                    touchAction: "manipulation",
                   }}
                 >
                   {submitting ? "Submitting…" : "Submit ✓"}
