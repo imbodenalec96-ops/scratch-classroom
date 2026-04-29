@@ -1240,6 +1240,7 @@ export default function AssignmentBuilder() {
   const [genAfternoonLoading, setGenAfternoonLoading] = useState(false);
   const [genTopicLoading, setGenTopicLoading] = useState(false);
   const [genPassageLoading, setGenPassageLoading] = useState(false);
+  const [regenWeekLoading, setRegenWeekLoading] = useState(false);
   const [showPassageModal, setShowPassageModal] = useState(false);
   const [passageDraft, setPassageDraft] = useState({ title: "", text: "", grade: 3, questionCount: 5 });
 
@@ -2101,6 +2102,25 @@ export default function AssignmentBuilder() {
               style={{ background: "linear-gradient(135deg, #ec4899, #db2777)" }}
             >
               📰 From Text
+            </button>
+            <button
+              disabled={regenWeekLoading || !classId}
+              title="Regenerate every assignment in this class scheduled this week (skips already-submitted ones)"
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm("Regenerate EVERY unsubmitted assignment for this week with the latest AI prompt?\n\nThis takes 1–3 minutes depending on how many assignments. Submitted student work is never overwritten.")) return;
+                setRegenWeekLoading(true);
+                try {
+                  const r = await api.regenerateWeek(classId);
+                  await loadAssignments(classId);
+                  alert(`✅ Regenerated ${r.regenerated} of ${r.total} assignments (${r.weekStart} → ${r.weekEnd}).${r.skipped ? `\n${r.skipped} skipped.` : ""}${r.errors?.length ? "\n\nErrors: " + r.errors.join("\n") : ""}${r.note ? "\n\n" + r.note : ""}`);
+                } catch (e: any) { alert("Regenerate failed: " + (e?.message || e)); }
+                finally { setRegenWeekLoading(false); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)" }}
+            >
+              {regenWeekLoading ? "⏳ Regenerating week…" : "♻️ Regenerate This Week"}
             </button>
             <button
               onClick={async () => {

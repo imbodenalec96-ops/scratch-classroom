@@ -81,6 +81,11 @@ export const api = {
       `/assignments/class/${classId}/generate-from-passage`,
       { method: "POST", body: JSON.stringify(opts) },
     ),
+  regenerateWeek: (classId: string) =>
+    request<{ regenerated: number; skipped: number; total: number; weekStart: string; weekEnd: string; errors: string[]; note?: string }>(
+      `/assignments/class/${classId}/regenerate-week`,
+      { method: "POST", body: JSON.stringify({}) },
+    ),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string; questionCount?: number; questionType?: string; learningObjective?: string; focusKeywords?: string; teacherNotes?: string; hintsAllowed?: boolean }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),

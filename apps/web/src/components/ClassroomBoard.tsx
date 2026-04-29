@@ -285,7 +285,16 @@ export default function ClassroomBoard() {
       api.getClassSchedule(cls.id).then(r => { if (!done) setSchedule(Array.isArray(r) ? r : []); }).catch(() => {});
       api.getBoardData(cls.id).then((d: any) => {
         if (done) return;
-        setBoard({ students: d?.students||[], schedules: d?.schedules||[], specials: d?.specials||[], settings: d?.settings||{} });
+        // Hide any 'test' / 'demo' / 'example' accounts from the board so
+        // they don't take up a tile in front of the actual class.
+        const filtered = (d?.students || []).filter((s: any) => {
+          const name = String(s?.name || "").toLowerCase().trim();
+          if (!name) return true;
+          if (name === "test" || name === "demo" || name === "example") return false;
+          if (/^test\b/.test(name) || /\btest\s*student\b/.test(name)) return false;
+          return true;
+        });
+        setBoard({ students: filtered, schedules: d?.schedules||[], specials: d?.specials||[], settings: d?.settings||{} });
       }).catch(() => {});
     };
     load();
@@ -483,14 +492,15 @@ export default function ClassroomBoard() {
         </div>
       )}
 
-      {/* ── LIVE CLASS PROGRESS panel (teachers only) — restyled to match
-          the editorial board theme: serif italics, paper tones (#f5f1e8 ink
-          on #0d1321 ground), brick-red rule, no glassmorphism. */}
+      {/* ── LIVE CLASS PROGRESS panel (teachers only) — anchored to the
+          BOTTOM-LEFT so it doesn't collide with the masthead time/date in
+          the top-right and doesn't break fullscreen by overflowing the
+          1920×1080 canvas. Editorial styling matches the board theme. */}
       {isTeacher && classProgress && (
         <div
           style={{
             position: "absolute",
-            top: 8, right: 12,
+            bottom: 64, left: 16,
             zIndex: 40,
             background: "linear-gradient(180deg, rgba(13,19,33,0.94) 0%, rgba(7,8,15,0.94) 100%)",
             borderTop: `2px solid #b23a48`,
@@ -501,7 +511,7 @@ export default function ClassroomBoard() {
             padding: "14px 18px 12px",
             color: "#f5f1e8",
             minWidth: 300,
-            maxWidth: 360,
+            maxWidth: 340,
             boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
           }}
         >

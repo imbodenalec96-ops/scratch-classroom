@@ -2344,6 +2344,101 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
   res.json({ created: created.length, assignments: created, errors });
 });
 
+// POST /assignments/class/:classId/regenerate-week
+// Wipes the AI content of every assignment in the class scheduled this
+// week (or with no scheduled_date — they're "always-on") that has NOT
+// been submitted by anyone yet, and regenerates fresh content using the
+// current AI prompt. Useful after the prompt has been improved (better
+// vocabulary calibration, self-contained lessons, etc) — the teacher
+// gets the new quality across the whole week without re-clicking
+// regenerate on every card.
+router.post("/class/:classId/regenerate-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const client = await getAnthropic();
+  if (!client) return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY" });
+  try { await ensureGradeCols(); } catch {}
+
+  // Compute Pacific-time week range (Sun→Sat) so the dates match how the
+  // pending query thinks about days.
+  const PT_OFFSET = -7 * 3600_000;
+  const schoolNow = new Date(Date.now() + PT_OFFSET);
+  const schoolDow = schoolNow.getUTCDay();
+  const sunday = new Date(schoolNow.getTime() - schoolDow * 86400_000);
+  const saturday = new Date(sunday.getTime() + 6 * 86400_000);
+  const weekStart = sunday.toISOString().slice(0, 10);
+  const weekEnd = saturday.toISOString().slice(0, 10);
+
+  // Find every regen-eligible assignment in this week. Exclude any with
+  // submissions — we never overwrite a kid's completed work.
+  const candidates = await db.prepare(
+    `SELECT a.id, a.title, a.target_subject, a.target_grade_min, a.target_grade_max,
+            a.student_id, a.week_theme, a.question_count, a.teacher_notes,
+            a.focus_keywords, a.question_type, a.learning_objective
+     FROM assignments a
+     LEFT JOIN submissions s ON s.assignment_id::text = a.id::text
+     WHERE a.class_id::text = ?
+       AND s.id IS NULL
+       AND (a.scheduled_date IS NULL OR (a.scheduled_date >= ? AND a.scheduled_date <= ?))
+     ORDER BY a.scheduled_date ASC, a.created_at ASC`
+  ).all(classId, weekStart, weekEnd) as any[];
+
+  if (candidates.length === 0) {
+    return res.json({ regenerated: 0, skipped: 0, errors: [], note: "No regen-eligible assignments this week." });
+  }
+
+  // Throttle: 4 in-flight at a time. Each call hits the AI; running 30 in
+  // parallel would blow past OpenRouter rate limits and Vercel's request
+  // budget on a single function invocation.
+  const CONCURRENCY = 4;
+  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  let i = 0;
+  async function worker() {
+    while (i < candidates.length) {
+      const idx = i++;
+      const c = candidates[idx];
+      try {
+        const subjLower = String(c.target_subject || "").toLowerCase() || "reading";
+        const gen = await generateDailyAssignmentContent(client, {
+          studentId: c.student_id || classId,
+          date: `${weekStart}|regen|${c.id}`,
+          subject: subjLower,
+          gradeMin: Number(c.target_grade_min ?? 3),
+          gradeMax: Number(c.target_grade_max ?? c.target_grade_min ?? 3),
+          weekTheme: c.week_theme || undefined,
+          recentPrompts: [],
+          questionCount: c.question_count || undefined,
+          teacherNotes: c.teacher_notes || undefined,
+          focusKeywords: c.focus_keywords || undefined,
+          questionType: c.question_type || undefined,
+          learningObjective: c.learning_objective || undefined,
+        });
+        await db.prepare(
+          `UPDATE assignments SET title = COALESCE(?, title), description = ?, content = ? WHERE id = ?`
+        ).run(
+          gen.title || c.title,
+          gen.content?.instructions || "",
+          JSON.stringify(gen.content),
+          c.id,
+        );
+        results.push({ id: c.id, ok: true });
+      } catch (e: any) {
+        results.push({ id: c.id, ok: false, error: e?.message || "unknown error" });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+  const okCount = results.filter((r) => r.ok).length;
+  const errors = results.filter((r) => !r.ok).slice(0, 10).map((r) => `${r.id.slice(0, 8)}: ${r.error}`);
+  res.json({
+    regenerated: okCount,
+    skipped: results.length - okCount,
+    total: results.length,
+    weekStart, weekEnd,
+    errors,
+  });
+});
+
 // POST /assignments/class/:classId/generate-from-passage
 // Teacher pastes any block of text (article, story, primary source) and the
 // AI generates a comprehension assignment around it: passage stays verbatim,
