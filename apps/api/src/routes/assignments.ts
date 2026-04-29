@@ -2354,51 +2354,70 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
 // regenerate on every card.
 router.post("/class/:classId/regenerate-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
-  const client = await getAnthropic();
-  if (!client) return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY" });
-  try { await ensureGradeCols(); } catch {}
+  const startTime = Date.now();
+  // Budget the whole request to 240s — Vercel's hard cap is 300s; we want
+  // to flush a partial response before that so the teacher gets feedback
+  // instead of a generic 'Error'.
+  const TIME_BUDGET_MS = 240_000;
+  // Per-assignment AI call cap to keep a single slow generation from
+  // monopolizing the budget.
+  const PER_CALL_MS = 35_000;
+  const MAX_PER_REQUEST = 12;
 
-  // Compute Pacific-time week range (Sun→Sat) so the dates match how the
-  // pending query thinks about days.
-  const PT_OFFSET = -7 * 3600_000;
-  const schoolNow = new Date(Date.now() + PT_OFFSET);
-  const schoolDow = schoolNow.getUTCDay();
-  const sunday = new Date(schoolNow.getTime() - schoolDow * 86400_000);
-  const saturday = new Date(sunday.getTime() + 6 * 86400_000);
-  const weekStart = sunday.toISOString().slice(0, 10);
-  const weekEnd = saturday.toISOString().slice(0, 10);
+  try {
+    const client = await getAnthropic();
+    if (!client) return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY in Vercel env" });
+    try { await ensureGradeCols(); } catch (e: any) { console.warn("[regen-week ensureGradeCols]", e?.message); }
 
-  // Find every regen-eligible assignment in this week. Exclude any with
-  // submissions — we never overwrite a kid's completed work.
-  const candidates = await db.prepare(
-    `SELECT a.id, a.title, a.target_subject, a.target_grade_min, a.target_grade_max,
-            a.student_id, a.week_theme, a.question_count, a.teacher_notes,
-            a.focus_keywords, a.question_type, a.learning_objective
-     FROM assignments a
-     LEFT JOIN submissions s ON s.assignment_id::text = a.id::text
-     WHERE a.class_id::text = ?
-       AND s.id IS NULL
-       AND (a.scheduled_date IS NULL OR (a.scheduled_date >= ? AND a.scheduled_date <= ?))
-     ORDER BY a.scheduled_date ASC, a.created_at ASC`
-  ).all(classId, weekStart, weekEnd) as any[];
+    // Pacific-time week range (Sun→Sat)
+    const PT_OFFSET = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PT_OFFSET);
+    const schoolDow = schoolNow.getUTCDay();
+    const sunday = new Date(schoolNow.getTime() - schoolDow * 86400_000);
+    const saturday = new Date(sunday.getTime() + 6 * 86400_000);
+    const weekStart = sunday.toISOString().slice(0, 10);
+    const weekEnd = saturday.toISOString().slice(0, 10);
 
-  if (candidates.length === 0) {
-    return res.json({ regenerated: 0, skipped: 0, errors: [], note: "No regen-eligible assignments this week." });
-  }
+    // Find regen-eligible assignments. We use NOT EXISTS instead of LEFT
+    // JOIN to avoid duplicate rows when an assignment has multiple
+    // submissions across students (the LEFT JOIN approach was returning
+    // bogus row counts and the prepared-statement may have bound params
+    // incorrectly with the duplicate rows).
+    let candidates: any[];
+    try {
+      candidates = await db.prepare(
+        `SELECT a.id, a.title, a.target_subject, a.target_grade_min, a.target_grade_max,
+                a.student_id, a.week_theme, a.question_count, a.teacher_notes,
+                a.focus_keywords, a.question_type, a.learning_objective
+         FROM assignments a
+         WHERE a.class_id::text = ?
+           AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id::text = a.id::text)
+           AND (a.scheduled_date IS NULL OR (a.scheduled_date >= ? AND a.scheduled_date <= ?))
+         ORDER BY a.scheduled_date ASC, a.created_at ASC
+         LIMIT ?`
+      ).all(classId, weekStart, weekEnd, MAX_PER_REQUEST) as any[];
+    } catch (e: any) {
+      console.error("[regen-week candidates query]", e?.message || e);
+      return res.status(500).json({ error: "Database query failed", details: e?.message || String(e) });
+    }
 
-  // Throttle: 4 in-flight at a time. Each call hits the AI; running 30 in
-  // parallel would blow past OpenRouter rate limits and Vercel's request
-  // budget on a single function invocation.
-  const CONCURRENCY = 4;
-  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
-  let i = 0;
-  async function worker() {
-    while (i < candidates.length) {
-      const idx = i++;
-      const c = candidates[idx];
+    if (!candidates || candidates.length === 0) {
+      return res.json({ regenerated: 0, skipped: 0, total: 0, errors: [], note: "No regen-eligible assignments this week (all submitted or none scheduled)." });
+    }
+
+    // Process serially with a per-call timeout. Serial keeps things simple
+    // and avoids overwhelming the Neon pool (max 1 connection on free).
+    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+    for (const c of candidates) {
+      // Stop if we're running out of time — return a partial response so
+      // the teacher sees some progress instead of a timeout.
+      if (Date.now() - startTime > TIME_BUDGET_MS) {
+        results.push({ id: c.id, ok: false, error: "skipped — request hit time budget" });
+        continue;
+      }
       try {
         const subjLower = String(c.target_subject || "").toLowerCase() || "reading";
-        const gen = await generateDailyAssignmentContent(client, {
+        const genPromise = generateDailyAssignmentContent(client, {
           studentId: c.student_id || classId,
           date: `${weekStart}|regen|${c.id}`,
           subject: subjLower,
@@ -2412,6 +2431,12 @@ router.post("/class/:classId/regenerate-week", requireRole("teacher", "admin"), 
           questionType: c.question_type || undefined,
           learningObjective: c.learning_objective || undefined,
         });
+        const gen = await Promise.race([
+          genPromise,
+          new Promise<never>((_resolve, reject) =>
+            setTimeout(() => reject(new Error(`per-call timeout ${PER_CALL_MS}ms`)), PER_CALL_MS),
+          ),
+        ]);
         await db.prepare(
           `UPDATE assignments SET title = COALESCE(?, title), description = ?, content = ? WHERE id = ?`
         ).run(
@@ -2422,21 +2447,30 @@ router.post("/class/:classId/regenerate-week", requireRole("teacher", "admin"), 
         );
         results.push({ id: c.id, ok: true });
       } catch (e: any) {
-        results.push({ id: c.id, ok: false, error: e?.message || "unknown error" });
+        console.warn("[regen-week one]", c.id, e?.message);
+        results.push({ id: c.id, ok: false, error: (e?.message || "unknown error").slice(0, 200) });
       }
     }
-  }
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-  const okCount = results.filter((r) => r.ok).length;
-  const errors = results.filter((r) => !r.ok).slice(0, 10).map((r) => `${r.id.slice(0, 8)}: ${r.error}`);
-  res.json({
-    regenerated: okCount,
-    skipped: results.length - okCount,
-    total: results.length,
-    weekStart, weekEnd,
-    errors,
-  });
+    const okCount = results.filter((r) => r.ok).length;
+    const errors = results.filter((r) => !r.ok).slice(0, 10).map((r) => `${r.id.slice(0, 8)}: ${r.error}`);
+    return res.json({
+      regenerated: okCount,
+      skipped: results.length - okCount,
+      total: results.length,
+      weekStart, weekEnd,
+      errors,
+      note: candidates.length === MAX_PER_REQUEST
+        ? `Capped at ${MAX_PER_REQUEST} per request. Click again to regenerate the rest.`
+        : undefined,
+    });
+  } catch (e: any) {
+    console.error("[regen-week TOP]", e?.stack || e?.message || e);
+    return res.status(500).json({
+      error: "Regenerate week failed",
+      details: (e?.message || String(e)).slice(0, 300),
+    });
+  }
 });
 
 // POST /assignments/class/:classId/generate-from-passage
