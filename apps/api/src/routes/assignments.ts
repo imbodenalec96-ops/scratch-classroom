@@ -2390,10 +2390,14 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
 });
 
 // POST /assignments/class/:classId/fill-student
-// Fill in the grade-targeted assignments a SINGLE student is missing,
-// without touching anyone else's queue or adding class-wide subjects.
-// Useful when one student's grade was changed AFTER the class-wide
-// Generate Today run — the teacher wants to backfill just for them.
+// Creates a DIRECT-TARGETED assignment for a specific student in each
+// of reading/math/writing/spelling at that student's per-subject grade
+// level. Uses target_student_ids = [studentId] so the row is bound to
+// THIS kid only — no skip, no grade-mismatch chance. Other students
+// don't see these (their target_student_ids gate filters them out).
+// Re-runnable: deletes any previous direct-fill rows for this student
+// before inserting fresh ones, so the teacher can re-fill at any time
+// without piling up duplicates.
 // Body: { studentId }
 router.post("/class/:classId/fill-student", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
@@ -2418,33 +2422,50 @@ router.post("/class/:classId/fill-student", requireRole("teacher", "admin"), asy
       spelling: grades.reading_grade ?? null, // spelling uses reading_grade
     };
 
+    // Look up student's name for the title prefix
+    const userRow: any = await db.prepare("SELECT name FROM users WHERE id::text = ?").get(studentId).catch(() => null);
+    const firstName = String(userRow?.name || "Student").split(" ")[0];
+
+    // Wipe any prior direct-fill rows for this student so a re-run is
+    // idempotent. Keep submitted rows (NOT EXISTS submission) intact.
+    try {
+      await db.prepare(
+        `DELETE FROM assignments
+         WHERE class_id::text = ?
+           AND target_student_ids = ?
+           AND title LIKE ?
+           AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id::text = id::text)`
+      ).run(classId, JSON.stringify([studentId]), `📝 ${firstName}'s %`);
+    } catch {}
+
     for (const subject of ["reading", "math", "writing", "spelling"] as const) {
       const gradeNum = Number(subjectGrade[subject]);
       if (!Number.isFinite(gradeNum)) { errors.push(`${subject}: no grade level set`); continue; }
       const premade = PREMADE[subject]?.[gradeNum];
       if (!premade) { errors.push(`${subject} G${gradeNum}: no premade content for that grade`); continue; }
 
-      // Skip if a (class, subject, grade) row already exists — this kid
-      // either already has it or is going to inherit it from the class
-      // Generate Today output.
-      const existing: any = await db.prepare(
-        `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
-      ).get(classId, subject, gradeNum);
-      if (existing) { created.push({ title: premade.title, subject, grade: gradeNum, skipped: true }); continue; }
-
-      const id = crypto.randomUUID();
-      await db.prepare(
-        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
-      ).run(
-        id, classId, req.user!.id, premade.title, premade.description,
-        JSON.stringify(premade.content), subject, gradeNum, gradeNum,
-        JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
-      );
-      created.push({ id, title: premade.title, subject, grade: gradeNum });
+      try {
+        const id = crypto.randomUUID();
+        const title = `📝 ${firstName}'s ${premade.title}`;
+        // target_student_ids = [studentId] makes this direct-assigned —
+        // pending filter's first-precedence check returns true ONLY for
+        // this student. Grade columns set too for diagnostic display.
+        await db.prepare(
+          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, target_student_ids, scheduled_date, rubric, hints_allowed)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
+        ).run(
+          id, classId, req.user!.id, title, premade.description,
+          JSON.stringify(premade.content), subject, gradeNum, gradeNum,
+          JSON.stringify([studentId]),
+          JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
+        );
+        created.push({ id, title, subject, grade: gradeNum });
+      } catch (e: any) {
+        errors.push(`${subject} G${gradeNum}: ${e?.message}`);
+      }
     }
 
-    res.json({ created: created.filter((c: any) => !c.skipped).length, total: created.length, assignments: created, errors });
+    res.json({ created: created.length, total: created.length, assignments: created, errors, studentName: firstName });
   } catch (e: any) {
     console.error("[fill-student]", e?.message || e);
     res.status(500).json({ error: e?.message || "fill failed" });
