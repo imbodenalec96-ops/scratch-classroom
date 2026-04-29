@@ -1141,11 +1141,14 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
       : todayStr; // same date → harmless duplicate in OR clause
 
-    // Past-due roll-over: include unsubmitted assignments scheduled in the
-    // last 14 days so anything from earlier this week doesn't fall off.
-    // The bonus/afternoon expiry-at-3:10pm gate still runs in JS below
-    // so afternoon work doesn't leak into the next school day.
-    const rollbackStr = new Date(schoolNow.getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
+    // Past-due roll-over + future buffer: include any unsubmitted
+    // assignment scheduled in the last 30 days through the next 7. This
+    // guarantees Wednesday's work shows on Wednesday no matter how/when
+    // it was created, AND yesterday's leftovers roll forward.
+    // SUBSTR(...,1,10) makes the comparison work whether scheduled_date
+    // is stored as 'YYYY-MM-DD' or as an ISO timestamp.
+    const rollbackStr = new Date(schoolNow.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const futureStr   = new Date(schoolNow.getTime() +  7 * 86_400_000).toISOString().slice(0, 10);
 
     // Exclude heavy content column from list — client fetches it on demand via GET /:id
     const rows = await db.prepare(`
@@ -1161,10 +1164,10 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
         AND (a.student_id IS NULL OR a.student_id::text = ?)
         AND (
           a.scheduled_date IS NULL
-          OR (a.scheduled_date >= ? AND a.scheduled_date <= ?)
+          OR (SUBSTR(a.scheduled_date::text, 1, 10) >= ? AND SUBSTR(a.scheduled_date::text, 1, 10) <= ?)
         )
       ORDER BY a.is_afternoon ASC, a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, rollbackStr, nextDayStr) as any[];
+    `).all(userId, classId, userId, rollbackStr, futureStr) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
