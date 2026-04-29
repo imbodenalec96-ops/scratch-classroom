@@ -419,7 +419,7 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       console.error("[live-progress recent]", e?.message);
     }
 
-    res.json({ pct, studentsDone, totalStudents, totalOpen, topToday, recent });
+    res.json({ pct, studentsDone, totalStudents, totalOpen, topToday, recent, byStudent });
   } catch (e: any) {
     console.error("[board live-progress TOP]", e?.message || e);
     res.status(500).json({ error: e?.message || "live progress failed" });
