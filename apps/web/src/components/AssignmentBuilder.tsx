@@ -1053,6 +1053,33 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 );
               })()}
 
+              {/* View related lesson — opens lessons in a new tab. Auto-save
+                  keeps the student's answers safe so they can come back. */}
+              {(parsed?.subject || assignment?.target_subject) && (
+                <a
+                  href={`/lessons?subject=${encodeURIComponent(String(parsed?.subject || assignment.target_subject || "").toLowerCase())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    background: "rgba(125,211,197,0.10)",
+                    color: "#5eead4",
+                    border: "1px solid rgba(125,211,197,0.30)",
+                    textDecoration: "none",
+                    marginBottom: 16,
+                  }}
+                  title="Open your lesson notes in a new tab — your answers stay saved"
+                >
+                  📖 Open lesson notes (won't lose progress)
+                </a>
+              )}
+
               {/* Multiple choice */}
               {(q.q.type === "multiple_choice" || q.q.type === "mc") && (q.q.options || q.q.o) && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

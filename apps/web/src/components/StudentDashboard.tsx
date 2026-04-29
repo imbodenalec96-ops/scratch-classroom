@@ -2128,6 +2128,34 @@ function WorkScreen({
                 </div>
               )}
 
+              {/* View-related-lesson link — opens /lessons in a new tab so
+                  the student can review their lesson notes without losing
+                  their answers (auto-save keeps progress safe anyway). */}
+              {parsed?.subject && (
+                <a
+                  href={`/lessons?subject=${encodeURIComponent(String(parsed.subject).toLowerCase())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    background: "rgba(125,211,197,0.10)",
+                    color: "#5eead4",
+                    border: "1px solid rgba(125,211,197,0.30)",
+                    textDecoration: "none",
+                    width: "fit-content",
+                  }}
+                  title="Open your lesson notes in a new tab — your answers stay saved"
+                >
+                  📖 Open lesson notes (won't lose progress)
+                </a>
+              )}
+
               {/* Hint — always light (Starfall surface is always light) */}
               {q.q.hint && (
                 <div>

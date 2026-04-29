@@ -1002,7 +1002,16 @@ export default function LessonsPage() {
   const dk = theme === "dark";
   const navigate = useNavigate();
 
-  const [subject, setSubject] = useState<SubjectKey>("reading");
+  const [subject, setSubject] = useState<SubjectKey>(() => {
+    // Honor ?subject= query param so 'Open lesson notes' from an assignment
+    // lands on the matching subject tab automatically.
+    try {
+      const p = new URLSearchParams(window.location.search).get("subject");
+      const valid: SubjectKey[] = ["reading", "math", "writing", "sel"];
+      if (p && (valid as string[]).includes(p)) return p as SubjectKey;
+    } catch {}
+    return "reading";
+  });
   const [gradeFilter, setGradeFilter] = useState<number>(0);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());

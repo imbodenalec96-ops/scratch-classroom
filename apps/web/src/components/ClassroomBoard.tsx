@@ -483,78 +483,124 @@ export default function ClassroomBoard() {
         </div>
       )}
 
-      {/* ── LIVE CLASS PROGRESS panel (top-right, teachers only) ──
-          New board widget that surfaces real-time classroom state without
-          duplicating the existing teacher controls in TeacherDashboard.
-          Shows: % of class done with morning work, top 3 by today's
-          submissions, and a rolling ticker of just-finished submissions. */}
+      {/* ── LIVE CLASS PROGRESS panel (teachers only) — restyled to match
+          the editorial board theme: serif italics, paper tones (#f5f1e8 ink
+          on #0d1321 ground), brick-red rule, no glassmorphism. */}
       {isTeacher && classProgress && (
         <div
           style={{
             position: "absolute",
             top: 8, right: 12,
             zIndex: 40,
-            background: "rgba(7,8,15,0.85)",
-            border: `1px solid ${g(0.18)}`,
-            borderRadius: 14,
-            padding: "12px 16px",
-            backdropFilter: "blur(12px)",
-            color: "white",
-            minWidth: 280,
+            background: "linear-gradient(180deg, rgba(13,19,33,0.94) 0%, rgba(7,8,15,0.94) 100%)",
+            borderTop: `2px solid #b23a48`,
+            border: `1px solid ${g(0.14)}`,
+            borderTopWidth: 2,
+            borderTopColor: "#b23a48",
+            borderRadius: 4,
+            padding: "14px 18px 12px",
+            color: "#f5f1e8",
+            minWidth: 300,
             maxWidth: 360,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
           }}
         >
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
-            📊 Class progress today
+          {/* Editorial header — small caps, italic serif */}
+          <div style={{
+            fontFamily: serif, fontStyle: "italic",
+            fontSize: 11, fontWeight: 600,
+            letterSpacing: "0.18em", textTransform: "uppercase",
+            color: "#7dd3c5", marginBottom: 10,
+            borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 8,
+          }}>
+            Class progress · today
           </div>
-          {/* Big progress number + bar */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
-            <span style={{ fontSize: 28, fontWeight: 900, color: classProgress.pct >= 100 ? "#86efac" : "#fde68a", fontFamily: serif }}>
+
+          {/* Big serif percent — masthead style */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
+            <span style={{
+              fontFamily: serif, fontSize: 44, fontWeight: 500, fontStyle: "italic",
+              letterSpacing: "-0.02em", lineHeight: 1,
+              color: classProgress.pct >= 100 ? "#86efac" : "#fde68a",
+            }}>
               {classProgress.pct}%
             </span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", fontWeight: 600 }}>
-              ({classProgress.studentsDone}/{classProgress.totalStudents} students done)
+            <span style={{
+              fontFamily: serif, fontStyle: "italic", fontSize: 13,
+              color: g(0.55), letterSpacing: "0.02em",
+            }}>
+              {classProgress.studentsDone} of {classProgress.totalStudents} done
             </span>
           </div>
-          <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginBottom: 12 }}>
+          <div style={{ height: 4, borderRadius: 0, background: g(0.06), overflow: "hidden", marginBottom: 14 }}>
             <div style={{
               width: `${classProgress.pct}%`,
               height: "100%",
-              background: classProgress.pct >= 100 ? "linear-gradient(90deg,#22c55e,#16a34a)" : "linear-gradient(90deg,#fbbf24,#f59e0b)",
+              background: classProgress.pct >= 100 ? "#22c55e" : "linear-gradient(90deg, #b23a48, #d97706)",
               transition: "width .6s ease",
             }} />
           </div>
-          {/* Top 3 today */}
+
+          {/* Top 3 finishers — magazine column style */}
           {classProgress.topToday.length > 0 && (
             <>
-              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>
-                🏆 Top finishers today
+              <div style={{
+                fontFamily: serif, fontStyle: "italic",
+                fontSize: 10, fontWeight: 600,
+                letterSpacing: "0.14em", textTransform: "uppercase",
+                color: "#fbbf24", marginBottom: 6,
+              }}>
+                Top finishers
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
                 {classProgress.topToday.slice(0, 3).map((t, i) => (
-                  <div key={t.student_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                    <span style={{ width: 18, color: ["#fbbf24","#d1d5db","#d97706"][i], fontWeight: 900 }}>
-                      {["1st","2nd","3rd"][i]}
+                  <div key={t.student_id} style={{
+                    display: "flex", alignItems: "baseline", gap: 8,
+                    fontFamily: serif, fontSize: 14, color: "#f5f1e8",
+                  }}>
+                    <span style={{
+                      width: 22, fontStyle: "italic", fontWeight: 600,
+                      color: ["#fbbf24","#d1d5db","#d97706"][i],
+                    }}>
+                      {["i.","ii.","iii."][i]}
                     </span>
-                    <span style={{ flex: 1, fontWeight: 700 }}>{(t.name || "?").split(" ")[0]}</span>
-                    <span style={{ fontWeight: 800, color: "#fde68a" }}>{t.count}</span>
+                    <span style={{ flex: 1, fontWeight: 500 }}>{(t.name || "?").split(" ")[0]}</span>
+                    <span style={{ fontStyle: "italic", color: "#fde68a", fontWeight: 600 }}>
+                      {t.count} done
+                    </span>
                   </div>
                 ))}
               </div>
             </>
           )}
-          {/* Recent submissions ticker */}
+
+          {/* Recent submissions — datelined ticker */}
           {classProgress.recent.length > 0 && (
             <>
-              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>
-                ⚡ Just finished
+              <div style={{
+                fontFamily: serif, fontStyle: "italic",
+                fontSize: 10, fontWeight: 600,
+                letterSpacing: "0.14em", textTransform: "uppercase",
+                color: "#7dd3c5", marginBottom: 6,
+              }}>
+                Just turned in
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 {classProgress.recent.slice(0, 4).map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontWeight: 700 }}>{(r.name || "?").split(" ")[0]}</span>
-                    <span style={{ fontStyle: "italic", opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>{r.title}</span>
+                  <div key={i} style={{
+                    display: "flex", justifyContent: "space-between", gap: 8,
+                    fontFamily: serif, fontSize: 12, color: g(0.7),
+                  }}>
+                    <span style={{ fontWeight: 600, color: "#f5f1e8" }}>
+                      {(r.name || "?").split(" ")[0]}
+                    </span>
+                    <span style={{
+                      fontStyle: "italic",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      maxWidth: 200,
+                    }}>
+                      {r.title}
+                    </span>
                   </div>
                 ))}
               </div>
