@@ -1155,6 +1155,41 @@ router.post("/reset-star-assignments", (req, res) =>
   res.redirect(307, "/api/admin/seed-star-assignments"),
 );
 
+// GET /admin/assignment-stats — quick diagnostic: total count, breakdown
+// by scheduled_date and target_student_ids state, so we can tell at a glance
+// why the student dashboard isn't populating.
+router.get("/assignment-stats", async (_req, res) => {
+  try {
+    const total: any = await db.prepare(
+      `SELECT COUNT(*)::int AS n FROM assignments`
+    ).get();
+    const byDate: any[] = await db.prepare(
+      `SELECT COALESCE(SUBSTR(scheduled_date::text, 1, 10), 'NULL') AS date,
+              COUNT(*)::int AS n,
+              SUM(CASE WHEN target_student_ids IS NOT NULL THEN 1 ELSE 0 END)::int AS targeted,
+              SUM(CASE WHEN COALESCE(is_afternoon, 0) = 1 THEN 1 ELSE 0 END)::int AS afternoon
+       FROM assignments
+       GROUP BY 1 ORDER BY 1`
+    ).all();
+    const submittedTotal: any = await db.prepare(
+      `SELECT COUNT(*)::int AS n FROM submissions`
+    ).get();
+    const unsubmitted: any = await db.prepare(
+      `SELECT COUNT(*)::int AS n FROM assignments a
+       WHERE NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id::text = a.id::text)`
+    ).get();
+    res.json({
+      todayPacific: new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10),
+      totalAssignments: total?.n ?? 0,
+      totalSubmissions: submittedTotal?.n ?? 0,
+      unsubmittedAssignments: unsubmitted?.n ?? 0,
+      byScheduledDate: byDate,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/students — list all active students for the assignment builder
 router.get("/students", async (_req, res) => {
   try {
