@@ -4623,16 +4623,47 @@ export default function StudentDashboard() {
    the card flips to show the real achievement icon + label and the
    points awarded. */
 const ACHIEVEMENT_CATALOG: Record<string, { icon: string; label: string; desc: string }> = {
-  first_assignment: { icon: "🎯", label: "First One Done",  desc: "Finished your first assignment" },
-  "5_assignments":  { icon: "🔥", label: "On a Roll",       desc: "Finished 5 assignments" },
-  "10_assignments": { icon: "⭐", label: "Star Student",    desc: "Finished 10 assignments" },
-  "25_assignments": { icon: "🏆", label: "Champion",        desc: "Finished 25 assignments" },
-  "50_assignments": { icon: "💎", label: "Diamond Worker",  desc: "Finished 50 assignments" },
-  "100_assignments":{ icon: "👑", label: "Hall of Fame",    desc: "Finished 100 assignments" },
-  perfect_score:    { icon: "💯", label: "Perfect Score",   desc: "Got 100% on an assignment" },
-  "3_in_a_day":     { icon: "⚡", label: "Speedster",       desc: "3 in one day" },
-  "5_in_a_day":     { icon: "🚀", label: "Power Day",       desc: "5 in one day" },
-  all_subjects:     { icon: "🌟", label: "Well Rounded",    desc: "Every subject" },
+  // Volume
+  first_assignment:  { icon: "🎯",  label: "First One Done",  desc: "Finished your first assignment" },
+  "5_assignments":   { icon: "🔥",  label: "On a Roll",        desc: "Finished 5 assignments" },
+  "10_assignments":  { icon: "⭐",  label: "Star Student",     desc: "Finished 10 assignments" },
+  "25_assignments":  { icon: "🏆",  label: "Champion",         desc: "Finished 25 assignments" },
+  "50_assignments":  { icon: "💎",  label: "Diamond Worker",   desc: "Finished 50 assignments" },
+  "100_assignments": { icon: "👑",  label: "Hall of Fame",     desc: "Finished 100 assignments" },
+  "200_assignments": { icon: "🌌",  label: "Cosmic Worker",    desc: "Finished 200 assignments" },
+  // Quality
+  perfect_score:     { icon: "💯",  label: "Perfect Score",    desc: "Got 100%" },
+  "3_perfect":       { icon: "✨",  label: "Triple Perfect",   desc: "Got 100% three times" },
+  "10_perfect":      { icon: "🥇",  label: "Always Right",     desc: "Got 100% ten times" },
+  "50_perfect":      { icon: "💠",  label: "Perfectionist",    desc: "Got 100% fifty times" },
+  all_subjects:      { icon: "🌟",  label: "Well Rounded",     desc: "Every subject" },
+  // Daily push
+  "3_in_a_day":      { icon: "⚡",  label: "Speedster",        desc: "3 in one day" },
+  "5_in_a_day":      { icon: "🚀",  label: "Power Day",        desc: "5 in one day" },
+  "7_in_a_day":      { icon: "🌪️", label: "Tornado Day",      desc: "7 in one day" },
+  // Subject masters
+  reading_master:    { icon: "📚",  label: "Reading Master",   desc: "10 reading assignments" },
+  math_master:       { icon: "🔢",  label: "Math Master",      desc: "10 math assignments" },
+  writing_master:    { icon: "✍️",  label: "Writing Master",   desc: "10 writing assignments" },
+  spelling_master:   { icon: "🔤",  label: "Spelling Master",  desc: "10 spelling assignments" },
+  // Specialty masters
+  sel_master:        { icon: "🧠",  label: "Mindful",          desc: "3 SEL lessons" },
+  history_master:    { icon: "📜",  label: "Historian",        desc: "3 history lessons" },
+  science_master:    { icon: "🔬",  label: "Scientist",        desc: "3 science lessons" },
+  vocab_master:      { icon: "📖",  label: "Word Wizard",      desc: "3 vocabulary lessons" },
+  // Bonus work
+  bonus_buster:      { icon: "🌅",  label: "Bonus Buster",     desc: "Finished a bonus" },
+  "5_bonus":         { icon: "✨",  label: "Bonus Champion",   desc: "Finished 5 bonuses" },
+  // Streaks
+  streak_3:          { icon: "📅",  label: "3-Day Streak",     desc: "3 days in a row" },
+  streak_5:          { icon: "🔥",  label: "5-Day Streak",     desc: "5 days in a row" },
+  streak_10:         { icon: "🏅",  label: "10-Day Streak",    desc: "10 days in a row" },
+  streak_15:         { icon: "⚡",  label: "Lightning Streak", desc: "15 days in a row" },
+  // Daily-themed (added below in milestones)
+  early_bird:        { icon: "🌄",  label: "Early Bird",       desc: "Submitted before 9 AM" },
+  night_owl:         { icon: "🌙",  label: "Night Owl",        desc: "Submitted after 5 PM" },
+  weekend_warrior:   { icon: "🛡️",  label: "Weekend Warrior",  desc: "Worked on a weekend" },
+  comeback:          { icon: "🔁",  label: "Comeback Kid",     desc: "Returned after a missed day" },
 };
 
 function LootBox({

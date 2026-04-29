@@ -2247,6 +2247,163 @@ const PREMADE: Record<string, Record<number, { title: string; description: strin
   },
 };
 
+// BONUS_PREMADE — afternoon bonus content. Mirrors PREMADE's shape
+// (subject → grade → {title, description, content}) but uses ENTIRELY
+// different questions and word sets, so the afternoon bonus is a fresh
+// challenge rather than a repeat of the morning's. Spelling especially:
+// every grade gets new word lists and clear prompts that don't require
+// the student to remember a dictation word.
+const BONUS_PREMADE: Record<string, Record<number, { title: string; description: string; content: any }>> = {
+  reading: {
+    1: { title: "1st Grade Reading: Animals & Colors", description: "Read about animals and pick the right answer.", content: { title: "Animals & Colors", subject: "Reading", grade: "1st Grade", instructions: "Read each question and pick the best answer.", totalPoints: 30, sections: [{ title: "Animals & Colors", questions: [
+      { type: "multiple_choice", text: "Which animal lives in water and has fins?", options: ["A. dog", "B. fish", "C. bear", "D. bird"], correctIndex: 1, points: 6 },
+      { type: "multiple_choice", text: "What color is grass usually?", options: ["A. red", "B. blue", "C. green", "D. purple"], correctIndex: 2, points: 6 },
+      { type: "multiple_choice", text: "Which one is a baby dog?", options: ["A. puppy", "B. kitten", "C. calf", "D. chick"], correctIndex: 0, points: 6 },
+      { type: "multiple_choice", text: "Which is the biggest?", options: ["A. mouse", "B. ant", "C. elephant", "D. cat"], correctIndex: 2, points: 6 },
+      { type: "short_answer", text: "What color is the sky on a sunny day?", correctAnswer: "blue", points: 6 },
+    ] }] } },
+    2: { title: "2nd Grade Reading: Word Families", description: "Read words in the same family.", content: { title: "Word Families", subject: "Reading", grade: "2nd Grade", instructions: "Read each question and pick the best answer.", totalPoints: 40, sections: [{ title: "Word Family Practice", questions: [
+      { type: "multiple_choice", text: "Which word rhymes with 'pig'?", options: ["A. dog", "B. big", "C. cat", "D. sun"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Which word rhymes with 'star'?", options: ["A. cup", "B. moon", "C. car", "D. tree"], correctIndex: 2, points: 8 },
+      { type: "fill_blank", text: "A 'cup' is something you drink ___ from.", correctAnswer: "water or milk", points: 8 },
+      { type: "fill_blank", text: "When you 'jump' you go up in the ___.", correctAnswer: "air or sky", points: 8 },
+      { type: "short_answer", text: "What do you do with your eyes?", correctAnswer: "see or look or read", points: 8 },
+    ] }] } },
+    3: { title: "3rd Grade Reading: Lily's New Bike", description: "Read a short story and answer.", content: { title: "Lily's New Bike", subject: "Reading", grade: "3rd Grade", instructions: "Read the passage, then answer.", totalPoints: 50, sections: [{ title: "Story Comprehension", passage: "Lily got a new bike for her birthday. It was bright blue with silver handlebars. The first day she rode it, she fell off and scraped her knee. She wanted to give up, but her dad said, 'Try again — every rider falls.' She got back on. By the end of the week, she could ride to the park all by herself.", questions: [
+      { type: "multiple_choice", text: "What color is Lily's bike?", options: ["A. red", "B. blue", "C. green", "D. yellow"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What happened on her first ride?", options: ["A. She won a race", "B. She fell off", "C. She rode to school", "D. She got a flat tire"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What did her dad tell her?", options: ["A. Stop riding", "B. Get a new bike", "C. Try again", "D. Walk to the park"], correctIndex: 2, points: 10 },
+      { type: "short_answer", text: "What is the lesson of this story?", correctAnswer: "don't give up or keep trying or practice", points: 10, lines: 2 },
+      { type: "short_answer", text: "Where could Lily ride by the end of the week?", correctAnswer: "the park by herself", points: 10, lines: 1 },
+    ] }] } },
+    4: { title: "4th Grade Reading: The Honey Bee", description: "Read about how bees make honey.", content: { title: "The Honey Bee", subject: "Reading", grade: "4th Grade", instructions: "Read the passage, then answer.", totalPoints: 50, sections: [{ title: "Honey Bee Reading", passage: "Honey bees are small but powerful workers. A single bee may visit 2,000 flowers in one day. As it lands on each flower, it collects sweet nectar in a special stomach. Back at the hive, the bee passes the nectar to other workers, who chew it and store it in honeycomb cells. Bees fan their wings over the cells to dry the nectar into thick, golden honey. One bee makes only about a quarter teaspoon of honey in its whole life — but a hive of thousands can produce 100 pounds of honey in a year.", questions: [
+      { type: "multiple_choice", text: "What is the main idea of this passage?", options: ["A. Bees are scary", "B. Bees work together to make honey", "C. Honey is sweet", "D. Flowers grow everywhere"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "How many flowers can one bee visit in a day?", options: ["A. 200", "B. 2,000", "C. 20,000", "D. 100"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What do bees use to dry the nectar?", options: ["A. Sunlight", "B. Their wings", "C. Hot air vents", "D. Other flowers"], correctIndex: 1, points: 10 },
+      { type: "short_answer", text: "How much honey can a hive of thousands make in a year?", correctAnswer: "100 pounds", points: 10, lines: 1 },
+      { type: "short_answer", text: "Use one detail from the passage to support the main idea.", correctAnswer: "any supporting detail about bees working together", points: 10, lines: 2 },
+    ] }] } },
+    5: { title: "5th Grade Reading: The Mountain Climb", description: "Analyze a narrative passage.", content: { title: "The Mountain Climb", subject: "Reading", grade: "5th Grade", instructions: "Read carefully. Use details from the text.", totalPoints: 60, sections: [{ title: "Reading Analysis", passage: "Maya had trained for two years for this climb. Her boots were broken in, her pack was light, her plan precise. But halfway up Mount Hayes, the weather turned. Snow fell sideways and the rope between her and her partner tightened in a sudden gust. Maya could feel the cold reach through her gloves to her bones. The summit was only an hour away. She thought of every hour of training, every early morning. Then she looked at her partner — eyes wide behind frosted goggles — and made the call. They turned back. The mountain would still be there next year. Her partner would not, if they kept going.", questions: [
+      { type: "multiple_choice", text: "What was Maya's primary motivation early in the passage?", options: ["A. fame", "B. completing the climb after years of training", "C. money", "D. pleasing her partner"], correctIndex: 1, points: 12 },
+      { type: "multiple_choice", text: "What changed Maya's decision?", options: ["A. fatigue", "B. her partner's safety in worsening weather", "C. running out of food", "D. losing the rope"], correctIndex: 1, points: 12 },
+      { type: "fill_blank", text: "Maya decided to ___ before reaching the summit.", correctAnswer: "turn back or go back", points: 12 },
+      { type: "short_answer", text: "What is the author's tone toward Maya's choice?", correctAnswer: "respectful, supportive, or admiring", points: 12, lines: 2 },
+      { type: "short_answer", text: "What does this story suggest about real strength?", correctAnswer: "knowing when to stop or putting people first", points: 12, lines: 2 },
+    ] }] } },
+  },
+  math: {
+    1: { title: "1st Grade Math: Add Up to 10", description: "Practice adding small numbers.", content: { title: "Add Up to 10", subject: "Math", grade: "1st Grade", instructions: "Solve each one.", totalPoints: 40, sections: [{ title: "Addition Practice", questions: [
+      { type: "multiple_choice", text: "4 + 3 = ?", options: ["A. 5", "B. 6", "C. 7", "D. 8"], correctIndex: 2, points: 8 },
+      { type: "multiple_choice", text: "2 + 5 = ?", options: ["A. 6", "B. 7", "C. 8", "D. 9"], correctIndex: 1, points: 8 },
+      { type: "fill_blank", text: "5 + ___ = 9", correctAnswer: "4", points: 8 },
+      { type: "multiple_choice", text: "6 + 1 = ?", options: ["A. 5", "B. 6", "C. 7", "D. 8"], correctIndex: 2, points: 8 },
+      { type: "short_answer", text: "If you have 3 candies and find 4 more, how many do you have?", correctAnswer: "7", points: 8 },
+    ] }] } },
+    2: { title: "2nd Grade Math: Subtract to 20", description: "Practice subtracting numbers up to 20.", content: { title: "Subtract to 20", subject: "Math", grade: "2nd Grade", instructions: "Solve each one.", totalPoints: 50, sections: [{ title: "Subtraction Practice", questions: [
+      { type: "multiple_choice", text: "12 - 5 = ?", options: ["A. 5", "B. 6", "C. 7", "D. 8"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "18 - 9 = ?", options: ["A. 7", "B. 8", "C. 9", "D. 10"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "15 - 7 = ___", correctAnswer: "8", points: 10 },
+      { type: "fill_blank", text: "20 - 6 = ___", correctAnswer: "14", points: 10 },
+      { type: "short_answer", text: "You had 13 stickers and gave 4 away. How many do you have now?", correctAnswer: "9", points: 10 },
+    ] }] } },
+    3: { title: "3rd Grade Math: Multiplication Facts", description: "Practice times tables 2-5.", content: { title: "Multiplication Facts", subject: "Math", grade: "3rd Grade", instructions: "Solve each one.", totalPoints: 50, sections: [{ title: "Multiplication", questions: [
+      { type: "multiple_choice", text: "3 × 4 = ?", options: ["A. 7", "B. 10", "C. 12", "D. 14"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "5 × 6 = ?", options: ["A. 11", "B. 25", "C. 30", "D. 36"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "4 × 4 = ___", correctAnswer: "16", points: 10 },
+      { type: "fill_blank", text: "2 × 9 = ___", correctAnswer: "18", points: 10 },
+      { type: "short_answer", text: "If 4 friends each have 5 marbles, how many marbles in total?", correctAnswer: "20", points: 10 },
+    ] }] } },
+    4: { title: "4th Grade Math: Long Division", description: "Practice dividing larger numbers.", content: { title: "Long Division", subject: "Math", grade: "4th Grade", instructions: "Solve each one. Show the answer.", totalPoints: 50, sections: [{ title: "Division Practice", questions: [
+      { type: "multiple_choice", text: "48 ÷ 6 = ?", options: ["A. 6", "B. 7", "C. 8", "D. 9"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "72 ÷ 9 = ?", options: ["A. 6", "B. 7", "C. 8", "D. 9"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "84 ÷ 4 = ___", correctAnswer: "21", points: 10 },
+      { type: "fill_blank", text: "100 ÷ 5 = ___", correctAnswer: "20", points: 10 },
+      { type: "short_answer", text: "You have 36 cookies to share equally with 6 friends. How many does each get?", correctAnswer: "6", points: 10 },
+    ] }] } },
+    5: { title: "5th Grade Math: Decimals", description: "Practice adding and subtracting decimals.", content: { title: "Decimals", subject: "Math", grade: "5th Grade", instructions: "Solve each one.", totalPoints: 60, sections: [{ title: "Decimal Practice", questions: [
+      { type: "multiple_choice", text: "0.5 + 0.3 = ?", options: ["A. 0.2", "B. 0.7", "C. 0.8", "D. 1.0"], correctIndex: 2, points: 12 },
+      { type: "multiple_choice", text: "1.2 - 0.4 = ?", options: ["A. 0.6", "B. 0.8", "C. 1.0", "D. 1.6"], correctIndex: 1, points: 12 },
+      { type: "fill_blank", text: "2.5 + 1.5 = ___", correctAnswer: "4 or 4.0", points: 12 },
+      { type: "fill_blank", text: "Which is bigger: 0.7 or 0.65? Answer with the bigger number.", correctAnswer: "0.7", points: 12 },
+      { type: "short_answer", text: "A pencil costs $0.75. You give the cashier $1. How much change do you get back?", correctAnswer: "0.25 or 25 cents or twenty-five cents", points: 12 },
+    ] }] } },
+  },
+  writing: {
+    1: { title: "1st Grade Writing: Sentences", description: "Write a complete sentence.", content: { title: "Writing Sentences", subject: "Writing", grade: "1st Grade", instructions: "Read each prompt, then write a sentence.", totalPoints: 30, sections: [{ title: "Sentence Practice", questions: [
+      { type: "multiple_choice", text: "Which is a complete sentence?", options: ["A. The cat", "B. Runs fast", "C. The cat runs fast.", "D. fast"], correctIndex: 2, points: 6 },
+      { type: "multiple_choice", text: "Which sentence ends correctly?", options: ["A. I like apples", "B. I like apples.", "C. I like apples,", "D. I like apples?"], correctIndex: 1, points: 6 },
+      { type: "fill_blank", text: "Every sentence starts with a ___ letter.", correctAnswer: "capital or big", points: 6 },
+      { type: "short_answer", text: "Write a sentence about your favorite animal. Start with a capital letter, end with a period.", correctAnswer: "any complete sentence about an animal", points: 6, lines: 2 },
+      { type: "short_answer", text: "Write a sentence about something you like to eat.", correctAnswer: "any complete sentence about a food", points: 6, lines: 2 },
+    ] }] } },
+    2: { title: "2nd Grade Writing: Punctuation", description: "Practice end punctuation.", content: { title: "Punctuation Practice", subject: "Writing", grade: "2nd Grade", instructions: "Pick the right punctuation.", totalPoints: 40, sections: [{ title: "Punctuation", questions: [
+      { type: "multiple_choice", text: "Which punctuation goes at the end of: 'Where is my book'", options: ["A. .", "B. ?", "C. !", "D. ,"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Which punctuation goes at the end of: 'Watch out'", options: ["A. .", "B. ?", "C. !", "D. ,"], correctIndex: 2, points: 8 },
+      { type: "fill_blank", text: "A question ends with a ___.", correctAnswer: "question mark", points: 8 },
+      { type: "fill_blank", text: "A statement ends with a ___.", correctAnswer: "period", points: 8 },
+      { type: "short_answer", text: "Write a question about something you want to know.", correctAnswer: "any sentence ending with a question mark", points: 8, lines: 2 },
+    ] }] } },
+    3: { title: "3rd Grade Writing: Paragraph", description: "Write a paragraph with a topic sentence.", content: { title: "Paragraph Writing", subject: "Writing", grade: "3rd Grade", instructions: "Read the prompts and write your answer.", totalPoints: 50, sections: [{ title: "Paragraph Practice", questions: [
+      { type: "multiple_choice", text: "What does a topic sentence do?", options: ["A. Ends a paragraph", "B. Tells the main idea", "C. Adds a detail", "D. Asks a question"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is the best topic sentence for a paragraph about dogs?", options: ["A. My dog is brown.", "B. Dogs make great pets.", "C. The end.", "D. Yesterday I ran."], correctIndex: 1, points: 10 },
+      { type: "fill_blank", text: "A paragraph usually has at least ___ sentences.", correctAnswer: "3 or three", points: 10 },
+      { type: "short_answer", text: "Write a topic sentence about your favorite season.", correctAnswer: "any topic sentence about a season", points: 10, lines: 2 },
+      { type: "short_answer", text: "Write 2 detail sentences that go with your topic.", correctAnswer: "any two related details", points: 10, lines: 3 },
+    ] }] } },
+    4: { title: "4th Grade Writing: Descriptive Words", description: "Use strong adjectives and verbs.", content: { title: "Descriptive Writing", subject: "Writing", grade: "4th Grade", instructions: "Pick the strongest word, then write.", totalPoints: 50, sections: [{ title: "Descriptive Practice", questions: [
+      { type: "multiple_choice", text: "Which is the most descriptive verb?", options: ["A. went", "B. sprinted", "C. moved", "D. did"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is the most descriptive adjective?", options: ["A. nice", "B. good", "C. enormous", "D. big"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "Replace 'said' with a stronger word in: 'She said it loudly.' New verb: ___", correctAnswer: "shouted or yelled or exclaimed", points: 10 },
+      { type: "short_answer", text: "Describe a thunderstorm in 2 sentences using strong adjectives and verbs.", correctAnswer: "any vivid description of a storm", points: 10, lines: 3 },
+      { type: "short_answer", text: "Describe the smell of a pizza in 1-2 sentences.", correctAnswer: "any sensory description", points: 10, lines: 2 },
+    ] }] } },
+    5: { title: "5th Grade Writing: Persuasive", description: "Make an argument with reasons.", content: { title: "Persuasive Writing", subject: "Writing", grade: "5th Grade", instructions: "Write your reasons clearly.", totalPoints: 60, sections: [{ title: "Persuasive Practice", questions: [
+      { type: "multiple_choice", text: "What is a 'thesis statement'?", options: ["A. A question", "B. The main argument of your essay", "C. A list of details", "D. A summary"], correctIndex: 1, points: 12 },
+      { type: "multiple_choice", text: "Which is the strongest reason to give in a persuasive essay?", options: ["A. Because I said so", "B. Because it makes me happy", "C. Because it would save money and improve learning", "D. Because it sounds cool"], correctIndex: 2, points: 12 },
+      { type: "fill_blank", text: "A persuasive essay should have ___ reasons that support the main argument.", correctAnswer: "three or 3 or several", points: 12 },
+      { type: "short_answer", text: "Write a thesis statement: should kids have homework on weekends? Pick a side.", correctAnswer: "any clear thesis with a side", points: 12, lines: 2 },
+      { type: "short_answer", text: "Give one strong reason that supports your thesis.", correctAnswer: "any specific reason", points: 12, lines: 3 },
+    ] }] } },
+  },
+  spelling: {
+    1: { title: "1st Grade Spelling: Pet Words", description: "Spell easy pet words.", content: { title: "Pet Words", subject: "Spelling", grade: "1st Grade", instructions: "Read each clue and pick or type the correct spelling. Every question shows the word — you don't need to listen for it.", totalPoints: 30, sections: [{ title: "Pet Words", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of the animal that says 'woof'?", options: ["A. dawg", "B. dog", "C. doog", "D. dgo"], correctIndex: 1, points: 6 },
+      { type: "multiple_choice", text: "Which is the correct spelling of the pet that says 'meow'?", options: ["A. cat", "B. kat", "C. catt", "D. ckat"], correctIndex: 0, points: 6 },
+      { type: "multiple_choice", text: "A baby dog is a ___. Pick the correct spelling.", options: ["A. pupy", "B. pupie", "C. puppy", "D. puppey"], correctIndex: 2, points: 6 },
+      { type: "short_answer", text: "Type the spelling for the animal that swims and has fins. Hint: f-i-s-h", correctAnswer: "fish", points: 6 },
+      { type: "short_answer", text: "Type the spelling for the animal with feathers and wings. Hint: b-i-r-d", correctAnswer: "bird", points: 6 },
+    ] }] } },
+    2: { title: "2nd Grade Spelling: Long Vowels", description: "Spell words with long vowel sounds.", content: { title: "Long Vowels", subject: "Spelling", grade: "2nd Grade", instructions: "Read each clue and pick or type the correct spelling. Every question shows the word.", totalPoints: 40, sections: [{ title: "Long Vowel Practice", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of 'time'?", options: ["A. tym", "B. time", "C. tiem", "D. tame"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Which is the correct spelling of 'rain'?", options: ["A. ran", "B. rain", "C. rean", "D. rayn"], correctIndex: 1, points: 8 },
+      { type: "short_answer", text: "Spell the word that means 'a person who teaches'. Fill in: te___er", correctAnswer: "teacher", points: 8 },
+      { type: "short_answer", text: "Spell the word for a place to swim. Fill in: l___e", correctAnswer: "lake", points: 8 },
+      { type: "short_answer", text: "Spell the word for a path cars drive on. Hint: r-o-a-d", correctAnswer: "road", points: 8 },
+    ] }] } },
+    3: { title: "3rd Grade Spelling: Compound Words", description: "Spell two words joined together.", content: { title: "Compound Words", subject: "Spelling", grade: "3rd Grade", instructions: "Read each clue and pick or type the correct spelling. Every question shows the parts of the word.", totalPoints: 50, sections: [{ title: "Compound Words", questions: [
+      { type: "multiple_choice", text: "'Sun' + 'shine' makes which word?", options: ["A. sunshine", "B. shinesun", "C. sun-shine", "D. sunshyne"], correctIndex: 0, points: 10 },
+      { type: "multiple_choice", text: "Which is the correct spelling of 'baseball'?", options: ["A. base ball", "B. baseball", "C. baseboll", "D. baisball"], correctIndex: 1, points: 10 },
+      { type: "short_answer", text: "Combine 'rain' + 'bow' into one word. Type it:", correctAnswer: "rainbow", points: 10 },
+      { type: "short_answer", text: "Combine 'fire' + 'truck' into one word. Type it:", correctAnswer: "firetruck", points: 10 },
+      { type: "short_answer", text: "Combine 'foot' + 'ball' into one word. Type it:", correctAnswer: "football", points: 10 },
+    ] }] } },
+    4: { title: "4th Grade Spelling: Tricky Endings", description: "Spell words with -tion, -sion, -ous endings.", content: { title: "Tricky Endings", subject: "Spelling", grade: "4th Grade", instructions: "Read each clue and pick or type the correct spelling. Every question shows the word.", totalPoints: 50, sections: [{ title: "Tricky Endings", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of 'nation'?", options: ["A. nashion", "B. nation", "C. nayshun", "D. naytion"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is the correct spelling of 'famous'?", options: ["A. famous", "B. famus", "C. famious", "D. famouss"], correctIndex: 0, points: 10 },
+      { type: "short_answer", text: "Spell the word that means a holiday from school. Fill in: vaca___", correctAnswer: "vacation", points: 10 },
+      { type: "short_answer", text: "Spell the word that means making a choice. Fill in: deci___", correctAnswer: "decision", points: 10 },
+      { type: "short_answer", text: "Spell the word that means scary or unsafe. Fill in: danger___", correctAnswer: "dangerous", points: 10 },
+    ] }] } },
+    5: { title: "5th Grade Spelling: Latin & Greek Roots", description: "Spell words built from common roots.", content: { title: "Roots", subject: "Spelling", grade: "5th Grade", instructions: "Read each clue and pick or type the correct spelling. Every question shows the word.", totalPoints: 50, sections: [{ title: "Root Words", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of 'telegraph'?", options: ["A. telegraph", "B. tellegraph", "C. telgraph", "D. telegrafe"], correctIndex: 0, points: 10 },
+      { type: "multiple_choice", text: "Which is the correct spelling of 'biology'?", options: ["A. biolagy", "B. biology", "C. biologie", "D. byology"], correctIndex: 1, points: 10 },
+      { type: "short_answer", text: "Spell the word that means writing about life events. Fill in: bio___y", correctAnswer: "biography", points: 10 },
+      { type: "short_answer", text: "Spell the word for the study of the Earth's surface. Fill in: geo___y", correctAnswer: "geography", points: 10 },
+      { type: "short_answer", text: "Spell the word for sending a message far away. Fill in: tele___m", correctAnswer: "telegram", points: 10 },
+    ] }] } },
+  },
+};
+
 // SEL — text-based lesson, no embedded YouTube. The previous video_url
 // (YouTube ID 2zrtHt3bBmQ) was showing students unrelated content
 // (off-topic clip / recommendation surface), so the SEL bundle now mirrors
@@ -2557,8 +2714,11 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
 
   for (const subject of subjects) {
     for (const grade of grades) {
-      const premade = PREMADE[subject]?.[grade];
-      if (!premade) continue; // not all subjects have content for every grade
+      // Bonus uses BONUS_PREMADE so kids get fresh content, not a
+      // duplicate of the morning's questions. Falls back to the morning
+      // bundle only if a bonus version is missing.
+      const premade = BONUS_PREMADE[subject]?.[grade] || PREMADE[subject]?.[grade];
+      if (!premade) continue;
       try {
         const id = crypto.randomUUID();
         const title = `🌅 Bonus — ${premade.title}`;

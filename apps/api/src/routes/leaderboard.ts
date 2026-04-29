@@ -184,6 +184,33 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       bonusCount = Number(r?.n ?? 0);
     } catch {}
 
+    // Daily-themed: based on submission timestamps + days of the week.
+    // - early_bird: any submission landed before 9 AM Pacific
+    // - night_owl: any submission after 5 PM Pacific
+    // - weekend_warrior: any submission on a Saturday or Sunday
+    // - comeback: a submission day with a gap of 2+ days from the prior one
+    let earlyBird = false, nightOwl = false, weekendWarrior = false, comeback = false;
+    try {
+      const stamps: any[] = await db.prepare(
+        `SELECT COALESCE(submitted_at, created_at)::text AS ts
+         FROM submissions WHERE student_id::text = ?
+         ORDER BY ts ASC`
+      ).all(userId);
+      const PACIFIC_MS = -7 * 3600_000;
+      let prevDay: number | null = null;
+      for (const r of stamps) {
+        const d = new Date(new Date(r.ts).getTime() + PACIFIC_MS);
+        const hour = d.getUTCHours();
+        const dow = d.getUTCDay(); // 0=Sun, 6=Sat
+        if (hour < 9) earlyBird = true;
+        if (hour >= 17) nightOwl = true;
+        if (dow === 0 || dow === 6) weekendWarrior = true;
+        const dayKey = Math.floor(d.getTime() / 86_400_000);
+        if (prevDay != null && dayKey - prevDay >= 2) comeback = true;
+        prevDay = dayKey;
+      }
+    } catch {}
+
     // Submission-day streak (consecutive Pacific school days with at
     // least one submission, ending today or yesterday). Cheap calc:
     // pull the last 14 distinct submission dates and walk backward.
@@ -256,6 +283,11 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       { id: "streak_5",         icon: "🔥",  label: "5-Day Streak",     when: streakDays >= 5 },
       { id: "streak_10",        icon: "🏅",  label: "10-Day Streak",    when: streakDays >= 10 },
       { id: "streak_15",        icon: "⚡",  label: "Lightning Streak", when: streakDays >= 15 },
+      // Daily-themed (one-shot earnable from any day's submission timing)
+      { id: "early_bird",       icon: "🌄",  label: "Early Bird",       when: earlyBird },
+      { id: "night_owl",        icon: "🌙",  label: "Night Owl",        when: nightOwl },
+      { id: "weekend_warrior",  icon: "🛡️",  label: "Weekend Warrior",  when: weekendWarrior },
+      { id: "comeback",         icon: "🔁",  label: "Comeback Kid",     when: comeback },
     ];
 
     const awarded: Array<{ id: string; label: string; icon: string }> = [];
@@ -337,6 +369,11 @@ const BADGE_POINTS: Record<string, number> = {
   streak_5:          3,
   streak_10:         4,
   streak_15:         5,
+  // Daily-themed
+  early_bird:        2,
+  night_owl:         2,
+  weekend_warrior:   3,
+  comeback:          2,
 };
 const DEFAULT_BADGE_POINTS = 1;
 

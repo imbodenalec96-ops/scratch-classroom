@@ -43,6 +43,11 @@ const ALL_BADGES = [
   { id: "streak_5",           icon: "🔥",  label: "5-Day Streak",      desc: "Submitted on 5 days in a row" },
   { id: "streak_10",          icon: "🏅",  label: "10-Day Streak",     desc: "Submitted on 10 days in a row" },
   { id: "streak_15",          icon: "⚡",  label: "Lightning Streak",  desc: "Submitted on 15 days in a row" },
+  // Daily-themed (one-shot)
+  { id: "early_bird",         icon: "🌄",  label: "Early Bird",        desc: "Submitted before 9 AM" },
+  { id: "night_owl",          icon: "🌙",  label: "Night Owl",         desc: "Submitted after 5 PM" },
+  { id: "weekend_warrior",    icon: "🛡️",  label: "Weekend Warrior",   desc: "Worked on a Saturday or Sunday" },
+  { id: "comeback",           icon: "🔁",  label: "Comeback Kid",      desc: "Came back after a missed day" },
 ];
 
 export default function Achievements() {
