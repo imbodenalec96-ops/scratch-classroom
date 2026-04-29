@@ -157,7 +157,7 @@ export default function ClassroomBoard() {
       } catch {}
     };
     tick();
-    const iv = setInterval(tick, 15_000);
+    const iv = setInterval(tick, 8_000);
     return () => { cancelled = true; clearInterval(iv); };
   }, [cls?.id, isTeacher]);
   const [error, setError] = useState<string | null>(null);
@@ -492,129 +492,75 @@ export default function ClassroomBoard() {
         </div>
       )}
 
-      {/* ── LIVE CLASS PROGRESS panel (teachers only) — anchored to the
-          BOTTOM-LEFT so it doesn't collide with the masthead time/date in
-          the top-right and doesn't break fullscreen by overflowing the
-          1920×1080 canvas. Editorial styling matches the board theme. */}
+      {/* ── LIVE CLASS PROGRESS — subtle line that hugs the bottom of the
+          board. Editorial label + thin amber/teal hairline that blends in
+          rather than competing with the student grid. Read-only, teachers
+          only. Refreshes every 15s so it tracks any newly-posted work. */}
       {isTeacher && classProgress && (
         <div
           style={{
             position: "absolute",
-            bottom: 64, left: 16,
+            bottom: 8, left: 16, right: 16,
             zIndex: 40,
-            background: "linear-gradient(180deg, rgba(13,19,33,0.94) 0%, rgba(7,8,15,0.94) 100%)",
-            borderTop: `2px solid #b23a48`,
-            border: `1px solid ${g(0.14)}`,
-            borderTopWidth: 2,
-            borderTopColor: "#b23a48",
-            borderRadius: 4,
-            padding: "14px 18px 12px",
-            color: "#f5f1e8",
-            minWidth: 300,
-            maxWidth: 340,
-            boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            pointerEvents: "none",
           }}
         >
-          {/* Editorial header — small caps, italic serif */}
           <div style={{
             fontFamily: serif, fontStyle: "italic",
             fontSize: 11, fontWeight: 600,
-            letterSpacing: "0.18em", textTransform: "uppercase",
-            color: "#7dd3c5", marginBottom: 10,
-            borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 8,
+            letterSpacing: "0.16em", textTransform: "uppercase",
+            color: g(0.45),
+            whiteSpace: "nowrap",
           }}>
-            Class progress · today
+            Class progress
           </div>
 
-          {/* Big serif percent — masthead style */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-            <span style={{
-              fontFamily: serif, fontSize: 44, fontWeight: 500, fontStyle: "italic",
-              letterSpacing: "-0.02em", lineHeight: 1,
-              color: classProgress.pct >= 100 ? "#86efac" : "#fde68a",
-            }}>
-              {classProgress.pct}%
-            </span>
-            <span style={{
-              fontFamily: serif, fontStyle: "italic", fontSize: 13,
-              color: g(0.55), letterSpacing: "0.02em",
-            }}>
-              {classProgress.studentsDone} of {classProgress.totalStudents} done
-            </span>
-          </div>
-          <div style={{ height: 4, borderRadius: 0, background: g(0.06), overflow: "hidden", marginBottom: 14 }}>
+          {/* Hairline rail with subtle accent fill */}
+          <div style={{
+            flex: 1,
+            height: 2,
+            background: g(0.08),
+            borderRadius: 1,
+            overflow: "hidden",
+            position: "relative",
+          }}>
             <div style={{
+              position: "absolute",
+              top: -1, left: 0, height: 4,
               width: `${classProgress.pct}%`,
-              height: "100%",
-              background: classProgress.pct >= 100 ? "#22c55e" : "linear-gradient(90deg, #b23a48, #d97706)",
-              transition: "width .6s ease",
+              background: classProgress.pct >= 100
+                ? "linear-gradient(90deg, transparent, #5b8a6e 40%, #7dd3c5 80%)"
+                : "linear-gradient(90deg, transparent, #d97706 40%, #fbbf24 80%)",
+              borderRadius: 2,
+              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+              boxShadow: classProgress.pct >= 100
+                ? "0 0 8px rgba(125,211,197,0.5)"
+                : "0 0 8px rgba(251,191,36,0.4)",
             }} />
           </div>
 
-          {/* Top 3 finishers — magazine column style */}
-          {classProgress.topToday.length > 0 && (
-            <>
-              <div style={{
-                fontFamily: serif, fontStyle: "italic",
-                fontSize: 10, fontWeight: 600,
-                letterSpacing: "0.14em", textTransform: "uppercase",
-                color: "#fbbf24", marginBottom: 6,
-              }}>
-                Top finishers
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-                {classProgress.topToday.slice(0, 3).map((t, i) => (
-                  <div key={t.student_id} style={{
-                    display: "flex", alignItems: "baseline", gap: 8,
-                    fontFamily: serif, fontSize: 14, color: "#f5f1e8",
-                  }}>
-                    <span style={{
-                      width: 22, fontStyle: "italic", fontWeight: 600,
-                      color: ["#fbbf24","#d1d5db","#d97706"][i],
-                    }}>
-                      {["i.","ii.","iii."][i]}
-                    </span>
-                    <span style={{ flex: 1, fontWeight: 500 }}>{(t.name || "?").split(" ")[0]}</span>
-                    <span style={{ fontStyle: "italic", color: "#fde68a", fontWeight: 600 }}>
-                      {t.count} done
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          <div style={{
+            fontFamily: serif, fontStyle: "italic",
+            fontSize: 13, fontWeight: 500,
+            color: classProgress.pct >= 100 ? "#7dd3c5" : "#fde68a",
+            whiteSpace: "nowrap",
+          }}>
+            {classProgress.studentsDone}/{classProgress.totalStudents} · {classProgress.pct}%
+          </div>
 
-          {/* Recent submissions — datelined ticker */}
-          {classProgress.recent.length > 0 && (
-            <>
-              <div style={{
-                fontFamily: serif, fontStyle: "italic",
-                fontSize: 10, fontWeight: 600,
-                letterSpacing: "0.14em", textTransform: "uppercase",
-                color: "#7dd3c5", marginBottom: 6,
-              }}>
-                Just turned in
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {classProgress.recent.slice(0, 4).map((r, i) => (
-                  <div key={i} style={{
-                    display: "flex", justifyContent: "space-between", gap: 8,
-                    fontFamily: serif, fontSize: 12, color: g(0.7),
-                  }}>
-                    <span style={{ fontWeight: 600, color: "#f5f1e8" }}>
-                      {(r.name || "?").split(" ")[0]}
-                    </span>
-                    <span style={{
-                      fontStyle: "italic",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      maxWidth: 200,
-                    }}>
-                      {r.title}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
+          {classProgress.recent[0] && (
+            <div style={{
+              fontFamily: serif, fontStyle: "italic",
+              fontSize: 11, color: g(0.45),
+              whiteSpace: "nowrap",
+              overflow: "hidden", textOverflow: "ellipsis",
+              maxWidth: 280,
+            }}>
+              · just turned in: {(classProgress.recent[0].name || "?").split(" ")[0]} — {classProgress.recent[0].title}
+            </div>
           )}
         </div>
       )}

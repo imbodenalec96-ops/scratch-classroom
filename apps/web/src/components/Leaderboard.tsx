@@ -74,13 +74,19 @@ export default function Leaderboard() {
     });
   }, []);
 
-  const bg     = dk ? "#070714" : "#f0f1f8";
+  // Starfall-style warm cream palette in light mode; the dark-mode tokens
+  // stay so /leaderboard still has a usable dark theme for teachers who
+  // toggle it. Functions/logic/tabs/data flow are all unchanged — this is
+  // a pure visual retheme.
+  const bg      = dk
+    ? "#070714"
+    : "radial-gradient(ellipse at top, #fdf9ef 0%, #f6efde 60%, #efe6d0 100%)";
   const surface = dk ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.95)";
-  const cardBg  = dk ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.9)";
-  const border  = dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
-  const text1   = dk ? "#f1f5f9" : "#0f172a";
-  const text2   = dk ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)";
-  const text3   = dk ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.22)";
+  const cardBg  = dk ? "rgba(255,255,255,0.03)" : "white";
+  const border  = dk ? "rgba(255,255,255,0.08)" : "rgba(58,36,16,0.10)";
+  const text1   = dk ? "#f1f5f9" : "#3a2410";
+  const text2   = dk ? "rgba(255,255,255,0.4)" : "#8a7a5e";
+  const text3   = dk ? "rgba(255,255,255,0.22)" : "rgba(58,36,16,0.35)";
 
   const entries = tab === "stars" ? stars : assignments;
   const top3    = entries.slice(0, 3);
