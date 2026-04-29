@@ -1414,6 +1414,7 @@ function WorkScreen({
   classId?: string;
 }) {
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
+  const [showLesson, setShowLesson] = useState(false);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");
@@ -2128,32 +2129,31 @@ function WorkScreen({
                 </div>
               )}
 
-              {/* View-related-lesson link — opens /lessons in a new tab so
-                  the student can review their lesson notes without losing
-                  their answers (auto-save keeps progress safe anyway). */}
-              {parsed?.subject && (
-                <a
-                  href={`/lessons?subject=${encodeURIComponent(String(parsed.subject).toLowerCase())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {/* See-the-lesson button — opens an in-app modal with the
+                  AI lesson for this assignment. No new tab; X to close. */}
+              {parsed?.lesson && (
+                <button
+                  onClick={() => setShowLesson(true)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
                     padding: "8px 14px",
-                    borderRadius: 10,
+                    borderRadius: 999,
                     fontSize: 13,
-                    fontWeight: 700,
-                    background: "rgba(125,211,197,0.10)",
-                    color: "#5eead4",
-                    border: "1px solid rgba(125,211,197,0.30)",
-                    textDecoration: "none",
+                    fontWeight: 800,
+                    background: "white",
+                    color: "#0f766e",
+                    border: "1px solid rgba(15,118,110,0.30)",
+                    cursor: "pointer",
                     width: "fit-content",
+                    boxShadow: "0 2px 6px rgba(15,118,110,0.10)",
+                    touchAction: "manipulation",
                   }}
-                  title="Open your lesson notes in a new tab — your answers stay saved"
+                  title="See the lesson for this assignment — your answers stay saved"
                 >
-                  📖 Open lesson notes (won't lose progress)
-                </a>
+                  📖 See the lesson
+                </button>
               )}
 
               {/* Hint — always light (Starfall surface is always light) */}
@@ -2423,6 +2423,63 @@ function WorkScreen({
         <div style={{ height: 80 }} />{" "}
         {/* spacer so mascot doesn't overlap last button */}
       </div>
+
+      {/* In-app lesson modal — shows the AI lesson for this assignment so
+          the kid can review without leaving the page or losing answers. */}
+      {showLesson && parsed?.lesson && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9100,
+            background: "rgba(58,36,16,0.55)",
+            backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowLesson(false); }}
+        >
+          <div style={{
+            background: "linear-gradient(180deg, #fffaed 0%, #fef5dc 100%)",
+            border: "1px solid rgba(58,36,16,0.12)",
+            borderTop: `4px solid ${starfall.accent}`,
+            borderRadius: 22,
+            maxWidth: 640, width: "100%",
+            maxHeight: "85vh", overflowY: "auto",
+            padding: "26px 30px",
+            boxShadow: "0 24px 64px rgba(58,36,16,0.35)",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: starfall.accent, marginBottom: 4 }}>📖 The Lesson</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#3a2410", fontFamily: "'Source Serif Pro', Georgia, serif" }}>
+                  {parsed.title || assignment.title || "Today's Lesson"}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLesson(false)}
+                aria-label="Close lesson"
+                style={{
+                  flexShrink: 0,
+                  width: 36, height: 36, borderRadius: "50%",
+                  background: "white",
+                  border: "1px solid rgba(58,36,16,0.15)",
+                  color: "#5a4632", fontSize: 18, fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(58,36,16,0.08)",
+                  touchAction: "manipulation",
+                }}
+              >✕</button>
+            </div>
+            <div style={{ fontSize: 16, lineHeight: 1.75, color: "#3a2410", fontFamily: "'Source Serif Pro', Georgia, serif", whiteSpace: "pre-wrap" }}>
+              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
+            </div>
+            <div style={{ marginTop: 18, padding: "10px 14px", background: "rgba(15,118,110,0.08)", borderRadius: 12, fontSize: 12, color: "#0f766e", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>💡</span>
+              <span>Your answers are saved. Tap ✕ to keep working on the assignment.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Admin skip modal ── */}
       {showSkipModal && (

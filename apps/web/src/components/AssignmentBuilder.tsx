@@ -215,6 +215,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
   // "I'm stuck — call my teacher" state. Mirrors WorkScreen's behavior.
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
+  const [showLesson, setShowLesson] = useState(false);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");
@@ -1150,13 +1151,12 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 );
               })()}
 
-              {/* View related lesson — opens lessons in a new tab. Auto-save
-                  keeps the student's answers safe so they can come back. */}
-              {(parsed?.subject || assignment?.target_subject) && (
-                <a
-                  href={`/lessons?subject=${encodeURIComponent(String(parsed?.subject || assignment.target_subject || "").toLowerCase())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {/* See the lesson — opens an inline modal with the lesson text
+                  that was generated WITH this assignment, so it's perfectly
+                  on-topic. No new tab, no lost progress — just an X to close. */}
+              {parsed?.lesson && (
+                <button
+                  onClick={() => setShowLesson(true)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -1168,15 +1168,15 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                     background: "white",
                     color: "#0f766e",
                     border: "1px solid rgba(15,118,110,0.25)",
-                    textDecoration: "none",
+                    cursor: "pointer",
                     marginBottom: 18,
                     boxShadow: "0 2px 6px rgba(15,118,110,0.10)",
                     touchAction: "manipulation",
                   }}
-                  title="Open your lesson notes in a new tab — your answers stay saved"
+                  title="See the lesson for this assignment — your answers stay saved"
                 >
-                  📖 Open lesson notes (won't lose progress)
-                </a>
+                  📖 See the lesson
+                </button>
               )}
 
               {/* Multiple choice — big tappable cards with letter chips */}
@@ -1311,9 +1311,108 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 </button>
               )}
             </div>
+
+            {/* Cute mascot + encouragement — tiny, doesn't compete for
+                attention. Encouragement rotates by question index so kids
+                see different cheers as they go. */}
+            <div style={{
+              marginTop: 22,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              fontSize: 13, color: "#8a7a5e", fontStyle: "italic",
+              animation: "sfBounce 3s ease-in-out infinite",
+            }}>
+              <span style={{ fontSize: 22 }}>
+                {(["🐻","🦊","🐰","🦉","🐢","🐳","🦄","🐶","🐱","⭐"][currentQ % 10])}
+              </span>
+              <span>
+                {[
+                  "You've got this!",
+                  "Take your time — read it carefully.",
+                  "Nice focus! Keep going.",
+                  "Tap any word you don't know.",
+                  "You're doing great!",
+                  "One question at a time.",
+                  "Look back at the lesson if you need it.",
+                  "Almost there — keep it up!",
+                  "Brilliant! Finish strong.",
+                  "Last one! You can do it.",
+                ][Math.min(currentQ, 9)]}
+              </span>
+            </div>
           </div>
         )}
       </div>
+
+      {/* In-app lesson modal — shows the AI lesson for this assignment so
+          the kid can review without leaving the page or losing answers.
+          Click X or outside to close. */}
+      {showLesson && parsed?.lesson && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9100,
+            background: "rgba(58,36,16,0.45)",
+            backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+            animation: "sfFadeUp .25s ease both",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowLesson(false); }}
+        >
+          <div style={{
+            background: "linear-gradient(180deg, #fffaed 0%, #fef5dc 100%)",
+            border: "1px solid rgba(58,36,16,0.12)",
+            borderTop: `4px solid ${accent}`,
+            borderRadius: 22,
+            maxWidth: 640,
+            width: "100%",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            padding: "26px 30px",
+            boxShadow: "0 24px 64px rgba(58,36,16,0.35)",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: accent, marginBottom: 4 }}>
+                  📖 The Lesson
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#3a2410", fontFamily: "'Source Serif Pro', Georgia, serif" }}>
+                  {parsed.title || assignment.title || "Today's Lesson"}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLesson(false)}
+                aria-label="Close lesson"
+                style={{
+                  flexShrink: 0,
+                  width: 36, height: 36, borderRadius: "50%",
+                  background: "white",
+                  border: "1px solid rgba(58,36,16,0.15)",
+                  color: "#5a4632",
+                  fontSize: 18, fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(58,36,16,0.08)",
+                  touchAction: "manipulation",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{
+              fontSize: 16, lineHeight: 1.75,
+              color: "#3a2410",
+              fontFamily: "'Source Serif Pro', Georgia, serif",
+              whiteSpace: "pre-wrap",
+            }}>
+              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
+            </div>
+            <div style={{ marginTop: 18, padding: "10px 14px", background: "rgba(15,118,110,0.08)", borderRadius: 12, fontSize: 12, color: "#0f766e", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>💡</span>
+              <span>Your answers are saved. Tap ✕ to keep working on the assignment.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Nav jump modal */}
       {showNavModal && (
