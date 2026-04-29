@@ -402,15 +402,17 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       let pass = isAnswerCorrect(q, currentAnswer);
 
       // For short-answer / fill-in questions where the literal match
-      // failed, ask Claude whether the student's wording captures the
-      // same idea. Multiple choice and spelling stay strict — those
-      // have a single right answer. We only ask the AI when there's
-      // a meaningful sentence to evaluate (3+ words).
+      // failed, ask the AI verifier whether the student's wording is
+      // close enough. Multiple choice and old-style "spell the word: X"
+      // dictation prompts stay strict — those have a single right
+      // answer. Everything else, even a one-word answer, gets the AI
+      // check: kids type "ocean" when expected is "ocean lake river",
+      // "9" when expected is "nine", "100 lbs" when expected is "100
+      // pounds". Without AI, all of those bounce.
       const isMC = q?.type === "multiple_choice" && Array.isArray(q?.options);
       const isSpelling = !isMC && /spell(?:\s+the\s+word)?[:\s]+\S+/i.test(q?.text || "");
-      const wordCount = currentAnswer.trim().split(/\s+/).filter(Boolean).length;
 
-      if (!pass && !isMC && !isSpelling && wordCount >= 3) {
+      if (!pass && !isMC && !isSpelling) {
         try {
           setFeedback("Checking your answer…");
           const verdict = await api.aiVerifyAnswer(
@@ -420,9 +422,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           );
           if (verdict?.close) pass = true;
         } catch {
-          // AI unreachable → be lenient; long-form answers shouldn't
-          // wedge a kid because the API is flaky.
-          if (wordCount >= 5) pass = true;
+          // AI unreachable → fall back to permissive: accept any
+          // non-empty answer rather than wedge a kid on a flake.
+          pass = currentAnswer.trim().length > 0;
         }
       }
 
@@ -461,9 +463,8 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     if (lastQ && lastAns.trim()) {
       const isMC = lastQ.type === "multiple_choice" && Array.isArray(lastQ.options);
       const isSpelling = !isMC && /spell(?:\s+the\s+word)?[:\s]+\S+/i.test(lastQ.text || "");
-      const wordCount = lastAns.trim().split(/\s+/).filter(Boolean).length;
       let pass = isAnswerCorrect(lastQ, lastAns);
-      if (!pass && !isMC && !isSpelling && wordCount >= 3) {
+      if (!pass && !isMC && !isSpelling) {
         try {
           setFeedback("Checking your answer…");
           const verdict = await api.aiVerifyAnswer(
@@ -473,7 +474,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           );
           if (verdict?.close) pass = true;
         } catch {
-          if (wordCount >= 5) pass = true;
+          pass = lastAns.trim().length > 0;
         }
       }
       if (!pass) {
