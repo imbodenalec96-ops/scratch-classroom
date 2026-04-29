@@ -3935,25 +3935,34 @@ export default function StudentDashboard() {
           const r = (size - stroke) / 2;
           const c = 2 * Math.PI * r;
           const offset = c * (1 - pct / 100);
+          // Subtler progress card for students — soft cream/sage instead
+          // of the loud purple/green that dominated the dashboard.
+          const progressBg = isStudentDb
+            ? (allDone
+                ? "linear-gradient(135deg, rgba(91,138,110,0.10), rgba(168,200,194,0.06))"
+                : "linear-gradient(135deg, rgba(178,58,72,0.06), rgba(217,119,6,0.04))")
+            : (allDone
+                ? "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(22,163,74,0.10))"
+                : "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(99,102,241,0.10))");
+          const progressBorder = isStudentDb
+            ? (allDone ? "rgba(91,138,110,0.30)" : "rgba(178,58,72,0.20)")
+            : (allDone ? "rgba(34,197,94,0.4)" : "rgba(139,92,246,0.4)");
+          const progressShadow = isStudentDb
+            ? "0 4px 14px rgba(58,36,16,0.06)"
+            : (allDone ? "0 8px 24px rgba(34,197,94,0.18)" : "0 8px 24px rgba(139,92,246,0.18)");
           return (
             <div
               style={{
                 marginBottom: 14,
                 padding: "16px 18px",
                 borderRadius: 20,
-                background: allDone
-                  ? "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(22,163,74,0.10))"
-                  : "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(99,102,241,0.10))",
-                border: allDone
-                  ? "1px solid rgba(34,197,94,0.4)"
-                  : "1px solid rgba(139,92,246,0.4)",
+                background: progressBg,
+                border: `1px solid ${progressBorder}`,
                 display: "flex",
                 alignItems: "center",
                 gap: 16,
                 animation: "dbSlide .4s ease both",
-                boxShadow: allDone
-                  ? "0 8px 24px rgba(34,197,94,0.18)"
-                  : "0 8px 24px rgba(139,92,246,0.18)",
+                boxShadow: progressShadow,
               }}
             >
               {/* Circular progress ring */}
@@ -3968,7 +3977,7 @@ export default function StudentDashboard() {
                   <circle
                     cx={size / 2} cy={size / 2} r={r}
                     fill="none"
-                    stroke={allDone ? "#22c55e" : "#a78bfa"}
+                    stroke={isStudentDb ? (allDone ? "#5b8a6e" : "#b23a48") : (allDone ? "#22c55e" : "#a78bfa")}
                     strokeWidth={stroke}
                     strokeLinecap="round"
                     strokeDasharray={c}
@@ -3985,7 +3994,7 @@ export default function StudentDashboard() {
                     justifyContent: "center",
                     fontWeight: 900,
                     fontSize: 18,
-                    color: allDone ? "#22c55e" : "#c4b5fd",
+                    color: isStudentDb ? (allDone ? "#5b8a6e" : "#b23a48") : (allDone ? "#22c55e" : "#c4b5fd"),
                   }}
                 >
                   {pct}%
@@ -3993,7 +4002,11 @@ export default function StudentDashboard() {
               </div>
               {/* Stats */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: allDone ? "#86efac" : "#ddd6fe", lineHeight: 1.1 }}>
+                <div style={{
+                  fontSize: 22, fontWeight: 900,
+                  color: isStudentDb ? (allDone ? "#5b8a6e" : "#3a2410") : (allDone ? "#86efac" : "#ddd6fe"),
+                  lineHeight: 1.1,
+                }}>
                   {allDone
                     ? "🎉 All done for today!"
                     : `${doneToday} of ${total} assignments done`}
@@ -4105,103 +4118,56 @@ export default function StudentDashboard() {
             grad: string;
             glow: string;
           };
+          // Per-tile palette. Students get the coordinated Starfall slate
+          // (soft brick-red, amber, teal, sage — same family) so the grid
+          // doesn't read as chaotic rainbow. Teachers/admins keep their
+          // saturated brand-color tiles.
+          const sf = isStudentDb;
+          const grads = {
+            assignments: sf ? "linear-gradient(135deg,#c9938b,#b23a48)"   : "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+            lessons:     sf ? "linear-gradient(135deg,#a8c8c2,#5b8a6e)"   : "linear-gradient(135deg,#3b82f6,#2563eb)",
+            achievements:sf ? "linear-gradient(135deg,#d9b577,#d97706)"   : "linear-gradient(135deg,#10b981,#059669)",
+            store:       sf ? "linear-gradient(135deg,#e9c46a,#d4922f)"   : "linear-gradient(135deg,#fbbf24,#f59e0b)",
+            websites:    sf ? "linear-gradient(135deg,#a8c8c2,#5b8a6e)"   : "linear-gradient(135deg,#6366f1,#4f46e5)",
+            videos:      sf ? "linear-gradient(135deg,#c9938b,#b23a48)"   : "linear-gradient(135deg,#ef4444,#dc2626)",
+            arcade:      sf ? "linear-gradient(135deg,#d9b577,#d97706)"   : "linear-gradient(135deg,#ec4899,#db2777)",
+            projects:    sf ? "linear-gradient(135deg,#a8c8c2,#5b8a6e)"   : "linear-gradient(135deg,#14b8a6,#0d9488)",
+            signout:     sf ? "linear-gradient(135deg,#bcae9b,#8a7a5e)"   : "linear-gradient(135deg,#6b7280,#4b5563)",
+          };
+          const glows = {
+            assignments: sf ? "rgba(178,58,72,0.18)"  : "rgba(139,92,246,0.35)",
+            lessons:     sf ? "rgba(91,138,110,0.18)" : "rgba(59,130,246,0.35)",
+            achievements:sf ? "rgba(217,119,6,0.18)"  : "rgba(16,185,129,0.35)",
+            store:       sf ? "rgba(217,119,6,0.18)"  : "rgba(251,191,36,0.35)",
+            websites:    sf ? "rgba(91,138,110,0.18)" : "rgba(99,102,241,0.35)",
+            videos:      sf ? "rgba(178,58,72,0.18)"  : "rgba(239,68,68,0.35)",
+            arcade:      sf ? "rgba(217,119,6,0.18)"  : "rgba(236,72,153,0.35)",
+            projects:    sf ? "rgba(91,138,110,0.18)" : "rgba(20,184,166,0.35)",
+            signout:     sf ? "rgba(58,36,16,0.10)"   : "rgba(107,114,128,0.35)",
+          };
+
           const TILES: Tile[] = [
             // Always visible — the schoolwork core
-            {
-              to: "/assignments",
-              icon: "📝",
-              label: "Assignments",
-              desc: "Work to do",
-              grad: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-              glow: "rgba(139,92,246,0.35)",
-            },
-            {
-              to: "/lessons",
-              icon: "📖",
-              label: "Lessons",
-              desc: "Read & review",
-              grad: "linear-gradient(135deg,#3b82f6,#2563eb)",
-              glow: "rgba(59,130,246,0.35)",
-            },
-            {
-              to: "/achievements",
-              icon: "🎖️",
-              label: "Achievements",
-              desc: "Your badges",
-              grad: "linear-gradient(135deg,#10b981,#059669)",
-              glow: "rgba(16,185,129,0.35)",
-            },
+            { to: "/assignments",   icon: "📝", label: "Assignments",   desc: "Work to do",     grad: grads.assignments,   glow: glows.assignments },
+            { to: "/lessons",       icon: "📖", label: "Lessons",        desc: "Read & review",  grad: grads.lessons,       glow: glows.lessons },
+            { to: "/achievements",  icon: "🎖️", label: "Achievements",  desc: "Your badges",    grad: grads.achievements,  glow: glows.achievements },
             // Store only visible during the cashout block
-            ...(blockInfo.state === "current" &&
-            (blockInfo as any).block?.subject?.toLowerCase() === "cashout"
-              ? ([
-                  {
-                    to: "/cashout",
-                    icon: "🪙",
-                    label: "Store",
-                    desc:
-                      dojoPoints != null ? `${dojoPoints} pts` : "Spend points",
-                    grad: "linear-gradient(135deg,#fbbf24,#f59e0b)",
-                    glow: "rgba(251,191,36,0.35)",
-                  },
-                ] as Tile[])
+            ...(blockInfo.state === "current" && (blockInfo as any).block?.subject?.toLowerCase() === "cashout"
+              ? ([{ to: "/cashout", icon: "🪙", label: "Store", desc: dojoPoints != null ? `${dojoPoints} pts` : "Spend points", grad: grads.store, glow: glows.store }] as Tile[])
               : []),
             // Free-time only — Websites, Videos, Arcade, Projects
             ...(unlocked
               ? ([
-                  {
-                    to: "/websites",
-                    icon: "🌐",
-                    label: "Websites",
-                    desc:
-                      myWebsites.length > 0
-                        ? `${myWebsites.length} apps`
-                        : "Apps",
-                    grad: "linear-gradient(135deg,#6366f1,#4f46e5)",
-                    glow: "rgba(99,102,241,0.35)",
-                  },
+                  { to: "/websites", icon: "🌐", label: "Websites", desc: myWebsites.length > 0 ? `${myWebsites.length} apps` : "Apps", grad: grads.websites, glow: glows.websites },
                   ...(classConfig.youtubeEnabled
-                    ? ([
-                        {
-                          to: "/student/videos",
-                          icon: "📺",
-                          label: "Videos",
-                          desc:
-                            youtubeLibrary.length > 0
-                              ? `${youtubeLibrary.length} ready`
-                              : "Teacher's picks",
-                          grad: "linear-gradient(135deg,#ef4444,#dc2626)",
-                          glow: "rgba(239,68,68,0.35)",
-                        },
-                      ] as Tile[])
+                    ? ([{ to: "/student/videos", icon: "📺", label: "Videos", desc: youtubeLibrary.length > 0 ? `${youtubeLibrary.length} ready` : "Teacher's picks", grad: grads.videos, glow: glows.videos }] as Tile[])
                     : []),
-                  {
-                    to: "/arcade",
-                    icon: "🎮",
-                    label: "Arcade",
-                    desc: "31 games",
-                    grad: "linear-gradient(135deg,#ec4899,#db2777)",
-                    glow: "rgba(236,72,153,0.35)",
-                  },
-                  {
-                    to: "/projects",
-                    icon: "💻",
-                    label: "Projects",
-                    desc: "2D · 3D · Unity",
-                    grad: "linear-gradient(135deg,#14b8a6,#0d9488)",
-                    glow: "rgba(20,184,166,0.35)",
-                  },
+                  { to: "/arcade",   icon: "🎮", label: "Arcade",   desc: "31 games",     grad: grads.arcade,   glow: glows.arcade },
+                  { to: "/projects", icon: "💻", label: "Projects", desc: "2D · 3D · Unity", grad: grads.projects, glow: glows.projects },
                 ] as Tile[])
               : []),
             // Sign out button
-            {
-              onClick: logout,
-              icon: "🚪",
-              label: "Sign Out",
-              desc: "Logout",
-              grad: "linear-gradient(135deg,#6b7280,#4b5563)",
-              glow: "rgba(107,114,128,0.35)",
-            },
+            { onClick: logout, icon: "🚪", label: "Sign Out", desc: "Logout", grad: grads.signout, glow: glows.signout },
           ];
           return (
             <div
