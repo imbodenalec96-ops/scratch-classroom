@@ -8,30 +8,41 @@ import { useNavigate } from "react-router-dom";
 // awards on the server, so cards light up automatically as kids hit them.
 const ALL_BADGES = [
   // Volume
-  { id: "first_assignment",   icon: "🎯",  label: "First One Done",  desc: "Finished your first assignment" },
-  { id: "5_assignments",      icon: "🔥",  label: "On a Roll",        desc: "Finished 5 assignments" },
-  { id: "10_assignments",     icon: "⭐",  label: "Star Student",     desc: "Finished 10 assignments" },
-  { id: "25_assignments",     icon: "🏆",  label: "Champion",         desc: "Finished 25 assignments" },
-  { id: "50_assignments",     icon: "💎",  label: "Diamond Worker",   desc: "Finished 50 assignments" },
-  { id: "100_assignments",    icon: "👑",  label: "Hall of Fame",     desc: "Finished 100 assignments" },
+  { id: "first_assignment",   icon: "🎯",  label: "First One Done",   desc: "Finished your first assignment" },
+  { id: "5_assignments",      icon: "🔥",  label: "On a Roll",         desc: "Finished 5 assignments" },
+  { id: "10_assignments",     icon: "⭐",  label: "Star Student",      desc: "Finished 10 assignments" },
+  { id: "25_assignments",     icon: "🏆",  label: "Champion",          desc: "Finished 25 assignments" },
+  { id: "50_assignments",     icon: "💎",  label: "Diamond Worker",    desc: "Finished 50 assignments" },
+  { id: "100_assignments",    icon: "👑",  label: "Hall of Fame",      desc: "Finished 100 assignments" },
+  { id: "200_assignments",    icon: "🌌",  label: "Cosmic Worker",     desc: "Finished 200 assignments" },
   // Quality
-  { id: "perfect_score",      icon: "💯",  label: "Perfect Score",    desc: "Got 100% on an assignment" },
-  { id: "3_perfect",          icon: "✨",  label: "Triple Perfect",   desc: "Got 100% three times" },
-  { id: "10_perfect",         icon: "🥇",  label: "Always Right",     desc: "Got 100% ten times" },
-  { id: "all_subjects",       icon: "🌟",  label: "Well Rounded",     desc: "Finished an assignment in every subject" },
+  { id: "perfect_score",      icon: "💯",  label: "Perfect Score",     desc: "Got 100% on an assignment" },
+  { id: "3_perfect",          icon: "✨",  label: "Triple Perfect",    desc: "Got 100% three times" },
+  { id: "10_perfect",         icon: "🥇",  label: "Always Right",      desc: "Got 100% ten times" },
+  { id: "50_perfect",         icon: "💠",  label: "Perfectionist",     desc: "Got 100% fifty times" },
+  { id: "all_subjects",       icon: "🌟",  label: "Well Rounded",      desc: "Finished an assignment in every subject" },
   // Daily push
-  { id: "3_in_a_day",         icon: "⚡",  label: "Speedster",        desc: "Finished 3 assignments in one day" },
-  { id: "5_in_a_day",         icon: "🚀",  label: "Power Day",        desc: "Finished 5 assignments in one day" },
-  { id: "7_in_a_day",         icon: "🌪️", label: "Tornado Day",      desc: "Finished 7 assignments in one day" },
-  // Subject masters
-  { id: "reading_master",     icon: "📚",  label: "Reading Master",   desc: "Finished 10 reading assignments" },
-  { id: "math_master",        icon: "🔢",  label: "Math Master",      desc: "Finished 10 math assignments" },
-  { id: "writing_master",     icon: "✍️",  label: "Writing Master",   desc: "Finished 10 writing assignments" },
-  { id: "spelling_master",    icon: "🔤",  label: "Spelling Master",  desc: "Finished 10 spelling assignments" },
+  { id: "3_in_a_day",         icon: "⚡",  label: "Speedster",         desc: "Finished 3 assignments in one day" },
+  { id: "5_in_a_day",         icon: "🚀",  label: "Power Day",         desc: "Finished 5 assignments in one day" },
+  { id: "7_in_a_day",         icon: "🌪️", label: "Tornado Day",       desc: "Finished 7 assignments in one day" },
+  // Core subject masters
+  { id: "reading_master",     icon: "📚",  label: "Reading Master",    desc: "Finished 10 reading assignments" },
+  { id: "math_master",        icon: "🔢",  label: "Math Master",       desc: "Finished 10 math assignments" },
+  { id: "writing_master",     icon: "✍️",  label: "Writing Master",    desc: "Finished 10 writing assignments" },
+  { id: "spelling_master",    icon: "🔤",  label: "Spelling Master",   desc: "Finished 10 spelling assignments" },
+  // Specialty subject masters
+  { id: "sel_master",         icon: "🧠",  label: "Mindful",           desc: "Finished 3 SEL lessons" },
+  { id: "history_master",     icon: "📜",  label: "Historian",         desc: "Finished 3 history lessons" },
+  { id: "science_master",     icon: "🔬",  label: "Scientist",         desc: "Finished 3 science lessons" },
+  { id: "vocab_master",       icon: "📖",  label: "Word Wizard",       desc: "Finished 3 vocabulary lessons" },
+  // Bonus work
+  { id: "bonus_buster",       icon: "🌅",  label: "Bonus Buster",      desc: "Finished an afternoon bonus" },
+  { id: "5_bonus",            icon: "✨",  label: "Bonus Champion",    desc: "Finished 5 afternoon bonuses" },
   // Streaks
-  { id: "streak_3",           icon: "📅",  label: "3-Day Streak",     desc: "Submitted on 3 days in a row" },
-  { id: "streak_5",           icon: "🔥",  label: "5-Day Streak",     desc: "Submitted on 5 days in a row" },
-  { id: "streak_10",          icon: "🏅",  label: "10-Day Streak",    desc: "Submitted on 10 days in a row" },
+  { id: "streak_3",           icon: "📅",  label: "3-Day Streak",      desc: "Submitted on 3 days in a row" },
+  { id: "streak_5",           icon: "🔥",  label: "5-Day Streak",      desc: "Submitted on 5 days in a row" },
+  { id: "streak_10",          icon: "🏅",  label: "10-Day Streak",     desc: "Submitted on 10 days in a row" },
+  { id: "streak_15",          icon: "⚡",  label: "Lightning Streak",  desc: "Submitted on 15 days in a row" },
 ];
 
 export default function Achievements() {
@@ -45,17 +56,27 @@ export default function Achievements() {
   useEffect(() => {
     api.getLeaderboard().then((entries) => {
       const me = entries.find((e: any) => e.user_id === user?.id);
-      const data = me || { points: 0, level: 1, badges: [] };
+      const raw = me || { dojo_points: 0, points: 0, level: 1, badges: [] };
+      // Use cumulative dojo_points (badge claims + teacher hand-outs) as
+      // the XP source — the legacy `points` column is always 0 for new
+      // users so the bar would otherwise look empty even when a kid had
+      // earned plenty of badges. Level = 1 + floor(points / 50) so a
+      // realistic schoolyear of work fills several levels.
+      const xp = Number(raw.dojo_points ?? raw.points ?? 0);
+      const computedLevel = 1 + Math.floor(xp / 50);
+      const data = { ...raw, points: xp, level: computedLevel, badges: raw.badges || [] };
       setLeaderboard(data);
       // Delay bar fill so the animation is visible
-      setTimeout(() => setBarWidth(data.points % 100), 250);
+      setTimeout(() => setBarWidth(((xp % 50) / 50) * 100), 250);
     }).catch(() => {
       setLeaderboard({ points: 0, level: 1, badges: [] });
     });
   }, [user]);
 
   const earned = new Set(leaderboard?.badges || []);
-  const xpForNext = (leaderboard?.level || 1) * 100;
+  const xpPerLevel = 50;
+  const xpInLevel = (leaderboard?.points ?? 0) % xpPerLevel;
+  const xpForNext = xpPerLevel;
 
   return (
     <div className="p-8 space-y-6">
@@ -90,13 +111,13 @@ export default function Achievements() {
               </div>
               <span className="text-sm font-semibold text-t1">Level {leaderboard.level}</span>
             </div>
-            <span className="text-xs text-t3 tabular-nums">{leaderboard.points} / {xpForNext} XP</span>
+            <span className="text-xs text-t3 tabular-nums">{xpInLevel} / {xpForNext} XP</span>
           </div>
           <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: "var(--bg-hover)" }}>
             <div className="xp-bar-fill" style={{ width: `${barWidth}%` }} />
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-t3">{xpForNext - (leaderboard.points % 100)} XP to next level</span>
+            <span className="text-xs text-t3">{xpForNext - xpInLevel} XP to next level</span>
             <span className="text-xs font-medium" style={{ color: "var(--text-accent)" }}>
               {earned.size} / {ALL_BADGES.length} badges
             </span>

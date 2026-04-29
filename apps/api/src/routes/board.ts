@@ -429,7 +429,19 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       if (total > 0 && done >= total) studentsDone += 1;
     }
 
-    const pct = totalStudents > 0 ? Math.round((studentsDone / totalStudents) * 100) : 0;
+    // Class progress now reflects total work done across the class
+    // rather than just "students who are 100% done". Aggregating
+    // done/total directly gives the bar a more meaningful glide:
+    // it crawls up as kids submit, instead of jumping in 1/9 chunks.
+    let totalDoneAcrossClass = 0;
+    let totalAssignedAcrossClass = 0;
+    for (const sp of Object.values(byStudent)) {
+      totalDoneAcrossClass += sp.done;
+      totalAssignedAcrossClass += sp.total;
+    }
+    const pct = totalAssignedAcrossClass > 0
+      ? Math.round((totalDoneAcrossClass / totalAssignedAcrossClass) * 100)
+      : 0;
 
     // Top finishers today
     const topToday = students
@@ -457,6 +469,8 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
     res.json({
       pct, studentsDone, totalStudents,
       totalOpen: totalOpenAcrossClass,
+      totalDone: totalDoneAcrossClass,
+      totalAssigned: totalAssignedAcrossClass,
       topToday, recent, byStudent,
     });
   } catch (e: any) {

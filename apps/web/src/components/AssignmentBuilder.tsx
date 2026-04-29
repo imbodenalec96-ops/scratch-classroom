@@ -450,6 +450,44 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
   const handleSubmit = async () => {
     if (!assignment) return;
+
+    // Before submitting: validate the LAST question (and any sentence-type
+    // answers Next-button skipped via auto-advance). handleNext catches
+    // each answer as the student moves forward, but the final question's
+    // Submit click bypasses that gate. Run the same AI-lenient check here
+    // so a wrong final answer doesn't sneak through.
+    const lastQ = allQuestions[total - 1]?.q;
+    const lastAns = answers[total - 1] ?? "";
+    if (lastQ && lastAns.trim()) {
+      const isMC = lastQ.type === "multiple_choice" && Array.isArray(lastQ.options);
+      const isSpelling = !isMC && /spell(?:\s+the\s+word)?[:\s]+\S+/i.test(lastQ.text || "");
+      const wordCount = lastAns.trim().split(/\s+/).filter(Boolean).length;
+      let pass = isAnswerCorrect(lastQ, lastAns);
+      if (!pass && !isMC && !isSpelling && wordCount >= 3) {
+        try {
+          setFeedback("Checking your answer…");
+          const verdict = await api.aiVerifyAnswer(
+            String(lastQ.text || ""),
+            String(lastQ.correctAnswer || ""),
+            lastAns,
+          );
+          if (verdict?.close) pass = true;
+        } catch {
+          if (wordCount >= 5) pass = true;
+        }
+      }
+      if (!pass) {
+        setFeedback("That last answer is not quite right. Try again!");
+        setTimeout(() => setFeedback(""), 3000);
+        return;
+      }
+      setFeedback("");
+    } else if (lastQ && !lastAns.trim()) {
+      setFeedback("Please answer the last question before submitting.");
+      setTimeout(() => setFeedback(""), 3000);
+      return;
+    }
+
     setSubmitting(true);
     const submittedId = assignment.id;
     try {

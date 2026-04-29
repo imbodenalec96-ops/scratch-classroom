@@ -203,6 +203,8 @@ export default function ClassroomBoard() {
     pct: number;
     studentsDone: number;
     totalStudents: number;
+    totalDone?: number;
+    totalAssigned?: number;
     topToday: Array<{ student_id: string; name: string; count: number }>;
     recent: Array<{ name: string; title: string; ts: string }>;
     byStudent?: Record<string, { open: number; done: number; total: number; pct: number }>;
@@ -608,7 +610,10 @@ export default function ClassroomBoard() {
             color: classProgress.pct >= 100 ? "#7dd3c5" : "#fde68a",
             whiteSpace: "nowrap",
           }}>
-            {classProgress.studentsDone}/{classProgress.totalStudents} · {classProgress.pct}%
+            {/* Show actual work done across the class — done/total
+                assignments, not just "students who finished". This
+                makes the bar move continuously as kids submit. */}
+            {(classProgress.totalDone ?? 0)}/{(classProgress.totalAssigned ?? 0)} · {classProgress.pct}%
           </div>
 
           {classProgress.recent[0] && (

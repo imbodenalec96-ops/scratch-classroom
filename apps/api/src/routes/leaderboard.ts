@@ -145,9 +145,13 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     } catch {}
 
     // Distinct subjects this student has completed AND per-subject counts
-    // for the four "_master" badges (10 in a single subject = mastery).
+    // for the four "_master" badges (10 in a single subject) plus the
+    // specialty subject completions (sel/history/science/vocabulary).
     let distinctSubjects = new Set<string>();
-    const subjectCounts: Record<string, number> = { reading: 0, math: 0, writing: 0, spelling: 0 };
+    const subjectCounts: Record<string, number> = {
+      reading: 0, math: 0, writing: 0, spelling: 0,
+      sel: 0, history: 0, science: 0, vocabulary: 0,
+    };
     try {
       const subjects: any[] = await db.prepare(
         `SELECT LOWER(a.target_subject) AS subject, COUNT(*)::int AS n
@@ -165,6 +169,20 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     } catch {}
     const hasAllCoreSubjects =
       ["reading", "math", "writing", "spelling"].every((s) => distinctSubjects.has(s));
+
+    // Bonus assignment completions (afternoon work). Used for the
+    // bonus_buster + 5_bonus badges.
+    let bonusCount = 0;
+    try {
+      const r: any = await db.prepare(
+        `SELECT COUNT(*)::int AS n FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE s.student_id::text = ?
+           AND (COALESCE(a.is_afternoon, 0) = 1
+                OR (a.title IS NOT NULL AND a.title LIKE '🌅%'))`
+      ).get(userId);
+      bonusCount = Number(r?.n ?? 0);
+    } catch {}
 
     // Submission-day streak (consecutive Pacific school days with at
     // least one submission, ending today or yesterday). Cheap calc:
@@ -203,30 +221,41 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     // celebratory toast.
     const milestones: Array<{ id: string; label: string; icon: string; when: boolean }> = [
       // Volume tier
-      { id: "first_assignment", icon: "🎯", label: "First One Done",     when: submittedCount >= 1 },
-      { id: "5_assignments",    icon: "🔥", label: "On a Roll",          when: submittedCount >= 5 },
-      { id: "10_assignments",   icon: "⭐", label: "Star Student",       when: submittedCount >= 10 },
-      { id: "25_assignments",   icon: "🏆", label: "Champion",           when: submittedCount >= 25 },
-      { id: "50_assignments",   icon: "💎", label: "Diamond Worker",     when: submittedCount >= 50 },
-      { id: "100_assignments",  icon: "👑", label: "Hall of Fame",       when: submittedCount >= 100 },
+      { id: "first_assignment", icon: "🎯",  label: "First One Done",  when: submittedCount >= 1 },
+      { id: "5_assignments",    icon: "🔥",  label: "On a Roll",        when: submittedCount >= 5 },
+      { id: "10_assignments",   icon: "⭐",  label: "Star Student",     when: submittedCount >= 10 },
+      { id: "25_assignments",   icon: "🏆",  label: "Champion",         when: submittedCount >= 25 },
+      { id: "50_assignments",   icon: "💎",  label: "Diamond Worker",   when: submittedCount >= 50 },
+      { id: "100_assignments",  icon: "👑",  label: "Hall of Fame",     when: submittedCount >= 100 },
+      { id: "200_assignments",  icon: "🌌",  label: "Cosmic Worker",    when: submittedCount >= 200 },
       // Quality tier
-      { id: "perfect_score",    icon: "💯", label: "Perfect Score",      when: perfectCount >= 1 },
-      { id: "3_perfect",        icon: "✨", label: "Triple Perfect",     when: perfectCount >= 3 },
-      { id: "10_perfect",       icon: "🥇", label: "Always Right",       when: perfectCount >= 10 },
-      { id: "all_subjects",     icon: "🌟", label: "Well Rounded",       when: hasAllCoreSubjects },
+      { id: "perfect_score",    icon: "💯",  label: "Perfect Score",    when: perfectCount >= 1 },
+      { id: "3_perfect",        icon: "✨",  label: "Triple Perfect",   when: perfectCount >= 3 },
+      { id: "10_perfect",       icon: "🥇",  label: "Always Right",     when: perfectCount >= 10 },
+      { id: "50_perfect",       icon: "💠",  label: "Perfectionist",    when: perfectCount >= 50 },
+      { id: "all_subjects",     icon: "🌟",  label: "Well Rounded",     when: hasAllCoreSubjects },
       // Daily push
-      { id: "3_in_a_day",       icon: "⚡", label: "Speedster",          when: todayCount >= 3 },
-      { id: "5_in_a_day",       icon: "🚀", label: "Power Day",          when: todayCount >= 5 },
-      { id: "7_in_a_day",       icon: "🌪️", label: "Tornado Day",       when: todayCount >= 7 },
-      // Subject masters (10 in a single subject)
-      { id: "reading_master",   icon: "📚", label: "Reading Master",     when: subjectCounts.reading  >= 10 },
-      { id: "math_master",      icon: "🔢", label: "Math Master",        when: subjectCounts.math     >= 10 },
-      { id: "writing_master",   icon: "✍️", label: "Writing Master",     when: subjectCounts.writing  >= 10 },
-      { id: "spelling_master",  icon: "🔤", label: "Spelling Master",    when: subjectCounts.spelling >= 10 },
+      { id: "3_in_a_day",       icon: "⚡",  label: "Speedster",        when: todayCount >= 3 },
+      { id: "5_in_a_day",       icon: "🚀",  label: "Power Day",        when: todayCount >= 5 },
+      { id: "7_in_a_day",       icon: "🌪️", label: "Tornado Day",      when: todayCount >= 7 },
+      // Subject masters (10 in a single core subject)
+      { id: "reading_master",   icon: "📚",  label: "Reading Master",   when: subjectCounts.reading  >= 10 },
+      { id: "math_master",      icon: "🔢",  label: "Math Master",      when: subjectCounts.math     >= 10 },
+      { id: "writing_master",   icon: "✍️",  label: "Writing Master",   when: subjectCounts.writing  >= 10 },
+      { id: "spelling_master",  icon: "🔤",  label: "Spelling Master",  when: subjectCounts.spelling >= 10 },
+      // Specialty subject completion (3 in specialty subject = mastery)
+      { id: "sel_master",       icon: "🧠",  label: "Mindful",          when: subjectCounts.sel        >= 3 },
+      { id: "history_master",   icon: "📜",  label: "Historian",        when: subjectCounts.history    >= 3 },
+      { id: "science_master",   icon: "🔬",  label: "Scientist",        when: subjectCounts.science    >= 3 },
+      { id: "vocab_master",     icon: "📖",  label: "Word Wizard",      when: subjectCounts.vocabulary >= 3 },
+      // Bonus work
+      { id: "bonus_buster",     icon: "🌅",  label: "Bonus Buster",     when: bonusCount >= 1 },
+      { id: "5_bonus",          icon: "✨",  label: "Bonus Champion",   when: bonusCount >= 5 },
       // Streaks
-      { id: "streak_3",         icon: "📅", label: "3-Day Streak",       when: streakDays >= 3 },
-      { id: "streak_5",         icon: "🔥", label: "5-Day Streak",       when: streakDays >= 5 },
-      { id: "streak_10",        icon: "🏅", label: "10-Day Streak",      when: streakDays >= 10 },
+      { id: "streak_3",         icon: "📅",  label: "3-Day Streak",     when: streakDays >= 3 },
+      { id: "streak_5",         icon: "🔥",  label: "5-Day Streak",     when: streakDays >= 5 },
+      { id: "streak_10",        icon: "🏅",  label: "10-Day Streak",    when: streakDays >= 10 },
+      { id: "streak_15",        icon: "⚡",  label: "Lightning Streak", when: streakDays >= 15 },
     ];
 
     const awarded: Array<{ id: string; label: string; icon: string }> = [];
@@ -268,37 +297,48 @@ async function ensureBadgeClaims() {
   } catch { badgeClaimsReady = true; }
 }
 
-// Per-badge point payouts. Capped at 10 so badges don't dwarf the
-// classroom-points teachers hand out manually for behavior. Smaller
-// milestones pay less; bigger ones still cap at the ceiling.
+// Per-badge point payouts. Capped at 5 so badges feel rewarding but
+// stay subordinate to the classroom-points teachers hand out manually.
+// Floor of 1, ceiling of 5, distributed by milestone difficulty.
 const BADGE_POINTS: Record<string, number> = {
   // Volume
-  first_assignment:  3,
-  "5_assignments":   5,
-  "10_assignments":  6,
-  "25_assignments":  8,
-  "50_assignments": 10,
-  "100_assignments":10,
-  // Quality / variety
-  perfect_score:     5,
-  "3_perfect":       8,
-  "10_perfect":     10,
-  all_subjects:      8,
+  first_assignment:  1,
+  "5_assignments":   2,
+  "10_assignments":  2,
+  "25_assignments":  3,
+  "50_assignments":  4,
+  "100_assignments": 5,
+  "200_assignments": 5,
+  // Quality
+  perfect_score:     2,
+  "3_perfect":       3,
+  "10_perfect":      4,
+  "50_perfect":      5,
+  all_subjects:      3,
   // Daily push
-  "3_in_a_day":      4,
-  "5_in_a_day":      6,
-  "7_in_a_day":      8,
-  // Subject mastery
-  reading_master:    8,
-  math_master:       8,
-  writing_master:    8,
-  spelling_master:   8,
-  // Streak
-  streak_3:          5,
-  streak_5:          8,
-  streak_10:        10,
+  "3_in_a_day":      2,
+  "5_in_a_day":      3,
+  "7_in_a_day":      4,
+  // Subject mastery (10 in a single subject)
+  reading_master:    3,
+  math_master:       3,
+  writing_master:    3,
+  spelling_master:   3,
+  // Specialty subject completion
+  sel_master:        2,
+  history_master:    2,
+  science_master:    2,
+  vocab_master:      2,
+  // Bonus work
+  bonus_buster:      2,
+  "5_bonus":         3,
+  // Streaks
+  streak_3:          2,
+  streak_5:          3,
+  streak_10:         4,
+  streak_15:         5,
 };
-const DEFAULT_BADGE_POINTS = 3;
+const DEFAULT_BADGE_POINTS = 1;
 
 router.post("/claim-badge", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
