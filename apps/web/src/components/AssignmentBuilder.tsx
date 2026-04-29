@@ -766,61 +766,70 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           ← Back
         </button>
         <div style={{ flex: 1 }} />
-        {todayList.length > 1 && (
-          <button
-            onClick={() => {
-              if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
-              // Find the next pending assignment that ISN'T this one. Move
-              // current to end of list so we don't immediately re-show it.
-              const skippedId = assignment?.id;
-              const others = todayList.filter((a: any) => a.id !== skippedId);
-              const skipped = todayList.find((a: any) => a.id === skippedId);
-              const reordered = skipped ? [...others, skipped] : others;
-              setTodayList(reordered);
-              const next = others[0];
-              if (!next) {
-                setAssignment(null);
-                setParsed(null);
-                return;
-              }
-              // Reset draft state for the new assignment
-              setCurrentQ(0);
-              setAnswers({});
-              if (next.content) {
-                setAssignment(next);
-                try { setParsed(JSON.parse(next.content)); } catch { setParsed(null); }
-              } else {
-                setLoadingContent(true);
-                api.getAssignment(next.id)
-                  .then((full: any) => {
-                    const content = full?.content ?? null;
-                    const p = content ? (() => { try { return JSON.parse(content); } catch { return null; } })() : null;
-                    setParsed(p);
-                    setAssignment({ ...next, content });
-                  })
-                  .catch(() => setAssignment(next))
-                  .finally(() => setLoadingContent(false));
-              }
-              stopPassageAudio();
-            }}
-            style={{
-              background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-              color: "#3a2410",
-              border: "1px solid #fcd34d",
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 800,
-              padding: "8px 14px",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
-              whiteSpace: "nowrap",
-              touchAction: "manipulation",
-            }}
-            title="Skip this one — try a different assignment"
-          >
-            🔄 Try a different one
-          </button>
-        )}
+        <button
+          onClick={async () => {
+            // Always-visible skip. Find the next assignment from the cached
+            // todayList. If empty, fetch fresh from the server so we know
+            // for sure whether anything else is pending.
+            const skippedId = assignment?.id;
+            let others = todayList.filter((a: any) => a.id !== skippedId);
+            if (others.length === 0) {
+              try {
+                const cls = classes.length ? classes : await api.getClasses();
+                const results = await Promise.all(
+                  cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])),
+                );
+                const fresh = (results as any[][]).flat();
+                others = fresh.filter((a: any) => a.id !== skippedId);
+                setTodayList(fresh);
+              } catch {}
+            }
+            if (others.length === 0) {
+              alert("This is your only assignment right now — there's nothing to switch to. Finish this one and your teacher can add more!");
+              return;
+            }
+            if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
+            const skipped = todayList.find((a: any) => a.id === skippedId);
+            const reordered = skipped ? [...others, skipped] : others;
+            setTodayList(reordered);
+            const next = others[0];
+            // Reset draft state for the new assignment
+            setCurrentQ(0);
+            setAnswers({});
+            if (next.content) {
+              setAssignment(next);
+              try { setParsed(JSON.parse(next.content)); } catch { setParsed(null); }
+            } else {
+              setLoadingContent(true);
+              api.getAssignment(next.id)
+                .then((full: any) => {
+                  const content = full?.content ?? null;
+                  const p = content ? (() => { try { return JSON.parse(content); } catch { return null; } })() : null;
+                  setParsed(p);
+                  setAssignment({ ...next, content });
+                })
+                .catch(() => setAssignment(next))
+                .finally(() => setLoadingContent(false));
+            }
+            stopPassageAudio();
+          }}
+          style={{
+            background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+            color: "#3a2410",
+            border: "1px solid #fcd34d",
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 800,
+            padding: "8px 14px",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
+            whiteSpace: "nowrap",
+            touchAction: "manipulation",
+          }}
+          title="Skip this one — try a different assignment"
+        >
+          🔄 Try a different one
+        </button>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
           {currentQ + 1} / {total}
         </div>

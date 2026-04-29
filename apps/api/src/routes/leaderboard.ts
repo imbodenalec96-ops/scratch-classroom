@@ -225,6 +225,22 @@ async function ensureBadgeClaims() {
   } catch { badgeClaimsReady = true; }
 }
 
+// Per-badge point payouts. Tiered by milestone difficulty so kids feel
+// the bigger achievements are worth more without 25 being the floor.
+const BADGE_POINTS: Record<string, number> = {
+  first_assignment: 5,
+  "5_assignments":   5,
+  "3_in_a_day":      5,
+  perfect_score:    10,
+  "10_assignments": 10,
+  "5_in_a_day":     10,
+  "25_assignments": 15,
+  all_subjects:     15,
+  "50_assignments": 20,
+  "100_assignments":25,
+};
+const DEFAULT_BADGE_POINTS = 5;
+
 router.post("/claim-badge", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   const userId = req.user.id;
@@ -258,8 +274,8 @@ router.post("/claim-badge", async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // First claim — award dojo points and log the claim atomically-ish
-    const POINTS = 25;
+    // First claim — award tiered points and log the claim
+    const POINTS = BADGE_POINTS[badgeId] ?? DEFAULT_BADGE_POINTS;
     await db.prepare(`UPDATE users SET dojo_points = COALESCE(dojo_points, 0) + ? WHERE id = ?`).run(POINTS, userId);
     const balRow: any = await db.prepare(
       "SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id = ?"

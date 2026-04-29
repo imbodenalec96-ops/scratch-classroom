@@ -1678,7 +1678,7 @@ function WorkScreen({
               <span style={{ color: "#D4CEC2" }}>·</span>
               <span>{todayName}</span>
             </div>
-            {onSkip ? (
+            {onSkip && (
               <button
                 onClick={() => {
                   if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
@@ -1702,7 +1702,7 @@ function WorkScreen({
               >
                 🔄 Try a different one
               </button>
-            ) : <span />}
+            )}
           </div>
 
           {/* Masthead */}
@@ -4367,7 +4367,7 @@ export default function StudentDashboard() {
                 letterSpacing: "0.2em",
               }}
             >
-              🎁 Achievements — Tap a box to claim 25 points!
+              🎁 Achievements — Tap a box to claim your bonus points!
             </div>
             <div
               style={{
