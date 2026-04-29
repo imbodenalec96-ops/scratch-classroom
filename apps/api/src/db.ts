@@ -45,13 +45,35 @@ if (process.env.DATABASE_URL) {
     // fullResults: true makes .query() return a pg-style {rows, rowCount}
     // object instead of just the row array. We rely on rowCount for
     // INSERT/UPDATE/DELETE (it becomes "changes" in our DB layer) — without
-    // it, write queries report 0 changes and generate-today looks like a no-op.
+    // it, write queries report 0 changes.
     const { neon } = await import("@neondatabase/serverless");
     const sql = neon(process.env.DATABASE_URL!, { fullResults: true });
+
+    // Restore the pre-driver-swap contract: app code does
+    // `JSON.parse(row.rubric || "[]")` everywhere because under pg we
+    // had setTypeParser pinning jsonb→string. neon's HTTP driver
+    // helpfully pre-parses jsonb/json into JS objects, which means
+    // JSON.parse({...}) blows up with `"[object Object]" is not valid JSON`.
+    // Re-stringify any non-Date object/array column values so the existing
+    // JSON.parse callers keep working without edits in 40+ places.
+    const reStringifyJsonCols = (rows: any[]): any[] => {
+      for (const row of rows) {
+        if (!row || typeof row !== "object") continue;
+        for (const k in row) {
+          const v = row[k];
+          if (v !== null && typeof v === "object" && !(v instanceof Date) && !Buffer.isBuffer(v)) {
+            try { row[k] = JSON.stringify(v); } catch { /* leave as-is */ }
+          }
+        }
+      }
+      return rows;
+    };
+
     pool = {
       async query(sqlText: string, params?: any[]) {
         const r: any = await (sql as any).query(sqlText, params || []);
-        return { rows: r.rows || [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) };
+        const rows = reStringifyJsonCols(r.rows || []);
+        return { rows, rowCount: r.rowCount ?? (rows?.length ?? 0) };
       },
     };
   } else {
