@@ -3756,11 +3756,17 @@ export default function StudentDashboard() {
               height: 72,
               borderRadius: "50%",
               flexShrink: 0,
-              background: avatarEmoji
-                ? "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(79,70,229,0.25))"
-                : "linear-gradient(135deg, #7c3aed, #4f46e5)",
-              border: "3px solid rgba(255,255,255,0.15)",
-              boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
+              background: isStudentDb
+                ? (avatarEmoji
+                    ? "linear-gradient(135deg, #fffaed, #fef5dc)"
+                    : "linear-gradient(135deg, #c9938b, #b23a48)")
+                : (avatarEmoji
+                    ? "linear-gradient(135deg, rgba(139,92,246,0.4), rgba(79,70,229,0.25))"
+                    : "linear-gradient(135deg, #7c3aed, #4f46e5)"),
+              border: isStudentDb ? "3px solid white" : "3px solid rgba(255,255,255,0.15)",
+              boxShadow: isStudentDb
+                ? "0 4px 14px rgba(178,58,72,0.18)"
+                : "0 8px 24px rgba(139,92,246,0.35)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -3827,11 +3833,16 @@ export default function StudentDashboard() {
                 padding: "16px 18px",
                 borderRadius: 18,
                 textDecoration: "none",
-                background:
-                  "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(217,119,6,0.08))",
-                border: "1px solid rgba(245,158,11,0.35)",
-                boxShadow: "0 2px 14px rgba(245,158,11,0.12)",
-                color: "white",
+                background: isStudentDb
+                  ? "white"
+                  : "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(217,119,6,0.08))",
+                border: isStudentDb
+                  ? "1px solid rgba(58,36,16,0.10)"
+                  : "1px solid rgba(245,158,11,0.35)",
+                boxShadow: isStudentDb
+                  ? "0 2px 8px rgba(58,36,16,0.06)"
+                  : "0 2px 14px rgba(245,158,11,0.12)",
+                color: isStudentDb ? "#3a2410" : "white",
               }}
               aria-label="Your points — tap to visit the store"
             >
@@ -3847,7 +3858,7 @@ export default function StudentDashboard() {
                   style={{
                     fontSize: 26,
                     fontWeight: 900,
-                    color: "#fbbf24",
+                    color: isStudentDb ? "#b45309" : "#fbbf24",
                     lineHeight: 1,
                     fontVariantNumeric: "tabular-nums",
                   }}
@@ -3857,7 +3868,7 @@ export default function StudentDashboard() {
                 <span
                   style={{
                     fontSize: 12,
-                    opacity: 0.8,
+                    color: isStudentDb ? "#5a4632" : "rgba(255,255,255,0.8)",
                     marginTop: 3,
                     fontWeight: 700,
                   }}
@@ -3867,20 +3878,25 @@ export default function StudentDashboard() {
               </span>
             </Link>
           )}
-          {/* Stars — simple, amber when they've earned rewards */}
+          {/* Stars — student mode uses dark gold strokes on white card so
+              they're actually visible on cream. Filled = solid gold, empty =
+              dark brown outline. */}
           <div
             style={{
               flex: 1,
               borderRadius: 18,
               padding: "12px 14px",
-              background:
-                myStars.rewards > 0
-                  ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
-                  : "rgba(255,255,255,0.05)",
-              border:
-                myStars.rewards > 0
-                  ? "1px solid rgba(245,158,11,0.3)"
-                  : "1px solid rgba(255,255,255,0.08)",
+              background: isStudentDb
+                ? "white"
+                : (myStars.rewards > 0
+                    ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.08))"
+                    : "rgba(255,255,255,0.05)"),
+              border: isStudentDb
+                ? `1px solid ${myStars.rewards > 0 ? "rgba(217,119,6,0.45)" : "rgba(58,36,16,0.10)"}`
+                : (myStars.rewards > 0
+                    ? "1px solid rgba(245,158,11,0.3)"
+                    : "1px solid rgba(255,255,255,0.08)"),
+              boxShadow: isStudentDb ? "0 2px 8px rgba(58,36,16,0.06)" : undefined,
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
@@ -3888,26 +3904,33 @@ export default function StudentDashboard() {
             }}
           >
             <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
-              {Array.from({ length: 5 }, (_, i) => (
-                <svg
-                  key={i}
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill={i < starsCount ? "#fbbf24" : "none"}
-                  stroke={i < starsCount ? "#f59e0b" : "rgba(255,255,255,0.18)"}
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-              ))}
+              {Array.from({ length: 5 }, (_, i) => {
+                const filled = i < starsCount;
+                const fill = filled ? "#f59e0b" : "none";
+                const stroke = filled
+                  ? "#b45309"
+                  : isStudentDb ? "rgba(58,36,16,0.45)" : "rgba(255,255,255,0.18)";
+                return (
+                  <svg
+                    key={i}
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth="2.2"
+                    strokeLinejoin="round"
+                  >
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                );
+              })}
             </div>
             <div
               style={{
                 fontSize: 11,
-                fontWeight: 700,
-                color: "rgba(255,255,255,0.55)",
+                fontWeight: 800,
+                color: isStudentDb ? "#5a4632" : "rgba(255,255,255,0.55)",
               }}
             >
               {myStars.rewards > 0
