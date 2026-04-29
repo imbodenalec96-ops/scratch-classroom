@@ -522,22 +522,30 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
   if (!assignment) {
     // No specific assignment selected — render the full list of today's work.
+    // Subject palettes — coordinated soft Starfall family (no neon).
     const SUBJECT_META: Record<string, { emoji: string; grad: string; glow: string; accent: string }> = {
-      reading:  { emoji: "📖", grad: "linear-gradient(135deg,#7c3aed,#4f46e5)", glow: "rgba(124,58,237,0.5)",  accent: "#c4b5fd" },
-      math:     { emoji: "🔢", grad: "linear-gradient(135deg,#0ea5e9,#0284c7)", glow: "rgba(14,165,233,0.5)",  accent: "#7dd3fc" },
-      writing:  { emoji: "✏️", grad: "linear-gradient(135deg,#10b981,#059669)", glow: "rgba(16,185,129,0.5)",  accent: "#6ee7b7" },
-      sel:      { emoji: "💛", grad: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.5)",  accent: "#fcd34d" },
-      spelling: { emoji: "🔤", grad: "linear-gradient(135deg,#06b6d4,#0891b2)", glow: "rgba(6,182,212,0.5)",   accent: "#67e8f9" },
-      science:  { emoji: "🔬", grad: "linear-gradient(135deg,#ec4899,#db2777)", glow: "rgba(236,72,153,0.5)",  accent: "#f9a8d4" },
+      reading:  { emoji: "📖", grad: "linear-gradient(135deg,#c9938b,#b23a48)", glow: "rgba(178,58,72,0.20)",  accent: "#b23a48" },
+      math:     { emoji: "🔢", grad: "linear-gradient(135deg,#a8c8c2,#5b8a6e)", glow: "rgba(91,138,110,0.20)", accent: "#2a6f6a" },
+      writing:  { emoji: "✏️", grad: "linear-gradient(135deg,#d9b577,#d97706)", glow: "rgba(217,119,6,0.20)",  accent: "#b45309" },
+      sel:      { emoji: "💛", grad: "linear-gradient(135deg,#e9c46a,#d4922f)", glow: "rgba(212,146,47,0.20)", accent: "#b45309" },
+      spelling: { emoji: "🔤", grad: "linear-gradient(135deg,#a8c8c2,#5b8a6e)", glow: "rgba(91,138,110,0.20)", accent: "#2a6f6a" },
+      science:  { emoji: "🔬", grad: "linear-gradient(135deg,#c9938b,#b23a48)", glow: "rgba(178,58,72,0.20)",  accent: "#b23a48" },
     };
-    const DEFAULT_META = { emoji: "📚", grad: "linear-gradient(135deg,#8b5cf6,#7c3aed)", glow: "rgba(139,92,246,0.5)", accent: "#c4b5fd" };
+    const DEFAULT_META = { emoji: "📚", grad: "linear-gradient(135deg,#bcae9b,#8a7a5e)", glow: "rgba(58,36,16,0.12)", accent: "#5a4632" };
 
     if (todayList.length === 0) {
       return (
-        <div style={{ minHeight: "100dvh", background: "linear-gradient(135deg,#0f0826,#0a0b1e)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+        <div style={{
+          minHeight: "100dvh",
+          background: "radial-gradient(ellipse at top, #fdf9ef 0%, #f6efde 60%, #efe6d0 100%)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: 32, color: "#3a2410",
+        }}>
           <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-          <h2 style={{ fontSize: 24, fontWeight: 900, color: "white", margin: "0 0 8px" }}>All done for today!</h2>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+          <h2 style={{ fontSize: 26, fontWeight: 900, color: "#3a2410", margin: "0 0 8px", fontFamily: "'Source Serif Pro', Georgia, serif" }}>
+            All done for today!
+          </h2>
+          <p style={{ fontSize: 15, color: "#5a4632", textAlign: "center" }}>
             {classes.length === 0 ? "Join a class to receive assignments." : "No new assignments — check back with your teacher."}
           </p>
         </div>
@@ -547,13 +555,13 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     return (
       <div style={{
         minHeight: "100dvh",
-        background: "linear-gradient(160deg,#0f0826 0%,#0a0b1e 60%,#0c1030 100%)",
+        background: "radial-gradient(ellipse at top, #fdf9ef 0%, #f6efde 60%, #efe6d0 100%)",
         fontFamily: "'Baloo 2','Inter',system-ui,sans-serif",
         padding: "0 0 60px",
+        color: "#3a2410",
       }}>
         <style>{`
           @keyframes abPop { from { opacity:0; transform: translateY(22px) scale(.95); } to { opacity:1; transform: none; } }
-          @keyframes abGlow { 0%,100% { opacity:.7 } 50% { opacity:1 } }
           .ab-card:active { transform: scale(.97) !important; }
         `}</style>
 
@@ -562,17 +570,18 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           <button
             onClick={() => navigate(-1)}
             style={{
-              background: "rgba(6,182,212,0.18)",
-              color: "#67e8f9",
-              border: "none",
-              borderRadius: 14,
+              background: "white",
+              color: "#5a4632",
+              border: "1px solid rgba(58,36,16,0.15)",
+              borderRadius: 999,
               padding: "10px 22px",
-              fontWeight: 700,
-              fontSize: 15,
-              boxShadow: "0 2px 10px rgba(6,182,212,0.12)",
+              fontWeight: 800,
+              fontSize: 14,
+              boxShadow: "0 2px 6px rgba(58,36,16,0.06)",
               cursor: "pointer",
               marginBottom: 20,
               display: "inline-block",
+              touchAction: "manipulation",
             }}
             aria-label="Back"
           >
@@ -580,13 +589,22 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           </button>
         </div>
         <div style={{ padding: "0 24px 32px", maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a78bfa", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase",
+            color: "#b23a48",
+            marginBottom: 10, display: "flex", alignItems: "center", gap: 6,
+          }}>
             <span style={{ fontSize: 16 }}>📅</span> {todayName.toUpperCase()}'S ASSIGNMENTS
           </div>
-          <h1 style={{ fontSize: 34, fontWeight: 900, color: "#fff", margin: "0 0 6px", lineHeight: 1.15 }}>
+          <h1 style={{
+            fontSize: 32, fontWeight: 800,
+            color: "#3a2410",
+            margin: "0 0 6px", lineHeight: 1.15,
+            fontFamily: "'Source Serif Pro', Georgia, serif",
+          }}>
             What are you<br />working on today?
           </h1>
-          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.38)", margin: 0 }}>
+          <p style={{ fontSize: 14, color: "#8a7a5e", margin: 0, fontStyle: "italic" }}>
             {todayList.length} assignment{todayList.length !== 1 ? "s" : ""} ready for you
           </p>
         </div>
@@ -625,31 +643,31 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 style={{
                   display: "flex", alignItems: "center", gap: 18,
                   width: "100%", textAlign: "left", cursor: "pointer",
-                  background: "rgba(255,255,255,0.055)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 22,
+                  background: "white",
+                  border: "1px solid rgba(58,36,16,0.10)",
+                  borderLeft: `4px solid ${meta.accent}`,
+                  borderRadius: 18,
                   padding: "18px 20px",
                   transition: "transform .15s, box-shadow .15s, border-color .15s",
                   animation: `abPop .45s ease both`,
                   animationDelay: `${i * 70}ms`,
-                  boxShadow: "none",
+                  boxShadow: "0 2px 8px rgba(58,36,16,0.05)",
+                  touchAction: "manipulation",
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                  e.currentTarget.style.boxShadow = `0 16px 40px ${meta.glow}`;
-                  e.currentTarget.style.borderColor = meta.accent + "55";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = `0 10px 24px ${meta.glow}`;
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = "";
-                  e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(58,36,16,0.05)";
                 }}
               >
-                {/* Icon circle */}
+                {/* Icon circle — softer, no heavy glow */}
                 <div style={{
                   width: 58, height: 58, borderRadius: 18, flexShrink: 0,
                   background: meta.grad,
-                  boxShadow: `0 8px 24px ${meta.glow}`,
+                  boxShadow: `0 4px 14px ${meta.glow}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 26,
                 }}>
@@ -658,21 +676,27 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
                 {/* Text */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.2, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{
+                    fontSize: 17, fontWeight: 800,
+                    color: "#3a2410",
+                    lineHeight: 1.2, marginBottom: 5,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    fontFamily: "'Source Serif Pro', Georgia, serif",
+                  }}>
                     {a.title}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{
-                      fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                      fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em",
                       color: meta.accent,
-                      background: meta.accent + "18",
-                      border: `1px solid ${meta.accent}30`,
-                      borderRadius: 6, padding: "2px 8px",
+                      background: meta.accent + "14",
+                      border: `1px solid ${meta.accent}33`,
+                      borderRadius: 999, padding: "3px 10px",
                     }}>
                       {a.target_subject || "Assignment"}
                     </span>
                     {a.target_grade_min != null && (
-                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>
+                      <span style={{ fontSize: 11, color: "#8a7a5e", fontWeight: 700 }}>
                         Grade {a.target_grade_min === 0 ? "K" : a.target_grade_min}
                       </span>
                     )}
@@ -681,9 +705,9 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
 
                 {/* Arrow */}
                 <div style={{
-                  width: 38, height: 38, borderRadius: 12, flexShrink: 0,
-                  background: meta.accent + "18",
-                  border: `1px solid ${meta.accent}30`,
+                  width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                  background: meta.accent + "14",
+                  border: `1px solid ${meta.accent}33`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: meta.accent, fontSize: 18, fontWeight: 700,
                 }}>
