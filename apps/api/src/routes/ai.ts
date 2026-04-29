@@ -190,8 +190,14 @@ router.post("/verify-answer", async (req: AuthRequest, res: Response) => {
     if (wordOK && longEnough) return res.json({ close: true, reason: "uses keyword in a sentence" });
   }
 
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_KEY) {
+  // Provider order: OpenRouter (cheapest classifier) → Anthropic direct → fallback.
+  // OpenRouter speaks the OpenAI chat-completions schema, so we use plain fetch
+  // instead of the Anthropic SDK when the env var is set.
+  // The env var name on Vercel is OPENTROUTER_API_AI per user preference.
+  const OPENROUTER_KEY = process.env.OPENTROUTER_API_AI || process.env.OPENROUTER_API_KEY;
+  const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
+
+  if (!OPENROUTER_KEY && !ANTHROPIC_KEY) {
     // No AI available — be lenient on anything 5+ words long, since
     // we'd rather let kids advance than get them stuck. Teachers still
     // grade for real on the gradebook side.
@@ -202,21 +208,59 @@ router.post("/verify-answer", async (req: AuthRequest, res: Response) => {
     });
   }
 
-  try {
-    const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
-    const prompt = [
-      "You are grading an elementary-school short-answer question.",
-      "Decide whether the student's answer demonstrates the same understanding as the expected answer.",
-      "Be GENEROUS: kids' spelling, grammar, and word choice are imperfect. If the meaning is right, accept it.",
-      "Reject only if the answer is off-topic, blank, gibberish, or factually wrong.",
-      "",
-      `QUESTION: ${question}`,
-      `EXPECTED: ${expected || "(any thoughtful, on-topic answer is acceptable)"}`,
-      `STUDENT ANSWER: ${answer}`,
-      "",
-      'Respond with strict JSON: {"close": true|false, "reason": "<one short sentence>"}',
-    ].join("\n");
+  const prompt = [
+    "You are grading an elementary-school short-answer question.",
+    "Decide whether the student's answer demonstrates the same understanding as the expected answer.",
+    "Be GENEROUS: kids' spelling, grammar, and word choice are imperfect. If the meaning is right, accept it.",
+    "Reject only if the answer is off-topic, blank, gibberish, or factually wrong.",
+    "",
+    `QUESTION: ${question}`,
+    `EXPECTED: ${expected || "(any thoughtful, on-topic answer is acceptable)"}`,
+    `STUDENT ANSWER: ${answer}`,
+    "",
+    'Respond with strict JSON: {"close": true|false, "reason": "<one short sentence>"}',
+  ].join("\n");
 
+  const parseVerdict = (text: string) => {
+    try {
+      const m = text.match(/\{[\s\S]*\}/);
+      const j = m ? JSON.parse(m[0]) : null;
+      if (j && typeof j.close === "boolean") {
+        return { close: !!j.close, reason: String(j.reason || "").slice(0, 160) };
+      }
+    } catch {}
+    return null;
+  };
+
+  try {
+    if (OPENROUTER_KEY) {
+      const r = await Promise.race([
+        fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            "Content-Type": "application/json",
+            // Optional but recommended by OpenRouter for analytics/abuse:
+            "HTTP-Referer": "https://scratch-classroom.vercel.app",
+            "X-Title": "Scratch Classroom",
+          },
+          body: JSON.stringify({
+            // Cheap, fast classifier — adjust if quality is off.
+            model: "anthropic/claude-haiku-4.5",
+            max_tokens: 120,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        }).then((x) => x.json()),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("openrouter timeout")), 8000)),
+      ]);
+      const text = String((r as any)?.choices?.[0]?.message?.content || "");
+      const v = parseVerdict(text);
+      if (v) return res.json(v);
+      return res.json({ close: true, reason: "ai parse failed, accepted" });
+    }
+
+    // Fallback: direct Anthropic
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY! });
     const result = await Promise.race([
       client.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -225,25 +269,13 @@ router.post("/verify-answer", async (req: AuthRequest, res: Response) => {
       }),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("verify timeout")), 8000)),
     ]);
-
     const text = (result as any).content?.[0]?.text || "";
-    let parsed: any = null;
-    try {
-      const m = text.match(/\{[\s\S]*\}/);
-      parsed = m ? JSON.parse(m[0]) : null;
-    } catch {}
-    if (!parsed) {
-      // Default to lenient on parse failure — better to let a kid through
-      // than to wedge them on a vague answer.
-      return res.json({ close: true, reason: "ai parse failed, accepted" });
-    }
-    return res.json({
-      close: !!parsed.close,
-      reason: String(parsed.reason || "").slice(0, 160),
-    });
+    const v = parseVerdict(text);
+    if (v) return res.json(v);
+    return res.json({ close: true, reason: "ai parse failed, accepted" });
   } catch (e: any) {
     console.error("[ai/verify-answer]", e?.message || e);
-    // Fail open — same reasoning as parse-failure above.
+    // Fail open — better to let a kid through than wedge them on flake.
     return res.json({ close: true, reason: "ai unavailable, accepted" });
   }
 });
