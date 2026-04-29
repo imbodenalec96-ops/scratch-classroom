@@ -2580,6 +2580,36 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
     }
   }
 
+  // Class-wide bonus subjects: history, science, vocabulary. These
+  // bundles already carry a `lesson` field that the student work view
+  // renders above the questions, so kids get the same teaching preface
+  // they get on the morning class-wide assignment — the bonus version
+  // is just a fresh attempt against the same material. SEL is left out
+  // of bonus on purpose (reflective, not really "more practice").
+  const classWideBonus: Array<{ key: string; bundle: { title: string; description: string; content: any }; rubric: number }> = [
+    { key: "history",    bundle: HISTORY_CONTENT,    rubric: 50 },
+    { key: "science",    bundle: SCIENCE_CONTENT,    rubric: 50 },
+    { key: "vocabulary", bundle: VOCABULARY_CONTENT, rubric: 50 },
+  ];
+  for (const cw of classWideBonus) {
+    try {
+      const id = crypto.randomUUID();
+      const title = `🌅 Bonus — ${cw.bundle.title}`;
+      await db.prepare(
+        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed, is_afternoon)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 5, ?, ?, 1, 1)`
+      ).run(
+        id, classId, req.user!.id, title, cw.bundle.description,
+        JSON.stringify(cw.bundle.content),
+        cw.key, todayStr,
+        JSON.stringify([{ label: "Correctness", maxPoints: cw.rubric }]),
+      );
+      created.push({ id, title, subject: cw.key });
+    } catch (e: any) {
+      errors.push(`${cw.key}: ${e?.message}`);
+    }
+  }
+
   res.json({ created: created.length, assignments: created, errors });
 });
 
