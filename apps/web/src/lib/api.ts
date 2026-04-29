@@ -71,6 +71,11 @@ export const api = {
   generateTodayAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/generate-today`, { method: "POST", body: JSON.stringify({}) }),
   generateAfternoonAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/generate-afternoon`, { method: "POST", body: JSON.stringify({}) }),
   clearAfternoonAssignments: (classId: string) => request<any>(`/assignments/class/${classId}/afternoon`, { method: "DELETE" }),
+  generateTopicPack: (classId: string, opts: { subject: string; topic: string; gradeMin?: number; gradeMax?: number; questionCount?: number }) =>
+    request<{ created: number; assignments: Array<{ id: string; title: string; subject: string; grade: number }>; errors: string[] }>(
+      `/assignments/class/${classId}/generate-topic-pack`,
+      { method: "POST", body: JSON.stringify(opts) },
+    ),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string; questionCount?: number; questionType?: string; learningObjective?: string; focusKeywords?: string; teacherNotes?: string; hintsAllowed?: boolean }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),
@@ -208,6 +213,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ word, gradeLevel, context }),
     }),
+  raiseHand: (classId: string, message?: string) =>
+    request<{ ok: boolean; requestId: string; alreadyRaised: boolean }>(`/classes/${classId}/help`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  cancelMyHelp: (classId: string) =>
+    request<{ ok: boolean }>(`/classes/${classId}/help/mine`, { method: "DELETE" }),
+  clearStudentHelp: (classId: string, studentId: string) =>
+    request<{ ok: boolean }>(`/classes/${classId}/help/${studentId}`, { method: "DELETE" }),
+  getClassHelpRequests: (classId: string) =>
+    request<{ requests: Array<{ id: string; student_id: string; student_name: string; avatar_emoji: string; message: string | null; raised_at: string }> }>(`/classes/${classId}/help`),
 
   // Users
   getUsers: () => request<any[]>("/users"),

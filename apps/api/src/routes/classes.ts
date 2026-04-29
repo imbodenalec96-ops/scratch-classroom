@@ -1370,4 +1370,97 @@ router.post("/:id/schedule/reset", requireRole("teacher", "admin"), async (req: 
   }
 });
 
+// Help-request ("I'm stuck") system. Idempotent per (class, student): a
+// student raising their hand a second time bumps timestamp on the existing
+// open request rather than spawning duplicates. Teachers clear when helped.
+let helpReqsReady = false;
+async function ensureHelpRequestsTable() {
+  if (helpReqsReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS help_requests (
+      id TEXT PRIMARY KEY,
+      class_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      message TEXT,
+      raised_at TEXT NOT NULL,
+      cleared_at TEXT,
+      cleared_by TEXT
+    )`);
+    try { await db.exec(`CREATE INDEX IF NOT EXISTS idx_help_open ON help_requests (class_id, cleared_at)`); } catch {}
+    helpReqsReady = true;
+  } catch { helpReqsReady = true; }
+}
+
+router.post("/:classId/help", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  const classId = req.params.classId;
+  const studentId = req.user.id;
+  const message = String(req.body?.message || "").slice(0, 200) || null;
+  try {
+    await ensureHelpRequestsTable();
+    const existing: any = await db.prepare(
+      "SELECT id FROM help_requests WHERE class_id::text = ? AND student_id::text = ? AND cleared_at IS NULL LIMIT 1"
+    ).get(classId, studentId);
+    if (existing) {
+      await db.prepare("UPDATE help_requests SET raised_at = ?, message = COALESCE(?, message) WHERE id = ?").run(
+        new Date().toISOString(), message, existing.id,
+      );
+      return res.json({ ok: true, requestId: existing.id, alreadyRaised: true });
+    }
+    const id = crypto.randomUUID();
+    await db.prepare(
+      "INSERT INTO help_requests (id, class_id, student_id, message, raised_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, classId, studentId, message, new Date().toISOString());
+    res.json({ ok: true, requestId: id, alreadyRaised: false });
+  } catch (e: any) {
+    console.error("[help raise]", e?.message || e);
+    res.status(500).json({ error: e?.message || "raise failed" });
+  }
+});
+
+// Student cancels their own pending request (e.g. they figured it out).
+router.delete("/:classId/help/mine", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  try {
+    await ensureHelpRequestsTable();
+    await db.prepare(
+      "UPDATE help_requests SET cleared_at = ?, cleared_by = ? WHERE class_id::text = ? AND student_id::text = ? AND cleared_at IS NULL"
+    ).run(new Date().toISOString(), req.user.id, req.params.classId, req.user.id);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cancel failed" });
+  }
+});
+
+// Teacher clears a student's request after helping.
+router.delete("/:classId/help/:studentId", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureHelpRequestsTable();
+    await db.prepare(
+      "UPDATE help_requests SET cleared_at = ?, cleared_by = ? WHERE class_id::text = ? AND student_id::text = ? AND cleared_at IS NULL"
+    ).run(new Date().toISOString(), req.user!.id, req.params.classId, req.params.studentId);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "clear failed" });
+  }
+});
+
+// Board / monitor poll — every open help request joined with student name.
+router.get("/:classId/help", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureHelpRequestsTable();
+    const rows = await db.prepare(
+      `SELECT h.id, h.student_id, h.message, h.raised_at,
+              u.name AS student_name, COALESCE(u.avatar_emoji, '') AS avatar_emoji
+       FROM help_requests h
+       JOIN users u ON u.id::text = h.student_id::text
+       WHERE h.class_id::text = ? AND h.cleared_at IS NULL
+       ORDER BY h.raised_at ASC`
+    ).all(req.params.classId) as any[];
+    res.json({ requests: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "load failed" });
+  }
+});
+
 export default router;

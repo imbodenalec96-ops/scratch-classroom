@@ -1163,6 +1163,7 @@ export default function AssignmentBuilder() {
   const [studentCheckLoading, setStudentCheckLoading] = useState(false);
   const [genTodayLoading, setGenTodayLoading] = useState(false);
   const [genAfternoonLoading, setGenAfternoonLoading] = useState(false);
+  const [genTopicLoading, setGenTopicLoading] = useState(false);
 
   // Form state
   const [classId, setClassId] = useState("");
@@ -1868,6 +1869,35 @@ export default function AssignmentBuilder() {
               className="btn-secondary gap-1.5 text-xs"
             >
               🗑 Clear Afternoon
+            </button>
+            <button
+              disabled={genTopicLoading || !classId}
+              title="Generate AI assignments on a specific topic across multiple grades"
+              onClick={async () => {
+                if (!classId) return;
+                const topic = (window.prompt("Topic to teach? (e.g. 'fractions', 'water cycle', 'verb tenses')") || "").trim();
+                if (!topic) return;
+                const subject = (window.prompt("Subject? (reading / math / writing / spelling / science)", "math") || "math").trim().toLowerCase();
+                const gradeMinStr = window.prompt("Lowest grade? (1–8)", "3");
+                const gradeMaxStr = window.prompt("Highest grade? (1–8)", "5");
+                const countStr = window.prompt("Questions per assignment? (2–10)", "4");
+                const gradeMin = Math.max(1, Math.min(8, Number(gradeMinStr) || 3));
+                const gradeMax = Math.max(gradeMin, Math.min(8, Number(gradeMaxStr) || 5));
+                const questionCount = Math.max(2, Math.min(10, Number(countStr) || 4));
+                if (!confirm(`Generate ${gradeMax - gradeMin + 1} AI assignments on "${topic}" for ${subject}, grades ${gradeMin}–${gradeMax}?\n\nTakes 30–60 seconds.`)) return;
+                setGenTopicLoading(true);
+                try {
+                  const result = await api.generateTopicPack(classId, { subject, topic, gradeMin, gradeMax, questionCount });
+                  await loadAssignments(classId);
+                  const summary = (result.assignments || []).map((a: any) => `• G${a.grade} ${a.subject}: ${a.title}`).join("\n");
+                  alert(`✅ Created ${result.created} assignments.\n\n${summary}${result.errors?.length ? "\n\nErrors: " + result.errors.join(", ") : ""}`);
+                } catch (e: any) { alert("Failed: " + e.message); }
+                finally { setGenTopicLoading(false); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #06b6d4, #0891b2)" }}
+            >
+              {genTopicLoading ? "⏳ Generating…" : "📚 Topic Pack (AI)"}
             </button>
             <button
               onClick={async () => {

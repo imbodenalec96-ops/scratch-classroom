@@ -1399,6 +1399,7 @@ function WorkScreen({
   setQuestionsAnswered,
   ttsPassages = true,
   ttsSpelling = true,
+  classId,
 }: {
   assignment: any;
   parsed: any;
@@ -1410,7 +1411,24 @@ function WorkScreen({
   setQuestionsAnswered: (n: number) => void;
   ttsPassages?: boolean;
   ttsSpelling?: boolean;
+  classId?: string;
 }) {
+  const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
+  const handleRaiseHand = async () => {
+    if (!classId || helpState !== "idle") return;
+    setHelpState("raising");
+    try {
+      await api.raiseHand(classId, `Stuck on question ${currentQ + 1}`);
+      setHelpState("raised");
+    } catch {
+      setHelpState("idle");
+    }
+  };
+  const handleCancelHelp = async () => {
+    if (!classId || helpState !== "raised") return;
+    try { await api.cancelMyHelp(classId); } catch {}
+    setHelpState("idle");
+  };
   const allQuestions: Array<{
     q: any;
     sectionTitle: string;
@@ -1517,6 +1535,11 @@ function WorkScreen({
       setCurrentQ(currentQ + 1);
       setCardKey((k) => k + 1);
       setShowHint(false);
+      // Auto-clear raised hand when student moves on — they figured it out
+      if (helpState === "raised" && classId) {
+        api.cancelMyHelp(classId).catch(() => {});
+        setHelpState("idle");
+      }
     }
   };
   const handlePrev = () => {
@@ -2061,7 +2084,49 @@ function WorkScreen({
                 >
                   <span style={{ fontSize: 18, lineHeight: 1 }}>🔊</span>
                 </button>
+                {/* I need help — raises hand to teacher's board */}
+                {classId && (
+                  <button
+                    onClick={helpState === "raised" ? handleCancelHelp : handleRaiseHand}
+                    disabled={helpState === "raising"}
+                    className="flex-shrink-0 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:scale-105"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: helpState === "raised" ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.06)",
+                      color: helpState === "raised" ? "#ef4444" : "#dc2626",
+                      border: helpState === "raised"
+                        ? "2px solid rgba(239,68,68,0.7)"
+                        : "1px solid rgba(239,68,68,0.25)",
+                      touchAction: "manipulation",
+                      animation: helpState === "raised" ? "pulse 1.5s ease-in-out infinite" : undefined,
+                    }}
+                    title={helpState === "raised" ? "Tap to cancel — teacher knows you're stuck" : "I need help"}
+                    aria-label="I need help"
+                  >
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>{helpState === "raised" ? "✋" : "🆘"}</span>
+                  </button>
+                )}
               </div>
+              {helpState === "raised" && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: 10,
+                    padding: "8px 12px",
+                    fontSize: 13,
+                    color: "#991b1b",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span>✋</span>
+                  <span>Hand raised — your teacher will come help you. Tap the ✋ again if you figure it out.</span>
+                </div>
+              )}
 
               {/* Hint — always light (Starfall surface is always light) */}
               {q.q.hint && (
@@ -3216,6 +3281,7 @@ export default function StudentDashboard() {
         setQuestionsAnswered={setQuestionsAnswered}
         ttsPassages={ttsPassages}
         ttsSpelling={ttsSpelling}
+        classId={classes[0]?.id}
       />
     );
   }

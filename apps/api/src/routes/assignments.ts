@@ -2339,6 +2339,77 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
   res.json({ created: created.length, assignments: created, errors });
 });
 
+// POST /assignments/class/:classId/generate-topic-pack
+// Teacher-driven AI generation: creates N grade-targeted assignments on a
+// specific topic (e.g. "fractions", "the water cycle", "verb tenses"). One
+// assignment per grade in the requested range, each with the topic baked
+// into the AI prompt as the learning objective + focus keywords. Useful
+// for "we're studying X this week — generate review assignments for it".
+router.post("/class/:classId/generate-topic-pack", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const subject = String(req.body?.subject || "reading").toLowerCase();
+  const topic = String(req.body?.topic || "").trim();
+  const gradeMin = Math.max(1, Math.min(8, Number(req.body?.gradeMin ?? 3)));
+  const gradeMax = Math.max(gradeMin, Math.min(8, Number(req.body?.gradeMax ?? 5)));
+  const questionCount = Math.max(2, Math.min(10, Number(req.body?.questionCount ?? 4)));
+
+  if (!topic) return res.status(400).json({ error: "topic required" });
+
+  const client = await getAnthropic();
+  if (!client) return res.status(503).json({ error: "AI not configured: set OPENROUTER_API_KEY" });
+  try { await ensureGradeCols(); } catch {}
+
+  const today = new Date().toISOString().slice(0, 10);
+  const grades: number[] = [];
+  for (let g = gradeMin; g <= gradeMax; g++) grades.push(g);
+
+  // Fan out: one AI call per grade in parallel
+  const results = await Promise.allSettled(
+    grades.map((grade) =>
+      generateDailyAssignmentContent(client, {
+        studentId: classId,
+        date: `${today}|topic|${subject}|${topic}|${grade}`,
+        subject,
+        gradeMin: grade,
+        gradeMax: grade,
+        recentPrompts: [],
+        questionCount,
+        learningObjective: topic,
+        focusKeywords: topic,
+      }),
+    ),
+  );
+
+  const created: any[] = [];
+  const errors: string[] = [];
+  for (let i = 0; i < grades.length; i++) {
+    const grade = grades[i];
+    const r = results[i];
+    if (r.status !== "fulfilled") {
+      errors.push(`G${grade}: ${(r.reason as any)?.message || "generation failed"}`);
+      continue;
+    }
+    try {
+      const id = crypto.randomUUID();
+      const title = `📚 ${topic} — G${grade} ${subject}`;
+      await db.prepare(
+        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+      ).run(
+        id, classId, req.user!.id, title,
+        r.value.content?.instructions || `Practice on ${topic}`,
+        JSON.stringify(r.value.content),
+        subject, grade, grade, today,
+        JSON.stringify([{ label: "Correctness", maxPoints: 50 }]),
+      );
+      created.push({ id, title, subject, grade });
+    } catch (e: any) {
+      errors.push(`G${grade}: insert failed — ${e?.message}`);
+    }
+  }
+  res.json({ created: created.length, assignments: created, errors });
+});
+
 // DELETE /assignments/class/:classId/afternoon
 // Clears every bonus / afternoon assignment for the class. Matches both
 // the is_afternoon flag AND the 🌅 title prefix so older ones inserted

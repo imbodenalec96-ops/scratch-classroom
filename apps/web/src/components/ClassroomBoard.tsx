@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
 import { getSocket } from "../lib/ws.ts";
+import { useAuth } from "../lib/auth.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -78,10 +79,24 @@ const ANIM = `
     0%,100% { box-shadow: 0 0 0 1px rgba(251,191,36,.4), 0 6px 24px rgba(217,119,6,.18); }
     50%     { box-shadow: 0 0 0 1px rgba(251,191,36,.75), 0 10px 36px rgba(217,119,6,.35); }
   }
+  @keyframes helpPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 8px 24px rgba(239,68,68,0.45); transform: scale(1); }
+    50%     { box-shadow: 0 0 0 14px rgba(239,68,68,0.0), 0 12px 32px rgba(239,68,68,0.6); transform: scale(1.02); }
+  }
+  @keyframes presPulse {
+    0%,100% { transform: scale(1); opacity: 0.9; }
+    50%     { transform: scale(1.18); opacity: 1; }
+  }
+  @keyframes helpBannerSlide {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 `;
 
 export default function ClassroomBoard() {
   const [params] = useSearchParams();
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher" || user?.role === "admin";
   const classParam = (params.get("class") || "").trim().toLowerCase();
 
   const [cls, setCls] = useState<any | null>(null);
@@ -90,6 +105,47 @@ export default function ClassroomBoard() {
     { students: [], schedules: [], specials: [], settings: {} }
   );
   const [now, setNow] = useState(new Date());
+
+  // Help requests + presence — polled every 8s so the board reflects live
+  // classroom state. helpByStudent and presenceByStudent are id→data maps
+  // for fast per-tile lookups during render.
+  const [helpRequests, setHelpRequests] = useState<any[]>([]);
+  const [presenceByStudent, setPresenceByStudent] = useState<Record<string, { last_seen: string; activity: string; isOnline: boolean }>>({});
+  useEffect(() => {
+    if (!cls?.id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const [help, presence] = await Promise.all([
+          api.getClassHelpRequests(cls.id).catch(() => ({ requests: [] as any[] })),
+          isTeacher ? api.getClassPresence(cls.id).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+        ]);
+        if (cancelled) return;
+        setHelpRequests(help.requests || []);
+        const map: Record<string, any> = {};
+        for (const p of presence as any[]) {
+          if (p?.id) map[p.id] = { last_seen: p.last_seen, activity: p.activity || "", isOnline: !!p.isOnline };
+        }
+        setPresenceByStudent(map);
+      } catch {}
+    };
+    tick();
+    const iv = setInterval(tick, 8000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [cls?.id, isTeacher]);
+  const helpByStudent = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of helpRequests) map[r.student_id] = r;
+    return map;
+  }, [helpRequests]);
+
+  // Quick-action modal state for teachers
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionVideo, setActionVideo] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
@@ -385,6 +441,189 @@ export default function ClassroomBoard() {
         }} />
       )}
 
+      {/* ── HELP BANNER: shown when any student raised their hand ── */}
+      {helpRequests.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8, left: "50%", transform: "translateX(-50%)",
+            zIndex: 50,
+            background: "linear-gradient(135deg, rgba(239,68,68,0.95), rgba(220,38,38,0.85))",
+            color: "white",
+            padding: "10px 22px",
+            borderRadius: 14,
+            fontWeight: 800,
+            fontSize: 18,
+            display: "flex", alignItems: "center", gap: 14,
+            boxShadow: "0 12px 32px rgba(239,68,68,0.45)",
+            border: "2px solid #fca5a5",
+            animation: "helpBannerSlide .35s ease both, helpPulse 1.6s ease-in-out infinite",
+          }}
+        >
+          <span style={{ fontSize: 28 }}>✋</span>
+          <span>
+            {helpRequests.length === 1
+              ? `${helpRequests[0].student_name} needs help!`
+              : `${helpRequests.length} students need help — ${helpRequests.slice(0, 4).map((r) => (r.student_name || "?").split(" ")[0]).join(", ")}${helpRequests.length > 4 ? "…" : ""}`}
+          </span>
+        </div>
+      )}
+
+      {/* ── TEACHER QUICK-ACTIONS: only visible to teachers/admins on the board ── */}
+      {isTeacher && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8, right: 12,
+            zIndex: 40,
+            display: "flex", gap: 6,
+          }}
+        >
+          {[
+            { id: "lock",      icon: "🔒", label: "Lock all",     bg: "#374151" },
+            { id: "freetime",  icon: "🎉", label: "Free time",    bg: "#7c3aed" },
+            { id: "broadcast", icon: "📺", label: "Broadcast",    bg: "#dc2626" },
+            { id: "message",   icon: "📢", label: "Message",      bg: "#2563eb" },
+          ].map((b) => (
+            <button
+              key={b.id}
+              onClick={() => {
+                if (b.id === "lock") setShowLockModal(true);
+                if (b.id === "freetime") {
+                  if (!confirm("Grant free time to ALL students in this class?")) return;
+                  setActionBusy(true);
+                  api.grantFreeTimeAll(cls.id).catch(() => {}).finally(() => setActionBusy(false));
+                }
+                if (b.id === "broadcast") setShowVideoModal(true);
+                if (b.id === "message") setShowMessageModal(true);
+              }}
+              disabled={actionBusy}
+              style={{
+                background: b.bg,
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 10,
+                padding: "8px 12px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: actionBusy ? "wait" : "pointer",
+                display: "flex", alignItems: "center", gap: 6,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                touchAction: "manipulation",
+              }}
+              title={b.label}
+            >
+              <span style={{ fontSize: 16 }}>{b.icon}</span>
+              <span>{b.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Quick-action modals */}
+      {isTeacher && showLockModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowLockModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
+            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>🔒 Lock all student screens</h2>
+            <textarea
+              value={actionMessage}
+              onChange={(e) => setActionMessage(e.target.value)}
+              placeholder="Optional message to show on locked screens (e.g. 'Eyes on me!')"
+              style={{ width: "100%", minHeight: 80, padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
+            />
+            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowLockModal(false)} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
+              <button
+                disabled={actionBusy}
+                onClick={async () => {
+                  setActionBusy(true);
+                  try { await api.lockClass(cls.id, actionMessage || undefined); setShowLockModal(false); setActionMessage(""); }
+                  catch {} finally { setActionBusy(false); }
+                }}
+                style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 800 }}
+              >
+                Lock all screens
+              </button>
+              <button
+                disabled={actionBusy}
+                onClick={async () => {
+                  setActionBusy(true);
+                  try { await api.unlockClass(cls.id); setShowLockModal(false); }
+                  catch {} finally { setActionBusy(false); }
+                }}
+                style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 800 }}
+              >
+                Unlock all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isTeacher && showMessageModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowMessageModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
+            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>📢 Send message to class</h2>
+            <textarea
+              value={actionMessage}
+              onChange={(e) => setActionMessage(e.target.value)}
+              placeholder="Type your message — appears on every student's screen"
+              style={{ width: "100%", minHeight: 100, padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
+            />
+            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowMessageModal(false); setActionMessage(""); }} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
+              <button
+                disabled={actionBusy || !actionMessage.trim()}
+                onClick={async () => {
+                  setActionBusy(true);
+                  try { await api.sendClassCommand(cls.id, "MESSAGE", actionMessage); setShowMessageModal(false); setActionMessage(""); }
+                  catch {} finally { setActionBusy(false); }
+                }}
+                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: actionBusy ? "wait" : "pointer", fontWeight: 800 }}
+              >
+                Send to all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isTeacher && showVideoModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: 24, maxWidth: 480, width: "92%" }}>
+            <h2 style={{ color: "white", marginTop: 0, fontSize: 20 }}>📺 Broadcast YouTube video</h2>
+            <input
+              type="url"
+              value={actionVideo}
+              onChange={(e) => setActionVideo(e.target.value)}
+              placeholder="Paste YouTube URL or video ID"
+              style={{ width: "100%", padding: 12, borderRadius: 10, background: "#0f0f1e", color: "white", border: "1px solid rgba(255,255,255,0.15)", fontSize: 14 }}
+            />
+            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowVideoModal(false); setActionVideo(""); }} style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
+              <button
+                disabled={actionBusy || !actionVideo.trim()}
+                onClick={async () => {
+                  setActionBusy(true);
+                  try { await api.broadcastClassVideo(cls.id, actionVideo); setShowVideoModal(false); setActionVideo(""); }
+                  catch {} finally { setActionBusy(false); }
+                }}
+                style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "white", border: "none", borderRadius: 10, padding: "10px 18px", cursor: actionBusy ? "wait" : "pointer", fontWeight: 800 }}
+              >
+                Broadcast to all students
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── ROW 1: Masthead header ── */}
       <header style={{
         position: "relative", zIndex: 1,
@@ -593,6 +832,58 @@ export default function ClassroomBoard() {
                     letterSpacing: "0.04em",
                     zIndex: 1,
                   }}>lv.{lv}</div>
+
+                  {/* Presence dot — green = online, gray = offline. Sits top-left
+                      so teacher can scan the room at a glance. */}
+                  {(() => {
+                    const pres = presenceByStudent[s.id];
+                    const online = pres?.isOnline;
+                    return (
+                      <div
+                        title={online ? `Working — ${pres?.activity || "active"}` : "Offline"}
+                        style={{
+                          position: "absolute", top: 7, left: 7,
+                          width: 10, height: 10, borderRadius: "50%",
+                          background: online ? "#22c55e" : "rgba(255,255,255,0.18)",
+                          boxShadow: online ? "0 0 8px rgba(34,197,94,0.7)" : undefined,
+                          animation: online ? "presPulse 2.4s ease-in-out infinite" : undefined,
+                          zIndex: 1,
+                        }}
+                      />
+                    );
+                  })()}
+
+                  {/* Help-request alert overlay — pulsing red badge when this
+                      student raised their hand. Tap clears it (teachers only). */}
+                  {helpByStudent[s.id] && (
+                    <button
+                      onClick={() => {
+                        if (!isTeacher || !cls?.id) return;
+                        api.clearStudentHelp(cls.id, s.id).catch(() => {});
+                        setHelpRequests((prev) => prev.filter((r) => r.student_id !== s.id));
+                      }}
+                      title={isTeacher ? "Tap to mark as helped" : "This student raised their hand"}
+                      style={{
+                        position: "absolute", inset: 0, zIndex: 5,
+                        background: "linear-gradient(135deg, rgba(239,68,68,0.85), rgba(220,38,38,0.65))",
+                        border: "3px solid #fca5a5",
+                        borderRadius: 4,
+                        cursor: isTeacher ? "pointer" : "default",
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                        animation: "helpPulse 1s ease-in-out infinite",
+                        color: "white",
+                      }}
+                    >
+                      <div style={{ fontSize: 38 }}>✋</div>
+                      <div style={{ fontSize: 13, fontWeight: 900, marginTop: 4, textShadow: "0 2px 6px rgba(0,0,0,0.5)" }}>
+                        NEEDS HELP
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
+                        {firstName}
+                      </div>
+                    </button>
+                  )}
 
                   {/* Card body */}
                   <div style={{ flex: 1, padding: "12px 8px 10px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, justifyContent: "center" }}>
