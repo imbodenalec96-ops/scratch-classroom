@@ -2246,6 +2246,70 @@ const SEL_CONTENT = {
   content: { title: "Growth Mindset: Learning from Challenges", subject: "Social-Emotional Learning", grade: "All Grades", instructions: "Watch the video about growth mindset. Then answer the reflection questions.", totalPoints: 40, video_url: "https://www.youtube.com/watch?v=2zrtHt3bBmQ", sections: [{ title: "Growth Mindset Reflection", questions: [{ type: "multiple_choice", text: "What is a growth mindset?", options: ["A. Believing you can't change", "B. Believing you can learn and grow with effort", "C. Giving up when something is hard", "D. Being afraid of mistakes"], correctIndex: 1, points: 10 }, { type: "short_answer", text: "Describe a time when you faced a challenge and learned from it.", lines: 4, points: 15 }, { type: "short_answer", text: "What's one thing you want to get better at? How will you use a growth mindset to help?", lines: 4, points: 15 }] }] },
 };
 
+// History / Science / Vocabulary — class-wide assignments (grades 1–5)
+// included by Generate Today so kids get a full curriculum spread, not
+// just the four core subjects + SEL. Each is a self-contained lesson +
+// 5 questions, written in plain elementary language.
+const HISTORY_CONTENT = {
+  title: "American Symbols: The Bald Eagle & The Flag",
+  description: "Learn about important symbols of the United States.",
+  content: {
+    title: "American Symbols",
+    subject: "History",
+    grade: "All Grades",
+    instructions: "Read the lesson, then answer the questions.",
+    totalPoints: 50,
+    lesson: "The United States has special symbols that stand for the country. The American flag has 13 stripes — one for each of the first 13 states — and 50 white stars on a blue square — one for each state today. The colors mean something too: red stands for bravery, white for peace, and blue for justice. The bald eagle is the national bird. It was chosen because it is strong, free, and lives only in North America. You can see it on coins, on the President's seal, and on dollar bills.",
+    sections: [{ title: "American Symbols", questions: [
+      { type: "multiple_choice", text: "How many stripes are on the American flag?", options: ["A. 7", "B. 13", "C. 50", "D. 100"], correctIndex: 1, points: 10, hint: "One for each of the first states." },
+      { type: "multiple_choice", text: "What does the color red on the flag stand for?", options: ["A. Peace", "B. Money", "C. Bravery", "D. Sadness"], correctIndex: 2, points: 10, hint: "Re-read the lesson." },
+      { type: "multiple_choice", text: "How many stars are on the flag today?", options: ["A. 13", "B. 50", "C. 100", "D. 7"], correctIndex: 1, points: 10, hint: "One per state." },
+      { type: "short_answer", text: "Why was the bald eagle chosen as the national bird?", correctAnswer: "strong free lives only in north america", points: 10, lines: 2 },
+      { type: "short_answer", text: "Name one place you can see the bald eagle.", correctAnswer: "coins president's seal dollar bills", points: 10, lines: 1 },
+    ] }],
+  },
+};
+
+const SCIENCE_CONTENT = {
+  title: "The Water Cycle",
+  description: "Learn how water moves around the Earth.",
+  content: {
+    title: "The Water Cycle",
+    subject: "Science",
+    grade: "All Grades",
+    instructions: "Read the lesson, then answer the questions.",
+    totalPoints: 50,
+    lesson: "Water is always moving. The sun heats up water in oceans, lakes, and rivers. The water turns into a gas called water vapor and rises into the sky — this is called EVAPORATION. High in the cold sky, the water vapor turns back into tiny water drops that form clouds — this is CONDENSATION. When the drops in the cloud get heavy, they fall as rain or snow — this is PRECIPITATION. The water then COLLECTS back in oceans, lakes, and rivers, and the cycle starts over again.",
+    sections: [{ title: "Water Cycle Practice", questions: [
+      { type: "multiple_choice", text: "What heats up the water to start the cycle?", options: ["A. The moon", "B. The wind", "C. The sun", "D. The clouds"], correctIndex: 2, points: 10, hint: "It's bright and yellow." },
+      { type: "multiple_choice", text: "What is it called when water turns into a gas and rises?", options: ["A. Precipitation", "B. Evaporation", "C. Condensation", "D. Collection"], correctIndex: 1, points: 10, hint: "Starts with E." },
+      { type: "multiple_choice", text: "What is rain or snow called?", options: ["A. Precipitation", "B. Evaporation", "C. Lakes", "D. Vapor"], correctIndex: 0, points: 10, hint: "It falls from the sky." },
+      { type: "short_answer", text: "What does CONDENSATION mean? (Use the lesson.)", correctAnswer: "water vapor turns back into drops to form clouds", points: 10, lines: 2 },
+      { type: "short_answer", text: "Name one place where water collects after it rains.", correctAnswer: "ocean lake river", points: 10, lines: 1 },
+    ] }],
+  },
+};
+
+const VOCABULARY_CONTENT = {
+  title: "Vocabulary: Words About Change",
+  description: "Learn five words that describe how things change.",
+  content: {
+    title: "Vocabulary: Words About Change",
+    subject: "Vocabulary",
+    grade: "All Grades",
+    instructions: "Read the word list and definitions, then answer the questions.",
+    totalPoints: 50,
+    lesson: "Today's words are about CHANGE. 1) GROW means to get bigger over time, like a tree growing tall. 2) MELT means a solid turns into a liquid, like ice melting into water. 3) BLOOM means a flower opens up. 4) HATCH means a baby animal comes out of an egg. 5) FREEZE means a liquid turns into a solid, like water freezing into ice. Try to use each word in your head before you answer the questions.",
+    sections: [{ title: "Vocabulary Practice", questions: [
+      { type: "multiple_choice", text: "What does MELT mean?", options: ["A. A solid turns into liquid", "B. A liquid turns into solid", "C. A baby animal is born", "D. A flower opens"], correctIndex: 0, points: 10, hint: "Like ice on a hot day." },
+      { type: "multiple_choice", text: "Which word means a baby bird comes out of an egg?", options: ["A. Bloom", "B. Freeze", "C. Hatch", "D. Grow"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "What does FREEZE mean?", options: ["A. To get bigger", "B. A liquid turns into solid", "C. A flower opens", "D. To get smaller"], correctIndex: 1, points: 10, hint: "Opposite of melt." },
+      { type: "short_answer", text: "Use the word GROW in a sentence.", correctAnswer: "any sentence using grow", points: 10, lines: 2 },
+      { type: "short_answer", text: "Which two words from the lesson are opposites?", correctAnswer: "melt and freeze", points: 10, lines: 1 },
+    ] }],
+  },
+};
+
 // POST /assignments/class/:classId/generate-today
 // One-click: creates grade-differentiated pre-made assignments for ALL subjects (reading, math, writing, spelling, SEL)
 // based on each student's grade level. Uses pre-written content — no AI required.
@@ -2296,27 +2360,39 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
     }
   }
 
-  // Insert SEL (class-wide, grades 1–5) if not already present
-  try {
-    const selExisting: any = await db.prepare(
-      `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = 'sel' AND scheduled_date IS NULL LIMIT 1`
-    ).get(classId);
-    if (!selExisting) {
+  // Insert class-wide subjects (SEL, History, Science, Vocabulary) —
+  // each one premade and class-wide grades 1–5. Idempotent: skip if a
+  // class-wide always-on row for that subject already exists.
+  const classWideSubjects: Array<{ key: string; bundle: { title: string; description: string; content: any }; rubric: number }> = [
+    { key: "sel",        bundle: SEL_CONTENT,        rubric: 40 },
+    { key: "history",    bundle: HISTORY_CONTENT,    rubric: 50 },
+    { key: "science",    bundle: SCIENCE_CONTENT,    rubric: 50 },
+    { key: "vocabulary", bundle: VOCABULARY_CONTENT, rubric: 50 },
+  ];
+
+  for (const cw of classWideSubjects) {
+    try {
+      const existing: any = await db.prepare(
+        `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND scheduled_date IS NULL LIMIT 1`
+      ).get(classId, cw.key);
+      if (existing) {
+        created.push({ title: cw.bundle.title, subject: cw.key, skipped: true });
+        continue;
+      }
       const id = crypto.randomUUID();
       await db.prepare(
         `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
-         VALUES (?, ?, ?, ?, ?, ?, 'sel', 1, 5, NULL, ?, 1)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 5, NULL, ?, 1)`
       ).run(
-        id, classId, req.user!.id, SEL_CONTENT.title, SEL_CONTENT.description,
-        JSON.stringify(SEL_CONTENT.content),
-        JSON.stringify([{ label: "Reflection", maxPoints: 40 }])
+        id, classId, req.user!.id, cw.bundle.title, cw.bundle.description,
+        JSON.stringify(cw.bundle.content),
+        cw.key,
+        JSON.stringify([{ label: cw.key === "sel" ? "Reflection" : "Correctness", maxPoints: cw.rubric }]),
       );
-      created.push({ id, title: SEL_CONTENT.title, subject: "sel" });
-    } else {
-      created.push({ title: SEL_CONTENT.title, skipped: true });
+      created.push({ id, title: cw.bundle.title, subject: cw.key });
+    } catch (e: any) {
+      errors.push(`${cw.key}: ${e?.message}`);
     }
-  } catch (e: any) {
-    errors.push(`sel: ${e?.message}`);
   }
 
   res.json({ created: created.length, assignments: created, errors });
