@@ -1894,7 +1894,7 @@ function WorkScreen({
                 whiteSpace: "pre-wrap",
               }}
             >
-              {parsed.lesson}
+              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
             </p>
           </div>
         )}
@@ -1909,11 +1909,16 @@ function WorkScreen({
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <div
-                className="text-[10px] font-bold uppercase tracking-widest"
-                style={{ color: starfall.accent }}
-              >
-                📖 Read this first
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div
+                  className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: starfall.accent }}
+                >
+                  📖 Read this first
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>
+                  💡 Tap any word to see what it means
+                </div>
               </div>
               {ttsPassages && <button
                 onClick={async () => {

@@ -82,7 +82,9 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
         {/* Instructions */}
         <div className="mb-6 p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg">
           <div className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Directions</div>
-          <p className="text-sm text-gray-700 leading-relaxed">{assignment.instructions}</p>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            <ClickableText text={assignment.instructions} contextForDefine={assignment.instructions} />
+          </p>
         </div>
 
         {/* Sections */}
@@ -884,8 +886,11 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 border: `1px solid ${accent}33`, borderLeft: `3px solid ${accent}`,
                 borderRadius: 16, padding: "16px 18px", marginBottom: 16,
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>📖 Read this first</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: accent }}>📖 Read this first</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>💡 Tap any word to see what it means</div>
+                  </div>
                   {ttsPassages && (
                     <button
                       onClick={() => {
