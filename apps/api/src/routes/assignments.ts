@@ -1141,6 +1141,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
       : todayStr; // same date → harmless duplicate in OR clause
 
+    // Past-due roll-over: include unsubmitted assignments scheduled in the
+    // last 14 days so anything from earlier this week doesn't fall off.
+    // The bonus/afternoon expiry-at-3:10pm gate still runs in JS below
+    // so afternoon work doesn't leak into the next school day.
+    const rollbackStr = new Date(schoolNow.getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
+
     // Exclude heavy content column from list — client fetches it on demand via GET /:id
     const rows = await db.prepare(`
       SELECT a.id, a.class_id, a.teacher_id, a.student_id, a.title, a.description,
@@ -1153,9 +1159,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
-        AND (a.scheduled_date IS NULL OR a.scheduled_date = ? OR a.scheduled_date = ?)
+        AND (
+          a.scheduled_date IS NULL
+          OR (a.scheduled_date >= ? AND a.scheduled_date <= ?)
+        )
       ORDER BY a.is_afternoon ASC, a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, todayStr, nextDayStr) as any[];
+    `).all(userId, classId, userId, rollbackStr, nextDayStr) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
@@ -1197,10 +1206,18 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
     // list so it doesn't follow them home or carry over into tomorrow.
     // Detected via is_afternoon flag OR the 🌅 title prefix so older
     // bonuses without the flag still expire.
+    // Now that the date filter rolls back 14 days, also drop ANY bonus
+    // whose scheduled_date is from a previous calendar day — bonus
+    // assignments don't roll over even if past-due regular work does.
     const isBonus = (r: any) =>
       Number(r.is_afternoon) === 1 ||
       (typeof r.title === "string" && r.title.startsWith("🌅"));
-    const final = isAfterRelease ? filtered.filter((r: any) => !isBonus(r)) : filtered;
+    const final = filtered.filter((r: any) => {
+      const bonus = isBonus(r);
+      if (bonus && isAfterRelease) return false;
+      if (bonus && r.scheduled_date && r.scheduled_date < todayStr) return false;
+      return true;
+    });
     res.json(final);
   } catch (e) {
     console.error('pending assignments error:', e);
