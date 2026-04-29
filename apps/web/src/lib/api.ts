@@ -201,6 +201,8 @@ export const api = {
   getAssignmentLeaderboard: () => request<any[]>("/leaderboard/assignments"),
   addPoints: (userId: string, points: number) => request<any>("/leaderboard/points", { method: "POST", body: JSON.stringify({ userId, points }) }),
   autoAwardBadges: () => request<{ awarded: Array<{ id: string; label: string; icon: string }>; badges: string[]; submittedCount: number }>("/leaderboard/auto-award", { method: "POST", body: JSON.stringify({}) }),
+  claimBadge: (badgeId: string) => request<{ alreadyClaimed: boolean; pointsAwarded: number; dojo_points: number }>("/leaderboard/claim-badge", { method: "POST", body: JSON.stringify({ badgeId }) }),
+  getMyBadgeClaims: () => request<{ claims: string[]; details: Array<{ badge_id: string; points_awarded: number; claimed_at: string }> }>("/leaderboard/my-claims"),
 
   // Users
   getUsers: () => request<any[]>("/users"),

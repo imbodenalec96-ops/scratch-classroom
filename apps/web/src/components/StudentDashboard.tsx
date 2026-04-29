@@ -2641,6 +2641,7 @@ export default function StudentDashboard() {
   const [broadcast, setBroadcast] = useState<string | null>(null);
   const [mascotCelebrating, setMascotCelebrating] = useState(false);
   const [badgeToast, setBadgeToast] = useState<Array<{ id: string; label: string; icon: string }> | null>(null);
+  const [badgeClaims, setBadgeClaims] = useState<string[]>([]);
   const [youtubeLibrary, setYoutubeLibrary] = useState<any[]>([]);
   const [playingLibVideo, setPlayingLibVideo] = useState<{
     videoId: string;
@@ -2678,6 +2679,15 @@ export default function StudentDashboard() {
   const classConfig = useClassConfig();
   const blockInfo = useBlockInfo(classes[0]?.id ?? null);
 
+
+  // Load which achievement badges the student has already claimed (opened)
+  // so the loot-box UI can render them as already-revealed on first paint.
+  useEffect(() => {
+    if (user?.role !== "student") return;
+    api.getMyBadgeClaims()
+      .then((d) => setBadgeClaims(Array.isArray(d?.claims) ? d.claims : []))
+      .catch(() => setBadgeClaims([]));
+  }, [user?.id]);
 
   // Reload YouTube library from ALL classes (merged) so we never miss videos
   useEffect(() => {
@@ -4344,8 +4354,8 @@ export default function StudentDashboard() {
 
 
 
-        {/* ── ACHIEVEMENTS: loot-box cards ── */}
-        {(myStars.rewards > 0 || badgeCount > 0) && (
+        {/* ── ACHIEVEMENTS: loot-box cards (one per earned badge) ── */}
+        {Array.isArray(myEntry?.badges) && myEntry.badges.length > 0 && (
           <div style={{ marginTop: 22 }}>
             <div
               style={{
@@ -4357,7 +4367,7 @@ export default function StudentDashboard() {
                 letterSpacing: "0.2em",
               }}
             >
-              🎁 Achievements
+              🎁 Achievements — Tap a box to claim 25 points!
             </div>
             <div
               style={{
@@ -4366,11 +4376,17 @@ export default function StudentDashboard() {
                 gap: 10,
               }}
             >
-              {Array.from({ length: myStars.rewards || badgeCount || 0 }).map(
-                (_, i) => (
-                  <LootBox key={i} index={i} />
-                ),
-              )}
+              {(myEntry.badges as string[]).map((badgeId) => (
+                <LootBox
+                  key={badgeId}
+                  badgeId={badgeId}
+                  alreadyClaimed={badgeClaims.includes(badgeId)}
+                  onClaimed={(newBalance) => {
+                    setBadgeClaims((prev) => prev.includes(badgeId) ? prev : [...prev, badgeId]);
+                    if (typeof newBalance === "number") setDojoPoints(newBalance);
+                  }}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -4381,31 +4397,70 @@ export default function StudentDashboard() {
   );
 }
 
-/* ── LootBox achievement card ── */
-const LOOT_PRIZES = [
-  "🎉",
-  "🌟",
-  "🏆",
-  "💎",
-  "🎖️",
-  "🦄",
-  "🔥",
-  "✨",
-  "👑",
-  "🎯",
-  "🚀",
-  "🎪",
-];
-function LootBox({ index }: { index: number }) {
-  const [opened, setOpened] = React.useState(false);
-  const prize = LOOT_PRIZES[index % LOOT_PRIZES.length];
+/* ── LootBox achievement card ──
+   Each card represents ONE earned achievement badge. Tapping calls the
+   /leaderboard/claim-badge endpoint, which idempotently awards 25 dojo
+   points the first time and is a no-op on subsequent opens. After open,
+   the card flips to show the real achievement icon + label and the
+   points awarded. */
+const ACHIEVEMENT_CATALOG: Record<string, { icon: string; label: string; desc: string }> = {
+  first_assignment: { icon: "🎯", label: "First One Done",  desc: "Finished your first assignment" },
+  "5_assignments":  { icon: "🔥", label: "On a Roll",       desc: "Finished 5 assignments" },
+  "10_assignments": { icon: "⭐", label: "Star Student",    desc: "Finished 10 assignments" },
+  "25_assignments": { icon: "🏆", label: "Champion",        desc: "Finished 25 assignments" },
+  "50_assignments": { icon: "💎", label: "Diamond Worker",  desc: "Finished 50 assignments" },
+  "100_assignments":{ icon: "👑", label: "Hall of Fame",    desc: "Finished 100 assignments" },
+  perfect_score:    { icon: "💯", label: "Perfect Score",   desc: "Got 100% on an assignment" },
+  "3_in_a_day":     { icon: "⚡", label: "Speedster",       desc: "3 in one day" },
+  "5_in_a_day":     { icon: "🚀", label: "Power Day",       desc: "5 in one day" },
+  all_subjects:     { icon: "🌟", label: "Well Rounded",    desc: "Every subject" },
+};
+
+function LootBox({
+  badgeId,
+  alreadyClaimed,
+  onClaimed,
+}: {
+  badgeId: string;
+  alreadyClaimed: boolean;
+  onClaimed: (newBalance?: number) => void;
+}) {
+  const [opened, setOpened] = React.useState(alreadyClaimed);
+  const [pointsJustAwarded, setPointsJustAwarded] = React.useState<number | null>(null);
+  const [claiming, setClaiming] = React.useState(false);
+  const meta = ACHIEVEMENT_CATALOG[badgeId] || { icon: "🎉", label: badgeId, desc: "Achievement" };
+
+  const handleOpen = async () => {
+    if (opened || claiming) return;
+    setClaiming(true);
+    try {
+      const result = await api.claimBadge(badgeId);
+      setOpened(true);
+      if (!result.alreadyClaimed && result.pointsAwarded > 0) {
+        setPointsJustAwarded(result.pointsAwarded);
+        // Hide the floating "+25" after a moment
+        setTimeout(() => setPointsJustAwarded(null), 3500);
+      }
+      onClaimed(result.dojo_points);
+    } catch {
+      // If the claim fails, still let them see the achievement so they
+      // don't think the box is broken — they just don't get the points.
+      setOpened(true);
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   return (
     <button
-      onClick={() => setOpened(true)}
+      onClick={handleOpen}
+      disabled={opened || claiming}
+      title={meta.desc}
       style={{
+        position: "relative",
         padding: "16px 10px",
         borderRadius: 16,
-        cursor: opened ? "default" : "pointer",
+        cursor: opened ? "default" : claiming ? "wait" : "pointer",
         background: opened
           ? "linear-gradient(135deg, rgba(245,158,11,0.3), rgba(234,179,8,0.15))"
           : "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(79,70,229,0.18))",
@@ -4418,10 +4473,9 @@ function LootBox({ index }: { index: number }) {
         animation: opened ? "dbPop .3s ease both" : undefined,
       }}
       onMouseEnter={(e) => {
-        if (!opened) {
+        if (!opened && !claiming) {
           (e.currentTarget as HTMLElement).style.transform = "scale(1.08)";
-          (e.currentTarget as HTMLElement).style.animation =
-            "lootShake .3s ease both";
+          (e.currentTarget as HTMLElement).style.animation = "lootShake .3s ease both";
         }
       }}
       onMouseLeave={(e) => {
@@ -4430,11 +4484,35 @@ function LootBox({ index }: { index: number }) {
       }}
     >
       <div style={{ fontSize: 32, marginBottom: 6 }}>
-        {opened ? prize : "🎁"}
+        {opened ? meta.icon : "🎁"}
       </div>
-      <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.65 }}>
-        {opened ? "Earned!" : "Tap to open"}
+      <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.2, marginBottom: 2 }}>
+        {opened ? meta.label : "Tap to open"}
       </div>
+      {opened && (
+        <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.65 }}>
+          {meta.desc}
+        </div>
+      )}
+      {pointsJustAwarded !== null && (
+        <div
+          style={{
+            position: "absolute",
+            top: -8,
+            right: -8,
+            background: "linear-gradient(135deg,#22c55e,#16a34a)",
+            color: "white",
+            fontSize: 12,
+            fontWeight: 900,
+            padding: "4px 8px",
+            borderRadius: 99,
+            boxShadow: "0 4px 12px rgba(34,197,94,0.5)",
+            animation: "dbPop .4s ease both",
+          }}
+        >
+          +{pointsJustAwarded} pts
+        </div>
+      )}
     </button>
   );
 }

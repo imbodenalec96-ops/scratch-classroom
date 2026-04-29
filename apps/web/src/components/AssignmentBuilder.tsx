@@ -209,6 +209,30 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const passageSourceRef = React.useRef<AudioBufferSourceNode | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+
+  // Auto-save: when the assignment loads, restore any in-progress draft
+  // for this assignment ID. When answers/currentQ change, persist the draft.
+  // Cleared on submit.
+  React.useEffect(() => {
+    if (!assignment?.id) return;
+    try {
+      const raw = localStorage.getItem(`assignment-draft-${assignment.id}`);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d?.answers && typeof d.answers === "object") setAnswers(d.answers);
+        if (typeof d?.currentQ === "number") setCurrentQ(d.currentQ);
+      }
+    } catch {}
+  }, [assignment?.id]);
+  React.useEffect(() => {
+    if (!assignment?.id) return;
+    try {
+      localStorage.setItem(
+        `assignment-draft-${assignment.id}`,
+        JSON.stringify({ answers, currentQ, savedAt: Date.now() }),
+      );
+    } catch {}
+  }, [answers, currentQ, assignment?.id]);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [classId, setClassId] = useState<string | null>(null);
@@ -298,6 +322,18 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               if (hasQuestions) {
                 setAssignment(a);
                 if (a.content) { try { setParsed(JSON.parse(a.content)); } catch {} }
+                // Also load the rest of the pending list in the background
+                // so the 'Try a different one' button has alternatives. Fire
+                // and forget — don't block the assignment from rendering.
+                (async () => {
+                  try {
+                    const cls = classes.length ? classes : await api.getClasses();
+                    const results = await Promise.all(
+                      cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])),
+                    );
+                    setTodayList((results as any[][]).flat());
+                  } catch {}
+                })();
                 setLoading(false);
                 return;
               }
@@ -365,6 +401,11 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
     try {
       await api.submitAssignmentWithAnswers(submittedId, answers);
     } catch {}
+    // Clear the auto-saved draft now that the assignment has been submitted
+    try { localStorage.removeItem(`assignment-draft-${submittedId}`); } catch {}
+    // Trigger achievement auto-award (idempotent on the server) so badges
+    // light up the same way they do on the dashboard work screen.
+    try { await api.autoAwardBadges(); } catch {}
     setSubmitting(false);
 
     // Check if there are more assignments to do before showing "All done"
@@ -725,6 +766,61 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
           ← Back
         </button>
         <div style={{ flex: 1 }} />
+        {todayList.length > 1 && (
+          <button
+            onClick={() => {
+              if (!confirm("Skip this one and try a different assignment? You can come back to this one later.")) return;
+              // Find the next pending assignment that ISN'T this one. Move
+              // current to end of list so we don't immediately re-show it.
+              const skippedId = assignment?.id;
+              const others = todayList.filter((a: any) => a.id !== skippedId);
+              const skipped = todayList.find((a: any) => a.id === skippedId);
+              const reordered = skipped ? [...others, skipped] : others;
+              setTodayList(reordered);
+              const next = others[0];
+              if (!next) {
+                setAssignment(null);
+                setParsed(null);
+                return;
+              }
+              // Reset draft state for the new assignment
+              setCurrentQ(0);
+              setAnswers({});
+              if (next.content) {
+                setAssignment(next);
+                try { setParsed(JSON.parse(next.content)); } catch { setParsed(null); }
+              } else {
+                setLoadingContent(true);
+                api.getAssignment(next.id)
+                  .then((full: any) => {
+                    const content = full?.content ?? null;
+                    const p = content ? (() => { try { return JSON.parse(content); } catch { return null; } })() : null;
+                    setParsed(p);
+                    setAssignment({ ...next, content });
+                  })
+                  .catch(() => setAssignment(next))
+                  .finally(() => setLoadingContent(false));
+              }
+              stopPassageAudio();
+            }}
+            style={{
+              background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+              color: "#3a2410",
+              border: "1px solid #fcd34d",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 800,
+              padding: "8px 14px",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
+              whiteSpace: "nowrap",
+              touchAction: "manipulation",
+            }}
+            title="Skip this one — try a different assignment"
+          >
+            🔄 Try a different one
+          </button>
+        )}
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
           {currentQ + 1} / {total}
         </div>

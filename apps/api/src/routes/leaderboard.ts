@@ -206,4 +206,92 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Self-claim a real reward for an earned achievement badge. Each badge
+// can only be claimed once per student (badge_claims PK enforces this).
+// Awards 25 dojo points to the student. Used by the loot-box UI on the
+// student dashboard so 'Tap to open' actually gives them something.
+let badgeClaimsReady = false;
+async function ensureBadgeClaims() {
+  if (badgeClaimsReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS badge_claims (
+      user_id TEXT NOT NULL,
+      badge_id TEXT NOT NULL,
+      points_awarded INTEGER NOT NULL DEFAULT 0,
+      claimed_at TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (user_id, badge_id)
+    )`);
+    badgeClaimsReady = true;
+  } catch { badgeClaimsReady = true; }
+}
+
+router.post("/claim-badge", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  const userId = req.user.id;
+  const badgeId = String(req.body?.badgeId || "").trim();
+  if (!badgeId) return res.status(400).json({ error: "badgeId required" });
+
+  try {
+    await ensureBadgeClaims();
+
+    // Confirm the student actually has this badge before paying out
+    const lbRow: any = await db.prepare(
+      "SELECT badges FROM leaderboard WHERE user_id = ?"
+    ).get(userId);
+    const earned: string[] = lbRow ? JSON.parse(lbRow.badges || "[]") : [];
+    if (!earned.includes(badgeId)) {
+      return res.status(400).json({ error: "badge not earned" });
+    }
+
+    // Already claimed? Return idempotent success — no double-payouts.
+    const existing: any = await db.prepare(
+      "SELECT * FROM badge_claims WHERE user_id = ? AND badge_id = ?"
+    ).get(userId, badgeId);
+    if (existing) {
+      const balRow: any = await db.prepare(
+        "SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id = ?"
+      ).get(userId);
+      return res.json({
+        alreadyClaimed: true,
+        pointsAwarded: 0,
+        dojo_points: balRow?.dojo_points ?? 0,
+      });
+    }
+
+    // First claim — award dojo points and log the claim atomically-ish
+    const POINTS = 25;
+    await db.prepare(`UPDATE users SET dojo_points = COALESCE(dojo_points, 0) + ? WHERE id = ?`).run(POINTS, userId);
+    const balRow: any = await db.prepare(
+      "SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id = ?"
+    ).get(userId);
+    await db.prepare(
+      `INSERT INTO badge_claims (user_id, badge_id, points_awarded, claimed_at) VALUES (?, ?, ?, ?)`
+    ).run(userId, badgeId, POINTS, new Date().toISOString());
+
+    res.json({
+      alreadyClaimed: false,
+      pointsAwarded: POINTS,
+      dojo_points: balRow?.dojo_points ?? 0,
+    });
+  } catch (e: any) {
+    console.error("[leaderboard claim-badge]", e?.message || e);
+    res.status(500).json({ error: e?.message || "claim failed" });
+  }
+});
+
+// Returns the set of badge IDs this student has already claimed, so the
+// loot-box UI can render them as "already opened" on first paint.
+router.get("/my-claims", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  try {
+    await ensureBadgeClaims();
+    const rows = await db.prepare(
+      "SELECT badge_id, points_awarded, claimed_at FROM badge_claims WHERE user_id = ?"
+    ).all(req.user.id) as any[];
+    res.json({ claims: rows.map((r) => r.badge_id), details: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
 export default router;
