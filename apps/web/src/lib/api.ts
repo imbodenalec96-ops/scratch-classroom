@@ -81,6 +81,11 @@ export const api = {
       `/assignments/class/${classId}/generate-from-passage`,
       { method: "POST", body: JSON.stringify(opts) },
     ),
+  fillStudentAssignments: (classId: string, studentId: string) =>
+    request<{ created: number; total: number; assignments: any[]; errors: string[] }>(
+      `/assignments/class/${classId}/fill-student`,
+      { method: "POST", body: JSON.stringify({ studentId }) },
+    ),
   rollForwardAssignments: (classId: string) =>
     request<{ moved: number; today: string }>(`/assignments/class/${classId}/roll-forward`, {
       method: "POST", body: JSON.stringify({}),

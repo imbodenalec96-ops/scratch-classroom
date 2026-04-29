@@ -2461,6 +2461,35 @@ export default function AssignmentBuilder() {
               📅 Bring Forward to Today
             </button>
             <button
+              disabled={!classId || classStudents.length === 0}
+              title="Fill in missing per-grade work for ONE student without adding new work for the rest of the class"
+              onClick={async () => {
+                if (!classId) return;
+                if (classStudents.length === 0) { alert("No students in this class."); return; }
+                const names = classStudents.map((s: any, i: number) => `${i + 1}. ${s.name}`).join("\n");
+                const pickStr = window.prompt(`Which student?\n\n${names}\n\nType the number (1–${classStudents.length}):`);
+                if (!pickStr) return;
+                const pick = Number(pickStr);
+                if (!Number.isFinite(pick) || pick < 1 || pick > classStudents.length) {
+                  alert("Invalid pick.");
+                  return;
+                }
+                const student = classStudents[pick - 1];
+                try {
+                  const r = await api.fillStudentAssignments(classId, student.id);
+                  await loadAssignments(classId);
+                  const summary = (r.assignments || [])
+                    .map((a: any) => a.skipped ? `• ${a.subject} G${a.grade}: already there` : `• ${a.subject} G${a.grade}: created`)
+                    .join("\n");
+                  alert(`✅ ${student.name}: ${r.created} new, ${r.total - r.created} already existed.\n\n${summary}${r.errors?.length ? "\n\nNotes: " + r.errors.join(", ") : ""}`);
+                } catch (e: any) { alert("Fill failed: " + (e?.message || e)); }
+              }}
+              className="btn-primary gap-2"
+              style={{ background: "linear-gradient(135deg, #d946ef, #a21caf)" }}
+            >
+              👤 Fill Missing for One Student
+            </button>
+            <button
               onClick={async () => {
                 if (studentCheck) { setStudentCheck(null); return; }
                 if (!classId || classStudents.length === 0) { alert("Select a class with students first."); return; }

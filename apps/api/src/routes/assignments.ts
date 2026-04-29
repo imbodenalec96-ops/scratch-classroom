@@ -2389,6 +2389,68 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
   res.json({ created: created.length, assignments: created, errors });
 });
 
+// POST /assignments/class/:classId/fill-student
+// Fill in the grade-targeted assignments a SINGLE student is missing,
+// without touching anyone else's queue or adding class-wide subjects.
+// Useful when one student's grade was changed AFTER the class-wide
+// Generate Today run — the teacher wants to backfill just for them.
+// Body: { studentId }
+router.post("/class/:classId/fill-student", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  const studentId = String(req.body?.studentId || "").trim();
+  if (!studentId) return res.status(400).json({ error: "studentId required" });
+
+  const created: any[] = [];
+  const errors: string[] = [];
+
+  try {
+    // Look up this student's per-subject grade levels
+    const grades: any = await db.prepare(
+      "SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?"
+    ).get(studentId).catch(() => null);
+    if (!grades) {
+      return res.status(400).json({ error: "Student has no grade levels configured. Set them in Admin → Class Roster first." });
+    }
+    const subjectGrade: Record<string, number | null> = {
+      reading:  grades.reading_grade ?? null,
+      math:     grades.math_grade    ?? null,
+      writing:  grades.writing_grade ?? null,
+      spelling: grades.reading_grade ?? null, // spelling uses reading_grade
+    };
+
+    for (const subject of ["reading", "math", "writing", "spelling"] as const) {
+      const gradeNum = Number(subjectGrade[subject]);
+      if (!Number.isFinite(gradeNum)) { errors.push(`${subject}: no grade level set`); continue; }
+      const premade = PREMADE[subject]?.[gradeNum];
+      if (!premade) { errors.push(`${subject} G${gradeNum}: no premade content for that grade`); continue; }
+
+      // Skip if a (class, subject, grade) row already exists — this kid
+      // either already has it or is going to inherit it from the class
+      // Generate Today output.
+      const existing: any = await db.prepare(
+        `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
+      ).get(classId, subject, gradeNum);
+      if (existing) { created.push({ title: premade.title, subject, grade: gradeNum, skipped: true }); continue; }
+
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
+      ).run(
+        id, classId, req.user!.id, premade.title, premade.description,
+        JSON.stringify(premade.content), subject, gradeNum, gradeNum,
+        JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
+      );
+      created.push({ id, title: premade.title, subject, grade: gradeNum });
+    }
+
+    res.json({ created: created.filter((c: any) => !c.skipped).length, total: created.length, assignments: created, errors });
+  } catch (e: any) {
+    console.error("[fill-student]", e?.message || e);
+    res.status(500).json({ error: e?.message || "fill failed" });
+  }
+});
+
 // POST /assignments/class/:classId/generate-afternoon
 // Adds bonus assignments using PREMADE content, one per (subject × grade)
 // pair across grades 1–5. Each is targeted via target_grade_min/max so the
