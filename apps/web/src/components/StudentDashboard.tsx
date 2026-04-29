@@ -2752,8 +2752,17 @@ export default function StudentDashboard() {
   };
 
   const { user, logout } = useAuth();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const dk = theme === "dark";
+  // Lock students to the Starfall (light) theme on every dashboard mount
+  // so all the pages they navigate to (Lessons, Achievements, Cashout,
+  // Arcade, etc.) inherit the cream palette via :root.light token set.
+  // Teachers/admins keep their toggle.
+  useEffect(() => {
+    if (user?.role === "student" && theme !== "light") {
+      setTheme("light");
+    }
+  }, [user?.role, theme, setTheme]);
   const navigate = useNavigate();
 
   const [phase, setPhase] = useState<Phase>("welcome");
@@ -3239,7 +3248,10 @@ export default function StudentDashboard() {
         } catch { confirmedDone = false; }
 
         if (confirmedDone) {
-          setWorkUnlocked();
+          // Per teacher request: do NOT unlock free time / arcade when
+          // the student finishes all morning work. Just return them to
+          // the dashboard so they can find more work or a teacher can
+          // post more. setWorkUnlocked() removed intentionally.
           setPendingAssignment(null);
           setParsedAssignment(null);
           setPhase("done");

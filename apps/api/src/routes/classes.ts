@@ -1370,6 +1370,97 @@ router.post("/:id/schedule/reset", requireRole("teacher", "admin"), async (req: 
   }
 });
 
+// Class timer ("20-minute work session" countdown shown on the board).
+// Teacher sets duration + start/pause/reset; board polls and shows the
+// countdown big. Stored as a single row per class. ends_at is the wall-
+// clock timestamp the timer should hit zero at; remaining_ms is the
+// snapshot when paused. label lets the teacher say what the timer is for.
+let timerTableReady = false;
+async function ensureClassTimer() {
+  if (timerTableReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS class_timers (
+      class_id TEXT PRIMARY KEY,
+      label TEXT,
+      duration_ms INTEGER NOT NULL DEFAULT 1200000,
+      ends_at TEXT,
+      remaining_ms INTEGER,
+      state TEXT NOT NULL DEFAULT 'idle',
+      updated_at TEXT
+    )`);
+    timerTableReady = true;
+  } catch { timerTableReady = true; }
+}
+
+router.get("/:classId/timer", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureClassTimer();
+    const row: any = await db.prepare("SELECT * FROM class_timers WHERE class_id::text = ?").get(req.params.classId);
+    if (!row) return res.json({ state: "idle", duration_ms: 1200000, label: null });
+    res.json({
+      state: row.state,
+      duration_ms: row.duration_ms,
+      ends_at: row.ends_at,
+      remaining_ms: row.remaining_ms,
+      label: row.label,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "timer load failed" });
+  }
+});
+
+router.post("/:classId/timer/set", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const minutes = Math.max(1, Math.min(120, Number(req.body?.minutes ?? 20)));
+  const label = String(req.body?.label || "").slice(0, 80) || null;
+  const action = String(req.body?.action || "set"); // set | start | pause | resume | reset
+  const durationMs = minutes * 60_000;
+  try {
+    await ensureClassTimer();
+    const existing: any = await db.prepare("SELECT * FROM class_timers WHERE class_id::text = ?").get(req.params.classId);
+    let state = "idle";
+    let ends_at: string | null = null;
+    let remaining_ms: number | null = null;
+    const now = Date.now();
+    const usedDuration = action === "set" || !existing ? durationMs : existing.duration_ms;
+
+    if (action === "start") {
+      state = "running";
+      ends_at = new Date(now + usedDuration).toISOString();
+      remaining_ms = null;
+    } else if (action === "resume" && existing?.remaining_ms != null) {
+      state = "running";
+      ends_at = new Date(now + existing.remaining_ms).toISOString();
+      remaining_ms = null;
+    } else if (action === "pause" && existing?.ends_at) {
+      const left = Math.max(0, new Date(existing.ends_at).getTime() - now);
+      state = "paused";
+      ends_at = null;
+      remaining_ms = left;
+    } else if (action === "reset") {
+      state = "idle";
+      ends_at = null;
+      remaining_ms = null;
+    } else {
+      // 'set' — just update duration without starting
+      state = "idle";
+    }
+
+    if (existing) {
+      await db.prepare(
+        `UPDATE class_timers SET label = ?, duration_ms = ?, ends_at = ?, remaining_ms = ?, state = ?, updated_at = ? WHERE class_id::text = ?`
+      ).run(label ?? existing.label, usedDuration, ends_at, remaining_ms, state, new Date().toISOString(), req.params.classId);
+    } else {
+      await db.prepare(
+        `INSERT INTO class_timers (class_id, label, duration_ms, ends_at, remaining_ms, state, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(req.params.classId, label, usedDuration, ends_at, remaining_ms, state, new Date().toISOString());
+    }
+    res.json({ state, duration_ms: usedDuration, ends_at, remaining_ms, label });
+  } catch (e: any) {
+    console.error("[timer set]", e?.message || e);
+    res.status(500).json({ error: e?.message || "timer save failed" });
+  }
+});
+
 // Help-request ("I'm stuck") system. Idempotent per (class, student): a
 // student raising their hand a second time bumps timestamp on the existing
 // open request rather than spawning duplicates. Teachers clear when helped.

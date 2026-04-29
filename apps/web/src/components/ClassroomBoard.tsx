@@ -139,6 +139,65 @@ export default function ClassroomBoard() {
     return map;
   }, [helpRequests]);
 
+  // Class timer — polled by everyone (board needs to display countdown),
+  // controls only render for teachers. Uses ends_at wall-clock time so
+  // every device shows the same countdown without server round-trips.
+  const [timer, setTimer] = useState<{
+    state: "idle" | "running" | "paused";
+    duration_ms: number;
+    ends_at?: string | null;
+    remaining_ms?: number | null;
+    label?: string | null;
+  } | null>(null);
+  const [timerNow, setTimerNow] = useState(Date.now());
+  useEffect(() => {
+    if (!cls?.id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const t = await api.getClassTimer(cls.id);
+        if (!cancelled) setTimer(t);
+      } catch {}
+    };
+    tick();
+    const iv = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [cls?.id]);
+  // Local 1Hz tick so the countdown doesn't lag the server-poll cadence
+  useEffect(() => {
+    const iv = setInterval(() => setTimerNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const timerRemainingMs = (() => {
+    if (!timer) return 0;
+    if (timer.state === "running" && timer.ends_at) {
+      return Math.max(0, new Date(timer.ends_at).getTime() - timerNow);
+    }
+    if (timer.state === "paused" && timer.remaining_ms != null) return timer.remaining_ms;
+    return timer.duration_ms || 0;
+  })();
+  const timerVisible = !!timer && (timer.state === "running" || timer.state === "paused");
+  const timerExpiringSoon = timer?.state === "running" && timerRemainingMs > 0 && timerRemainingMs <= 60_000;
+  const timerHitZero = timer?.state === "running" && timerRemainingMs === 0;
+  const fmtTime = (ms: number) => {
+    const total = Math.ceil(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  // Teacher controls — set duration, start/pause/resume/reset.
+  const [timerControlsOpen, setTimerControlsOpen] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState(20);
+  const sendTimer = async (action: "set" | "start" | "pause" | "resume" | "reset", minutes?: number) => {
+    if (!cls?.id) return;
+    try {
+      const t = await api.setClassTimer(cls.id, { minutes: minutes ?? timerMinutes, action });
+      setTimer(t as any);
+    } catch {}
+  };
+
   // Live class progress (teacher-only widget on the board)
   const [classProgress, setClassProgress] = useState<{
     pct: number;
@@ -562,6 +621,162 @@ export default function ClassroomBoard() {
               · just turned in: {(classProgress.recent[0].name || "?").split(" ")[0]} — {classProgress.recent[0].title}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── CLASS TIMER ── Big countdown when active. Teacher controls
+          appear as a small icon (top-left) that opens a panel. The
+          controls only render for teachers, so kids touching the board
+          don't see anything to tap. */}
+      {timerVisible && (
+        <div
+          style={{
+            position: "absolute",
+            top: 78, left: "50%", transform: "translateX(-50%)",
+            zIndex: 35,
+            display: "flex", flexDirection: "column", alignItems: "center",
+            background: "linear-gradient(180deg, rgba(13,19,33,0.92) 0%, rgba(7,8,15,0.92) 100%)",
+            borderTop: `2px solid ${timerHitZero ? "#22c55e" : timerExpiringSoon ? "#b23a48" : "#7dd3c5"}`,
+            border: `1px solid ${g(0.14)}`,
+            borderRadius: 4,
+            padding: "8px 22px 10px",
+            pointerEvents: "none",
+            boxShadow: timerExpiringSoon ? "0 0 24px rgba(178,58,72,0.45)" : "0 6px 20px rgba(0,0,0,0.4)",
+            animation: timerExpiringSoon ? "helpPulse 1s ease-in-out infinite" : undefined,
+          }}
+        >
+          {timer?.label && (
+            <div style={{
+              fontFamily: serif, fontStyle: "italic",
+              fontSize: 11, fontWeight: 600,
+              letterSpacing: "0.16em", textTransform: "uppercase",
+              color: g(0.55), marginBottom: 2,
+            }}>
+              {timer.label}
+            </div>
+          )}
+          <div style={{
+            fontFamily: serif, fontSize: 56, fontWeight: 500, fontStyle: "italic",
+            letterSpacing: "-0.02em", lineHeight: 1,
+            color: timerHitZero ? "#86efac" : timerExpiringSoon ? "#fca5a5" : "#fde68a",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {timerHitZero ? "Time!" : fmtTime(timerRemainingMs)}
+          </div>
+          {timer?.state === "paused" && (
+            <div style={{
+              fontFamily: serif, fontStyle: "italic",
+              fontSize: 11, color: g(0.5),
+              marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase",
+            }}>
+              ⏸ paused
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Teacher-only timer controls — discreet icon, opens a panel */}
+      {isTeacher && (
+        <button
+          onClick={() => setTimerControlsOpen((v) => !v)}
+          title="Class timer controls"
+          style={{
+            position: "absolute",
+            top: 12, left: 14,
+            zIndex: 36,
+            width: 36, height: 36, borderRadius: "50%",
+            background: "rgba(13,19,33,0.85)",
+            border: `1px solid ${g(0.18)}`,
+            color: "#fde68a",
+            fontSize: 18,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            touchAction: "manipulation",
+          }}
+        >
+          ⏱
+        </button>
+      )}
+
+      {isTeacher && timerControlsOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: 56, left: 14,
+            zIndex: 50,
+            background: "linear-gradient(180deg, rgba(13,19,33,0.96) 0%, rgba(7,8,15,0.96) 100%)",
+            borderTop: "2px solid #b23a48",
+            border: `1px solid ${g(0.14)}`,
+            borderRadius: 4,
+            padding: "14px 18px",
+            color: "#f5f1e8",
+            minWidth: 280,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div style={{
+            fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 600,
+            letterSpacing: "0.16em", textTransform: "uppercase",
+            color: "#7dd3c5", marginBottom: 10,
+            borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 6,
+          }}>
+            ⏱ Class timer
+          </div>
+          {/* Minutes setter */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={() => setTimerMinutes((m) => Math.max(1, m - 5))}
+              style={{ width: 32, height: 32, borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
+            >−</button>
+            <div style={{ flex: 1, textAlign: "center", fontFamily: serif, fontSize: 22, fontStyle: "italic", color: "#fde68a", fontVariantNumeric: "tabular-nums" }}>
+              {timerMinutes} min
+            </div>
+            <button
+              onClick={() => setTimerMinutes((m) => Math.min(120, m + 5))}
+              style={{ width: 32, height: 32, borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
+            >+</button>
+          </div>
+          {/* Quick presets */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
+            {[5, 10, 15, 20, 30, 45, 60].map((m) => (
+              <button
+                key={m}
+                onClick={() => setTimerMinutes(m)}
+                style={{
+                  padding: "4px 10px", borderRadius: 99,
+                  background: timerMinutes === m ? "#7dd3c5" : g(0.06),
+                  border: `1px solid ${timerMinutes === m ? "#7dd3c5" : g(0.14)}`,
+                  color: timerMinutes === m ? "#0d1321" : g(0.7),
+                  fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: serif,
+                }}
+              >{m}</button>
+            ))}
+          </div>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {timer?.state !== "running" && (
+              <button
+                onClick={() => sendTimer(timer?.state === "paused" ? "resume" : "start")}
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: "linear-gradient(135deg, #5b8a6e, #2a6f6a)", color: "#f5f1e8", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+              >
+                ▶ {timer?.state === "paused" ? "Resume" : "Start"}
+              </button>
+            )}
+            {timer?.state === "running" && (
+              <button
+                onClick={() => sendTimer("pause")}
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: "linear-gradient(135deg, #d97706, #b45309)", color: "#f5f1e8", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+              >
+                ⏸ Pause
+              </button>
+            )}
+            <button
+              onClick={() => sendTimer("reset")}
+              style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+            >
+              ↻ Reset
+            </button>
+          </div>
         </div>
       )}
 

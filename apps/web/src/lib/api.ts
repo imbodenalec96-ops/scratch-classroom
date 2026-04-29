@@ -238,6 +238,13 @@ export const api = {
     request<{ ok: boolean }>(`/classes/${classId}/help/${studentId}`, { method: "DELETE" }),
   getClassHelpRequests: (classId: string) =>
     request<{ requests: Array<{ id: string; student_id: string; student_name: string; avatar_emoji: string; message: string | null; raised_at: string }> }>(`/classes/${classId}/help`),
+  getClassTimer: (classId: string) =>
+    request<{ state: "idle" | "running" | "paused"; duration_ms: number; ends_at?: string | null; remaining_ms?: number | null; label?: string | null }>(`/classes/${classId}/timer`),
+  setClassTimer: (classId: string, opts: { minutes: number; action: "set" | "start" | "pause" | "resume" | "reset"; label?: string }) =>
+    request<{ state: string; duration_ms: number; ends_at: string | null; remaining_ms: number | null; label: string | null }>(
+      `/classes/${classId}/timer/set`,
+      { method: "POST", body: JSON.stringify(opts) },
+    ),
 
   // Users
   getUsers: () => request<any[]>("/users"),

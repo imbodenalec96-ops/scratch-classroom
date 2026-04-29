@@ -68,63 +68,67 @@
   --bubble-other-border:rgba(139,92,246,0.18);
 }
 
-.light {
-  /* Backgrounds — cool soft blue-grey */
-  --bg:          #f0f1f8;
-  --bg-sidebar:  #ffffff;
+.light, .starfall {
+  /* Starfall-style warm cream palette — used for students AND for
+     teachers who toggle to light mode. Soft on kid eyes, low contrast,
+     friendly. Replaces the previous cool blue-grey light palette so
+     every existing var(--bg) / var(--text-1) / var(--accent) pickup
+     gets the new look automatically without per-component edits. */
+  --bg:          #f6efde;
+  --bg-sidebar:  #fffaed;
   --bg-surface:  #ffffff;
-  --bg-raised:   #eef0fa;
-  --bg-hover:    rgba(99,102,241,0.06);
+  --bg-raised:   #fef5dc;
+  --bg-hover:    rgba(178,58,72,0.06);
   --bg-input:    #ffffff;
-  --bg-muted:    rgba(99,102,241,0.03);
+  --bg-muted:    rgba(58,36,16,0.03);
 
-  /* Borders */
-  --border:      rgba(99,102,241,0.10);
-  --border-md:   rgba(99,102,241,0.18);
-  --border-focus:rgba(99,102,241,0.50);
+  /* Borders — warm brown, low-contrast */
+  --border:      rgba(58,36,16,0.10);
+  --border-md:   rgba(58,36,16,0.18);
+  --border-focus:rgba(178,58,72,0.45);
 
-  /* Text */
-  --text-1:      #0f0e2a;
-  --text-2:      #4a4a7a;
-  --text-3:      #8080a8;
-  --text-accent: #6366f1;
+  /* Text — warm brown ink */
+  --text-1:      #3a2410;
+  --text-2:      #5a4632;
+  --text-3:      #8a7a5e;
+  --text-accent: #b23a48;
 
-  /* Accent */
-  --accent:             #6366f1;
-  --accent-hover:       #4f46e5;
-  --accent-light:       rgba(99,102,241,0.10);
-  --accent-coral:       #6366f1;
-  --accent-coral-hover: #4f46e5;
+  /* Accent — brick-red (board theme) */
+  --accent:             #b23a48;
+  --accent-hover:       #951f30;
+  --accent-light:       rgba(178,58,72,0.10);
+  --accent-coral:       #d97706;
+  --accent-coral-hover: #b45309;
 
-  /* Secondary */
-  --accent-sage: #10b981;
-  --accent-ink:  #6366f1;
-  --accent-rust: #e11d48;
+  /* Secondary — teal (Starfall library green) */
+  --accent-sage: #2a6f6a;
+  --accent-ink:  #b23a48;
+  --accent-rust: #c2410c;
 
   /* Focus ring */
-  --ring:        rgba(99,102,241,0.25);
+  --ring:        rgba(178,58,72,0.25);
 
-  /* Radii */
-  --r-sm: 4px;
-  --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
-  --r-2xl: 20px;
+  /* Radii — slightly more rounded for the friendlier feel */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
 
-  /* Shadows */
-  --shadow-ambient: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-hover:   0 4px 12px rgba(0,0,0,0.10);
+  /* Shadows — soft brown, no harsh black */
+  --shadow-ambient: 0 1px 4px rgba(58,36,16,0.06);
+  --shadow-hover:   0 6px 16px rgba(58,36,16,0.12);
 
-  /* Status */
-  --success:     #10b981;
-  --warning:     #f59e0b;
-  --danger:      #e11d48;
-  --info:        #0284c7;
+  /* Status — warm-tone palette */
+  --success:     #5b8a6e;
+  --warning:     #d97706;
+  --danger:      #b23a48;
+  --info:        #2a6f6a;
 
   /* Chat bubbles */
-  --bubble-other-bg:    #eef0fa;
-  --bubble-other-text:  #0f0e2a;
-  --bubble-other-border:rgba(99,102,241,0.12);
+  --bubble-other-bg:    #fef5dc;
+  --bubble-other-text:  #3a2410;
+  --bubble-other-border:rgba(58,36,16,0.10);
 }
 
 /* ═══════════════════════════════════════════════════════════
