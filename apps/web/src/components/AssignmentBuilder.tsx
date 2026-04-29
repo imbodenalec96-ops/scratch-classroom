@@ -1367,6 +1367,7 @@ export default function AssignmentBuilder() {
   const [genTopicLoading, setGenTopicLoading] = useState(false);
   const [genPassageLoading, setGenPassageLoading] = useState(false);
   const [regenWeekLoading, setRegenWeekLoading] = useState(false);
+  const [regenWeekProgress, setRegenWeekProgress] = useState<{ done: number; total: number; current: string; errors: string[] } | null>(null);
   const [showPassageModal, setShowPassageModal] = useState(false);
   const [passageDraft, setPassageDraft] = useState({ title: "", text: "", grade: 3, questionCount: 5 });
 
@@ -2026,6 +2027,48 @@ export default function AssignmentBuilder() {
 
   return (
     <div className="p-6 space-y-5 animate-page-enter max-w-screen-xl mx-auto">
+      {/* Regenerate-week live progress overlay */}
+      {regenWeekProgress && (
+        <div
+          style={{
+            position: "fixed",
+            top: 16, right: 16,
+            zIndex: 10000,
+            background: "rgba(15,15,30,0.96)",
+            border: "1px solid rgba(139,92,246,0.4)",
+            borderRadius: 14,
+            padding: "16px 20px",
+            color: "white",
+            minWidth: 320,
+            maxWidth: 420,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#c4b5fd", marginBottom: 6 }}>
+            ♻️ Regenerating week
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 4 }}>
+            {regenWeekProgress.done} / {regenWeekProgress.total}
+          </div>
+          <div style={{ height: 8, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{
+              width: `${(regenWeekProgress.done / Math.max(1, regenWeekProgress.total)) * 100}%`,
+              height: "100%",
+              background: "linear-gradient(90deg, #8b5cf6, #6d28d9)",
+              transition: "width .3s ease",
+            }} />
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {regenWeekProgress.current}
+          </div>
+          {regenWeekProgress.errors.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "#fca5a5" }}>
+              ⚠ {regenWeekProgress.errors.length} error{regenWeekProgress.errors.length === 1 ? "" : "s"} so far
+            </div>
+          )}
+        </div>
+      )}
+
       {/* "Generate from text" modal — paste any passage, AI builds questions */}
       {showPassageModal && (
         <div
@@ -2234,19 +2277,48 @@ export default function AssignmentBuilder() {
               title="Regenerate every assignment in this class scheduled this week (skips already-submitted ones)"
               onClick={async () => {
                 if (!classId) return;
-                if (!confirm("Regenerate EVERY unsubmitted assignment for this week with the latest AI prompt?\n\nThis takes 1–3 minutes depending on how many assignments. Submitted student work is never overwritten.")) return;
-                setRegenWeekLoading(true);
+                // Step 1: fetch the candidate list (cheap server query, no AI)
+                let candidates: Array<{ id: string; title: string }> = [];
                 try {
-                  const r = await api.regenerateWeek(classId);
-                  await loadAssignments(classId);
-                  alert(`✅ Regenerated ${r.regenerated} of ${r.total} assignments (${r.weekStart} → ${r.weekEnd}).${r.skipped ? `\n${r.skipped} skipped.` : ""}${r.errors?.length ? "\n\nErrors: " + r.errors.join("\n") : ""}${r.note ? "\n\n" + r.note : ""}`);
-                } catch (e: any) { alert("Regenerate failed: " + (e?.message || e)); }
-                finally { setRegenWeekLoading(false); }
+                  const r = await api.getRegenCandidates(classId);
+                  candidates = r.candidates || [];
+                } catch (e: any) {
+                  alert("Couldn't load this week's assignments: " + (e?.message || "unknown error"));
+                  return;
+                }
+                if (candidates.length === 0) {
+                  alert("No regen-eligible assignments this week (all submitted or none scheduled).");
+                  return;
+                }
+                if (!confirm(`Regenerate ${candidates.length} unsubmitted assignment${candidates.length === 1 ? "" : "s"} for this week with the latest AI prompt?\n\nProcessed one at a time. Takes ~30 seconds per assignment. You can leave this tab open.`)) return;
+                // Step 2: regenerate one at a time with live progress.
+                // Each call is its own short request — no serverless timeout risk.
+                setRegenWeekLoading(true);
+                setRegenWeekProgress({ done: 0, total: candidates.length, current: candidates[0]?.title || "", errors: [] });
+                const errors: string[] = [];
+                for (let i = 0; i < candidates.length; i++) {
+                  const c = candidates[i];
+                  setRegenWeekProgress({ done: i, total: candidates.length, current: c.title, errors: [...errors] });
+                  try {
+                    await api.regenerateAssignment(c.id);
+                  } catch (e: any) {
+                    errors.push(`${(c.title || c.id.slice(0,8))}: ${e?.message || "failed"}`);
+                  }
+                }
+                setRegenWeekProgress({ done: candidates.length, total: candidates.length, current: "Done!", errors });
+                await loadAssignments(classId);
+                setRegenWeekLoading(false);
+                setTimeout(() => setRegenWeekProgress(null), 4000);
+                if (errors.length > 0) {
+                  alert(`Regenerated ${candidates.length - errors.length} of ${candidates.length}.\n\nErrors:\n${errors.slice(0, 8).join("\n")}`);
+                }
               }}
               className="btn-primary gap-2"
               style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)" }}
             >
-              {regenWeekLoading ? "⏳ Regenerating week…" : "♻️ Regenerate This Week"}
+              {regenWeekLoading
+                ? `⏳ ${regenWeekProgress?.done ?? 0}/${regenWeekProgress?.total ?? "?"}`
+                : "♻️ Regenerate This Week"}
             </button>
             <button
               onClick={async () => {

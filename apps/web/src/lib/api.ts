@@ -86,6 +86,10 @@ export const api = {
       `/assignments/class/${classId}/regenerate-week`,
       { method: "POST", body: JSON.stringify({}) },
     ),
+  getRegenCandidates: (classId: string) =>
+    request<{ candidates: Array<{ id: string; title: string; target_subject: string; scheduled_date: string | null }>; weekStart: string; weekEnd: string }>(
+      `/assignments/class/${classId}/regen-candidates`,
+    ),
   // NB: data may include { targetGradeMin, targetGradeMax, targetSubject } for per-assignment grade gating
   generateAssignment: (data: { title: string; subject: string; grade: string; instructions?: string; passage?: string; questionCount?: number; questionType?: string; learningObjective?: string; focusKeywords?: string; teacherNotes?: string; hintsAllowed?: boolean }) =>
     request<any>("/ai/generate-assignment", { method: "POST", body: JSON.stringify(data) }),

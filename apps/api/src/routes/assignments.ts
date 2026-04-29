@@ -2352,6 +2352,36 @@ router.post("/class/:classId/generate-afternoon", requireRole("teacher", "admin"
 // vocabulary calibration, self-contained lessons, etc) — the teacher
 // gets the new quality across the whole week without re-clicking
 // regenerate on every card.
+// GET /assignments/class/:classId/regen-candidates
+// Lists assignment IDs eligible for regeneration this week (no submissions
+// + scheduled this week or always-on). Used by the client-side regenerate
+// loop so each AI call is its own short request — no serverless timeouts.
+router.get("/class/:classId/regen-candidates", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const classId = req.params.classId;
+  try {
+    try { await ensureGradeCols(); } catch {}
+    const PT_OFFSET = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PT_OFFSET);
+    const schoolDow = schoolNow.getUTCDay();
+    const sunday = new Date(schoolNow.getTime() - schoolDow * 86400_000);
+    const saturday = new Date(sunday.getTime() + 6 * 86400_000);
+    const weekStart = sunday.toISOString().slice(0, 10);
+    const weekEnd = saturday.toISOString().slice(0, 10);
+    const rows = await db.prepare(
+      `SELECT a.id, a.title, a.target_subject, a.scheduled_date
+       FROM assignments a
+       WHERE a.class_id::text = ?
+         AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id::text = a.id::text)
+         AND (a.scheduled_date IS NULL OR (a.scheduled_date >= ? AND a.scheduled_date <= ?))
+       ORDER BY a.scheduled_date ASC, a.created_at ASC`
+    ).all(classId, weekStart, weekEnd) as any[];
+    res.json({ candidates: rows, weekStart, weekEnd });
+  } catch (e: any) {
+    console.error("[regen-candidates]", e?.message || e);
+    res.status(500).json({ error: e?.message || "candidates failed" });
+  }
+});
+
 router.post("/class/:classId/regenerate-week", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   const startTime = Date.now();
