@@ -37,17 +37,19 @@ if (process.env.DATABASE_URL) {
   let pool: { query: (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount: number | null }>; end?: () => Promise<void> };
 
   if (isNeonUrl) {
-    const { Pool, neonConfig } = await import("@neondatabase/serverless");
-    // ws not needed for plain query() over HTTP fetch; only required for
-    // transactions/listen which we don't use.
-    neonConfig.fetchConnectionCache = true;
-    const neonPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    // Use neon()'s HTTP-fetch SQL function instead of Pool.
+    // Pool requires WebSockets, which aren't available in Vercel Node.js
+    // functions out of the box — that's what was returning {ok:false} from
+    // /api/ping in prod and breaking student login. neon() goes over plain
+    // HTTPS and works everywhere fetch works.
+    const { neon } = await import("@neondatabase/serverless");
+    const sql = neon(process.env.DATABASE_URL!);
     pool = {
-      async query(sql: string, params?: any[]) {
-        const r = await neonPool.query(sql, params);
-        return { rows: r.rows, rowCount: r.rowCount ?? 0 };
+      async query(sqlText: string, params?: any[]) {
+        // neon's .query() accepts an array of params and returns rows directly
+        const rows = await (sql as any).query(sqlText, params || []);
+        return { rows: rows as any[], rowCount: Array.isArray(rows) ? rows.length : 0 };
       },
-      async end() { await neonPool.end(); },
     };
   } else {
     const pg = await import("pg");
