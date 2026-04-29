@@ -205,7 +205,7 @@ export default function ClassroomBoard() {
     totalStudents: number;
     topToday: Array<{ student_id: string; name: string; count: number }>;
     recent: Array<{ name: string; title: string; ts: string }>;
-    byStudent?: Record<string, { open: number; done: number; pct: number }>;
+    byStudent?: Record<string, { open: number; done: number; total: number; pct: number }>;
   } | null>(null);
   useEffect(() => {
     if (!cls?.id || !isTeacher) return;
@@ -1093,13 +1093,13 @@ export default function ClassroomBoard() {
                       ))}
                     </div>
 
-                    {/* Per-student daily progress — done/open assignments visible
-                        to this kid today. Hairline rail w/ filled bar, mirrors
-                        the styling of the class-wide progress bar at the bottom
-                        of the board. Only renders if there is work to do. */}
+                    {/* Per-student daily progress — `done` of `total`
+                        assignments visible to this kid today (matches what
+                        they actually see in their dashboard queue). The bar
+                        only appears if the student has work assigned. */}
                     {(() => {
                       const sp = classProgress?.byStudent?.[String(s.id)];
-                      if (!sp || sp.open <= 0) return null;
+                      if (!sp || sp.total <= 0) return null;
                       const fillsClass = sp.pct >= 100;
                       return (
                         <div style={{
@@ -1134,7 +1134,7 @@ export default function ClassroomBoard() {
                             fontVariantNumeric: "tabular-nums",
                             textAlign: "center",
                           }}>
-                            {sp.done}/{sp.open}{fillsClass ? " ✓" : ""}
+                            {sp.done}/{sp.total}{fillsClass ? " ✓" : ""}
                           </div>
                         </div>
                       );

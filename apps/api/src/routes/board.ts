@@ -320,48 +320,72 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       console.error("[live-progress subs]", e?.message);
     }
 
-    // Open assignments today. Pull target_* metadata so we can compute
-    // visibility per student in JS — same rules as /assignments/student
-    // (target_student_ids wins; otherwise target_grade_min/max range; null = all).
-    let openAssignments: any[] = [];
+    // Pull today's class assignments (today + null-scheduled), MIRRORING
+    // the rules /assignments/class/:classId/pending applies for the
+    // student dashboard so the board's per-student bar matches what each
+    // kid actually sees in their queue.
+    //
+    // Same set of fields the strict pending endpoint reads — title is
+    // needed for the bonus filter (rows starting with 🌅 are bonus and
+    // must be hidden after the 3:10 PM Pacific bell).
+    const PACIFIC_MS = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PACIFIC_MS);
+    const isAfterRelease = schoolNow.getUTCHours() > 15 ||
+      (schoolNow.getUTCHours() === 15 && schoolNow.getUTCMinutes() >= 10);
+    const nextDayStr = isAfterRelease
+      ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
+      : todayStr;
+
+    let dayAssignments: any[] = [];
     try {
-      openAssignments = await db.prepare(
-        `SELECT id::text AS id, target_subject, target_grade_min, target_grade_max,
-                target_student_ids
+      dayAssignments = await db.prepare(
+        `SELECT id::text AS id, title, target_subject,
+                target_grade_min, target_grade_max, target_student_ids,
+                scheduled_date, is_afternoon
          FROM assignments
          WHERE class_id::text = ?
-           AND (scheduled_date IS NULL OR SUBSTR(scheduled_date::text, 1, 10) = ?)
-           AND COALESCE(is_afternoon, 0) = 0`
-      ).all(classId, todayStr) as any[];
+           AND (
+             scheduled_date IS NULL
+             OR SUBSTR(scheduled_date::text, 1, 10) = ?
+             OR SUBSTR(scheduled_date::text, 1, 10) = ?
+           )`
+      ).all(classId, todayStr, nextDayStr) as any[];
     } catch (e: any) {
-      console.error("[live-progress open]", e?.message);
+      console.error("[live-progress day]", e?.message);
     }
-    const totalOpen = openAssignments.length;
 
-    // submissionSet: which (student_id, assignment_id) pairs are turned in
-    // *today*. Without the date filter, any submission ever recorded for a
-    // null-scheduled assignment would mark a kid as "done" forever — that's
-    // why the board was showing yesterday-finished students at 100% today.
+    // Bonus rules: bonus rows (🌅 prefix or is_afternoon=1) only count
+    // on the day they were created and disappear at the 3:10 bell.
+    const isBonus = (a: any) =>
+      Number(a.is_afternoon) === 1 ||
+      (typeof a.title === "string" && a.title.startsWith("🌅"));
+    const passesBonusRules = (a: any): boolean => {
+      if (!isBonus(a)) return true;
+      if (isAfterRelease) return false;
+      const sd = a.scheduled_date ? String(a.scheduled_date).slice(0, 10) : null;
+      return sd === todayStr;
+    };
+
+    // ALL submissions for the day's assignments, regardless of
+    // when they were submitted — once a kid turns something in, that
+    // assignment is permanently off their queue (matches /pending which
+    // LEFT-JOINs submissions and filters s.id IS NULL).
     const submittedPairs = new Set<string>();
-    if (totalOpen > 0) {
-      const ids = openAssignments.map((a) => a.id);
+    if (dayAssignments.length > 0) {
+      const ids = dayAssignments.map((a) => a.id);
       const placeholders = ids.map(() => "?").join(",");
       try {
         const subs = await db.prepare(
           `SELECT student_id::text AS student_id, assignment_id::text AS assignment_id
-           FROM submissions
-           WHERE assignment_id::text IN (${placeholders})
-             AND SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) = ?`
-        ).all(...ids, todayStr) as any[];
+           FROM submissions WHERE assignment_id::text IN (${placeholders})`
+        ).all(...ids) as any[];
         for (const r of subs) submittedPairs.add(`${r.student_id}|${r.assignment_id}`);
       } catch (e: any) {
         console.error("[live-progress submittedPairs]", e?.message);
       }
     }
 
-    // Per-student visibility + completion. visibleTo() mirrors the
-    // visibility logic in routes/assignments.ts so the board agrees with
-    // what each student actually sees in their queue.
+    // Visibility: target_student_ids wins, otherwise grade range, otherwise visible-to-all.
     const isVisibleTo = (a: any, s: any): boolean => {
       if (a.target_student_ids) {
         try {
@@ -374,24 +398,32 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       const g = subj === "math" ? s.math_grade
               : subj === "writing" ? s.writing_grade
               : s.reading_grade;
-      if (g == null) return true; // unknown grade → don't silently hide
+      if (g == null) return true;
       const tMin = Number(a.target_grade_min);
       const tMax = a.target_grade_max != null ? Number(a.target_grade_max) : tMin;
       return Number(g) >= tMin && Number(g) <= tMax;
     };
 
-    const byStudent: Record<string, { open: number; done: number; pct: number }> = {};
+    // For each student, total = visible+bonus-pass assignments.
+    //   done = how many of those they've submitted (any time).
+    //   open = total - done (still on their queue).
+    //   pct  = done / total. Class progress aggregates these.
+    const byStudent: Record<string, { open: number; done: number; total: number; pct: number }> = {};
     let studentsDone = 0;
+    let totalOpenAcrossClass = 0;
     for (const s of students) {
-      let open = 0, done = 0;
-      for (const a of openAssignments) {
+      let total = 0, done = 0;
+      for (const a of dayAssignments) {
+        if (!passesBonusRules(a)) continue;
         if (!isVisibleTo(a, s)) continue;
-        open += 1;
+        total += 1;
         if (submittedPairs.has(`${s.id}|${a.id}`)) done += 1;
       }
-      const sPct = open > 0 ? Math.round((done / open) * 100) : 0;
-      byStudent[String(s.id)] = { open, done, pct: sPct };
-      if (open > 0 && done >= open) studentsDone += 1;
+      const open = total - done;
+      const sPct = total > 0 ? Math.round((done / total) * 100) : 0;
+      byStudent[String(s.id)] = { open, done, total, pct: sPct };
+      totalOpenAcrossClass += open;
+      if (total > 0 && done >= total) studentsDone += 1;
     }
 
     const pct = totalStudents > 0 ? Math.round((studentsDone / totalStudents) * 100) : 0;
@@ -419,7 +451,11 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       console.error("[live-progress recent]", e?.message);
     }
 
-    res.json({ pct, studentsDone, totalStudents, totalOpen, topToday, recent, byStudent });
+    res.json({
+      pct, studentsDone, totalStudents,
+      totalOpen: totalOpenAcrossClass,
+      topToday, recent, byStudent,
+    });
   } catch (e: any) {
     console.error("[board live-progress TOP]", e?.message || e);
     res.status(500).json({ error: e?.message || "live progress failed" });

@@ -473,7 +473,7 @@ export const api = {
       totalOpen: number;
       topToday: Array<{ student_id: string; name: string; count: number }>;
       recent: Array<{ name: string; title: string; ts: string }>;
-      byStudent: Record<string, { open: number; done: number; pct: number }>;
+      byStudent: Record<string, { open: number; done: number; total: number; pct: number }>;
     }>(`/board/classes/${classId}/live-progress`),
   bumpStudentStars: (studentId: string, delta: number) =>
     request<any>(`/board/students/${studentId}/stars`, { method: "POST", body: JSON.stringify({ delta }) }),
