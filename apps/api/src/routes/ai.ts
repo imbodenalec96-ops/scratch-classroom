@@ -685,8 +685,13 @@ Return ONLY valid JSON, no markdown, no code fences, no explanation — just thi
  *
  * Falls back to 503 if no ElevenLabs key.
  * ───────────────────────────────────────────────────────────────── */
-const EL_VOICE_SPELLING = "21m00Tio1uXcvkmUEBsA"; // Rachel — clear, neutral
-const EL_VOICE_PASSAGE  = "XrExE9yKIg1WjnnlVkGX"; // Matilda — warm, expressive, great for stories
+// Spelling voice picked for CLARITY, not warmth — kids need every phoneme
+// audible. 'Charlotte' is a warm but precise British female that
+// pronounces each word deliberately. Paired with the higher-quality v2
+// multilingual model and high stability settings to eliminate the
+// jittery/rushed delivery the previous turbo+Rachel combo produced.
+const EL_VOICE_SPELLING = "XB0fDUnXU5powFXDhCwa"; // Charlotte — clear, warm, dictation-friendly
+const EL_VOICE_PASSAGE  = "XrExE9yKIg1WjnnlVkGX"; // Matilda — warm, expressive storytelling
 
 router.post("/tts", async (req: AuthRequest, res: Response) => {
   const { text, mode } = req.body;
@@ -698,19 +703,24 @@ router.post("/tts", async (req: AuthRequest, res: Response) => {
   const isPassage = mode === "passage";
 
   const voiceId  = isPassage ? EL_VOICE_PASSAGE  : EL_VOICE_SPELLING;
-  const modelId  = isPassage ? "eleven_multilingual_v2" : "eleven_turbo_v2_5";
-  // Passages: lower stability = more natural expression; higher style = storytelling feel
-  // Spelling: low stability + style boost = warm, natural teacher voice (not robotic)
+  // Both modes now use the v2 multilingual model — higher fidelity than
+  // turbo, worth the extra latency for the clarity gain on spelling.
+  const modelId  = "eleven_multilingual_v2";
+  // Spelling needs HIGH stability so the voice doesn't slur or rush; style
+  // dropped to 0 so it reads like a teacher dictating, not a podcast host.
+  // Passage stays expressive for storytelling.
   const voiceSettings = isPassage
-    ? { stability: 0.40, similarity_boost: 0.75, style: 0.55, use_speaker_boost: true }
-    : { stability: 0.30, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true };
+    ? { stability: 0.45, similarity_boost: 0.80, style: 0.45, use_speaker_boost: true }
+    : { stability: 0.75, similarity_boost: 0.90, style: 0.00, use_speaker_boost: true };
 
-  // Spelling: say "Your spelling word is [word]. [word]." — teacher dictation style
-  // Passage: read as-is (up to 5000 chars)
+  // Spelling: deliberate dictation cadence with explicit pauses (ellipses
+  // create natural breaks in ElevenLabs v2). Word is repeated with a beat
+  // between repetitions so kids can hear it twice and re-listen.
+  // Passage: read as-is (up to 5000 chars).
   const word = text.trim().slice(0, 200);
   const spoken = isPassage
     ? text.trim().slice(0, 5000)
-    : `Your spelling word is: ${word}. ${word}.`;
+    : `Listen carefully. Your spelling word is... ${word}. ... ${word}.`;
 
   try {
     const response = await fetch(
