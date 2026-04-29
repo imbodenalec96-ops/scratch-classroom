@@ -28,21 +28,46 @@ function convertSqlForPg(sql: string): string {
 let db: DB;
 
 if (process.env.DATABASE_URL) {
-  const pg = await import("pg");
-  // Return JSON/JSONB as raw strings to match SQLite behavior
-  pg.default.types.setTypeParser(3802, (val: string) => val); // jsonb
-  pg.default.types.setTypeParser(114, (val: string) => val);  // json
+  // Pick the right driver:
+  //  - Neon URL (neon.tech): use @neondatabase/serverless. HTTP-based,
+  //    no persistent TCP connection per instance, sub-second cold starts.
+  //    Replaces the 10-second cold-start tax pg.Pool was paying on Vercel.
+  //  - Anything else (local Postgres, RDS, etc): fall back to pg.Pool.
+  const isNeonUrl = /\.neon\.(tech|build)/i.test(process.env.DATABASE_URL || "");
+  let pool: { query: (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount: number | null }>; end?: () => Promise<void> };
 
-  // Serverless-safe pool settings: Vercel spins up many function instances
-  // under load, each with its own pool. Keep per-instance connections low and
-  // idle timeouts short so Neon doesn't run out of slots / memory.
-  const pool = new pg.default.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
-    max: process.env.VERCEL ? 1 : 10,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 10_000,
-  });
+  if (isNeonUrl) {
+    const { Pool, neonConfig } = await import("@neondatabase/serverless");
+    // ws not needed for plain query() over HTTP fetch; only required for
+    // transactions/listen which we don't use.
+    neonConfig.fetchConnectionCache = true;
+    const neonPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    pool = {
+      async query(sql: string, params?: any[]) {
+        const r = await neonPool.query(sql, params);
+        return { rows: r.rows, rowCount: r.rowCount ?? 0 };
+      },
+      async end() { await neonPool.end(); },
+    };
+  } else {
+    const pg = await import("pg");
+    pg.default.types.setTypeParser(3802, (val: string) => val); // jsonb → string
+    pg.default.types.setTypeParser(114,  (val: string) => val); // json  → string
+    const pgPool = new pg.default.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+      max: process.env.VERCEL ? 1 : 10,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
+    });
+    pool = {
+      async query(sql: string, params?: any[]) {
+        const r = await pgPool.query(sql, params);
+        return { rows: r.rows, rowCount: r.rowCount ?? 0 };
+      },
+      async end() { await pgPool.end(); },
+    };
+  }
 
   db = {
     prepare(sql: string): PreparedStatement {
@@ -67,7 +92,7 @@ if (process.env.DATABASE_URL) {
       await pool.query(convertSqlForPg(sql));
     },
     async close() {
-      await pool.end();
+      if (pool.end) await pool.end();
     },
   };
 } else if (process.env.VERCEL) {

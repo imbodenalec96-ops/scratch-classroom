@@ -12,3 +12,5 @@ dist/
 .claude/worktrees/
 .env.seed
 scripts/
+fix_passages_and_spelling.cjs
+fix_wednesday_passages.cjs
