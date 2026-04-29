@@ -1141,16 +1141,12 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
       : todayStr; // same date → harmless duplicate in OR clause
 
-    // Past-due roll-over + future buffer: include any unsubmitted
-    // assignment scheduled in the last 30 days through the next 7. This
-    // guarantees Wednesday's work shows on Wednesday no matter how/when
-    // it was created, AND yesterday's leftovers roll forward.
-    // SUBSTR(...,1,10) makes the comparison work whether scheduled_date
-    // is stored as 'YYYY-MM-DD' or as an ISO timestamp.
-    const rollbackStr = new Date(schoolNow.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
-    const futureStr   = new Date(schoolNow.getTime() +  7 * 86_400_000).toISOString().slice(0, 10);
-
-    // Exclude heavy content column from list — client fetches it on demand via GET /:id
+    // Show every unsubmitted assignment in this class — date filter
+    // dropped entirely after repeat reports of kids not seeing their
+    // work on the day it was assigned. The bonus-expiry rule is still
+    // enforced in the JS post-filter so 🌅 cards still drop at 3:10 PM
+    // and don't roll into the next day. Per-student / per-grade
+    // targeting is still respected below.
     const rows = await db.prepare(`
       SELECT a.id, a.class_id, a.teacher_id, a.student_id, a.title, a.description,
              a.due_date, a.rubric, a.scheduled_date, a.target_subject,
@@ -1162,12 +1158,8 @@ router.get("/class/:classId/pending", async (req: AuthRequest, res: Response) =>
       LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
       WHERE a.class_id::text = ? AND s.id IS NULL
         AND (a.student_id IS NULL OR a.student_id::text = ?)
-        AND (
-          a.scheduled_date IS NULL
-          OR (SUBSTR(a.scheduled_date::text, 1, 10) >= ? AND SUBSTR(a.scheduled_date::text, 1, 10) <= ?)
-        )
-      ORDER BY a.is_afternoon ASC, a.scheduled_date ASC, a.created_at ASC
-    `).all(userId, classId, userId, rollbackStr, futureStr) as any[];
+      ORDER BY a.is_afternoon ASC, a.scheduled_date ASC NULLS LAST, a.created_at ASC
+    `).all(userId, classId, userId) as any[];
 
     // Look up this student's grade levels once
     let studentGrades: any = null;
