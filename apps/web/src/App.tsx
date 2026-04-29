@@ -1,52 +1,83 @@
-import React, { useEffect } from "react";
+import React, { useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { isAccessAllowed } from "./lib/workUnlock.ts";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
+
+// Eagerly loaded — these are on the critical path of every initial render
+// (login → layout → dashboard) so lazy-loading them just adds a flash.
 import LoginPage from "./components/LoginPage.tsx";
 import Layout from "./components/Layout.tsx";
-import AdminDashboard from "./components/AdminDashboard.tsx";
-import TeacherDashboard from "./components/TeacherDashboard.tsx";
 import StudentDashboard from "./components/StudentDashboard.tsx";
-import ProjectWorkspace from "./components/ProjectWorkspace.tsx";
-import ProjectsList from "./components/ProjectsList.tsx";
-import ClassManager from "./components/ClassManager.tsx";
-import AssignmentBuilder from "./components/AssignmentBuilder.tsx";
-import QuizBuilder from "./components/QuizBuilder.tsx";
-import GradingPanel from "./components/GradingPanel.tsx";
-import AnalyticsPanel from "./components/AnalyticsPanel.tsx";
-import MonitorPanel from "./components/MonitorPanel.tsx";
-import MonitorPage from "./components/MonitorPage.tsx";
-import Leaderboard from "./components/Leaderboard.tsx";
-import Achievements from "./components/Achievements.tsx";
-import ChatPanel from "./components/ChatPanel.tsx";
-import LessonsPage from "./components/LessonsPage.tsx";
-import ArcadePage from "./components/ArcadePage.tsx";
-import YouTubeManager from "./components/YouTubeManager.tsx";
-import LessonAnalytics from "./components/LessonAnalytics.tsx";
-import ClassGrades from "./components/ClassGrades.tsx";
-import TeacherGradebook, { GradebookStudentPicker } from "./components/TeacherGradebook.tsx";
-import TeacherWebsites from "./components/TeacherWebsites.tsx";
-import StudentWebsites from "./components/StudentWebsites.tsx";
-import TeacherSchedule from "./components/TeacherSchedule.tsx";
-import WebsiteViewer from "./components/WebsiteViewer.tsx";
-import {
-  VideoLearningPage, TedTalkPage, DismissalPage,
-  AssignmentTodayPage, SELPage,
-} from "./components/BlockPlaceholder.tsx";
-import CashoutPage from "./components/CashoutPage.tsx";
-import DailyNewsViewer from "./components/DailyNewsViewer.tsx";
-import { useClassConfig } from "./lib/useClassConfig.ts";
 import LandingPage from "./components/LandingPage.tsx";
 import PublicLayout from "./components/PublicLayout.tsx";
-import StudentKiosk from "./components/StudentKiosk.tsx";
-import TeacherAdmin from "./components/TeacherAdmin.tsx";
-import AssignmentSchedulePage from "./components/AssignmentSchedulePage.tsx";
-import ClassroomBoard from "./components/ClassroomBoard.tsx";
-import TeacherBoardSettings from "./components/TeacherBoardSettings.tsx";
-import TeacherStore from "./components/TeacherStore.tsx";
-import StudentVideoPage from "./components/StudentVideoPage.tsx";
-import PrintAssignment from "./components/PrintAssignment.tsx";
+
+// Lazy-loaded — every other route is split into its own chunk so the
+// initial bundle older iPads have to download + parse stays small. Each
+// route only ships when the student actually navigates to it.
+const AdminDashboard = lazy(() => import("./components/AdminDashboard.tsx"));
+const TeacherDashboard = lazy(() => import("./components/TeacherDashboard.tsx"));
+const ProjectWorkspace = lazy(() => import("./components/ProjectWorkspace.tsx"));
+const ProjectsList = lazy(() => import("./components/ProjectsList.tsx"));
+const ClassManager = lazy(() => import("./components/ClassManager.tsx"));
+const AssignmentBuilder = lazy(() => import("./components/AssignmentBuilder.tsx"));
+const QuizBuilder = lazy(() => import("./components/QuizBuilder.tsx"));
+const GradingPanel = lazy(() => import("./components/GradingPanel.tsx"));
+const AnalyticsPanel = lazy(() => import("./components/AnalyticsPanel.tsx"));
+const MonitorPanel = lazy(() => import("./components/MonitorPanel.tsx"));
+const MonitorPage = lazy(() => import("./components/MonitorPage.tsx"));
+const Leaderboard = lazy(() => import("./components/Leaderboard.tsx"));
+const Achievements = lazy(() => import("./components/Achievements.tsx"));
+const ChatPanel = lazy(() => import("./components/ChatPanel.tsx"));
+const LessonsPage = lazy(() => import("./components/LessonsPage.tsx"));
+const ArcadePage = lazy(() => import("./components/ArcadePage.tsx"));
+const YouTubeManager = lazy(() => import("./components/YouTubeManager.tsx"));
+const LessonAnalytics = lazy(() => import("./components/LessonAnalytics.tsx"));
+const ClassGrades = lazy(() => import("./components/ClassGrades.tsx"));
+const TeacherGradebook = lazy(() => import("./components/TeacherGradebook.tsx"));
+const GradebookStudentPickerLazy = lazy(() =>
+  import("./components/TeacherGradebook.tsx").then((m) => ({ default: m.GradebookStudentPicker })),
+);
+const TeacherWebsites = lazy(() => import("./components/TeacherWebsites.tsx"));
+const StudentWebsites = lazy(() => import("./components/StudentWebsites.tsx"));
+const TeacherSchedule = lazy(() => import("./components/TeacherSchedule.tsx"));
+const WebsiteViewer = lazy(() => import("./components/WebsiteViewer.tsx"));
+const VideoLearningPageLazy = lazy(() =>
+  import("./components/BlockPlaceholder.tsx").then((m) => ({ default: m.VideoLearningPage })),
+);
+const TedTalkPageLazy = lazy(() =>
+  import("./components/BlockPlaceholder.tsx").then((m) => ({ default: m.TedTalkPage })),
+);
+const DismissalPageLazy = lazy(() =>
+  import("./components/BlockPlaceholder.tsx").then((m) => ({ default: m.DismissalPage })),
+);
+const AssignmentTodayPageLazy = lazy(() =>
+  import("./components/BlockPlaceholder.tsx").then((m) => ({ default: m.AssignmentTodayPage })),
+);
+const SELPageLazy = lazy(() =>
+  import("./components/BlockPlaceholder.tsx").then((m) => ({ default: m.SELPage })),
+);
+const CashoutPage = lazy(() => import("./components/CashoutPage.tsx"));
+const DailyNewsViewer = lazy(() => import("./components/DailyNewsViewer.tsx"));
+const StudentKiosk = lazy(() => import("./components/StudentKiosk.tsx"));
+const TeacherAdmin = lazy(() => import("./components/TeacherAdmin.tsx"));
+const AssignmentSchedulePage = lazy(() => import("./components/AssignmentSchedulePage.tsx"));
+const ClassroomBoard = lazy(() => import("./components/ClassroomBoard.tsx"));
+const TeacherBoardSettings = lazy(() => import("./components/TeacherBoardSettings.tsx"));
+const TeacherStore = lazy(() => import("./components/TeacherStore.tsx"));
+const StudentVideoPage = lazy(() => import("./components/StudentVideoPage.tsx"));
+const PrintAssignment = lazy(() => import("./components/PrintAssignment.tsx"));
+
+import { useClassConfig } from "./lib/useClassConfig.ts";
+
+// Aliases keep the rest of the file untouched — these names match the
+// ones used by <Route> elements below.
+const VideoLearningPage = VideoLearningPageLazy;
+const TedTalkPage = TedTalkPageLazy;
+const DismissalPage = DismissalPageLazy;
+const AssignmentTodayPage = AssignmentTodayPageLazy;
+const SELPage = SELPageLazy;
+const GradebookStudentPicker = GradebookStudentPickerLazy;
 
 function AppLoader() {
   return (
@@ -139,6 +170,7 @@ export default function App() {
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
+        <Suspense fallback={<AppLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -214,6 +246,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
     </ThemeProvider>
