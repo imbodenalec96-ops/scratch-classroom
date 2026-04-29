@@ -1190,6 +1190,95 @@ router.get("/assignment-stats", async (_req, res) => {
   }
 });
 
+// GET /admin/strict-pending?name=Ameer — runs the exact same strict
+// filter the student dashboard uses, so we can tell whether the issue
+// is data or filtering.
+router.get("/strict-pending", async (req, res) => {
+  const name = (req.query.name as string) || "";
+  if (!name) return res.status(400).json({ error: "?name= required" });
+  try {
+    const student: any = await db.prepare(
+      `SELECT id::text, name FROM users WHERE name LIKE ? AND role='student' LIMIT 1`
+    ).get(`%${name}%`);
+    if (!student) return res.json({ error: `Student '${name}' not found` });
+
+    const PACIFIC_MS = -7 * 3600_000;
+    const schoolNow = new Date(Date.now() + PACIFIC_MS);
+    const todayStr = schoolNow.toISOString().slice(0, 10);
+    const isAfterRelease = schoolNow.getUTCHours() > 15 ||
+      (schoolNow.getUTCHours() === 15 && schoolNow.getUTCMinutes() >= 10);
+    const nextDayStr = isAfterRelease
+      ? new Date(schoolNow.getTime() + 86_400_000).toISOString().slice(0, 10)
+      : todayStr;
+
+    const cls: any = await db.prepare(
+      `SELECT c.id::text AS id, c.name FROM class_members cm
+       JOIN classes c ON c.id::text = cm.class_id::text
+       WHERE cm.user_id::text = ? LIMIT 1`
+    ).get(student.id);
+    if (!cls) return res.json({ student, error: "no class membership" });
+
+    const grades: any = await db.prepare(
+      `SELECT reading_grade, math_grade, writing_grade FROM user_grade_levels WHERE user_id::text = ?`
+    ).get(student.id);
+
+    const rows: any[] = await db.prepare(`
+      SELECT a.id::text, a.title, a.target_subject, a.target_grade_min, a.target_grade_max,
+             a.target_student_ids, a.scheduled_date, a.student_id::text, a.is_afternoon
+      FROM assignments a
+      LEFT JOIN submissions s ON s.assignment_id::text = a.id::text AND s.student_id::text = ?
+      WHERE a.class_id::text = ? AND s.id IS NULL
+        AND (a.student_id IS NULL OR a.student_id::text = ?)
+        AND (
+          a.scheduled_date IS NULL
+          OR SUBSTR(a.scheduled_date::text, 1, 10) = ?
+          OR SUBSTR(a.scheduled_date::text, 1, 10) = ?
+        )
+    `).all(student.id, cls.id, student.id, todayStr, nextDayStr) as any[];
+
+    const visible: any[] = [];
+    const hidden: any[] = [];
+    for (const r of rows) {
+      let pass = true; let reason = "ok";
+      if (r.target_student_ids) {
+        try {
+          const ids = JSON.parse(r.target_student_ids);
+          if (Array.isArray(ids) && ids.length > 0 && !ids.includes(student.id)) {
+            pass = false; reason = "target_student_ids excludes";
+          }
+        } catch { pass = false; reason = "bad target_student_ids json"; }
+      }
+      if (pass && r.target_grade_min != null) {
+        const subj = r.target_subject;
+        const col = subj === "math" ? "math_grade"
+                  : subj === "writing" ? "writing_grade"
+                  : "reading_grade";
+        const g = grades ? grades[col] : null;
+        if (g != null) {
+          const tMax = r.target_grade_max ?? r.target_grade_min;
+          if (Number(g) < Number(r.target_grade_min) || Number(g) > Number(tMax)) {
+            pass = false; reason = `grade ${g} outside [${r.target_grade_min}-${tMax}] for ${subj}`;
+          }
+        }
+      }
+      (pass ? visible : hidden).push({
+        title: r.title, subject: r.target_subject,
+        grade: r.target_grade_min, scheduled: r.scheduled_date,
+        reason: pass ? undefined : reason,
+      });
+    }
+    res.json({
+      student, class: cls, grades, todayStr, nextDayStr,
+      rowsAfterDateFilter: rows.length,
+      visible: visible.length, hidden: hidden.length,
+      sampleVisible: visible.slice(0, 10),
+      sampleHidden: hidden.slice(0, 10),
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/students — list all active students for the assignment builder
 router.get("/students", async (_req, res) => {
   try {
