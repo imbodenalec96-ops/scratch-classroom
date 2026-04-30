@@ -12,6 +12,49 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import PinPad from "./PinPad.tsx";
 
+/** Open a print-ready sheet of "Hi {Name}, your PIN is {1234}" cards.
+ *  3-up grid, big readable PIN, one card per kid. New window so the
+ *  user can preview, hit ⌘P, and close without losing the console. */
+function printPinCards(rows: Array<{ name: string; kiosk_pin: string | null; avatar_emoji: string | null }>): void {
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) return;
+  const cardsHtml = rows.map((r) => `
+    <div class="card">
+      <div class="emoji">${r.avatar_emoji || "🎒"}</div>
+      <div class="hi">Hi ${escapeHtml(r.name.split(" ")[0])}!</div>
+      <div class="label">Your store PIN</div>
+      <div class="pin">${(r.kiosk_pin || "").split("").join(" ")}</div>
+      <div class="footer">Tap your face on the board, then type your PIN.</div>
+    </div>
+  `).join("");
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Student PIN Cards</title>
+    <style>
+      @page { size: letter; margin: 0.4in; }
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 12px; background: white; color: #1a1915; }
+      h1 { font-size: 14px; font-weight: 800; margin: 0 0 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #5a4632; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .card { border: 2px dashed #c8b690; border-radius: 14px; padding: 18px 14px; text-align: center;
+              background: linear-gradient(180deg, #fffaed, #fef5dc); page-break-inside: avoid;
+              box-shadow: inset 0 0 0 1px #fff; }
+      .emoji { font-size: 38px; line-height: 1; }
+      .hi { font-size: 18px; font-weight: 800; margin-top: 6px; color: #3a2410; }
+      .label { font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+               color: #7a5e3a; margin-top: 14px; }
+      .pin { font-size: 38px; font-weight: 900; letter-spacing: 0.22em; margin-top: 6px;
+             color: #b23a48; font-variant-numeric: tabular-nums; }
+      .footer { font-size: 10px; color: #7a5e3a; margin-top: 14px; line-height: 1.4; }
+      @media print { h1 { display: none; } body { padding: 0; } }
+    </style></head><body>
+    <h1>Student Store PINs · Print &amp; cut · ${rows.length} card${rows.length===1?"":"s"}</h1>
+    <div class="grid">${cardsHtml}</div>
+    <script>setTimeout(()=>window.print(), 300);</script>
+  </body></html>`);
+  w.document.close();
+}
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
 type Student = {
   id: string;
   name: string;
@@ -473,6 +516,19 @@ export function PinsTab({ classId }: { classId: string }) {
               cursor: "pointer",
             }}
           >{reveal ? "🙈 Hide" : "👁 Show PINs"}</button>
+          <button
+            onClick={() => printPinCards(list.filter((s) => !!s.kiosk_pin))}
+            disabled={list.filter((s) => !!s.kiosk_pin).length === 0}
+            title="Open a printable sheet of PIN cards in a new window"
+            style={{
+              padding: "8px 14px", borderRadius: 999,
+              background: "rgba(124,58,237,0.18)",
+              border: "1px solid rgba(124,58,237,0.40)",
+              color: "#c4b5fd", fontSize: 12, fontWeight: 700,
+              cursor: list.filter((s) => !!s.kiosk_pin).length === 0 ? "default" : "pointer",
+              opacity: list.filter((s) => !!s.kiosk_pin).length === 0 ? 0.4 : 1,
+            }}
+          >🖨 Print Cards</button>
           {missing > 0 && (
             <button
               onClick={generateAll}
@@ -630,6 +686,26 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
       const r = await api.boardRedeem(picked.id, pin, item.id);
       setBalance(r.dojo_points);
       showFlash("ok", `🎉 ${r.student_name} got ${r.item_name}! Show the teacher.`);
+      // 🔔 ka-ching — synthesized via Web Audio API so we don't need
+      // to ship an mp3. Two quick chimes, descending, bright timbre.
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const playTone = (freq: number, when: number, dur = 0.18) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = "triangle";
+          gain.gain.setValueAtTime(0, ctx.currentTime + when);
+          gain.gain.linearRampToValueAtTime(0.30, ctx.currentTime + when + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + dur);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + when);
+          osc.stop(ctx.currentTime + when + dur + 0.02);
+        };
+        playTone(1318, 0);     // E6
+        playTone(1760, 0.10);  // A6
+        setTimeout(() => ctx.close().catch(() => {}), 600);
+      } catch { /* audio best-effort */ }
       // Refresh items in case stock dropped
       try { setItems(await api.getStoreItems()); } catch {}
     } catch (e: any) {

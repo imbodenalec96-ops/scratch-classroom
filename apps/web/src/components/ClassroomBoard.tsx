@@ -6,6 +6,7 @@ import { getSocket } from "../lib/ws.ts";
 import { useAuth } from "../lib/auth.tsx";
 import BoardConsole from "./BoardConsole.tsx";
 import PinPad from "./PinPad.tsx";
+import BirthdayCelebration from "./BirthdayCelebration.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -1289,6 +1290,26 @@ export default function ClassroomBoard() {
                       ))}
                     </div>
 
+                    {/* 🍔 EARNED McDONALD'S! pill — only when full stars.
+                        Pulsing red gradient to celebrate the reward. */}
+                    {isFull && (
+                      <div style={{
+                        marginTop: 4,
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        padding: "3px 10px", borderRadius: 999,
+                        fontSize: 11, fontWeight: 800,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        background: "linear-gradient(135deg, #dc2626, #f97316)",
+                        color: "white",
+                        boxShadow: "0 0 12px rgba(249,115,22,0.55)",
+                        animation: "starGlow 1.6s ease-in-out infinite",
+                        whiteSpace: "nowrap",
+                      }}>
+                        🍔 Earned McDonald's!
+                      </div>
+                    )}
+
                     {/* Per-student daily progress — `done` of `total`
                         assignments visible to this kid today (matches what
                         they actually see in their dashboard queue). The bar
@@ -1737,6 +1758,12 @@ export default function ClassroomBoard() {
         storeOnly
         onClose={() => setShowStoreOnly(false)}
       />
+    )}
+
+    {/* Birthday auto-celebration — full-board takeover when any kid's
+        birthday is today (Pacific). Once-per-day per kid via localStorage. */}
+    {board?.students?.length > 0 && (
+      <BirthdayCelebration students={board.students as any} />
     )}
 
     {/* PIN gate before the console opens. Locks teacher tools so
