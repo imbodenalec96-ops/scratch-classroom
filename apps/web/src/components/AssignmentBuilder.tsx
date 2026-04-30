@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.ts";
-import { getPetStage, useDojoPoints } from "../lib/petCompanion.tsx";
+import { PetEmoji, useDojoPoints } from "../lib/petCompanion.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
@@ -163,12 +163,10 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
 }
 
 /* ── Floating PetChip for the assignment builder ──
-   Same look as the StudentDashboard's WorkScreen chip but lives here
-   so kids see their pet here too. Instant render from localStorage
-   cache; quietly refreshes from /store/me/balance. ── */
+   Animated buddy in the top-right corner; bobs/hops/flutters by
+   stage and pops with sparkles when the kid levels up. ── */
 function BuilderPetChip() {
   const { points } = useDojoPoints();
-  const stage = getPetStage(points);
   return (
     <div style={{
       position: "fixed",
@@ -180,11 +178,8 @@ function BuilderPetChip() {
       background: "rgba(255,255,255,0.92)",
       border: "1px solid rgba(217,119,6,0.30)",
       boxShadow: "0 2px 6px rgba(58,36,16,0.10)",
-      pointerEvents: "none",
     }}>
-      <span style={{ fontSize: 22, lineHeight: 1, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
-        {stage.emoji}
-      </span>
+      <PetEmoji points={points} size={26} />
       <span style={{ fontSize: 11, fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>
         {points}
       </span>

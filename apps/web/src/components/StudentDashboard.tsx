@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
-import { PetChip, getPetStage, useDojoPoints } from "../lib/petCompanion.tsx";
+import { PetChip, PetEmoji, getPetStage, useDojoPoints } from "../lib/petCompanion.tsx";
 import { useSocket } from "../lib/ws.ts";
 import ClickableText from "./ClickableText.tsx";
 import {
@@ -166,13 +166,12 @@ async function speakViaTtsApi(word: string): Promise<boolean> {
   }
 }
 
-/** Floating pet chip — top-right corner of the WorkScreen so kids
- *  see their buddy while doing assignments. Uses the cached
- *  dojo_points so it appears instantly on first paint, then quietly
- *  updates from the server. ── */
+/** Floating pet chip — top-right of the WorkScreen. Uses the
+ *  animated PetEmoji from petCompanion so the buddy bobs / hops /
+ *  flutters per stage and pops with sparkles when the kid levels up.
+ *  Tappable for a fun bounce. */
 function FloatingPetChip() {
   const { points } = useDojoPoints();
-  const stage = getPetStage(points);
   return (
     <div style={{
       position: "absolute",
@@ -184,11 +183,8 @@ function FloatingPetChip() {
       background: "rgba(255,255,255,0.92)",
       border: "1px solid rgba(217,119,6,0.30)",
       boxShadow: "0 2px 6px rgba(58,36,16,0.10)",
-      pointerEvents: "none",
     }}>
-      <span style={{ fontSize: 22, lineHeight: 1, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
-        {stage.emoji}
-      </span>
+      <PetEmoji points={points} size={26} />
       <span style={{ fontSize: 11, fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>
         {points}
       </span>
@@ -244,51 +240,105 @@ function speakTextFallback(text: string, rate = 0.82) {
   }
 }
 
-function speakText(text: string, rate = 0.82) {
+async function speakText(text: string, rate = 0.82) {
+  // Try ElevenLabs passage mode first (warm Matilda voice). Falls
+  // back to the best Web Speech voice if no key is configured. This
+  // makes the question 🔊 button and the lesson 🔊 button sound great
+  // when ELEVENLABS_API_KEY is set in Vercel env.
+  const usedApi = await speakViaTtsApiPassage(text);
+  if (usedApi) return;
   speakTextFallback(text, rate);
 }
 
-/** Extract the actual word from a spelling question like "Spell the word: cat" → "cat" */
-function extractSpellingWord(questionText: string): string {
-  const match = questionText.match(/spell(?:\s+the\s+word)?[:\s]+([a-zA-Z''-]+)/i);
-  if (match) return match[1];
-  // If the whole text is just a word (no spaces), use it directly
-  const trimmed = questionText.trim();
-  if (/^[a-zA-Z''-]+$/.test(trimmed)) return trimmed;
-  return questionText.trim();
+/** Extract the actual word from a spelling question like "Spell the word: cat" → "cat".
+ *  Returns null when the question doesn't fit a dictation pattern — caller should
+ *  fall back to reading the whole question instead of pretending to dictate. */
+function extractSpellingWord(questionText: string): string | null {
+  // "Spell the word: cat", "Spell: cat", "Type the word: cat"
+  const m1 = questionText.match(/(?:spell|type)(?:\s+the\s+word)?[:\s]+(['"]?)([a-zA-Z'-]{2,})\1\s*$/i);
+  if (m1) return m1[2];
+  // Bare word like "cat" with optional quotes
+  const trimmed = questionText.trim().replace(/^["']|["']$/g, "");
+  if (/^[a-zA-Z'-]{2,}$/.test(trimmed)) return trimmed;
+  // Hint pattern: "Hint: c-a-t" → "cat"
+  const m2 = questionText.match(/h-?i-?n-?t[:\s]+([a-zA-Z]-([a-zA-Z]-){0,9}[a-zA-Z])/i);
+  if (m2) return m2[1].replace(/-/g, "");
+  return null;
 }
 
-/** Speak a spelling word using OpenAI TTS if available, otherwise Web Speech API.
- *  Says the word twice at a clear pace — like a spelling bee announcer. */
+/** Speak a spelling question:
+ *  - If the question is a dictation prompt ("Spell the word: cat"),
+ *    extract the word and use the ElevenLabs spelling-bee voice
+ *    (says it twice with a beat between repetitions).
+ *  - Otherwise (multiple-choice spelling, fill-blank), read the WHOLE
+ *    question aloud naturally so each question sounds different.
+ *  Falls back to the best Web Speech voice if ElevenLabs is unavailable. */
 async function speakSpellingWord(questionText: string) {
   const word = extractSpellingWord(questionText);
-  const usedApi = await speakViaTtsApi(word);
-  if (usedApi) return;
-  // Web Speech fallback: say the word, pause, say it again
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  const doSpeak = () => {
-    try {
-      window.speechSynthesis.cancel();
-      const voice = getBestVoice();
-      const say = (text: string, rate: number) => {
-        const u = new SpeechSynthesisUtterance(text);
-        u.rate = rate;
-        u.pitch = 1.0;
-        u.lang = "en-US";
-        if (voice) u.voice = voice;
-        return u;
-      };
-      window.speechSynthesis.speak(say(word, 0.75));
-      window.speechSynthesis.speak(say(word, 0.65));
-    } catch { /* best effort */ }
-  };
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) doSpeak();
-  else {
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.onvoiceschanged = null;
-      doSpeak();
+  if (word) {
+    // Dictation flow: ElevenLabs spelling mode (server wraps the word)
+    const usedApi = await speakViaTtsApi(word);
+    if (usedApi) return;
+    // Web Speech fallback: say the word, pause, say it again
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const doSpeak = () => {
+      try {
+        window.speechSynthesis.cancel();
+        const voice = getBestVoice();
+        const say = (text: string, rate: number) => {
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = rate;
+          u.pitch = 1.0;
+          u.lang = "en-US";
+          if (voice) u.voice = voice;
+          return u;
+        };
+        window.speechSynthesis.speak(say(word, 0.75));
+        window.speechSynthesis.speak(say(word, 0.65));
+      } catch { /* best effort */ }
     };
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) doSpeak();
+    else {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        doSpeak();
+      };
+    }
+    return;
+  }
+  // Non-dictation spelling question — read the whole prompt naturally
+  // via passage mode (warm voice via ElevenLabs, falls back to Web Speech).
+  const usedApi = await speakViaTtsApiPassage(questionText);
+  if (usedApi) return;
+  speakTextFallback(questionText, 0.88);
+}
+
+/** Passage mode TTS — reads longer text in a warm narrator voice.
+ *  Used for non-dictation spelling prompts and reading passages. */
+async function speakViaTtsApiPassage(text: string): Promise<boolean> {
+  if (_ttsKeyAvailable === false) return false;
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${TTS_API}/ai/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text, mode: "passage" }),
+    });
+    if (res.status === 503) { _ttsKeyAvailable = false; return false; }
+    if (!res.ok) return false;
+    _ttsKeyAvailable = true;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    await audio.play();
+    return true;
+  } catch {
+    return false;
   }
 }
 
