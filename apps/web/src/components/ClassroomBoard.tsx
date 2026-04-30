@@ -263,6 +263,45 @@ export default function ClassroomBoard() {
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
+  // Store-only mode: opens the BoardConsole already on the Store tab,
+  // skipping the teacher PIN. Kids still need their own PIN to redeem.
+  const [showStoreOnly, setShowStoreOnly] = useState(false);
+  // PIN gate before opening the console — keeps kids from poking at
+  // teacher tools when they walk past the projector. PIN is checked
+  // against admin_settings.remote_access_pin / teacher_password via
+  // /admin-settings/check-skip-code (same gate as the bypass flow).
+  const [consolePinModal, setConsolePinModal] = useState(false);
+  const [consolePin, setConsolePin] = useState("");
+  const [consolePinError, setConsolePinError] = useState("");
+  const [consolePinLoading, setConsolePinLoading] = useState(false);
+  const tryConsoleUnlock = async () => {
+    if (!consolePin.trim()) return;
+    setConsolePinLoading(true);
+    setConsolePinError("");
+    try {
+      const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+        (window.location.hostname === "localhost"
+          ? "http://localhost:4000/api"
+          : "https://scratch-classroom-api-td1x.vercel.app/api");
+      const token = localStorage.getItem("token") || "";
+      const r = await fetch(`${apiBase}/admin-settings/check-skip-code?code=${encodeURIComponent(consolePin.trim())}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await r.json();
+      if (data?.valid) {
+        setConsolePinModal(false);
+        setConsolePin("");
+        setShowConsole(true);
+      } else {
+        setConsolePinError("Wrong PIN — try again");
+        setConsolePin("");
+      }
+    } catch {
+      setConsolePinError("Could not verify. Check connection.");
+    } finally {
+      setConsolePinLoading(false);
+    }
+  };
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicLoaded, setMusicLoaded] = useState(false);
   const musicRef = useRef<HTMLIFrameElement>(null);
@@ -898,17 +937,34 @@ export default function ClassroomBoard() {
             color: "#f5f1e8",
           }}>{timeStr}</div>
           {isTeacher && (
-            <button
-              onClick={() => setShowConsole(true)}
-              title="Open teacher console — store, manual progress, etc."
-              style={{
-                padding: "5px 11px", borderRadius: 3,
-                border: `1px solid ${blockAccent}88`,
-                background: `${blockAccent}22`, color: blockAccent,
-                cursor: "pointer", fontSize: 11, fontWeight: 700,
-                letterSpacing: "0.08em", textTransform: "uppercase",
-              }}
-            >🛠 Tools</button>
+            <>
+              {/* Store — kids walk up, tap their face, type their PIN.
+                  No teacher gate; each redemption is PIN-locked already. */}
+              <button
+                onClick={() => setShowStoreOnly(true)}
+                title="Classroom store — students unlock with their PIN"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid #d9770688`,
+                  background: "rgba(217,119,6,0.20)", color: "#fbbf24",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >🛒 Store</button>
+              {/* Tools — teacher-only utilities (manual progress entry).
+                  Locked behind the teacher PIN so kids can't tamper. */}
+              <button
+                onClick={() => { setConsolePin(""); setConsolePinError(""); setConsolePinModal(true); }}
+                title="Open teacher console — requires PIN"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid ${blockAccent}88`,
+                  background: `${blockAccent}22`, color: blockAccent,
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >🔒 Tools</button>
+            </>
           )}
           <button onClick={toggleFullscreen} style={{
             padding: "5px 9px", borderRadius: 3, border: `1px solid ${g(0.16)}`,
@@ -1672,6 +1728,89 @@ export default function ClassroomBoard() {
         students={(board?.students || []) as any}
         onClose={() => setShowConsole(false)}
       />
+    )}
+    {showStoreOnly && cls?.id && (
+      <BoardConsole
+        classId={cls.id}
+        students={(board?.students || []) as any}
+        storeOnly
+        onClose={() => setShowStoreOnly(false)}
+      />
+    )}
+
+    {/* PIN gate before the console opens. Locks teacher tools so
+        kids walking past the projector can't poke at the manual
+        progress entry or open the store without permission. */}
+    {consolePinModal && (
+      <div
+        onClick={(e) => { if (e.target === e.currentTarget) { setConsolePinModal(false); setConsolePin(""); setConsolePinError(""); } }}
+        style={{
+          position: "fixed", inset: 0, zIndex: 250,
+          background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <div style={{
+          background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          borderRadius: 22,
+          width: "min(380px, 92vw)",
+          padding: 28,
+          color: "#f5f1e8",
+          textAlign: "center",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+        }}>
+          <div style={{ fontSize: 38, marginBottom: 6 }}>🔒</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55, marginBottom: 4 }}>
+            Teacher Tools
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 18 }}>
+            Enter the teacher PIN
+          </div>
+          <input
+            autoFocus type="password" inputMode="numeric"
+            maxLength={8}
+            value={consolePin}
+            onChange={(e) => { setConsolePin(e.target.value.replace(/\D/g, "")); setConsolePinError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") tryConsoleUnlock(); }}
+            placeholder="••••"
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "16px 18px",
+              fontSize: 28, letterSpacing: "0.3em", textAlign: "center",
+              borderRadius: 14,
+              border: consolePinError ? "1.5px solid #ef4444" : "1.5px solid rgba(255,255,255,0.20)",
+              background: "rgba(0,0,0,0.40)",
+              color: "white", outline: "none",
+              marginBottom: consolePinError ? 8 : 16,
+            }}
+          />
+          {consolePinError && <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>{consolePinError}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={() => { setConsolePinModal(false); setConsolePin(""); setConsolePinError(""); }}
+              style={{
+                flex: 1, padding: "12px 0", borderRadius: 12,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "rgba(245,241,232,0.70)", fontWeight: 700, cursor: "pointer",
+              }}
+            >Cancel</button>
+            <button
+              onClick={tryConsoleUnlock}
+              disabled={consolePinLoading || !consolePin.trim()}
+              style={{
+                flex: 2, padding: "12px 0", borderRadius: 12,
+                background: consolePin.trim() ? "linear-gradient(135deg,#b23a48,#d97706)" : "rgba(255,255,255,0.10)",
+                border: "none", color: "white", fontWeight: 800,
+                cursor: consolePinLoading || !consolePin.trim() ? "default" : "pointer",
+                opacity: consolePinLoading || !consolePin.trim() ? 0.5 : 1,
+              }}
+            >{consolePinLoading ? "Checking…" : "Unlock"}</button>
+          </div>
+        </div>
+      </div>
     )}
     </div>
   );

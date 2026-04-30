@@ -31,11 +31,14 @@ type StoreItem = {
 interface Props {
   classId: string;
   students: Student[];
+  /** If true, skip the tab UI and only show the Store. Used for the
+   *  board's standalone Store button (no teacher PIN, kid-PIN only). */
+  storeOnly?: boolean;
   onClose: () => void;
 }
 
-export default function BoardConsole({ classId, students, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store">("progress");
+export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
+  const [tab, setTab] = useState<"progress" | "store">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -65,31 +68,35 @@ export default function BoardConsole({ classId, students, onClose }: Props) {
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.45 }}>
-              Teacher Console
+              {storeOnly ? "Classroom Store" : "Teacher Console"}
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>
-              {tab === "progress" ? "Manual Progress" : "Classroom Store"}
+              {storeOnly
+                ? "Tap your face to start"
+                : tab === "progress" ? "Manual Progress" : "Classroom Store"}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12 }}>
-            {(["progress", "store"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: tab === t ? "linear-gradient(135deg, #b23a48, #d97706)" : "transparent",
-                  color: tab === t ? "white" : "rgba(245,241,232,0.65)",
-                  fontWeight: 700, fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                {t === "progress" ? "📋 Progress" : "🛒 Store"}
-              </button>
-            ))}
-          </div>
+          {!storeOnly && (
+            <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12 }}>
+              {(["progress", "store"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: tab === t ? "linear-gradient(135deg, #b23a48, #d97706)" : "transparent",
+                    color: tab === t ? "white" : "rgba(245,241,232,0.65)",
+                    fontWeight: 700, fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t === "progress" ? "📋 Progress" : "🛒 Store"}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={onClose}
             aria-label="Close"
