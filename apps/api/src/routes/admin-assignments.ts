@@ -1322,10 +1322,14 @@ function pickDailyBundle(subject: string, grade: number, dateStr: string, roundI
   }
   return null;
 }
-router.post("/regenerate-today-content", async (_req, res) => {
+router.post("/regenerate-today-content", async (req, res) => {
+  // ?wipe=true → delete unsubmitted always-on grade-targeted rows
+  // BEFORE inserting today's rotation. Safe: only touches rows where
+  // no kid has submitted yet (so no graded work is lost). Used to
+  // clear phantom rows + let today's rotated content actually replace
+  // yesterday's stale set.
+  const wipe = (req.query?.wipe === "true") || (req.body?.wipe === true);
   try {
-    // Case-insensitive match on Postgres needs ILIKE; fall back to first
-    // class if nothing matches "Star".
     const cls: any = await db.prepare(
       "SELECT id::text AS id FROM classes WHERE LOWER(name) LIKE '%star%' ORDER BY created_at LIMIT 1"
     ).get() || await db.prepare(
@@ -1340,6 +1344,28 @@ router.post("/regenerate-today-content", async (_req, res) => {
     const teacherId: string = teacher.id;
     const created: any[] = [];
     const errors: string[] = [];
+
+    // Wipe unsubmitted phantom rows — caller-opted-in only. Lets the
+    // daily rotation actually swap content out from rows nobody has
+    // touched. Skips rows where any kid has submitted (so graded work
+    // never gets dropped).
+    let wiped = 0;
+    if (wipe) {
+      try {
+        const r: any = await db.prepare(
+          `DELETE FROM assignments
+           WHERE class_id::text = ?
+             AND scheduled_date IS NULL
+             AND target_subject IN ('reading','math','writing','spelling')
+             AND target_student_ids IS NULL
+             AND COALESCE(is_afternoon, 0) = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM submissions s WHERE s.assignment_id::text = id::text
+             )`
+        ).run(classId);
+        wiped = (r as any)?.changes ?? 0;
+      } catch { /* if delete fails, fall through and try insert */ }
+    }
 
     // Today's Pacific date — used as the rotation seed so Mon/Tue/Wed
     // each pick a different content bank for the same (subject, grade).
@@ -1465,7 +1491,7 @@ router.post("/regenerate-today-content", async (_req, res) => {
       }
     }
 
-    res.json({ created: created.length, assignments: created, errors });
+    res.json({ created: created.length, wiped, assignments: created, errors });
   } catch (e: any) {
     res.status(500).json({ error: String(e?.message || e) });
   }
