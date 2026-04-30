@@ -1415,27 +1415,14 @@ function WorkScreen({
 }) {
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
   const [showLesson, setShowLesson] = useState(false);
-  // Auto-read the lesson aloud when the modal first opens. Kids who
-  // can't read well still get the teaching content, and they can mash
-  // the 🔊 button to replay or wait silently. Stops speech when the
-  // modal closes so it doesn't leak into the next screen.
+  // Stop any in-flight lesson TTS when the modal closes so speech
+  // doesn't leak into the next screen. Reading itself is manual —
+  // kids tap the 🔊 button to start it, never auto-plays.
   useEffect(() => {
     if (!showLesson) {
       try { window.speechSynthesis?.cancel(); } catch {}
-      return;
     }
-    const passage = parsed?.sections?.[0]?.passage;
-    const lessonText = String(parsed?.lesson
-      || [parsed?.instructions, passage].filter(Boolean).join("\n\n")
-      || "");
-    if (!lessonText) return;
-    // Small delay so the modal animates in before TTS kicks off
-    const t = setTimeout(() => speakText(lessonText, 0.9), 350);
-    return () => {
-      clearTimeout(t);
-      try { window.speechSynthesis?.cancel(); } catch {}
-    };
-  }, [showLesson, parsed?.lesson, parsed?.instructions]);
+  }, [showLesson]);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");
@@ -4933,21 +4920,31 @@ const ACHIEVEMENT_CATALOG: Record<string, { icon: string; label: string; desc: s
   "50_assignments":  { icon: "💎",  label: "Diamond Worker",   desc: "Finished 50 assignments" },
   "100_assignments": { icon: "👑",  label: "Hall of Fame",     desc: "Finished 100 assignments" },
   "200_assignments": { icon: "🌌",  label: "Cosmic Worker",    desc: "Finished 200 assignments" },
+  "500_assignments": { icon: "🦄",  label: "Legend",           desc: "Finished 500 assignments" },
+  "1000_assignments":{ icon: "🌠",  label: "Mythic",           desc: "Finished 1000 assignments" },
   // Quality
   perfect_score:     { icon: "💯",  label: "Perfect Score",    desc: "Got 100%" },
   "3_perfect":       { icon: "✨",  label: "Triple Perfect",   desc: "Got 100% three times" },
   "10_perfect":      { icon: "🥇",  label: "Always Right",     desc: "Got 100% ten times" },
+  "25_perfect":      { icon: "🎖️", label: "Genius",           desc: "Got 100% 25 times" },
   "50_perfect":      { icon: "💠",  label: "Perfectionist",    desc: "Got 100% fifty times" },
+  "100_perfect":     { icon: "🪐",  label: "Hall of Mind",     desc: "Got 100% 100 times" },
   all_subjects:      { icon: "🌟",  label: "Well Rounded",     desc: "Every subject" },
   // Daily push
   "3_in_a_day":      { icon: "⚡",  label: "Speedster",        desc: "3 in one day" },
   "5_in_a_day":      { icon: "🚀",  label: "Power Day",        desc: "5 in one day" },
   "7_in_a_day":      { icon: "🌪️", label: "Tornado Day",      desc: "7 in one day" },
+  "10_in_a_day":     { icon: "🏃",  label: "Marathon Day",     desc: "10 in one day" },
   // Subject masters
   reading_master:    { icon: "📚",  label: "Reading Master",   desc: "10 reading assignments" },
   math_master:       { icon: "🔢",  label: "Math Master",      desc: "10 math assignments" },
   writing_master:    { icon: "✍️",  label: "Writing Master",   desc: "10 writing assignments" },
   spelling_master:   { icon: "🔤",  label: "Spelling Master",  desc: "10 spelling assignments" },
+  // Subject legends
+  reading_legend:    { icon: "🦉",  label: "Reading Legend",   desc: "50 reading assignments" },
+  math_legend:       { icon: "🧮",  label: "Math Legend",      desc: "50 math assignments" },
+  writing_legend:    { icon: "🪶",  label: "Writing Legend",   desc: "50 writing assignments" },
+  spelling_legend:   { icon: "🏰",  label: "Spelling Legend",  desc: "50 spelling assignments" },
   // Specialty masters
   sel_master:        { icon: "🧠",  label: "Mindful",          desc: "3 SEL lessons" },
   history_master:    { icon: "📜",  label: "Historian",        desc: "3 history lessons" },
@@ -4956,11 +4953,15 @@ const ACHIEVEMENT_CATALOG: Record<string, { icon: string; label: string; desc: s
   // Bonus work
   bonus_buster:      { icon: "🌅",  label: "Bonus Buster",     desc: "Finished a bonus" },
   "5_bonus":         { icon: "✨",  label: "Bonus Champion",   desc: "Finished 5 bonuses" },
+  "10_bonus":        { icon: "🌇",  label: "Bonus Hero",       desc: "Finished 10 bonuses" },
+  "25_bonus":        { icon: "🌃",  label: "Sunset Sage",      desc: "Finished 25 bonuses" },
   // Streaks
   streak_3:          { icon: "📅",  label: "3-Day Streak",     desc: "3 days in a row" },
   streak_5:          { icon: "🔥",  label: "5-Day Streak",     desc: "5 days in a row" },
   streak_10:         { icon: "🏅",  label: "10-Day Streak",    desc: "10 days in a row" },
   streak_15:         { icon: "⚡",  label: "Lightning Streak", desc: "15 days in a row" },
+  streak_30:         { icon: "💫",  label: "Unstoppable",      desc: "30 days in a row" },
+  streak_50:         { icon: "👑",  label: "Living Legend",    desc: "50 days in a row" },
   // Daily-themed (added below in milestones)
   early_bird:        { icon: "🌄",  label: "Early Bird",       desc: "Submitted before 9 AM" },
   night_owl:         { icon: "🌙",  label: "Night Owl",        desc: "Submitted after 5 PM" },

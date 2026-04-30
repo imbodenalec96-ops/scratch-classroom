@@ -255,21 +255,31 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       { id: "50_assignments",   icon: "💎",  label: "Diamond Worker",   when: submittedCount >= 50 },
       { id: "100_assignments",  icon: "👑",  label: "Hall of Fame",     when: submittedCount >= 100 },
       { id: "200_assignments",  icon: "🌌",  label: "Cosmic Worker",    when: submittedCount >= 200 },
+      { id: "500_assignments",  icon: "🦄",  label: "Legend",           when: submittedCount >= 500 },
+      { id: "1000_assignments", icon: "🌠",  label: "Mythic",           when: submittedCount >= 1000 },
       // Quality tier
       { id: "perfect_score",    icon: "💯",  label: "Perfect Score",    when: perfectCount >= 1 },
       { id: "3_perfect",        icon: "✨",  label: "Triple Perfect",   when: perfectCount >= 3 },
       { id: "10_perfect",       icon: "🥇",  label: "Always Right",     when: perfectCount >= 10 },
+      { id: "25_perfect",       icon: "🎖️", label: "Genius",           when: perfectCount >= 25 },
       { id: "50_perfect",       icon: "💠",  label: "Perfectionist",    when: perfectCount >= 50 },
+      { id: "100_perfect",      icon: "🪐",  label: "Hall of Mind",     when: perfectCount >= 100 },
       { id: "all_subjects",     icon: "🌟",  label: "Well Rounded",     when: hasAllCoreSubjects },
       // Daily push
       { id: "3_in_a_day",       icon: "⚡",  label: "Speedster",        when: todayCount >= 3 },
       { id: "5_in_a_day",       icon: "🚀",  label: "Power Day",        when: todayCount >= 5 },
       { id: "7_in_a_day",       icon: "🌪️", label: "Tornado Day",      when: todayCount >= 7 },
+      { id: "10_in_a_day",      icon: "🏃",  label: "Marathon Day",     when: todayCount >= 10 },
       // Subject masters (10 in a single core subject)
       { id: "reading_master",   icon: "📚",  label: "Reading Master",   when: subjectCounts.reading  >= 10 },
       { id: "math_master",      icon: "🔢",  label: "Math Master",      when: subjectCounts.math     >= 10 },
       { id: "writing_master",   icon: "✍️",  label: "Writing Master",   when: subjectCounts.writing  >= 10 },
       { id: "spelling_master",  icon: "🔤",  label: "Spelling Master",  when: subjectCounts.spelling >= 10 },
+      // Subject legends (50 in a single core subject)
+      { id: "reading_legend",   icon: "🦉",  label: "Reading Legend",   when: subjectCounts.reading  >= 50 },
+      { id: "math_legend",      icon: "🧮",  label: "Math Legend",      when: subjectCounts.math     >= 50 },
+      { id: "writing_legend",   icon: "🪶",  label: "Writing Legend",   when: subjectCounts.writing  >= 50 },
+      { id: "spelling_legend",  icon: "🏰",  label: "Spelling Legend",  when: subjectCounts.spelling >= 50 },
       // Specialty subject completion (3 in specialty subject = mastery)
       { id: "sel_master",       icon: "🧠",  label: "Mindful",          when: subjectCounts.sel        >= 3 },
       { id: "history_master",   icon: "📜",  label: "Historian",        when: subjectCounts.history    >= 3 },
@@ -278,11 +288,15 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       // Bonus work
       { id: "bonus_buster",     icon: "🌅",  label: "Bonus Buster",     when: bonusCount >= 1 },
       { id: "5_bonus",          icon: "✨",  label: "Bonus Champion",   when: bonusCount >= 5 },
+      { id: "10_bonus",         icon: "🌇",  label: "Bonus Hero",       when: bonusCount >= 10 },
+      { id: "25_bonus",         icon: "🌃",  label: "Sunset Sage",      when: bonusCount >= 25 },
       // Streaks
       { id: "streak_3",         icon: "📅",  label: "3-Day Streak",     when: streakDays >= 3 },
       { id: "streak_5",         icon: "🔥",  label: "5-Day Streak",     when: streakDays >= 5 },
       { id: "streak_10",        icon: "🏅",  label: "10-Day Streak",    when: streakDays >= 10 },
       { id: "streak_15",        icon: "⚡",  label: "Lightning Streak", when: streakDays >= 15 },
+      { id: "streak_30",        icon: "💫",  label: "Unstoppable",      when: streakDays >= 30 },
+      { id: "streak_50",        icon: "👑",  label: "Living Legend",    when: streakDays >= 50 },
       // Daily-themed (one-shot earnable from any day's submission timing)
       { id: "early_bird",       icon: "🌄",  label: "Early Bird",       when: earlyBird },
       { id: "night_owl",        icon: "🌙",  label: "Night Owl",        when: nightOwl },
@@ -341,22 +355,32 @@ const BADGE_POINTS: Record<string, number> = {
   "50_assignments":  4,
   "100_assignments": 5,
   "200_assignments": 5,
+  "500_assignments": 5,
+  "1000_assignments":5,
   // Quality
   perfect_score:     2,
   "3_perfect":       3,
   "10_perfect":      4,
+  "25_perfect":      4,
   "50_perfect":      5,
+  "100_perfect":     5,
   all_subjects:      3,
   // Daily push
   "3_in_a_day":      2,
   "5_in_a_day":      3,
   "7_in_a_day":      4,
+  "10_in_a_day":     5,
   // Subject mastery (10 in a single subject)
   reading_master:    3,
   math_master:       3,
   writing_master:    3,
   spelling_master:   3,
-  // Specialty subject completion
+  // Subject legend (50 in a single subject)
+  reading_legend:    5,
+  math_legend:       5,
+  writing_legend:    5,
+  spelling_legend:   5,
+  // Specialty subject completion (3 each)
   sel_master:        2,
   history_master:    2,
   science_master:    2,
@@ -364,12 +388,16 @@ const BADGE_POINTS: Record<string, number> = {
   // Bonus work
   bonus_buster:      2,
   "5_bonus":         3,
+  "10_bonus":        4,
+  "25_bonus":        5,
   // Streaks
   streak_3:          2,
   streak_5:          3,
   streak_10:         4,
   streak_15:         5,
-  // Daily-themed
+  streak_30:         5,
+  streak_50:         5,
+  // Daily-themed (one-shot)
   early_bird:        2,
   night_owl:         2,
   weekend_warrior:   3,

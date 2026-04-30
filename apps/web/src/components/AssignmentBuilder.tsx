@@ -216,31 +216,13 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   // "I'm stuck — call my teacher" state. Mirrors WorkScreen's behavior.
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
   const [showLesson, setShowLesson] = useState(false);
-  // Auto-read the lesson when the modal opens; cancel on close.
+  // Stop in-flight TTS when the modal closes. Reading is manual —
+  // kids tap the 🔊 button, never auto-plays.
   useEffect(() => {
     if (!showLesson) {
       try { window.speechSynthesis?.cancel(); } catch {}
-      return;
     }
-    const passage = parsed?.sections?.[0]?.passage;
-    const lessonText = String(parsed?.lesson
-      || [parsed?.instructions, passage].filter(Boolean).join("\n\n")
-      || "");
-    if (!lessonText) return;
-    const t = setTimeout(() => {
-      try {
-        window.speechSynthesis?.cancel();
-        const u = new SpeechSynthesisUtterance(lessonText);
-        u.rate = 0.9;
-        u.lang = "en-US";
-        window.speechSynthesis?.speak(u);
-      } catch { /* TTS best-effort */ }
-    }, 350);
-    return () => {
-      clearTimeout(t);
-      try { window.speechSynthesis?.cancel(); } catch {}
-    };
-  }, [showLesson, parsed?.lesson, parsed?.instructions]);
+  }, [showLesson]);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");

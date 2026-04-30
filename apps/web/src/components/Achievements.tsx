@@ -15,21 +15,31 @@ const ALL_BADGES = [
   { id: "50_assignments",     icon: "💎",  label: "Diamond Worker",    desc: "Finished 50 assignments" },
   { id: "100_assignments",    icon: "👑",  label: "Hall of Fame",      desc: "Finished 100 assignments" },
   { id: "200_assignments",    icon: "🌌",  label: "Cosmic Worker",     desc: "Finished 200 assignments" },
+  { id: "500_assignments",    icon: "🦄",  label: "Legend",            desc: "Finished 500 assignments" },
+  { id: "1000_assignments",   icon: "🌠",  label: "Mythic",            desc: "Finished 1000 assignments" },
   // Quality
   { id: "perfect_score",      icon: "💯",  label: "Perfect Score",     desc: "Got 100% on an assignment" },
   { id: "3_perfect",          icon: "✨",  label: "Triple Perfect",    desc: "Got 100% three times" },
   { id: "10_perfect",         icon: "🥇",  label: "Always Right",      desc: "Got 100% ten times" },
+  { id: "25_perfect",         icon: "🎖️", label: "Genius",            desc: "Got 100% twenty-five times" },
   { id: "50_perfect",         icon: "💠",  label: "Perfectionist",     desc: "Got 100% fifty times" },
+  { id: "100_perfect",        icon: "🪐",  label: "Hall of Mind",      desc: "Got 100% one hundred times" },
   { id: "all_subjects",       icon: "🌟",  label: "Well Rounded",      desc: "Finished an assignment in every subject" },
   // Daily push
   { id: "3_in_a_day",         icon: "⚡",  label: "Speedster",         desc: "Finished 3 assignments in one day" },
   { id: "5_in_a_day",         icon: "🚀",  label: "Power Day",         desc: "Finished 5 assignments in one day" },
   { id: "7_in_a_day",         icon: "🌪️", label: "Tornado Day",       desc: "Finished 7 assignments in one day" },
+  { id: "10_in_a_day",        icon: "🏃",  label: "Marathon Day",      desc: "Finished 10 assignments in one day" },
   // Core subject masters
   { id: "reading_master",     icon: "📚",  label: "Reading Master",    desc: "Finished 10 reading assignments" },
   { id: "math_master",        icon: "🔢",  label: "Math Master",       desc: "Finished 10 math assignments" },
   { id: "writing_master",     icon: "✍️",  label: "Writing Master",    desc: "Finished 10 writing assignments" },
   { id: "spelling_master",    icon: "🔤",  label: "Spelling Master",   desc: "Finished 10 spelling assignments" },
+  // Subject legends (50 each)
+  { id: "reading_legend",     icon: "🦉",  label: "Reading Legend",    desc: "Finished 50 reading assignments" },
+  { id: "math_legend",        icon: "🧮",  label: "Math Legend",       desc: "Finished 50 math assignments" },
+  { id: "writing_legend",     icon: "🪶",  label: "Writing Legend",    desc: "Finished 50 writing assignments" },
+  { id: "spelling_legend",    icon: "🏰",  label: "Spelling Legend",   desc: "Finished 50 spelling assignments" },
   // Specialty subject masters
   { id: "sel_master",         icon: "🧠",  label: "Mindful",           desc: "Finished 3 SEL lessons" },
   { id: "history_master",     icon: "📜",  label: "Historian",         desc: "Finished 3 history lessons" },
@@ -38,11 +48,15 @@ const ALL_BADGES = [
   // Bonus work
   { id: "bonus_buster",       icon: "🌅",  label: "Bonus Buster",      desc: "Finished an afternoon bonus" },
   { id: "5_bonus",            icon: "✨",  label: "Bonus Champion",    desc: "Finished 5 afternoon bonuses" },
+  { id: "10_bonus",           icon: "🌇",  label: "Bonus Hero",        desc: "Finished 10 afternoon bonuses" },
+  { id: "25_bonus",           icon: "🌃",  label: "Sunset Sage",       desc: "Finished 25 afternoon bonuses" },
   // Streaks
   { id: "streak_3",           icon: "📅",  label: "3-Day Streak",      desc: "Submitted on 3 days in a row" },
   { id: "streak_5",           icon: "🔥",  label: "5-Day Streak",      desc: "Submitted on 5 days in a row" },
   { id: "streak_10",          icon: "🏅",  label: "10-Day Streak",     desc: "Submitted on 10 days in a row" },
   { id: "streak_15",          icon: "⚡",  label: "Lightning Streak",  desc: "Submitted on 15 days in a row" },
+  { id: "streak_30",          icon: "💫",  label: "Unstoppable",       desc: "Submitted on 30 days in a row" },
+  { id: "streak_50",          icon: "👑",  label: "Living Legend",     desc: "Submitted on 50 days in a row" },
   // Daily-themed (one-shot)
   { id: "early_bird",         icon: "🌄",  label: "Early Bird",        desc: "Submitted before 9 AM" },
   { id: "night_owl",          icon: "🌙",  label: "Night Owl",         desc: "Submitted after 5 PM" },
