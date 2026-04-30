@@ -1497,6 +1497,22 @@ router.post("/regenerate-today-content", async (req, res) => {
   }
 });
 
+// POST /admin/clear-mcdonalds-week — wipes behavior_stars=5 to 0 for
+// every student in the class (no auth). Intended for Sunday auto-run
+// after the McDonald's reward day passes. Called from the board's
+// Sunday-load effect; idempotent so multiple calls in a day are fine.
+router.post("/clear-mcdonalds-week", async (_req, res) => {
+  try {
+    const r = await db.prepare(
+      `UPDATE board_user_data SET behavior_stars = 0, reward_count = COALESCE(reward_count, 0) + 1
+       WHERE behavior_stars >= 5`
+    ).run();
+    res.json({ cleared: (r as any)?.changes ?? 0 });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // POST /admin/set-stars/:studentId body {stars: 0-5} — set a student's
 // behavior stars directly. No auth (admin route). Used to mark a kid
 // as having earned McDonald's without going through the +/− flow.

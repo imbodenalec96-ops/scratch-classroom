@@ -204,6 +204,26 @@ export default function ClassroomBoard() {
     } catch {}
   };
 
+  // Sunday auto-clear of McDonald's stars. Once per Sunday (Pacific),
+  // wipe every kid's stars=5 → 0 since the reward day (Saturday) has
+  // passed. localStorage gate keeps it idempotent within the day.
+  useEffect(() => {
+    if (!isTeacher) return; // teacher's session triggers it for the class
+    const pacific = new Date(Date.now() - 7 * 3600_000);
+    if (pacific.getUTCDay() !== 0) return; // only Sunday
+    const dayKey = pacific.toISOString().slice(0, 10);
+    const seenKey = `thign:mcdClear:${dayKey}`;
+    if (localStorage.getItem(seenKey)) return;
+    const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
+      (window.location.hostname === "localhost"
+        ? "http://localhost:4000/api"
+        : "https://scratch-classroom-api-td1x.vercel.app/api");
+    fetch(`${apiBase}/admin/clear-mcdonalds-week`, { method: "POST" })
+      .then((r) => r.json())
+      .then((d) => { if (d?.cleared >= 0) localStorage.setItem(seenKey, "1"); })
+      .catch(() => {});
+  }, [isTeacher]);
+
   // Helper-of-the-day (additive — picks the kid with the most
   // submissions today; renders as a small pill if available, otherwise
   // nothing). Polls on the same cadence as live-progress.
@@ -1294,24 +1314,44 @@ export default function ClassroomBoard() {
                     </div>
 
                     {/* 🍔 EARNED McDONALD'S! pill — only when full stars.
-                        Pulsing red gradient to celebrate the reward. */}
-                    {isFull && (
-                      <div style={{
-                        marginTop: 4,
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                        padding: "3px 10px", borderRadius: 999,
-                        fontSize: 11, fontWeight: 800,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        background: "linear-gradient(135deg, #dc2626, #f97316)",
-                        color: "white",
-                        boxShadow: "0 0 12px rgba(249,115,22,0.55)",
-                        animation: "starGlow 1.6s ease-in-out infinite",
-                        whiteSpace: "nowrap",
-                      }}>
-                        🍔 Earned McDonald's!
-                      </div>
-                    )}
+                        Day-aware text: "Today!" on Saturday, "Tomorrow!"
+                        on Friday, "Saturday!" Mon–Thu. Sunday is post-
+                        reward — pill stays hidden (and the auto-clear
+                        effect below resets stars on Sunday's first load
+                        so the badge doesn't linger). */}
+                    {isFull && (() => {
+                      // Pacific day-of-week. 0=Sun, 6=Sat
+                      const pacific = new Date(Date.now() - 7 * 3600_000);
+                      const dow = pacific.getUTCDay();
+                      // On Sunday, suppress the pill entirely (auto-clear
+                      // effect will zero the stars on this load).
+                      if (dow === 0) return null;
+                      const labels: Record<number, string> = {
+                        1: "Saturday!", // Mon → 5 days
+                        2: "Saturday!", // Tue → 4 days
+                        3: "Saturday!", // Wed → 3 days
+                        4: "Saturday!", // Thu → 2 days
+                        5: "Tomorrow!", // Fri → 1 day
+                        6: "Today!",    // Sat → 0 days
+                      };
+                      return (
+                        <div style={{
+                          marginTop: 4,
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "3px 10px", borderRadius: 999,
+                          fontSize: 11, fontWeight: 800,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          background: "linear-gradient(135deg, #dc2626, #f97316)",
+                          color: "white",
+                          boxShadow: "0 0 12px rgba(249,115,22,0.55)",
+                          animation: "starGlow 1.6s ease-in-out infinite",
+                          whiteSpace: "nowrap",
+                        }}>
+                          🍔 McDonald's {labels[dow]}
+                        </div>
+                      );
+                    })()}
 
                     {/* Per-student daily progress — `done` of `total`
                         assignments visible to this kid today (matches what
