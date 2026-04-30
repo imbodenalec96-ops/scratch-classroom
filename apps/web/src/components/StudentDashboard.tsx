@@ -1662,7 +1662,15 @@ function WorkScreen({
       });
       const data = await r.json();
       if (data.valid) {
-        setAnswers(prev => ({ ...prev, [currentQ]: "__SKIPPED__" }));
+        // Preserve whatever the kid typed in the answer box. The
+        // teacher hit bypass because the answer was close-enough or
+        // they want to move on; throwing away the typed text would
+        // make grading impossible. Fall back to "__SKIPPED__" only
+        // when the box was empty.
+        setAnswers(prev => {
+          const existing = String(prev[currentQ] ?? "").trim();
+          return { ...prev, [currentQ]: existing || "__SKIPPED__" };
+        });
         setShowSkipModal(false);
         setSkipCode("");
         if (currentQ < total - 1) {
@@ -2688,9 +2696,12 @@ function WorkScreen({
         >
           <div style={{ background: "white", borderRadius: 20, padding: 28, width: "min(360px, 90vw)", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>🔑</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e1b4b", marginBottom: 4 }}>Admin Skip</div>
-            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", marginBottom: 20 }}>
-              Enter the teacher passcode to skip question {currentQ + 1}.
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e1b4b", marginBottom: 4 }}>Bypass Question</div>
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", marginBottom: 16 }}>
+              Enter the teacher passcode to bypass question {currentQ + 1}.
+              {String(answers[currentQ] ?? "").trim()
+                ? <> Their typed answer will be <strong style={{ color: "#0f766e" }}>saved</strong>.</>
+                : <> The empty answer will be marked skipped.</>}
             </div>
             <input
               autoFocus
