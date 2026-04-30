@@ -2493,6 +2493,205 @@ const VOCABULARY_CONTENT = {
   },
 };
 
+// EXTRA_PREMADE — second morning set per subject/grade. generate-today
+// inserts BOTH PREMADE and EXTRA_PREMADE so kids get more variety and
+// volume each day (~2 reading + 2 math + 2 writing + 2 spelling per
+// grade instead of one of each). Themes are deliberately different
+// from PREMADE and BONUS_PREMADE so all three sets feel distinct.
+const EXTRA_PREMADE: Record<string, Record<number, { title: string; description: string; content: any }>> = {
+  reading: {
+    1: { title: "1st Grade Reading: Friendly Words", description: "Read words about being kind.", content: { title: "Friendly Words", subject: "Reading", grade: "1st Grade", instructions: "Read each one and pick the best answer.", totalPoints: 30, sections: [{ title: "Friendly Words", questions: [
+      { type: "multiple_choice", text: "Which word is a friendly thing to say?", options: ["A. Mean", "B. Please", "C. Stop", "D. No"], correctIndex: 1, points: 6 },
+      { type: "multiple_choice", text: "Which word do you say when someone helps you?", options: ["A. Thanks", "B. Bye", "C. Wait", "D. Run"], correctIndex: 0, points: 6 },
+      { type: "multiple_choice", text: "Which is a way to be kind?", options: ["A. Pushing", "B. Sharing", "C. Hiding", "D. Yelling"], correctIndex: 1, points: 6 },
+      { type: "fill_blank", text: "When someone is sad, you can give them a ___.", correctAnswer: "hug or smile", points: 6 },
+      { type: "short_answer", text: "What's one nice thing you can say to a friend?", correctAnswer: "any kind sentence", points: 6 },
+    ] }] } },
+    2: { title: "2nd Grade Reading: At the Park", description: "Read about a day at the park.", content: { title: "At the Park", subject: "Reading", grade: "2nd Grade", instructions: "Read the short story, then answer.", totalPoints: 40, sections: [{ title: "Park Story", passage: "Sam and Mia went to the park on Saturday. Sam ran to the swings while Mia found her friend on the slide. They took turns pushing each other higher and higher. When Sam's mom called for snack time, they shared apple slices on the grass. After snack, they raced back for one more turn before going home.", questions: [
+      { type: "multiple_choice", text: "What day did they go to the park?", options: ["A. Monday", "B. Friday", "C. Saturday", "D. Sunday"], correctIndex: 2, points: 8 },
+      { type: "multiple_choice", text: "Where did Mia find her friend?", options: ["A. On the swings", "B. On the slide", "C. In the sandbox", "D. By the fence"], correctIndex: 1, points: 8 },
+      { type: "fill_blank", text: "They shared ___ slices for snack.", correctAnswer: "apple", points: 8 },
+      { type: "short_answer", text: "What did they do after snack?", correctAnswer: "raced back to the swings", points: 8, lines: 1 },
+      { type: "short_answer", text: "How would you describe Sam and Mia? (in one word)", correctAnswer: "friendly or kind or fun", points: 8 },
+    ] }] } },
+    3: { title: "3rd Grade Reading: Tom's Soccer Game", description: "Read a story about a big game.", content: { title: "Tom's Soccer Game", subject: "Reading", grade: "3rd Grade", instructions: "Read carefully, then answer.", totalPoints: 50, sections: [{ title: "Soccer Story", passage: "Tom had practiced every day for the championship. On game day, his team was losing 1-0 in the final minute. The ball came to Tom near the goal. He took a deep breath, remembered everything Coach taught him, and kicked. The ball flew past the goalie into the net! The game ended in a tie, and his teammates lifted him onto their shoulders. Tom learned that practice and calm thinking really do pay off.", questions: [
+      { type: "multiple_choice", text: "What sport does Tom play?", options: ["A. Baseball", "B. Soccer", "C. Basketball", "D. Tennis"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What was the score before Tom's kick?", options: ["A. Tied 0-0", "B. Tom's team winning", "C. Tom's team losing 1-0", "D. Losing 5-0"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "Tom ___ before he kicked.", correctAnswer: "took a deep breath", points: 10 },
+      { type: "short_answer", text: "What is the lesson of the story?", correctAnswer: "practice pays off or stay calm", points: 10, lines: 2 },
+      { type: "short_answer", text: "How did Tom's teammates show they were happy?", correctAnswer: "lifted him onto their shoulders", points: 10, lines: 1 },
+    ] }] } },
+    4: { title: "4th Grade Reading: How Volcanoes Work", description: "Read an explanation of volcanoes.", content: { title: "How Volcanoes Work", subject: "Reading", grade: "4th Grade", instructions: "Read carefully, then answer.", totalPoints: 50, sections: [{ title: "Volcano Reading", passage: "Deep underground, melted rock called magma is always moving. Sometimes it pushes up through cracks in the Earth's crust. When magma reaches the surface and erupts, it's called lava. Lava can flow slowly down a mountainside or shoot up in a fountain hundreds of feet high. As it cools, lava turns back into solid rock — and over thousands of years, layer after layer can build a brand-new mountain. The Hawaiian Islands were all formed this way, by volcanoes erupting from the ocean floor.", questions: [
+      { type: "multiple_choice", text: "What is melted rock underground called?", options: ["A. Lava", "B. Magma", "C. Ash", "D. Crust"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What does magma become when it reaches the surface?", options: ["A. Rain", "B. Sand", "C. Lava", "D. Steam"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "How were the Hawaiian Islands formed?", options: ["A. Earthquakes", "B. Asteroids", "C. Glaciers", "D. Underwater volcanoes"], correctIndex: 3, points: 10 },
+      { type: "short_answer", text: "What happens to lava as it cools?", correctAnswer: "turns back into solid rock", points: 10, lines: 1 },
+      { type: "short_answer", text: "Use one detail from the passage to support the main idea about how mountains form.", correctAnswer: "any detail about layers building up", points: 10, lines: 2 },
+    ] }] } },
+    5: { title: "5th Grade Reading: The Lost City", description: "Analyze a passage about an archaeological discovery.", content: { title: "The Lost City", subject: "Reading", grade: "5th Grade", instructions: "Read carefully, then answer.", totalPoints: 60, sections: [{ title: "Lost City Reading", passage: "For three centuries the city had slept beneath the jungle. Vines wound through doorways, trees grew up between paving stones, and only the occasional weathered carving hinted at what once stood there. Dr. Reyes had spent eleven years searching old maps and following stories told by villagers. When her team finally cut through the last wall of green and saw the great stone steps rising before them, she did not cheer. She knelt down, placed one hand on the cold rock, and simply said, 'Thank you.' She knew the discovery was not hers — she had only been the one lucky enough to find it.", questions: [
+      { type: "multiple_choice", text: "How long had Dr. Reyes been searching?", options: ["A. 3 years", "B. 5 years", "C. 11 years", "D. 30 years"], correctIndex: 2, points: 12 },
+      { type: "multiple_choice", text: "What was Dr. Reyes's reaction at the discovery?", options: ["A. She cheered loudly", "B. She knelt and said thank you", "C. She ran away", "D. She immediately took photos"], correctIndex: 1, points: 12 },
+      { type: "fill_blank", text: "The city had been hidden by the ___ for three centuries.", correctAnswer: "jungle or trees or vines", points: 12 },
+      { type: "short_answer", text: "What is the author's tone toward Dr. Reyes?", correctAnswer: "respectful or admiring or thoughtful", points: 12, lines: 2 },
+      { type: "short_answer", text: "What does this story suggest about the right attitude toward discovery?", correctAnswer: "humility or gratitude or respect for what came before", points: 12, lines: 2 },
+    ] }] } },
+  },
+  math: {
+    1: { title: "1st Grade Math: Counting to 20", description: "Count and order numbers up to 20.", content: { title: "Counting to 20", subject: "Math", grade: "1st Grade", instructions: "Solve each one.", totalPoints: 40, sections: [{ title: "Counting", questions: [
+      { type: "multiple_choice", text: "What number comes after 12?", options: ["A. 11", "B. 13", "C. 14", "D. 20"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Which is bigger?", options: ["A. 8", "B. 15", "C. 12", "D. 9"], correctIndex: 1, points: 8 },
+      { type: "fill_blank", text: "Count by 2s: 2, 4, 6, ___", correctAnswer: "8", points: 8 },
+      { type: "fill_blank", text: "10 + 5 = ___", correctAnswer: "15", points: 8 },
+      { type: "short_answer", text: "If you have 7 stickers and your friend gives you 3 more, how many total?", correctAnswer: "10", points: 8 },
+    ] }] } },
+    2: { title: "2nd Grade Math: Place Value", description: "Understand tens and ones.", content: { title: "Place Value", subject: "Math", grade: "2nd Grade", instructions: "Solve each one.", totalPoints: 50, sections: [{ title: "Place Value", questions: [
+      { type: "multiple_choice", text: "In the number 47, the 4 is in the ___ place.", options: ["A. ones", "B. tens", "C. hundreds", "D. thousands"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "How many tens are in 60?", options: ["A. 1", "B. 5", "C. 6", "D. 60"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "The number 35 has ___ tens and 5 ones.", correctAnswer: "3", points: 10 },
+      { type: "fill_blank", text: "8 tens and 2 ones = ___", correctAnswer: "82", points: 10 },
+      { type: "short_answer", text: "Write the number that has 5 tens and 4 ones.", correctAnswer: "54", points: 10 },
+    ] }] } },
+    3: { title: "3rd Grade Math: Word Problems", description: "Use math to solve real-world problems.", content: { title: "Word Problems", subject: "Math", grade: "3rd Grade", instructions: "Read carefully and solve.", totalPoints: 50, sections: [{ title: "Word Problems", questions: [
+      { type: "multiple_choice", text: "There are 24 cookies. 6 friends share equally. How many does each get?", options: ["A. 3", "B. 4", "C. 5", "D. 6"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "A book costs $7. You buy 3. How much do you spend?", options: ["A. $10", "B. $14", "C. $21", "D. $24"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "If a class has 5 rows of 6 desks, there are ___ desks total.", correctAnswer: "30", points: 10 },
+      { type: "short_answer", text: "You had 50 stickers and gave 18 away. How many do you have left?", correctAnswer: "32", points: 10 },
+      { type: "short_answer", text: "A pizza is cut into 8 slices. You eat 3. How many are left?", correctAnswer: "5", points: 10 },
+    ] }] } },
+    4: { title: "4th Grade Math: Fractions Basics", description: "Understand parts of a whole.", content: { title: "Fractions Basics", subject: "Math", grade: "4th Grade", instructions: "Solve each one.", totalPoints: 50, sections: [{ title: "Fractions", questions: [
+      { type: "multiple_choice", text: "Which fraction is bigger?", options: ["A. 1/4", "B. 1/2", "C. 1/8", "D. 1/10"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "1/4 + 1/4 = ?", options: ["A. 1/8", "B. 2/8", "C. 1/2", "D. 2/4 (which is 1/2)"], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "A pizza has 8 slices. You eat 2. The fraction you ate is ___/8.", correctAnswer: "2", points: 10 },
+      { type: "fill_blank", text: "1/2 of 10 = ___", correctAnswer: "5", points: 10 },
+      { type: "short_answer", text: "If 3/4 of the kids in a class of 20 wear jackets, how many wear jackets?", correctAnswer: "15", points: 10 },
+    ] }] } },
+    5: { title: "5th Grade Math: Percentages", description: "Work with percents and decimals.", content: { title: "Percentages", subject: "Math", grade: "5th Grade", instructions: "Solve each one.", totalPoints: 60, sections: [{ title: "Percentages", questions: [
+      { type: "multiple_choice", text: "What is 50% of 80?", options: ["A. 20", "B. 30", "C. 40", "D. 60"], correctIndex: 2, points: 12 },
+      { type: "multiple_choice", text: "What is 25% of 100?", options: ["A. 25", "B. 50", "C. 75", "D. 100"], correctIndex: 0, points: 12 },
+      { type: "fill_blank", text: "10% of 200 = ___", correctAnswer: "20", points: 12 },
+      { type: "fill_blank", text: "0.5 = ___%", correctAnswer: "50", points: 12 },
+      { type: "short_answer", text: "If a $40 shirt is 25% off, how much do you save?", correctAnswer: "$10 or 10", points: 12 },
+    ] }] } },
+  },
+  writing: {
+    1: { title: "1st Grade Writing: Capital Letters", description: "Use capital letters correctly.", content: { title: "Capital Letters", subject: "Writing", grade: "1st Grade", instructions: "Pick the right answer or write a sentence.", totalPoints: 30, sections: [{ title: "Capitals", questions: [
+      { type: "multiple_choice", text: "Which name is written correctly?", options: ["A. sam", "B. Sam", "C. SAM", "D. saM"], correctIndex: 1, points: 6 },
+      { type: "multiple_choice", text: "What kind of letter starts every sentence?", options: ["A. lowercase", "B. small", "C. capital", "D. number"], correctIndex: 2, points: 6 },
+      { type: "fill_blank", text: "The names of people and places start with a ___ letter.", correctAnswer: "capital or big", points: 6 },
+      { type: "short_answer", text: "Write your first name with a capital letter.", correctAnswer: "any capitalized name", points: 6 },
+      { type: "short_answer", text: "Write a sentence about your school. Start with a capital letter.", correctAnswer: "any sentence starting with a capital", points: 6, lines: 2 },
+    ] }] } },
+    2: { title: "2nd Grade Writing: Commas in Lists", description: "Use commas to separate items.", content: { title: "Commas in Lists", subject: "Writing", grade: "2nd Grade", instructions: "Pick the right answer.", totalPoints: 40, sections: [{ title: "Commas", questions: [
+      { type: "multiple_choice", text: "Which sentence uses commas correctly?", options: ["A. I like apples bananas and grapes.", "B. I like apples, bananas, and grapes.", "C. I, like apples bananas grapes.", "D. I like, apples bananas, grapes"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Where do commas go in a list?", options: ["A. At the end only", "B. Between each item", "C. Nowhere", "D. Only after the first word"], correctIndex: 1, points: 8 },
+      { type: "fill_blank", text: "Write the list correctly: red blue green → red___ blue___ green", correctAnswer: ", , or commas", points: 8 },
+      { type: "short_answer", text: "Write a sentence listing 3 things you like to eat. Use commas.", correctAnswer: "any sentence with commas in a list", points: 8, lines: 2 },
+      { type: "short_answer", text: "Write a sentence listing 3 colors. Use commas.", correctAnswer: "any sentence with commas in a list", points: 8, lines: 2 },
+    ] }] } },
+    3: { title: "3rd Grade Writing: Story Structure", description: "Beginning, middle, end.", content: { title: "Story Structure", subject: "Writing", grade: "3rd Grade", instructions: "Pick the right answer or write.", totalPoints: 50, sections: [{ title: "Story Parts", questions: [
+      { type: "multiple_choice", text: "What goes in the BEGINNING of a story?", options: ["A. The ending", "B. The characters and setting", "C. The biggest problem", "D. A summary"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "What is the MIDDLE of a story usually about?", options: ["A. Saying goodbye", "B. The problem and what happens", "C. Just the ending", "D. The author"], correctIndex: 1, points: 10 },
+      { type: "fill_blank", text: "Most stories have three parts: beginning, middle, and ___.", correctAnswer: "end or ending", points: 10 },
+      { type: "short_answer", text: "Write a beginning sentence introducing a character.", correctAnswer: "any sentence introducing a character", points: 10, lines: 2 },
+      { type: "short_answer", text: "Write an ending sentence that wraps up a story.", correctAnswer: "any closing sentence", points: 10, lines: 2 },
+    ] }] } },
+    4: { title: "4th Grade Writing: Show Don't Tell", description: "Use details to show, not tell.", content: { title: "Show Don't Tell", subject: "Writing", grade: "4th Grade", instructions: "Pick the strongest writing.", totalPoints: 50, sections: [{ title: "Show vs Tell", questions: [
+      { type: "multiple_choice", text: "Which sentence SHOWS instead of tells?", options: ["A. She was sad.", "B. Tears rolled down her cheeks.", "C. She felt bad.", "D. It was sad."], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is a 'showing' way to say 'It was cold'?", options: ["A. The day was cold.", "B. Brrr, it was cold.", "C. Frost crunched under his boots.", "D. Cold weather happened."], correctIndex: 2, points: 10 },
+      { type: "fill_blank", text: "Showing uses ___ instead of just telling the reader.", correctAnswer: "details or actions or senses", points: 10 },
+      { type: "short_answer", text: "Rewrite 'He was scared' so it SHOWS instead of tells.", correctAnswer: "any sentence with sensory or action details showing fear", points: 10, lines: 2 },
+      { type: "short_answer", text: "Rewrite 'The food was good' so it SHOWS.", correctAnswer: "any sentence with sensory details about food", points: 10, lines: 2 },
+    ] }] } },
+    5: { title: "5th Grade Writing: Counterargument", description: "Address the other side.", content: { title: "Counterargument", subject: "Writing", grade: "5th Grade", instructions: "Pick or write your answer.", totalPoints: 60, sections: [{ title: "Counterargument", questions: [
+      { type: "multiple_choice", text: "What is a counterargument?", options: ["A. The main argument", "B. A list of details", "C. The opposite point of view", "D. A summary"], correctIndex: 2, points: 12 },
+      { type: "multiple_choice", text: "Why include a counterargument in a persuasive essay?", options: ["A. To confuse the reader", "B. To show you considered the other side fairly", "C. To make it longer", "D. To agree with everyone"], correctIndex: 1, points: 12 },
+      { type: "fill_blank", text: "A strong counterargument paragraph also has a ___ to it.", correctAnswer: "response or rebuttal or answer", points: 12 },
+      { type: "short_answer", text: "Topic: kids should have more recess. Write one counterargument.", correctAnswer: "any reasonable opposing view about recess", points: 12, lines: 3 },
+      { type: "short_answer", text: "Now respond to that counterargument briefly.", correctAnswer: "any thoughtful rebuttal", points: 12, lines: 3 },
+    ] }] } },
+  },
+  spelling: {
+    1: { title: "1st Grade Spelling: Color Words", description: "Spell colors.", content: { title: "Color Words", subject: "Spelling", grade: "1st Grade", instructions: "Read each clue and pick or type the correct spelling.", totalPoints: 30, sections: [{ title: "Colors", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling for the color of grass?", options: ["A. grin", "B. green", "C. gren", "D. grein"], correctIndex: 1, points: 6 },
+      { type: "multiple_choice", text: "Which is the correct spelling for the color of the sun?", options: ["A. yellow", "B. yelow", "C. yallow", "D. yelloh"], correctIndex: 0, points: 6 },
+      { type: "short_answer", text: "Type the spelling for the color of the sky. Hint: b-l-u-e", correctAnswer: "blue", points: 6 },
+      { type: "short_answer", text: "Type the spelling for the color of fire trucks. Hint: r-e-d", correctAnswer: "red", points: 6 },
+      { type: "short_answer", text: "Type the spelling for the color of snow. Hint: w-h-i-t-e", correctAnswer: "white", points: 6 },
+    ] }] } },
+    2: { title: "2nd Grade Spelling: Number Words", description: "Spell numbers as words.", content: { title: "Number Words", subject: "Spelling", grade: "2nd Grade", instructions: "Read each clue and pick or type the correct spelling.", totalPoints: 40, sections: [{ title: "Numbers", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling for the word for 4?", options: ["A. for", "B. four", "C. fore", "D. fow"], correctIndex: 1, points: 8 },
+      { type: "multiple_choice", text: "Which is the correct spelling for the word for 7?", options: ["A. sevin", "B. sevon", "C. seven", "D. svn"], correctIndex: 2, points: 8 },
+      { type: "short_answer", text: "Type the word for the number 8.", correctAnswer: "eight", points: 8 },
+      { type: "short_answer", text: "Type the word for the number 10.", correctAnswer: "ten", points: 8 },
+      { type: "short_answer", text: "Type the word for the number 12.", correctAnswer: "twelve", points: 8 },
+    ] }] } },
+    3: { title: "3rd Grade Spelling: -ing Words", description: "Add -ing endings correctly.", content: { title: "-ing Words", subject: "Spelling", grade: "3rd Grade", instructions: "Read each clue and pick or type the correct spelling.", totalPoints: 50, sections: [{ title: "-ing Words", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of run + ing?", options: ["A. runing", "B. runneing", "C. running", "D. runng"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "Which is the correct spelling of swim + ing?", options: ["A. swiming", "B. swimming", "C. swimeing", "D. swiminng"], correctIndex: 1, points: 10 },
+      { type: "short_answer", text: "Add -ing to 'jump'. Type the new word:", correctAnswer: "jumping", points: 10 },
+      { type: "short_answer", text: "Add -ing to 'hop'. Type the new word:", correctAnswer: "hopping", points: 10 },
+      { type: "short_answer", text: "Add -ing to 'play'. Type the new word:", correctAnswer: "playing", points: 10 },
+    ] }] } },
+    4: { title: "4th Grade Spelling: Silent Letters", description: "Spell words with silent letters.", content: { title: "Silent Letters", subject: "Spelling", grade: "4th Grade", instructions: "Read each clue and pick or type the correct spelling.", totalPoints: 50, sections: [{ title: "Silent Letters", questions: [
+      { type: "multiple_choice", text: "Which is the correct spelling of the body part on your wrist?", options: ["A. nuckle", "B. knuckle", "C. nucle", "D. knucle"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is the correct spelling of the verb meaning 'to write'?", options: ["A. rite", "B. wrigt", "C. write", "D. writ"], correctIndex: 2, points: 10 },
+      { type: "short_answer", text: "Spell the word for a part of a tree, with a silent 'b' at the end. Hint: lam_", correctAnswer: "lamb", points: 10 },
+      { type: "short_answer", text: "Spell the word that means 'be aware', starts with a silent 'k'. Hint: _now", correctAnswer: "know", points: 10 },
+      { type: "short_answer", text: "Spell the body part where your foot is, has a silent 'k' at the start. Hint: _nee", correctAnswer: "knee", points: 10 },
+    ] }] } },
+    5: { title: "5th Grade Spelling: Homophones", description: "Spell words that sound the same.", content: { title: "Homophones", subject: "Spelling", grade: "5th Grade", instructions: "Read each clue and pick or type the correct spelling.", totalPoints: 50, sections: [{ title: "Homophones", questions: [
+      { type: "multiple_choice", text: "Which spelling means 'belonging to them'?", options: ["A. there", "B. their", "C. they're", "D. thier"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which spelling means 'a contraction of you are'?", options: ["A. your", "B. yor", "C. you're", "D. yore"], correctIndex: 2, points: 10 },
+      { type: "short_answer", text: "Spell the word for the number 2:", correctAnswer: "two", points: 10 },
+      { type: "short_answer", text: "Spell the word that means 'in addition', sounds like 'two':", correctAnswer: "too", points: 10 },
+      { type: "short_answer", text: "Spell the word for going somewhere, sounds like 'two':", correctAnswer: "to", points: 10 },
+    ] }] } },
+  },
+};
+
+// Two more class-wide bundles so morning content has more breadth.
+// Same lesson + 5-question shape as History/Science/Vocab so the
+// student work view's lesson-rendering already handles them.
+const GEOGRAPHY_CONTENT = {
+  title: "Continents and Oceans",
+  description: "Learn the 7 continents and 5 oceans.",
+  content: {
+    title: "Continents and Oceans",
+    subject: "Geography",
+    grade: "All Grades",
+    instructions: "Read the lesson, then answer the questions.",
+    totalPoints: 50,
+    lesson: "Earth has 7 large pieces of land called CONTINENTS: Africa, Antarctica, Asia, Australia, Europe, North America, and South America. Asia is the biggest continent. Antarctica is the coldest. Earth also has 5 OCEANS: the Pacific (the largest), the Atlantic, the Indian, the Southern (around Antarctica), and the Arctic (around the North Pole). Together, the oceans cover about three-quarters of Earth's surface — that's why our planet looks blue from space.",
+    sections: [{ title: "Geography Practice", questions: [
+      { type: "multiple_choice", text: "How many continents are there?", options: ["A. 5", "B. 6", "C. 7", "D. 9"], correctIndex: 2, points: 10, hint: "Count them in the lesson." },
+      { type: "multiple_choice", text: "Which is the LARGEST ocean?", options: ["A. Atlantic", "B. Pacific", "C. Indian", "D. Arctic"], correctIndex: 1, points: 10 },
+      { type: "multiple_choice", text: "Which is the COLDEST continent?", options: ["A. Africa", "B. Asia", "C. Antarctica", "D. Australia"], correctIndex: 2, points: 10 },
+      { type: "short_answer", text: "Roughly what fraction of Earth's surface is covered by oceans?", correctAnswer: "three quarters or 3/4 or 75%", points: 10, lines: 1 },
+      { type: "short_answer", text: "Name one continent that starts with the letter A.", correctAnswer: "africa or asia or australia or antarctica", points: 10, lines: 1 },
+    ] }],
+  },
+};
+
+const ART_CONTENT = {
+  title: "Primary and Secondary Colors",
+  description: "Learn how colors mix.",
+  content: {
+    title: "Primary and Secondary Colors",
+    subject: "Art",
+    grade: "All Grades",
+    instructions: "Read the lesson, then answer the questions.",
+    totalPoints: 50,
+    lesson: "PRIMARY colors are the three colors you cannot make by mixing other colors: RED, YELLOW, and BLUE. By mixing the primary colors together you make the SECONDARY colors. Red + Yellow = ORANGE. Yellow + Blue = GREEN. Blue + Red = PURPLE. White and black are not colors on the color wheel — they are used to make a color LIGHTER (white) or DARKER (black). Artists use these rules every time they paint.",
+    sections: [{ title: "Color Theory Practice", questions: [
+      { type: "multiple_choice", text: "Which is NOT a primary color?", options: ["A. Red", "B. Blue", "C. Green", "D. Yellow"], correctIndex: 2, points: 10, hint: "Green is what you GET when you mix two primaries." },
+      { type: "multiple_choice", text: "Red + Yellow = ?", options: ["A. Purple", "B. Green", "C. Orange", "D. Brown"], correctIndex: 2, points: 10 },
+      { type: "multiple_choice", text: "Blue + Red = ?", options: ["A. Green", "B. Orange", "C. Purple", "D. Pink"], correctIndex: 2, points: 10 },
+      { type: "short_answer", text: "What two primary colors mix to make GREEN?", correctAnswer: "yellow and blue", points: 10, lines: 1 },
+      { type: "short_answer", text: "What do artists add to make a color LIGHTER?", correctAnswer: "white", points: 10, lines: 1 },
+    ] }],
+  },
+};
+
 // POST /assignments/class/:classId/generate-today
 // One-click: creates grade-differentiated pre-made assignments for ALL subjects (reading, math, writing, spelling, SEL)
 // based on each student's grade level. Uses pre-written content — no AI required.
@@ -2508,39 +2707,59 @@ router.post("/class/:classId/generate-today", requireRole("teacher", "admin"), a
   // first Generate Today run, no assignment ever got created for their
   // new grade. Now we cover the full elementary range up front; grade
   // targeting still ensures only matching students see each row.
-  for (const subject of ["reading", "math", "writing", "spelling"] as const) {
-    for (const gradeNum of [1, 2, 3, 4, 5]) {
-      try {
-        const premade = PREMADE[subject]?.[gradeNum];
-        if (!premade) continue;
-        const existing: any = await db.prepare(
-          `SELECT id FROM assignments WHERE class_id::text = ? AND target_subject = ? AND target_grade_min = ? AND scheduled_date IS NULL LIMIT 1`
-        ).get(classId, subject, gradeNum);
-        if (existing) { created.push({ title: premade.title, skipped: true }); continue; }
-        const id = crypto.randomUUID();
-        await db.prepare(
-          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
-        ).run(
-          id, classId, req.user!.id, premade.title, premade.description,
-          JSON.stringify(premade.content), subject, gradeNum, gradeNum,
-          JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
-        );
-        created.push({ id, title: premade.title, grade: gradeNum, subject });
-      } catch (e: any) {
-        errors.push(`${subject} G${gradeNum}: ${e?.message}`);
+  // Two rounds: PREMADE (round 1) and EXTRA_PREMADE (round 2). Each
+  // round is title-tagged so the idempotency check per round doesn't
+  // collide with the other. Result: kids get 2× the morning content
+  // per subject (different questions in each round).
+  const rounds: Array<{ tag: string; bank: typeof PREMADE }> = [
+    { tag: "round1", bank: PREMADE },
+    { tag: "round2", bank: EXTRA_PREMADE },
+  ];
+
+  for (const round of rounds) {
+    for (const subject of ["reading", "math", "writing", "spelling"] as const) {
+      for (const gradeNum of [1, 2, 3, 4, 5]) {
+        try {
+          const premade = round.bank[subject]?.[gradeNum];
+          if (!premade) continue;
+          // Title-tag round 2 so it's idempotent independently of round 1
+          const taggedTitle = round.tag === "round2"
+            ? `${premade.title} — Round 2`
+            : premade.title;
+          const existing: any = await db.prepare(
+            `SELECT id FROM assignments
+             WHERE class_id::text = ? AND target_subject = ?
+               AND target_grade_min = ? AND scheduled_date IS NULL
+               AND title = ? LIMIT 1`
+          ).get(classId, subject, gradeNum, taggedTitle);
+          if (existing) { created.push({ title: taggedTitle, skipped: true }); continue; }
+          const id = crypto.randomUUID();
+          await db.prepare(
+            `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
+          ).run(
+            id, classId, req.user!.id, taggedTitle, premade.description,
+            JSON.stringify(premade.content), subject, gradeNum, gradeNum,
+            JSON.stringify([{ label: "Correctness", maxPoints: premade.content.totalPoints || 50 }])
+          );
+          created.push({ id, title: taggedTitle, grade: gradeNum, subject, round: round.tag });
+        } catch (e: any) {
+          errors.push(`${round.tag} ${subject} G${gradeNum}: ${e?.message}`);
+        }
       }
     }
   }
 
-  // Insert class-wide subjects (SEL, History, Science, Vocabulary) —
-  // each one premade and class-wide grades 1–5. Idempotent: skip if a
-  // class-wide always-on row for that subject already exists.
+  // Class-wide bundles. SEL/History/Science/Vocabulary stay; added
+  // Geography + Art for more subject breadth. Each one carries its own
+  // teaching lesson + 5 questions.
   const classWideSubjects: Array<{ key: string; bundle: { title: string; description: string; content: any }; rubric: number }> = [
     { key: "sel",        bundle: SEL_CONTENT,        rubric: 40 },
     { key: "history",    bundle: HISTORY_CONTENT,    rubric: 50 },
     { key: "science",    bundle: SCIENCE_CONTENT,    rubric: 50 },
     { key: "vocabulary", bundle: VOCABULARY_CONTENT, rubric: 50 },
+    { key: "geography",  bundle: GEOGRAPHY_CONTENT,  rubric: 50 },
+    { key: "art",        bundle: ART_CONTENT,        rubric: 50 },
   ];
 
   for (const cw of classWideSubjects) {

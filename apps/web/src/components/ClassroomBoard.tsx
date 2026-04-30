@@ -943,7 +943,7 @@ export default function ClassroomBoard() {
 
         {/* LEFT: Behavior Stars — "The Roster" */}
         <section style={{ ...card, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "10px 14px" }}>
-          <SectionLabel n="01" title="The Roster" kicker="Five stars earns a reward" />
+          <SectionLabel n="01" title="The Roster" kicker="Five stars earns McDonald's! 🍔" />
           {(() => {
             const n = board.students.length || 1;
             const cols = n <= 4 ? 2 : n <= 8 ? 4 : n <= 12 ? 4 : n <= 16 ? 4 : 5;
