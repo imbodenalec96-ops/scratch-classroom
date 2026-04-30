@@ -635,4 +635,13 @@ export const api = {
     }),
   clearStudentHelpAdmin: (studentId: string) =>
     request<{ cleared: number }>(`/extras/clear-help/${studentId}`, { method: "POST", body: "{}" }),
+  // Kiosk PINs — teacher-only PIN management
+  getStudentPins: (classId: string) =>
+    request<Array<{ id: string; name: string; kiosk_pin: string | null; avatar_emoji: string | null }>>(`/extras/classes/${classId}/pins`),
+  setStudentPin: (studentId: string, pin?: string) =>
+    request<{ ok: boolean; pin: string }>(`/extras/students/${studentId}/pin`, {
+      method: "PUT", body: JSON.stringify(pin ? { pin } : {}),
+    }),
+  generateMissingPins: (classId: string) =>
+    request<{ assigned: number }>(`/extras/classes/${classId}/pins/generate-missing`, { method: "POST", body: "{}" }),
 };

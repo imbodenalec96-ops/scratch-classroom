@@ -494,6 +494,21 @@ router.get("/classes/:classId/manual-progress", async (req: AuthRequest, res: Re
 // needed. Teacher/admin override works via store_override_until same
 // as the cashout block check.
 
+// Idempotent migration for the kiosk PIN column. Stored as plaintext
+// (not hashed) on purpose: teachers need to look up + share PINs with
+// kids who forget. The PIN is separate from the student-login password
+// so leaking the PIN doesn't compromise the account.
+let pinSchemaReady = false;
+async function ensurePinSchema() {
+  if (pinSchemaReady) return;
+  try { await db.exec(`ALTER TABLE users ADD COLUMN kiosk_pin TEXT`); } catch {}
+  pinSchemaReady = true;
+}
+function generatePin(): string {
+  // 4 digits, never starts with 0 so kids don't lose leading digits
+  return String(1000 + Math.floor(Math.random() * 9000));
+}
+
 router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
   // Teacher must initiate (this endpoint runs from the board view)
   if (req.user?.role !== "teacher" && req.user?.role !== "admin") {
@@ -506,14 +521,23 @@ router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: "studentId, pin, and itemId required" });
   }
   try {
-    // Verify the kid's PIN
+    await ensurePinSchema();
+    // Verify the kid's kiosk PIN. We try kiosk_pin first; for kids who
+    // haven't been assigned one yet, fall back to the legacy bcrypt
+    // password_hash so the system keeps working until every PIN is set.
     const bcrypt = await import("bcrypt");
     const userRow: any = await db.prepare(
-      "SELECT id::text AS id, name, password_hash, role FROM users WHERE id::text = ?"
+      "SELECT id::text AS id, name, password_hash, role, kiosk_pin FROM users WHERE id::text = ?"
     ).get(studentId);
     if (!userRow) return res.status(404).json({ error: "Student not found" });
     if (userRow.role !== "student") return res.status(400).json({ error: "Not a student" });
-    const valid = await bcrypt.default.compare(pin, userRow.password_hash);
+    let valid = false;
+    if (userRow.kiosk_pin) {
+      valid = String(userRow.kiosk_pin) === pin;
+    } else {
+      // No kiosk PIN set yet → accept the login password as a stop-gap
+      try { valid = await bcrypt.default.compare(pin, userRow.password_hash); } catch { valid = false; }
+    }
     if (!valid) return res.status(401).json({ error: "Wrong PIN" });
 
     // Pull the item + balance, then run the same redemption flow as
@@ -559,6 +583,65 @@ router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
   } catch (e: any) {
     console.error("[board-redeem]", e?.message || e);
     res.status(500).json({ error: e?.message || "redemption failed" });
+  }
+});
+
+// ── Kiosk PIN management (teacher-only) ──────────────────────────────
+// GET  /classes/:classId/pins → list every student's current PIN
+// PUT  /students/:studentId/pin body {pin?} → set PIN; if pin missing, generate random 4-digit
+// POST /classes/:classId/pins/generate-missing → assign random PIN to every kid that doesn't have one yet
+
+router.get("/classes/:classId/pins", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    await ensurePinSchema();
+    const rows: any[] = await db.prepare(
+      `SELECT u.id::text AS id, u.name, u.kiosk_pin, u.avatar_emoji
+       FROM users u
+       JOIN class_members cm ON cm.user_id::text = u.id::text
+       WHERE cm.class_id::text = ? AND u.role = 'student'
+       ORDER BY u.name`
+    ).all(req.params.classId);
+    res.json(rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
+router.put("/students/:studentId/pin", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const studentId = req.params.studentId;
+  let pin = String(req.body?.pin || "").replace(/\D/g, "");
+  if (!pin) pin = generatePin();
+  if (pin.length < 3 || pin.length > 8) {
+    return res.status(400).json({ error: "PIN must be 3-8 digits" });
+  }
+  try {
+    await ensurePinSchema();
+    await db.prepare(`UPDATE users SET kiosk_pin = ? WHERE id::text = ?`).run(pin, studentId);
+    res.json({ ok: true, pin });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
+router.post("/classes/:classId/pins/generate-missing", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    await ensurePinSchema();
+    const rows: any[] = await db.prepare(
+      `SELECT u.id::text AS id FROM users u
+       JOIN class_members cm ON cm.user_id::text = u.id::text
+       WHERE cm.class_id::text = ? AND u.role = 'student'
+         AND (u.kiosk_pin IS NULL OR u.kiosk_pin = '')`
+    ).all(req.params.classId);
+    let assigned = 0;
+    for (const r of rows) {
+      try {
+        await db.prepare(`UPDATE users SET kiosk_pin = ? WHERE id::text = ?`).run(generatePin(), r.id);
+        assigned += 1;
+      } catch {}
+    }
+    res.json({ assigned });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
   }
 });
 

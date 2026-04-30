@@ -38,7 +38,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -78,12 +78,12 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           </div>
           {!storeOnly && (
             <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12 }}>
-              {(["progress", "store"] as const).map((t) => (
+              {(["progress", "store", "pins"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
                   style={{
-                    padding: "8px 16px",
+                    padding: "8px 14px",
                     borderRadius: 8,
                     border: "none",
                     background: tab === t ? "linear-gradient(135deg, #b23a48, #d97706)" : "transparent",
@@ -92,7 +92,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                     cursor: "pointer",
                   }}
                 >
-                  {t === "progress" ? "📋 Progress" : "🛒 Store"}
+                  {t === "progress" ? "📋 Progress" : t === "store" ? "🛒 Store" : "🔑 PINs"}
                 </button>
               ))}
             </div>
@@ -115,6 +115,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           {tab === "progress" && <ProgressTab classId={classId} students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
+          {tab === "pins"     && <PinsTab classId={classId} />}
         </div>
       </div>
     </div>
@@ -241,6 +242,178 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── PINs tab — teacher manages each kid's 4-digit kiosk PIN ─────── */
+
+function PinsTab({ classId }: { classId: string }) {
+  const [list, setList] = useState<Array<{ id: string; name: string; kiosk_pin: string | null; avatar_emoji: string | null }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [reveal, setReveal] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const rows = await api.getStudentPins(classId);
+      setList(rows);
+    } catch {} finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, [classId]);
+
+  const generateAll = async () => {
+    if (!confirm("Generate a random PIN for every student who doesn't have one yet?")) return;
+    setBusyId("__all__");
+    try {
+      await api.generateMissingPins(classId);
+      await refresh();
+    } catch {}
+    setBusyId(null);
+  };
+  const regenerate = async (s: { id: string; name: string }) => {
+    setBusyId(s.id);
+    try {
+      const r = await api.setStudentPin(s.id);
+      setList((prev) => prev.map((row) => row.id === s.id ? { ...row, kiosk_pin: r.pin } : row));
+    } catch {}
+    setBusyId(null);
+  };
+  const saveCustom = async (s: { id: string }) => {
+    const pin = draft.replace(/\D/g, "");
+    if (pin.length < 3) { setEditing(null); return; }
+    setBusyId(s.id);
+    try {
+      const r = await api.setStudentPin(s.id, pin);
+      setList((prev) => prev.map((row) => row.id === s.id ? { ...row, kiosk_pin: r.pin } : row));
+      setEditing(null);
+      setDraft("");
+    } catch {}
+    setBusyId(null);
+  };
+
+  const missing = list.filter((s) => !s.kiosk_pin).length;
+
+  return (
+    <div>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 12, marginBottom: 18, flexWrap: "wrap",
+      }}>
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
+          Each student needs a 4-digit PIN to redeem from the board store.
+          {missing > 0 && <> <span style={{ color: "#fcd34d", fontWeight: 700 }}>{missing} student{missing===1?"":"s"} still need one.</span></>}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setReveal((v) => !v)}
+            style={{
+              padding: "8px 14px", borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "rgba(245,241,232,0.85)", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >{reveal ? "🙈 Hide" : "👁 Show PINs"}</button>
+          {missing > 0 && (
+            <button
+              onClick={generateAll}
+              disabled={busyId === "__all__"}
+              style={{
+                padding: "8px 14px", borderRadius: 999,
+                background: "linear-gradient(135deg,#b23a48,#d97706)",
+                border: "none", color: "white", fontSize: 12, fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >🎲 Generate Missing</button>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 12,
+        }}>
+          {list.map((s) => {
+            const initial = (s.name || "?")[0].toUpperCase();
+            const has = !!s.kiosk_pin;
+            const pin = s.kiosk_pin || "";
+            const isEditing = editing === s.id;
+            return (
+              <div key={s.id} style={{
+                background: "rgba(255,255,255,0.04)",
+                border: has ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(252,211,77,0.40)",
+                borderRadius: 14,
+                padding: "14px 16px",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 22, color: "white", fontWeight: 800, flexShrink: 0,
+                }}>{s.avatar_emoji || initial}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                  {isEditing ? (
+                    <input
+                      autoFocus type="password" inputMode="numeric" maxLength={6}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveCustom(s); if (e.key === "Escape") { setEditing(null); setDraft(""); } }}
+                      onBlur={() => saveCustom(s)}
+                      placeholder="••••"
+                      style={{
+                        width: "90%", marginTop: 4, padding: "4px 8px",
+                        fontSize: 18, fontVariantNumeric: "tabular-nums",
+                        letterSpacing: "0.2em", textAlign: "center",
+                        borderRadius: 6, border: "1px solid rgba(255,255,255,0.20)",
+                        background: "rgba(0,0,0,0.40)", color: "white", outline: "none",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      onClick={() => { if (has) { setEditing(s.id); setDraft(pin); } }}
+                      title={has ? "Click to change" : "Not set"}
+                      style={{
+                        fontSize: 22, fontWeight: 900,
+                        fontVariantNumeric: "tabular-nums", letterSpacing: "0.18em",
+                        color: has ? "#fde68a" : "rgba(245,241,232,0.35)",
+                        cursor: has ? "pointer" : "default",
+                      }}
+                    >{has ? (reveal ? pin : "••••") : "— not set —"}</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => regenerate(s)}
+                  disabled={busyId === s.id}
+                  title={has ? "Generate a new PIN" : "Assign a PIN"}
+                  style={{
+                    padding: "8px 12px", borderRadius: 8,
+                    background: has ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#b23a48,#d97706)",
+                    border: has ? "1px solid rgba(255,255,255,0.15)" : "none",
+                    color: "white", fontSize: 12, fontWeight: 800,
+                    cursor: "pointer", flexShrink: 0,
+                  }}
+                >{has ? "🎲 New" : "🎲 Set"}</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 18, padding: "10px 14px", background: "rgba(15,118,110,0.10)", borderRadius: 10, fontSize: 12, color: "rgba(167,243,208,0.9)" }}>
+        💡 Tip: Click "👁 Show PINs" to reveal them, write each on a card for the kid, then hide again. Tap any 4-digit PIN to type a custom one.
+      </div>
     </div>
   );
 }
