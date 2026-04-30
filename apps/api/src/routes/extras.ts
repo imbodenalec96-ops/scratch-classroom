@@ -208,7 +208,7 @@ router.get("/me/next-badge", async (req: AuthRequest, res: Response) => {
     const today: any = await db.prepare(
       `SELECT COUNT(*)::int AS n FROM submissions
        WHERE student_id::text = ?
-         AND COALESCE(submitted_at, created_at) >= (CURRENT_DATE - INTERVAL '1 day')`
+         AND submitted_at >= (CURRENT_DATE - INTERVAL '1 day')`
     ).get(userId).catch(() => ({ n: 0 }));
     const todayCount = Number(today?.n ?? 0);
 
@@ -248,7 +248,7 @@ router.get("/me/next-badge", async (req: AuthRequest, res: Response) => {
     let streakDays = 0;
     try {
       const dates: any[] = await db.prepare(
-        `SELECT DISTINCT SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
+        `SELECT DISTINCT SUBSTR((submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
          FROM submissions WHERE student_id::text = ?
          ORDER BY d DESC LIMIT 30`
       ).all(userId);
@@ -340,7 +340,7 @@ router.get("/me/streak", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   try {
     const dates: any[] = await db.prepare(
-      `SELECT DISTINCT SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
+      `SELECT DISTINCT SUBSTR((submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
        FROM submissions WHERE student_id::text = ?
        ORDER BY d DESC LIMIT 30`
     ).all(req.user.id);
@@ -418,7 +418,7 @@ router.get("/classes/:classId/helper-of-day", async (req: AuthRequest, res: Resp
        JOIN users u ON u.id::text = s.student_id::text
        JOIN class_members cm ON cm.user_id::text = u.id::text
        WHERE cm.class_id::text = ?
-         AND SUBSTR((COALESCE(s.submitted_at, s.created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) = ?
+         AND SUBSTR((s.submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) = ?
        GROUP BY u.id::text, u.name
        ORDER BY n DESC LIMIT 1`
     ).get(req.params.classId, day);

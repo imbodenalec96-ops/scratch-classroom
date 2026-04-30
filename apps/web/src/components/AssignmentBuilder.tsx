@@ -298,6 +298,15 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const [navCode, setNavCode] = useState("");
   const [navError, setNavError] = useState("");
   const [navLoading, setNavLoading] = useState(false);
+  // Admin bypass flow — when a kid is stuck on a question (or the
+  // teacher wants to skip), enter the school PIN to advance and keep
+  // whatever they've typed in the answer box. Mirrors the WorkScreen
+  // bypass on StudentDashboard so the experience is the same on both
+  // entry points.
+  const [showBypassModal, setShowBypassModal] = useState(false);
+  const [bypassCode, setBypassCode] = useState("");
+  const [bypassError, setBypassError] = useState("");
+  const [bypassLoading, setBypassLoading] = useState(false);
   const currentBlock = useCurrentBlock(classId);
 
   const stopPassageAudio = React.useCallback(() => {
@@ -874,6 +883,70 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   const apiBase = (import.meta as any)?.env?.VITE_API_BASE ||
     (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://scratch-classroom-api-td1x.vercel.app/api");
 
+  const handleBypass = async () => {
+    if (!bypassCode.trim()) return;
+    setBypassLoading(true);
+    setBypassError("");
+    try {
+      const token = localStorage.getItem("token") || "";
+      const r = await fetch(`${apiBase}/admin-settings/check-skip-code?code=${encodeURIComponent(bypassCode.trim())}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await r.json();
+      if (data.valid) {
+        // Save whatever the kid typed (or "__SKIPPED__" if empty),
+        // close the modal, and either advance or finalize submit. We
+        // pre-compute the new answers map so handleSubmit's later read
+        // doesn't see the stale state.
+        const existing = String(answers[currentQ] ?? "").trim();
+        const newAnswers = { ...answers, [currentQ]: existing || "__SKIPPED__" };
+        setAnswers(newAnswers);
+        setShowBypassModal(false);
+        setBypassCode("");
+        setFeedback("");
+        if (currentQ < total - 1) {
+          setCurrentQ(currentQ + 1);
+          stopPassageAudio();
+        } else {
+          // Final question: submit immediately, bypassing the AI check
+          if (!assignment) return;
+          setSubmitting(true);
+          const submittedId = assignment.id;
+          try { await api.submitAssignmentWithAnswers(submittedId, newAnswers); } catch {}
+          try { localStorage.removeItem(`assignment-draft-${submittedId}`); } catch {}
+          try { await api.autoAwardBadges(); } catch {}
+          setSubmitting(false);
+          // Pull the next pending one (same flow as handleSubmit's tail)
+          let remaining = todayList.filter((a: any) => a.id !== submittedId);
+          if (remaining.length === 0) {
+            try {
+              const cls = classes.length ? classes : await api.getClasses();
+              const results = await Promise.all(cls.map((c: any) => api.getPendingAssignments(c.id).catch(() => [])));
+              remaining = (results as any[][]).flat().filter((a: any) => a.id !== submittedId);
+            } catch {}
+          }
+          if (remaining.length > 0) {
+            const next = remaining[0];
+            setTodayList(remaining);
+            setAssignment(next);
+            setParsed(next.content ? (() => { try { return JSON.parse(next.content); } catch { return null; } })() : null);
+            setCurrentQ(0);
+            setAnswers({});
+          } else {
+            setAssignment(null);
+            setParsed(null);
+          }
+        }
+      } else {
+        setBypassError("Wrong code. Try again.");
+      }
+    } catch {
+      setBypassError("Could not verify. Check connection.");
+    } finally {
+      setBypassLoading(false);
+    }
+  };
+
   const handleNavJump = async () => {
     if (!navCode.trim()) return;
     setNavLoading(true);
@@ -1391,8 +1464,97 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                 border: `1px solid ${feedback.includes("not quite") ? "#fecaca" : "#fde68a"}`,
                 color: feedback.includes("not quite") ? "#991b1b" : "#92400e",
                 animation: "sfFadeUp .25s ease both",
+                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
               }}>
-                {feedback}
+                <span style={{ flex: 1 }}>{feedback}</span>
+                {/* Teacher bypass button — show when the answer was
+                    rejected. Opens a passcode modal that, on success,
+                    saves whatever the kid typed and advances. */}
+                {feedback.includes("not quite") && (
+                  <button
+                    onClick={() => { setBypassCode(""); setBypassError(""); setShowBypassModal(true); }}
+                    style={{
+                      padding: "8px 14px", borderRadius: 999,
+                      background: "white",
+                      border: "1px solid rgba(58,36,16,0.20)",
+                      color: "#5a4632",
+                      fontSize: 12, fontWeight: 800,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                    title="Teacher: enter PIN to bypass and save the typed answer"
+                  >
+                    🔑 Bypass
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Bypass modal */}
+            {showBypassModal && (
+              <div
+                onClick={(e) => { if (e.target === e.currentTarget) { setShowBypassModal(false); setBypassCode(""); setBypassError(""); } }}
+                style={{
+                  position: "fixed", inset: 0, zIndex: 9100,
+                  background: "rgba(58,36,16,0.45)", backdropFilter: "blur(6px)",
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}
+              >
+                <div style={{
+                  background: "linear-gradient(180deg, #fffaed 0%, #fef5dc 100%)",
+                  border: "1px solid rgba(58,36,16,0.12)",
+                  borderRadius: 22, padding: 28, width: "min(380px, 92vw)",
+                  boxShadow: "0 24px 64px rgba(58,36,16,0.35)",
+                  color: "#3a2410",
+                }}>
+                  <div style={{ fontSize: 24, marginBottom: 4 }}>🔑</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Bypass Question</div>
+                  <div style={{ fontSize: 12, color: "#7a5e3a", marginBottom: 18 }}>
+                    Enter the teacher PIN to bypass question {currentQ + 1}.
+                    {String(answers[currentQ] ?? "").trim()
+                      ? <> Their typed answer will be <strong style={{ color: "#0f766e" }}>saved</strong>.</>
+                      : <> The empty answer will be marked skipped.</>}
+                  </div>
+                  <input
+                    autoFocus type="password" inputMode="numeric"
+                    value={bypassCode}
+                    onChange={(e) => { setBypassCode(e.target.value); setBypassError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleBypass(); }}
+                    placeholder="Enter PIN…"
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      padding: "12px 14px", fontSize: 18,
+                      letterSpacing: "0.2em",
+                      borderRadius: 12,
+                      border: bypassError ? "1.5px solid #ef4444" : "1.5px solid rgba(58,36,16,0.20)",
+                      background: "white", color: "#3a2410",
+                      outline: "none", marginBottom: bypassError ? 8 : 16, textAlign: "center",
+                    }}
+                  />
+                  {bypassError && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 14 }}>{bypassError}</div>}
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => { setShowBypassModal(false); setBypassCode(""); setBypassError(""); }}
+                      style={{
+                        flex: 1, padding: "11px 0", borderRadius: 12,
+                        border: "1px solid rgba(58,36,16,0.18)",
+                        background: "transparent", color: "#5a4632",
+                        fontSize: 14, fontWeight: 700, cursor: "pointer",
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={handleBypass}
+                      disabled={bypassLoading || !bypassCode.trim()}
+                      style={{
+                        flex: 2, padding: "11px 0", borderRadius: 12, border: "none",
+                        background: "linear-gradient(135deg,#b23a48,#d97706)", color: "white",
+                        fontSize: 14, fontWeight: 800,
+                        cursor: bypassLoading || !bypassCode.trim() ? "default" : "pointer",
+                        opacity: bypassLoading || !bypassCode.trim() ? 0.5 : 1,
+                      }}
+                    >{bypassLoading ? "Checking…" : "Bypass"}</button>
+                  </div>
+                </div>
               </div>
             )}
 

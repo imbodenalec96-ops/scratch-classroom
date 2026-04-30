@@ -312,7 +312,7 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
          FROM submissions s
          JOIN assignments a ON a.id::text = s.assignment_id::text
          WHERE a.class_id::text = ?
-           AND SUBSTR((COALESCE(s.submitted_at, s.created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) = ?
+           AND SUBSTR((s.submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) = ?
          GROUP BY s.student_id`
       ).all(classId, todayStr) as any[];
       for (const r of subRows) subsByStudent.set(String(r.student_id), Number(r.n));
@@ -390,7 +390,7 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       const allSubs: any[] = await db.prepare(
         `SELECT s.student_id::text AS student_id,
                 a.title, a.target_subject, a.target_grade_min,
-                SUBSTR((COALESCE(s.submitted_at, s.created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS day
+                SUBSTR((s.submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) AS day
          FROM submissions s
          JOIN assignments a ON a.id::text = s.assignment_id::text
          WHERE a.class_id::text = ?`
@@ -497,12 +497,12 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
     let recent: any[] = [];
     try {
       recent = await db.prepare(
-        `SELECT u.name, a.title, COALESCE(s.submitted_at, s.created_at) AS ts
+        `SELECT u.name, a.title, s.submitted_at AS ts
          FROM submissions s
          JOIN assignments a ON a.id::text = s.assignment_id::text
          JOIN users u ON u.id::text = s.student_id::text
          WHERE a.class_id::text = ?
-         ORDER BY COALESCE(s.submitted_at, s.created_at) DESC
+         ORDER BY s.submitted_at DESC
          LIMIT 5`
       ).all(classId) as any[];
     } catch (e: any) {

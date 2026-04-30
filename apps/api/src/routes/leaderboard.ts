@@ -129,7 +129,7 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
       const today: any = await db.prepare(
         `SELECT COUNT(*)::int AS n FROM submissions
          WHERE student_id::text = ?
-           AND COALESCE(submitted_at, created_at) >= (CURRENT_DATE - INTERVAL '1 day')`
+           AND submitted_at >= (CURRENT_DATE - INTERVAL '1 day')`
       ).get(userId);
       todayCount = Number(today?.n ?? 0);
     } catch {}
@@ -192,7 +192,7 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     let earlyBird = false, nightOwl = false, weekendWarrior = false, comeback = false;
     try {
       const stamps: any[] = await db.prepare(
-        `SELECT COALESCE(submitted_at, created_at)::text AS ts
+        `SELECT submitted_at::text AS ts
          FROM submissions WHERE student_id::text = ?
          ORDER BY ts ASC`
       ).all(userId);
@@ -217,7 +217,7 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     let streakDays = 0;
     try {
       const dates: any[] = await db.prepare(
-        `SELECT DISTINCT SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
+        `SELECT DISTINCT SUBSTR((submitted_at::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
          FROM submissions WHERE student_id::text = ?
          ORDER BY d DESC LIMIT 14`
       ).all(userId);

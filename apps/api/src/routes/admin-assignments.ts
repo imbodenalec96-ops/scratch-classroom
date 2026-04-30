@@ -1510,7 +1510,7 @@ router.get("/student-submissions", async (req, res) => {
     if (!u) return res.json({ error: `Student '${name}' not found` });
     const rows: any[] = await db.prepare(
       `SELECT a.id::text AS aid, a.title, a.target_subject, a.target_grade_min,
-              COALESCE(s.submitted_at, s.created_at)::text AS ts
+              s.submitted_at::text AS ts
        FROM submissions s
        JOIN assignments a ON a.id::text = s.assignment_id::text
        WHERE s.student_id::text = ?
