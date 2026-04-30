@@ -494,7 +494,7 @@ export default function ClassroomBoard() {
       transform: `translate(-50%, -50%) scale(${scale})`,
       transformOrigin: "center center",
       overflow: "hidden", display: "grid",
-      gridTemplateRows: "72px 96px 1fr 56px",
+      gridTemplateRows: "72px 156px 1fr 56px",
       gap: 8, padding: "12px 16px 12px 16px",
       color: "white", fontFamily: "'Inter', system-ui, sans-serif",
       background: bgUrl ? `url(${bgUrl}) center/cover no-repeat` : bg,
@@ -866,29 +866,67 @@ export default function ClassroomBoard() {
             textTransform: "uppercase", letterSpacing: "0.28em", marginBottom: 3,
           }}>The Hour</div>
           {currentBlock ? (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
-              <span style={{
-                fontFamily: serif, fontSize: 36, fontWeight: 600,
-                letterSpacing: "-0.02em", color: "#f5f1e8", lineHeight: 1,
-              }}>{currentBlock.label || currentBlock.subject}</span>
-              <span style={{
-                fontFamily: mono, fontSize: 15, color: "rgba(245,241,232,0.55)",
-                fontVariantNumeric: "tabular-nums",
-              }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
-              {currentBlock.is_break && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
                 <span style={{
-                  fontFamily: serif, fontStyle: "italic", fontSize: 12, fontWeight: 500,
-                  padding: "2px 10px", borderRadius: 2,
-                  background: "rgba(42,111,106,0.25)", color: "#7dd3c5",
-                  border: "1px solid rgba(42,111,106,0.45)",
-                }}>Break</span>
-              )}
-              {nextBlock && (
+                  fontFamily: serif, fontSize: 56, fontWeight: 600,
+                  letterSpacing: "-0.02em", color: "#f5f1e8", lineHeight: 1,
+                }}>{currentBlock.label || currentBlock.subject}</span>
                 <span style={{
-                  fontFamily: serif, fontStyle: "italic", fontSize: 12,
-                  color: "rgba(245,241,232,0.45)",
-                }}>then <span style={{ color: "rgba(245,241,232,0.75)", fontStyle: "normal", fontWeight: 500 }}>{nextBlock.block.label}</span> <span style={{ fontFamily: mono }}>{nextBlock.block.start_time}</span></span>
-              )}
+                  fontFamily: mono, fontSize: 20, color: "rgba(245,241,232,0.7)",
+                  fontVariantNumeric: "tabular-nums",
+                }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
+                {currentBlock.is_break && (
+                  <span style={{
+                    fontFamily: serif, fontStyle: "italic", fontSize: 14, fontWeight: 500,
+                    padding: "3px 12px", borderRadius: 3,
+                    background: "rgba(42,111,106,0.25)", color: "#7dd3c5",
+                    border: "1px solid rgba(42,111,106,0.45)",
+                  }}>Break</span>
+                )}
+              </div>
+              {/* Up next strip — show the next 3 blocks so kids can see
+                  what's coming for the rest of the day, not just the
+                  immediate next block. */}
+              {(() => {
+                const upcoming: ScheduleBlock[] = [];
+                if (Array.isArray(schedule) && currentBlock) {
+                  const idx = schedule.findIndex((b) => b.start_time === currentBlock.start_time && b.end_time === currentBlock.end_time);
+                  if (idx >= 0) {
+                    for (let i = idx + 1; i < schedule.length && upcoming.length < 3; i++) {
+                      upcoming.push(schedule[i]);
+                    }
+                  }
+                }
+                if (upcoming.length === 0) return null;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{
+                      fontFamily: serif, fontStyle: "italic", fontSize: 12,
+                      color: "rgba(245,241,232,0.45)", letterSpacing: "0.16em",
+                      textTransform: "uppercase", fontWeight: 600,
+                    }}>Up Next</span>
+                    {upcoming.map((b, i) => (
+                      <span key={i} style={{
+                        display: "inline-flex", alignItems: "baseline", gap: 6,
+                        padding: "4px 12px", borderRadius: 3,
+                        background: "rgba(255,255,255,0.05)",
+                        border: `1px solid ${g(0.10)}`,
+                      }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 12, fontWeight: 600,
+                          color: "rgba(245,241,232,0.85)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}>{b.start_time}</span>
+                        <span style={{
+                          fontFamily: serif, fontSize: 14, fontWeight: 500,
+                          color: "#f5f1e8", letterSpacing: "-0.01em",
+                        }}>{b.label || b.subject}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <span style={{

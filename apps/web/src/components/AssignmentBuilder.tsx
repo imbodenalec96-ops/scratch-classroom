@@ -1242,9 +1242,13 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               })()}
 
               {/* See the lesson — opens an inline modal with the lesson text
-                  that was generated WITH this assignment, so it's perfectly
-                  on-topic. No new tab, no lost progress — just an X to close. */}
-              {parsed?.lesson && (
+                  for this assignment. Falls back to instructions + the
+                  first section's reading passage when an explicit `lesson`
+                  field isn't set, so EVERY assignment (PREMADE, EXTRA,
+                  BONUS, AI-generated full-week) shows the same lesson UI.
+                  Logic mirrored on the modal render below so the two stay
+                  in sync. */}
+              {(parsed?.lesson || parsed?.instructions || parsed?.sections?.[0]?.passage) && (
                 <button
                   onClick={() => setShowLesson(true)}
                   style={{
@@ -1436,7 +1440,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
       {/* In-app lesson modal — shows the AI lesson for this assignment so
           the kid can review without leaving the page or losing answers.
           Click X or outside to close. */}
-      {showLesson && parsed?.lesson && (
+      {showLesson && (parsed?.lesson || parsed?.instructions || parsed?.sections?.[0]?.passage) && (
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 9100,
@@ -1494,7 +1498,12 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
               fontFamily: "'Source Serif Pro', Georgia, serif",
               whiteSpace: "pre-wrap",
             }}>
-              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
+              {(() => {
+                const passage = parsed?.sections?.[0]?.passage;
+                const lesson = parsed?.lesson
+                  || [parsed?.instructions, passage].filter(Boolean).join("\n\n");
+                return <ClickableText text={lesson} contextForDefine={lesson} />;
+              })()}
             </div>
             <div style={{ marginTop: 18, padding: "10px 14px", background: "rgba(15,118,110,0.08)", borderRadius: 12, fontSize: 12, color: "#0f766e", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
               <span>💡</span>

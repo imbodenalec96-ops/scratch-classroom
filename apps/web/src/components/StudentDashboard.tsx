@@ -1894,8 +1894,11 @@ function WorkScreen({
             — {q.sectionTitle} —
           </div>
         )}
-        {/* ── Lesson — teaches the concept before any questions ── */}
-        {parsed?.lesson && (
+        {/* ── Lesson — teaches the concept before any questions. Falls
+            back to instructions + first section's reading passage so
+            every assignment renders a teaching preface, matching the
+            full-week AI-generated layout. ── */}
+        {(parsed?.lesson || parsed?.instructions || parsed?.sections?.[0]?.passage) && (
           <div
             className="rounded-2xl p-6 animate-fade-in"
             style={{
@@ -1918,7 +1921,12 @@ function WorkScreen({
                 whiteSpace: "pre-wrap",
               }}
             >
-              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
+              {(() => {
+                const passage = parsed?.sections?.[0]?.passage;
+                const lessonText = parsed?.lesson
+                  || [parsed?.instructions, passage].filter(Boolean).join("\n\n");
+                return <ClickableText text={lessonText} contextForDefine={lessonText} />;
+              })()}
             </p>
           </div>
         )}
@@ -2130,8 +2138,10 @@ function WorkScreen({
               )}
 
               {/* See-the-lesson button — opens an in-app modal with the
-                  AI lesson for this assignment. No new tab; X to close. */}
-              {parsed?.lesson && (
+                  AI lesson for this assignment. Same fallback chain as
+                  the inline lesson block so EVERY assignment gets the
+                  button. ── */}
+              {(parsed?.lesson || parsed?.instructions || parsed?.sections?.[0]?.passage) && (
                 <button
                   onClick={() => setShowLesson(true)}
                   style={{
@@ -2426,7 +2436,7 @@ function WorkScreen({
 
       {/* In-app lesson modal — shows the AI lesson for this assignment so
           the kid can review without leaving the page or losing answers. */}
-      {showLesson && parsed?.lesson && (
+      {showLesson && (parsed?.lesson || parsed?.instructions || parsed?.sections?.[0]?.passage) && (
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 9100,
@@ -2471,7 +2481,12 @@ function WorkScreen({
               >✕</button>
             </div>
             <div style={{ fontSize: 16, lineHeight: 1.75, color: "#3a2410", fontFamily: "'Source Serif Pro', Georgia, serif", whiteSpace: "pre-wrap" }}>
-              <ClickableText text={parsed.lesson} contextForDefine={parsed.lesson} />
+              {(() => {
+                const passage = parsed?.sections?.[0]?.passage;
+                const lessonText = parsed?.lesson
+                  || [parsed?.instructions, passage].filter(Boolean).join("\n\n");
+                return <ClickableText text={lessonText} contextForDefine={lessonText} />;
+              })()}
             </div>
             <div style={{ marginTop: 18, padding: "10px 14px", background: "rgba(15,118,110,0.08)", borderRadius: 12, fontSize: 12, color: "#0f766e", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
               <span>💡</span>
