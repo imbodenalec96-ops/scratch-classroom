@@ -1461,17 +1461,20 @@ export default function ClassroomBoard() {
                       minWidth: 0,
                     }}>
                       <div style={{
-                        fontFamily: serif, fontSize: 22, fontWeight: 800,
+                        // Sans-serif here — the serif we use elsewhere
+                        // breaks apart at the board's fractional scale
+                        // (1920px → 70-80% browser scaling chops glyph
+                        // stems on short words like "Art" / "P.E"). Sans
+                        // is much more robust at sub-pixel sizes.
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        fontSize: 22, fontWeight: 800,
                         color: gc.text,
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                         lineHeight: 1.1,
-                        // Drop the negative letter-spacing — when the board's
-                        // 1920px design is scaled down to fit a small browser
-                        // window, sub-pixel rendering with -0.01em was eating
-                        // glyph stems on short words like "Art" / "PE".
-                        letterSpacing: "0.005em",
-                        textRendering: "geometricPrecision" as any,
+                        letterSpacing: "0.01em",
+                        textRendering: "optimizeLegibility" as any,
                         WebkitFontSmoothing: "antialiased",
+                        MozOsxFontSmoothing: "grayscale",
                         textShadow: "0 1px 0 rgba(0,0,0,0.25)",
                       }}>
                         {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
