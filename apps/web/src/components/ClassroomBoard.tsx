@@ -1313,27 +1313,26 @@ export default function ClassroomBoard() {
                       ))}
                     </div>
 
-                    {/* 🍔 EARNED McDONALD'S! pill — only when full stars.
-                        Day-aware text: "Today!" on Saturday, "Tomorrow!"
-                        on Friday, "Saturday!" Mon–Thu. Sunday is post-
-                        reward — pill stays hidden (and the auto-clear
-                        effect below resets stars on Sunday's first load
-                        so the badge doesn't linger). */}
+                    {/* 🍔 EARNED McDONALD'S! pill — shown when full stars.
+                        Reads the date stored when the teacher marked the
+                        kid (board_user_data.mcdonalds_for) and renders a
+                        friendly label ("Today!"/"Tomorrow!"/"Saturday!"/
+                        "Sat May 3"). When the date passes, the pill text
+                        switches to "Today!" briefly until the daily
+                        auto-clear or manual reset. */}
                     {isFull && (() => {
-                      // Pacific day-of-week. 0=Sun, 6=Sat
-                      const pacific = new Date(Date.now() - 7 * 3600_000);
-                      const dow = pacific.getUTCDay();
-                      // On Sunday, suppress the pill entirely (auto-clear
-                      // effect will zero the stars on this load).
-                      if (dow === 0) return null;
-                      const labels: Record<number, string> = {
-                        1: "Saturday!", // Mon → 5 days
-                        2: "Saturday!", // Tue → 4 days
-                        3: "Saturday!", // Wed → 3 days
-                        4: "Saturday!", // Thu → 2 days
-                        5: "Tomorrow!", // Fri → 1 day
-                        6: "Today!",    // Sat → 0 days
-                      };
+                      const mcd: string | undefined = (s as any).mcdonalds_for;
+                      let label = "Earned!";
+                      if (mcd) {
+                        const today = new Date(Date.now() - 7 * 3600_000);
+                        today.setUTCHours(0, 0, 0, 0);
+                        const target = new Date(mcd + "T00:00:00Z");
+                        const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+                        if (diff <= 0) label = "Today!";
+                        else if (diff === 1) label = "Tomorrow!";
+                        else if (diff < 7) label = target.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }) + "!";
+                        else label = target.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+                      }
                       return (
                         <div style={{
                           marginTop: 4,
@@ -1348,7 +1347,7 @@ export default function ClassroomBoard() {
                           animation: "starGlow 1.6s ease-in-out infinite",
                           whiteSpace: "nowrap",
                         }}>
-                          🍔 McDonald's {labels[dow]}
+                          🍔 McDonald's {label}
                         </div>
                       );
                     })()}

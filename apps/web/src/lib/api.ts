@@ -475,6 +475,11 @@ export const api = {
       recent: Array<{ name: string; title: string; ts: string }>;
       byStudent: Record<string, { open: number; done: number; total: number; pct: number }>;
     }>(`/board/classes/${classId}/live-progress`),
+  bumpStudentStarsWithDate: (studentId: string, delta: number, mcdonaldsDate?: string) =>
+    request<{ id: string; behavior_stars: number; reward_count: number; rewardFired: boolean; mcdonalds_for: string | null }>(`/board/students/${studentId}/stars`, {
+      method: "POST",
+      body: JSON.stringify(mcdonaldsDate ? { delta, mcdonaldsDate } : { delta }),
+    }),
   bumpStudentStars: (studentId: string, delta: number) =>
     request<any>(`/board/students/${studentId}/stars`, { method: "POST", body: JSON.stringify({ delta }) }),
   setStudentLevel: (studentId: string, level: number) =>

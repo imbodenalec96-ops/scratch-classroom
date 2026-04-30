@@ -68,12 +68,16 @@ router.use(async (_req, _res, next) => { await ensureBoardSchema(); next(); });
 router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => {
   const classId = req.params.classId;
   try {
+    // Idempotent migration for the McDonald's-day column
+    try { await db.exec(`ALTER TABLE board_user_data ADD COLUMN mcdonalds_for TEXT`); } catch {}
+
     const students = await db.prepare(
       `SELECT u.id, u.name, u.avatar_url, u.avatar_emoji, u.specials_grade,
               COALESCE(u.dojo_points, 0)      AS dojo_points,
               COALESCE(bd.behavior_stars, 0) AS behavior_stars,
               COALESCE(bd.reward_count, 0)    AS reward_count,
-              COALESCE(bd.level, 1)           AS level
+              COALESCE(bd.level, 1)           AS level,
+              bd.mcdonalds_for                AS mcdonalds_for
        FROM users u
        JOIN class_members cm ON u.id = cm.user_id
        LEFT JOIN board_user_data bd ON bd.user_id = u.id::text
@@ -100,12 +104,22 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
   }
 });
 
-// ── Behavior stars: bump by delta, rollover at 10 → reward + reset ──
+// ── Behavior stars: bump by delta. When stars hit 5, the kid has
+// "earned McDonald's" — body can include mcdonaldsDate (YYYY-MM-DD)
+// to record what day they're actually getting the reward. The 🍔
+// pill on the roster card displays that date. Stars stay at 5 until
+// the date passes (auto-cleared by /admin/clear-mcdonalds-week or
+// the per-kid Reset button).
 router.post("/students/:id/stars", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const id = req.params.id;
   const delta = Math.trunc(Number(req.body?.delta ?? 0));
+  const mcdonaldsDate = typeof req.body?.mcdonaldsDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.mcdonaldsDate)
+    ? req.body.mcdonaldsDate : null;
   if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: "delta required" });
   try {
+    // Make sure the column exists (idempotent)
+    try { await db.exec(`ALTER TABLE board_user_data ADD COLUMN mcdonalds_for TEXT`); } catch {}
+
     const user: any = await db.prepare(`SELECT id FROM users WHERE id = ?::uuid AND role = 'student'`).get(id);
     if (!user) return res.status(404).json({ error: "student not found" });
 
@@ -113,26 +127,43 @@ router.post("/students/:id/stars", requireRole("teacher", "admin"), async (req: 
       `INSERT INTO board_user_data (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING`
     ).run(id);
     const row: any = await db.prepare(
-      `SELECT behavior_stars, reward_count FROM board_user_data WHERE user_id = ?`
+      `SELECT behavior_stars, reward_count, mcdonalds_for FROM board_user_data WHERE user_id = ?`
     ).get(id);
 
-    let stars = Math.max(0, (row?.behavior_stars || 0) + delta);
+    let stars = Math.max(0, Math.min(5, (row?.behavior_stars || 0) + delta));
     let rewards = row?.reward_count || 0;
+    let mcdFor: string | null = row?.mcdonalds_for || null;
     let rewardFired = false;
-    if (stars >= 5) {
+
+    // Crossing into 5 → record the McDonald's date. If teacher didn't
+    // pick one, default to next Saturday (Pacific).
+    if (stars === 5 && (row?.behavior_stars || 0) < 5) {
       rewardFired = true;
       rewards = rewards + 1;
-      stars = 0;
+      mcdFor = mcdonaldsDate || nextSaturdayPacific();
     }
-    await db.prepare(
-      `UPDATE board_user_data SET behavior_stars = ?, reward_count = ? WHERE user_id = ?`
-    ).run(stars, rewards, id);
+    // Dropping below 5 → clear the date
+    if (stars < 5 && (row?.behavior_stars || 0) >= 5) {
+      mcdFor = null;
+    }
 
-    res.json({ id, behavior_stars: stars, reward_count: rewards, rewardFired });
+    await db.prepare(
+      `UPDATE board_user_data SET behavior_stars = ?, reward_count = ?, mcdonalds_for = ? WHERE user_id = ?`
+    ).run(stars, rewards, mcdFor, id);
+
+    res.json({ id, behavior_stars: stars, reward_count: rewards, rewardFired, mcdonalds_for: mcdFor });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "stars update failed" });
   }
 });
+
+function nextSaturdayPacific(): string {
+  const d = new Date(Date.now() - 7 * 3600_000);
+  const dow = d.getUTCDay();
+  const offset = dow === 6 ? 0 : ((6 - dow + 7) % 7) || 7;
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
 
 // ── Level (1..5) ──
 router.post("/students/:id/level", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {

@@ -8,9 +8,13 @@
 //      picks an item, redeems. PIN check goes to the server; teacher
 //      stays in control of when the store is open.
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import PinPad from "./PinPad.tsx";
+
+// Lazy-load the existing board settings page so we don't pull its
+// chunk into the BoardConsole bundle until the teacher opens that tab.
+const TeacherBoardSettings = lazy(() => import("./TeacherBoardSettings.tsx"));
 
 /** Open a print-ready sheet of "Hi {Name}, your PIN is {1234}" cards.
  *  3-up grid, big readable PIN, one card per kid. New window so the
@@ -55,6 +59,20 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
+/** YYYY-MM-DD → friendly label like "Today", "Tomorrow", "Saturday",
+ *  or "Sat May 3" for further-out dates. Used by the McDonald's pill
+ *  + the StarsTab toast. */
+export function formatMcdDate(iso: string): string {
+  const today = new Date(Date.now() - 7 * 3600_000);
+  today.setUTCHours(0, 0, 0, 0);
+  const target = new Date(iso + "T00:00:00Z");
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays <= 0) return "Today!";
+  if (diffDays === 1) return "Tomorrow!";
+  if (diffDays < 7) return target.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }) + "!";
+  return target.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 type Student = {
   id: string;
   name: string;
@@ -82,7 +100,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -122,7 +140,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           </div>
           {!storeOnly && (
             <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
-              {(["progress", "points", "stars", "spinner", "groups", "store", "pins"] as const).map((t) => (
+              {(["progress", "points", "stars", "spinner", "groups", "store", "pins", "settings"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -142,7 +160,8 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                     : t === "spinner" ? "🎲 Spinner"
                     : t === "groups" ? "👥 Groups"
                     : t === "store" ? "🛒 Store"
-                    : "🔑 PINs"}
+                    : t === "pins" ? "🔑 PINs"
+                    : "⚙️ Settings"}
                 </button>
               ))}
             </div>
@@ -170,6 +189,11 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           {tab === "groups"   && <GroupsTab students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
           {tab === "pins"     && <PinsTab classId={classId} />}
+          {tab === "settings" && (
+            <Suspense fallback={<div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>}>
+              <TeacherBoardSettings />
+            </Suspense>
+          )}
         </div>
       </div>
     </div>
@@ -348,21 +372,41 @@ function StarsTab({ students }: { students: Student[] }) {
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // McDonald's date prompt — pops when a kid crosses into 5 stars
+  const [datePrompt, setDatePrompt] = useState<{ student: Student; delta: number; date: string } | null>(null);
 
-  const bump = async (s: Student, delta: number) => {
-    const cur = stars[s.id] || 0;
-    const next = Math.max(0, Math.min(5, cur + delta));
-    if (next === cur) return;
+  const nextSaturday = () => {
+    const d = new Date(Date.now() - 7 * 3600_000);
+    const dow = d.getUTCDay();
+    const offset = dow === 6 ? 0 : ((6 - dow + 7) % 7) || 7;
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const doBump = async (s: Student, delta: number, date?: string) => {
     setBusyId(s.id);
     try {
-      const r: any = await api.bumpStudentStars(s.id, delta);
-      setStars((prev) => ({ ...prev, [s.id]: typeof r?.behavior_stars === "number" ? r.behavior_stars : next }));
-      if (next === 5 && cur < 5) {
-        setFlash(`🍔 ${s.name.split(" ")[0]} earned McDonald's!`);
-        setTimeout(() => setFlash(null), 2400);
+      const r: any = await api.bumpStudentStarsWithDate(s.id, delta, date);
+      setStars((prev) => ({ ...prev, [s.id]: typeof r?.behavior_stars === "number" ? r.behavior_stars : ((stars[s.id] || 0) + delta) }));
+      if (r?.behavior_stars === 5 && r?.mcdonalds_for) {
+        const friendly = formatMcdDate(r.mcdonalds_for);
+        setFlash(`🍔 ${s.name.split(" ")[0]} → McDonald's ${friendly}!`);
+        setTimeout(() => setFlash(null), 2800);
       }
     } catch {}
     setBusyId(null);
+  };
+
+  const bump = (s: Student, delta: number) => {
+    const cur = stars[s.id] || 0;
+    const next = Math.max(0, Math.min(5, cur + delta));
+    if (next === cur) return;
+    if (next === 5 && cur < 5) {
+      // Prompt for the McDonald's date before saving
+      setDatePrompt({ student: s, delta, date: nextSaturday() });
+      return;
+    }
+    doBump(s, delta);
   };
 
   const reset = async (s: Student) => {
@@ -380,8 +424,87 @@ function StarsTab({ students }: { students: Student[] }) {
   return (
     <div>
       <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)", marginBottom: 18 }}>
-        Tap stars to add or remove. <strong style={{ color: "#fde68a" }}>5 stars = McDonald's earned!</strong> 🍔 pill shows on their roster card. Tap 🍔 to reset stars after handing out the reward.
+        Tap stars to add or remove. <strong style={{ color: "#fde68a" }}>Hit 5 → asks what day they get McDonald's.</strong> The 🍔 pill on the roster card shows that day. After they get it, tap 🍔 to reset.
       </div>
+
+      {/* McDonald's date prompt — when a kid crosses into 5 stars,
+          ask the teacher what day the reward is for. Defaults to next
+          Saturday but they can pick anything. */}
+      {datePrompt && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setDatePrompt(null); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 220,
+            background: "rgba(0,0,0,0.60)", backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div style={{
+            background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
+            border: "1px solid rgba(217,119,6,0.40)",
+            borderRadius: 22, padding: 28,
+            width: "min(420px, 92vw)",
+            color: "white",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 4 }}>🍔</div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "#fde68a", marginBottom: 4 }}>
+              McDonald's Earned
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 18 }}>
+              When does {datePrompt.student.name.split(" ")[0]} get it?
+            </div>
+            <input
+              type="date"
+              value={datePrompt.date}
+              min={new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10)}
+              onChange={(e) => setDatePrompt({ ...datePrompt, date: e.target.value })}
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "14px 16px",
+                fontSize: 22, fontWeight: 800,
+                textAlign: "center",
+                borderRadius: 12,
+                border: "1.5px solid rgba(217,119,6,0.40)",
+                background: "rgba(0,0,0,0.40)",
+                color: "white", outline: "none",
+                marginBottom: 14,
+                colorScheme: "dark",
+              }}
+            />
+            <div style={{ fontSize: 12, color: "rgba(245,241,232,0.55)", marginBottom: 18 }}>
+              Default is next Saturday. Pick any future day.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setDatePrompt(null)}
+                style={{
+                  flex: 1, padding: "12px 0", borderRadius: 12,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "rgba(245,241,232,0.70)", fontWeight: 700, cursor: "pointer",
+                }}
+              >Cancel</button>
+              <button
+                onClick={() => {
+                  const dp = datePrompt;
+                  setDatePrompt(null);
+                  doBump(dp.student, dp.delta, dp.date);
+                }}
+                style={{
+                  flex: 2, padding: "12px 0", borderRadius: 12,
+                  background: "linear-gradient(135deg,#dc2626,#f97316)",
+                  border: "none", color: "white", fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 6px 16px rgba(220,38,38,0.40)",
+                }}
+              >🍔 Lock it in</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {flash && (
         <div style={{
