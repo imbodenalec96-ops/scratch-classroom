@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
+import PinPad from "./PinPad.tsx";
 
 type Student = {
   id: string;
@@ -38,7 +39,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -77,13 +78,13 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
             </div>
           </div>
           {!storeOnly && (
-            <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12 }}>
-              {(["progress", "store", "pins"] as const).map((t) => (
+            <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
+              {(["progress", "points", "store", "pins"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
                   style={{
-                    padding: "8px 14px",
+                    padding: "8px 12px",
                     borderRadius: 8,
                     border: "none",
                     background: tab === t ? "linear-gradient(135deg, #b23a48, #d97706)" : "transparent",
@@ -92,7 +93,10 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                     cursor: "pointer",
                   }}
                 >
-                  {t === "progress" ? "📋 Progress" : t === "store" ? "🛒 Store" : "🔑 PINs"}
+                  {t === "progress" ? "📋 Progress"
+                    : t === "points" ? "🪙 Points"
+                    : t === "store" ? "🛒 Store"
+                    : "🔑 PINs"}
                 </button>
               ))}
             </div>
@@ -114,6 +118,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
 
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           {tab === "progress" && <ProgressTab classId={classId} students={students} />}
+          {tab === "points"   && <PointsTab classId={classId} students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
           {tab === "pins"     && <PinsTab classId={classId} />}
         </div>
@@ -236,6 +241,153 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
                       cursor: "pointer",
                     }}
                   >+</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Points tab — hand out (or take away) dojo points per kid ────── */
+// Quick deltas: −5, −1, +1, +5, +10. Live balance reads from the
+// leaderboard so teachers see updates immediately. Bulk action lets
+// the teacher reward the whole class at once.
+
+function PointsTab({ classId, students }: { classId: string; students: Student[] }) {
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const loadBalances = async () => {
+    try {
+      const lb: any[] = await api.getLeaderboard();
+      const next: Record<string, number> = {};
+      for (const r of lb) next[r.user_id] = Number(r.dojo_points) || 0;
+      setBalances(next);
+    } catch {} finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadBalances(); }, []);
+
+  const adjust = async (s: Student, delta: number) => {
+    setBusyId(s.id);
+    try {
+      const r = await api.adjustStudentPoints(s.id, delta);
+      setBalances((b) => ({ ...b, [s.id]: r.dojo_points }));
+      setFlash(`${delta > 0 ? "+" : ""}${delta} → ${s.name.split(" ")[0]}`);
+      setTimeout(() => setFlash(null), 1200);
+    } catch (e: any) {
+      setFlash(`Error: ${e?.message || "failed"}`);
+      setTimeout(() => setFlash(null), 2000);
+    }
+    setBusyId(null);
+  };
+
+  const bulkAdjust = async (delta: number) => {
+    if (!confirm(`${delta > 0 ? "Award" : "Remove"} ${Math.abs(delta)} pts ${delta > 0 ? "to" : "from"} every student?`)) return;
+    setBusyId("__bulk__");
+    try {
+      await api.adjustClassPoints(classId, delta);
+      await loadBalances();
+      setFlash(`${delta > 0 ? "+" : ""}${delta} → whole class`);
+      setTimeout(() => setFlash(null), 1500);
+    } catch {}
+    setBusyId(null);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
+          Tap a delta to award (or remove) points. Whole-class bulk on the right.
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[-1, 1, 5].map((d) => (
+            <button
+              key={d}
+              onClick={() => bulkAdjust(d)}
+              disabled={busyId === "__bulk__"}
+              style={{
+                padding: "8px 12px", borderRadius: 999,
+                background: d > 0 ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.12)",
+                border: d > 0 ? "1px solid rgba(34,197,94,0.40)" : "1px solid rgba(239,68,68,0.40)",
+                color: d > 0 ? "#86efac" : "#fca5a5",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >👥 {d > 0 ? "+" : ""}{d} all</button>
+          ))}
+        </div>
+      </div>
+
+      {flash && (
+        <div style={{
+          padding: "8px 14px", borderRadius: 10, marginBottom: 14,
+          background: flash.startsWith("Error")
+            ? "rgba(239,68,68,0.18)"
+            : "rgba(34,197,94,0.18)",
+          border: flash.startsWith("Error")
+            ? "1px solid rgba(239,68,68,0.4)"
+            : "1px solid rgba(34,197,94,0.4)",
+          color: flash.startsWith("Error") ? "#fca5a5" : "#bbf7d0",
+          fontWeight: 700, fontSize: 13,
+        }}>{flash}</div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 12,
+        }}>
+          {students.map((s) => {
+            const initial = (s.name || "?")[0].toUpperCase();
+            const bal = balances[s.id] || 0;
+            return (
+              <div key={s.id} style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 14,
+                padding: "14px 14px",
+                display: "flex", alignItems: "center", gap: 10,
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 20, color: "white", fontWeight: 800, flexShrink: 0,
+                }}>{s.avatar_emoji || initial}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name.split(" ")[0]}</div>
+                  <div style={{
+                    fontSize: 16, fontWeight: 900, color: "#fde68a",
+                    fontVariantNumeric: "tabular-nums",
+                  }}>🪙 {bal}</div>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[-1, 1, 5, 10].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => adjust(s, d)}
+                      disabled={busyId === s.id}
+                      style={{
+                        width: 38, height: 38, borderRadius: 8,
+                        background: d > 0
+                          ? "linear-gradient(135deg, #15803d, #22c55e)"
+                          : "rgba(239,68,68,0.10)",
+                        border: d > 0 ? "none" : "1px solid rgba(239,68,68,0.40)",
+                        color: d > 0 ? "white" : "#fca5a5",
+                        fontSize: 13, fontWeight: 800,
+                        cursor: "pointer",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >{d > 0 ? "+" : ""}{d}</button>
+                  ))}
                 </div>
               </div>
             );
@@ -555,26 +707,16 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
         <div style={{ fontSize: 13, color: "rgba(245,241,232,0.55)", marginBottom: 22 }}>
           Type your 4-digit PIN to open the store.
         </div>
-        <input
-          autoFocus type="password" inputMode="numeric"
-          maxLength={6}
+        <PinPad
           value={pin}
-          onChange={(e) => { setPin(e.target.value.replace(/\D/g, "")); setPinError(""); }}
-          onKeyDown={(e) => { if (e.key === "Enter") verifyPin(); }}
-          placeholder="••••"
-          style={{
-            width: "100%", boxSizing: "border-box",
-            padding: "16px 18px",
-            fontSize: 28, letterSpacing: "0.3em",
-            textAlign: "center",
-            borderRadius: 14,
-            border: pinError ? "1.5px solid #ef4444" : "1.5px solid rgba(255,255,255,0.20)",
-            background: "rgba(0,0,0,0.30)",
-            color: "white", outline: "none",
-            marginBottom: pinError ? 8 : 16,
-          }}
+          onChange={(v) => { setPin(v); setPinError(""); }}
+          onSubmit={verifyPin}
+          maxLength={6}
+          size="lg"
+          warm
         />
-        {pinError && <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>{pinError}</div>}
+        {pinError && <div style={{ fontSize: 13, color: "#fca5a5", marginTop: 14 }}>{pinError}</div>}
+        <div style={{ height: 16 }} />
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={reset}

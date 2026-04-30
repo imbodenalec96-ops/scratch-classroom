@@ -118,8 +118,10 @@ function DashboardRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/home" replace />;
-  if (user.role === "admin") return <Navigate to="/admin-dashboard" replace />;
-  if (user.role === "teacher") return <Navigate to="/teacher" replace />;
+  // Teachers + admins land on the board — that's the room's main
+  // surface now that iPads are gone. They can still reach /admin or
+  // /teacher from the sidebar / nav for back-office tasks.
+  if (user.role === "admin" || user.role === "teacher") return <Navigate to="/board" replace />;
   return <Navigate to="/student" replace />;
 }
 

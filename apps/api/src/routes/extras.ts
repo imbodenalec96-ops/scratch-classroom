@@ -451,12 +451,29 @@ async function ensureManualSchema() {
   manualSchemaReady = true;
 }
 
+// Each completed assignment is worth this many dojo points. Tuned to
+// give kids a clear earn rate (1 assignment = 1 store point) without
+// making the store feel cheap.
+const POINTS_PER_ASSIGNMENT = 1;
+
 router.put("/students/:studentId/manual-progress", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const studentId = req.params.studentId;
   const count = Math.max(0, Math.min(999, Number(req.body?.count ?? 0) | 0));
   try {
     await ensureManualSchema();
     const day = todayPacific();
+
+    // Compute the delta vs whatever was previously stored for today.
+    // POINTS_PER_ASSIGNMENT × delta is added (or removed) from the
+    // student's dojo_points, so the store balance reflects assignment
+    // completion in real time. Negative deltas roll points back when
+    // the teacher corrects an over-tally.
+    const prev: any = await db.prepare(
+      `SELECT count FROM manual_progress WHERE student_id::text = ? AND day = ?`
+    ).get(studentId, day);
+    const prevCount = Number(prev?.count ?? 0);
+    const delta = count - prevCount;
+
     await db.prepare(
       `INSERT INTO manual_progress (student_id, day, count, updated_at, updated_by)
        VALUES (?, ?, ?, ?, ?)
@@ -465,7 +482,32 @@ router.put("/students/:studentId/manual-progress", requireRole("teacher", "admin
          updated_at = EXCLUDED.updated_at,
          updated_by = EXCLUDED.updated_by`
     ).run(studentId, day, count, new Date().toISOString(), req.user?.id ?? null);
-    res.json({ ok: true, day, count });
+
+    let pointsDelta = 0;
+    let newBalance: number | null = null;
+    if (delta !== 0) {
+      pointsDelta = delta * POINTS_PER_ASSIGNMENT;
+      try {
+        // Clamp at 0 so a correction can't push a kid into negative.
+        await db.prepare(
+          `UPDATE users SET dojo_points = GREATEST(0, COALESCE(dojo_points, 0) + ?) WHERE id::text = ?`
+        ).run(pointsDelta, studentId);
+        const balRow: any = await db.prepare(
+          `SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id::text = ?`
+        ).get(studentId);
+        newBalance = balRow?.dojo_points ?? 0;
+        // Log to store_transactions for audit visibility
+        try {
+          const txId = (globalThis as any).crypto?.randomUUID?.() || String(Date.now());
+          await db.prepare(
+            `INSERT INTO store_transactions (id, student_id, item_id, item_name, price, kind, delta, reason, actor_id)
+             VALUES (?, ?, NULL, ?, 0, 'adjust', ?, ?, ?)`
+          ).run(txId, studentId, "Assignment credit", pointsDelta, `manual_progress ${prevCount}→${count}`, req.user?.id ?? null);
+        } catch { /* tx table may not exist on first run */ }
+      } catch { /* best-effort */ }
+    }
+
+    res.json({ ok: true, day, count, pointsDelta, dojo_points: newBalance });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "failed" });
   }

@@ -5,6 +5,7 @@ import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useC
 import { getSocket } from "../lib/ws.ts";
 import { useAuth } from "../lib/auth.tsx";
 import BoardConsole from "./BoardConsole.tsx";
+import PinPad from "./PinPad.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -1768,25 +1769,15 @@ export default function ClassroomBoard() {
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 18 }}>
             Enter the teacher PIN
           </div>
-          <input
-            autoFocus type="password" inputMode="numeric"
-            maxLength={8}
+          <PinPad
             value={consolePin}
-            onChange={(e) => { setConsolePin(e.target.value.replace(/\D/g, "")); setConsolePinError(""); }}
-            onKeyDown={(e) => { if (e.key === "Enter") tryConsoleUnlock(); }}
-            placeholder="••••"
-            style={{
-              width: "100%", boxSizing: "border-box",
-              padding: "16px 18px",
-              fontSize: 28, letterSpacing: "0.3em", textAlign: "center",
-              borderRadius: 14,
-              border: consolePinError ? "1.5px solid #ef4444" : "1.5px solid rgba(255,255,255,0.20)",
-              background: "rgba(0,0,0,0.40)",
-              color: "white", outline: "none",
-              marginBottom: consolePinError ? 8 : 16,
-            }}
+            onChange={(v) => { setConsolePin(v); setConsolePinError(""); }}
+            onSubmit={tryConsoleUnlock}
+            maxLength={8}
+            warm
           />
-          {consolePinError && <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>{consolePinError}</div>}
+          {consolePinError && <div style={{ fontSize: 13, color: "#fca5a5", marginTop: 12 }}>{consolePinError}</div>}
+          <div style={{ height: 14 }} />
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={() => { setConsolePinModal(false); setConsolePin(""); setConsolePinError(""); }}
