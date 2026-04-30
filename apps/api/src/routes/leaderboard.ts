@@ -217,7 +217,7 @@ router.post("/auto-award", async (req: AuthRequest, res: Response) => {
     let streakDays = 0;
     try {
       const dates: any[] = await db.prepare(
-        `SELECT DISTINCT SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) AS d
+        `SELECT DISTINCT SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS d
          FROM submissions WHERE student_id::text = ?
          ORDER BY d DESC LIMIT 14`
       ).all(userId);

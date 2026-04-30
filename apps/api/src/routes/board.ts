@@ -312,7 +312,7 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
          FROM submissions s
          JOIN assignments a ON a.id::text = s.assignment_id::text
          WHERE a.class_id::text = ?
-           AND SUBSTR(COALESCE(s.submitted_at, s.created_at)::text, 1, 10) = ?
+           AND SUBSTR((COALESCE(s.submitted_at, s.created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) = ?
          GROUP BY s.student_id`
       ).all(classId, todayStr) as any[];
       for (const r of subRows) subsByStudent.set(String(r.student_id), Number(r.n));
@@ -377,10 +377,16 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       const ids = dayAssignments.map((a) => a.id);
       const placeholders = ids.map(() => "?").join(",");
       try {
+        // Bucket submissions by Pacific date, NOT UTC. submitted_at /
+        // created_at are UTC timestamps; subtracting 7 hours before
+        // slicing gives the Pacific calendar day. Without this fix,
+        // anything submitted between 5 PM Pacific and midnight Pacific
+        // shows up as "tomorrow" UTC and silently disappears from
+        // today's "done" count on the board.
         const subs = await db.prepare(
           `SELECT student_id::text AS student_id,
                   assignment_id::text AS assignment_id,
-                  SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) AS day
+                  SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS day
            FROM submissions WHERE assignment_id::text IN (${placeholders})`
         ).all(...ids) as any[];
         for (const r of subs) {
