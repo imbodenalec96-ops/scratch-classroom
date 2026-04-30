@@ -216,6 +216,31 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
   // "I'm stuck — call my teacher" state. Mirrors WorkScreen's behavior.
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
   const [showLesson, setShowLesson] = useState(false);
+  // Auto-read the lesson when the modal opens; cancel on close.
+  useEffect(() => {
+    if (!showLesson) {
+      try { window.speechSynthesis?.cancel(); } catch {}
+      return;
+    }
+    const passage = parsed?.sections?.[0]?.passage;
+    const lessonText = String(parsed?.lesson
+      || [parsed?.instructions, passage].filter(Boolean).join("\n\n")
+      || "");
+    if (!lessonText) return;
+    const t = setTimeout(() => {
+      try {
+        window.speechSynthesis?.cancel();
+        const u = new SpeechSynthesisUtterance(lessonText);
+        u.rate = 0.9;
+        u.lang = "en-US";
+        window.speechSynthesis?.speak(u);
+      } catch { /* TTS best-effort */ }
+    }, 350);
+    return () => {
+      clearTimeout(t);
+      try { window.speechSynthesis?.cancel(); } catch {}
+    };
+  }, [showLesson, parsed?.lesson, parsed?.instructions]);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");
@@ -1465,7 +1490,7 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
             boxShadow: "0 24px 64px rgba(58,36,16,0.35)",
           }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: accent, marginBottom: 4 }}>
                   📖 The Lesson
                 </div>
@@ -1473,8 +1498,40 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
                   {parsed.title || assignment.title || "Today's Lesson"}
                 </div>
               </div>
+              {/* 🔊 manual replay — auto-read fires on open, button is for repeats */}
               <button
-                onClick={() => setShowLesson(false)}
+                onClick={() => {
+                  const passage = parsed?.sections?.[0]?.passage;
+                  const lessonText = String(parsed?.lesson
+                    || [parsed?.instructions, passage].filter(Boolean).join("\n\n")
+                    || "");
+                  if (!lessonText) return;
+                  try {
+                    window.speechSynthesis?.cancel();
+                    const u = new SpeechSynthesisUtterance(lessonText);
+                    u.rate = 0.9;
+                    u.lang = "en-US";
+                    window.speechSynthesis?.speak(u);
+                  } catch { /* best effort */ }
+                }}
+                aria-label="Read lesson aloud"
+                title="Read lesson aloud"
+                style={{
+                  flexShrink: 0,
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: `${accent}14`,
+                  border: `1px solid ${accent}33`,
+                  color: accent, fontSize: 18, fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  touchAction: "manipulation",
+                }}
+              >🔊</button>
+              <button
+                onClick={() => {
+                  try { window.speechSynthesis?.cancel(); } catch {}
+                  setShowLesson(false);
+                }}
                 aria-label="Close lesson"
                 style={{
                   flexShrink: 0,

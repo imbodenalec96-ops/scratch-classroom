@@ -1415,6 +1415,27 @@ function WorkScreen({
 }) {
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
   const [showLesson, setShowLesson] = useState(false);
+  // Auto-read the lesson aloud when the modal first opens. Kids who
+  // can't read well still get the teaching content, and they can mash
+  // the 🔊 button to replay or wait silently. Stops speech when the
+  // modal closes so it doesn't leak into the next screen.
+  useEffect(() => {
+    if (!showLesson) {
+      try { window.speechSynthesis?.cancel(); } catch {}
+      return;
+    }
+    const passage = parsed?.sections?.[0]?.passage;
+    const lessonText = String(parsed?.lesson
+      || [parsed?.instructions, passage].filter(Boolean).join("\n\n")
+      || "");
+    if (!lessonText) return;
+    // Small delay so the modal animates in before TTS kicks off
+    const t = setTimeout(() => speakText(lessonText, 0.9), 350);
+    return () => {
+      clearTimeout(t);
+      try { window.speechSynthesis?.cancel(); } catch {}
+    };
+  }, [showLesson, parsed?.lesson, parsed?.instructions]);
   const handleRaiseHand = async () => {
     if (!classId || helpState !== "idle") return;
     setHelpState("raising");
@@ -2458,14 +2479,41 @@ function WorkScreen({
             boxShadow: "0 24px 64px rgba(58,36,16,0.35)",
           }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: starfall.accent, marginBottom: 4 }}>📖 The Lesson</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: "#3a2410", fontFamily: "'Source Serif Pro', Georgia, serif" }}>
                   {parsed.title || assignment.title || "Today's Lesson"}
                 </div>
               </div>
+              {/* 🔊 read-aloud the lesson — uses the same speakText helper
+                  the question button uses so kids who can't read well still
+                  get the teaching content. Safe to mash; cancels in-flight
+                  speech each call. */}
               <button
-                onClick={() => setShowLesson(false)}
+                onClick={() => {
+                  const passage = parsed?.sections?.[0]?.passage;
+                  const lessonText = parsed?.lesson
+                    || [parsed?.instructions, passage].filter(Boolean).join("\n\n");
+                  speakText(String(lessonText || ""), 0.9);
+                }}
+                aria-label="Read lesson aloud"
+                title="Read lesson aloud"
+                style={{
+                  flexShrink: 0,
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: `${starfall.accent}14`,
+                  border: `1px solid ${starfall.accent}33`,
+                  color: starfall.accent, fontSize: 18, fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  touchAction: "manipulation",
+                }}
+              >🔊</button>
+              <button
+                onClick={() => {
+                  try { window.speechSynthesis?.cancel(); } catch {}
+                  setShowLesson(false);
+                }}
                 aria-label="Close lesson"
                 style={{
                   flexShrink: 0,
