@@ -168,35 +168,52 @@ router.post("/redeem", async (req: AuthRequest, res: Response) => {
     // (for testing + sanity). Students can only redeem while their class's
     // current schedule block has subject='cashout'.
     if (role === "student") {
-      // Use client's local-time claim. Server runs in UTC on Vercel, so
-      // computing hhmm from `new Date()` would be wrong timezone. Client
-      // sends { nowHHMM, today } in the body — we validate shape + trust.
-      const nowHHMM = typeof req.body?.nowHHMM === "string" && /^\d{2}:\d{2}$/.test(req.body.nowHHMM)
-        ? req.body.nowHHMM : null;
-      const today = typeof req.body?.today === "string" && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(req.body.today)
-        ? req.body.today : null;
-      if (!nowHHMM || !today) {
-        return res.status(400).json({ error: "client time required" });
-      }
-      // NB: class_schedule.class_id is TEXT, class_members.class_id is UUID —
-      // cast so Postgres can JOIN. Without the cast, the query throws
-      // 'operator does not exist: uuid = text' and the whole endpoint errors.
-      const cashoutRow: any = await db.prepare(
-        `SELECT cs.subject, cs.start_time, cs.end_time, cs.active_days
-           FROM class_schedule cs
-           JOIN class_members cm ON cm.class_id::text = cs.class_id
-          WHERE cm.user_id = ?::uuid
-            AND cs.subject = 'cashout'
-            AND cs.start_time <= ?
-            AND cs.end_time > ?
-          LIMIT 1`
-      ).get(userId, nowHHMM, nowHHMM);
-      const active = cashoutRow && (
-        !cashoutRow.active_days ||
-        String(cashoutRow.active_days).toLowerCase().includes(today.toLowerCase())
-      );
-      if (!active) {
-        return res.status(423).json({ error: "The store is closed right now. It opens during the cashout block on your schedule." });
+      // Teacher override — if a teacher has opened the store via
+      // /api/store/override, ALL students can redeem until the
+      // override_until timestamp passes. This lets the teacher pop
+      // the store open spontaneously (e.g. surprise reward time).
+      let overrideActive = false;
+      try {
+        const o: any = await db.prepare(
+          "SELECT value FROM admin_settings WHERE key='store_override_until'"
+        ).get();
+        if (o?.value) {
+          const until = Date.parse(String(o.value));
+          if (Number.isFinite(until) && until > Date.now()) overrideActive = true;
+        }
+      } catch {}
+
+      if (!overrideActive) {
+        // Use client's local-time claim. Server runs in UTC on Vercel, so
+        // computing hhmm from `new Date()` would be wrong timezone. Client
+        // sends { nowHHMM, today } in the body — we validate shape + trust.
+        const nowHHMM = typeof req.body?.nowHHMM === "string" && /^\d{2}:\d{2}$/.test(req.body.nowHHMM)
+          ? req.body.nowHHMM : null;
+        const today = typeof req.body?.today === "string" && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(req.body.today)
+          ? req.body.today : null;
+        if (!nowHHMM || !today) {
+          return res.status(400).json({ error: "client time required" });
+        }
+        // NB: class_schedule.class_id is TEXT, class_members.class_id is UUID —
+        // cast so Postgres can JOIN. Without the cast, the query throws
+        // 'operator does not exist: uuid = text' and the whole endpoint errors.
+        const cashoutRow: any = await db.prepare(
+          `SELECT cs.subject, cs.start_time, cs.end_time, cs.active_days
+             FROM class_schedule cs
+             JOIN class_members cm ON cm.class_id::text = cs.class_id
+            WHERE cm.user_id = ?::uuid
+              AND cs.subject = 'cashout'
+              AND cs.start_time <= ?
+              AND cs.end_time > ?
+            LIMIT 1`
+        ).get(userId, nowHHMM, nowHHMM);
+        const active = cashoutRow && (
+          !cashoutRow.active_days ||
+          String(cashoutRow.active_days).toLowerCase().includes(today.toLowerCase())
+        );
+        if (!active) {
+          return res.status(423).json({ error: "The store is closed right now. It opens during the cashout block on your schedule." });
+        }
       }
     }
 
@@ -360,6 +377,49 @@ router.post("/points/class/:classId/adjust", requireRole("teacher", "admin"), as
     res.json({ updated });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "bulk adjust failed" });
+  }
+});
+
+// ── Store override (teacher/admin "open store now" toggle) ───────────
+// GET /store/override — anyone can read (so the cashout page knows
+// to flip the "store closed" banner off).
+router.get("/override", async (_req: AuthRequest, res: Response) => {
+  try {
+    const row: any = await db.prepare(
+      "SELECT value FROM admin_settings WHERE key='store_override_until'"
+    ).get();
+    const until = row?.value ? Date.parse(String(row.value)) : 0;
+    const open = Number.isFinite(until) && until > Date.now();
+    res.json({ open, until: open ? new Date(until).toISOString() : null });
+  } catch {
+    res.json({ open: false, until: null });
+  }
+});
+
+// POST /store/override — teacher/admin opens the store for `minutes`
+// (default 30, max 240). Sets store_override_until = now + minutes.
+router.post("/override", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const minutes = Math.max(5, Math.min(240, Number(req.body?.minutes ?? 30)));
+  const until = new Date(Date.now() + minutes * 60_000).toISOString();
+  try {
+    await db.prepare(
+      "INSERT INTO admin_settings (key, value) VALUES ('store_override_until', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+    ).run(until);
+    res.json({ open: true, until, minutes });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
+// DELETE /store/override — teacher/admin closes the store immediately.
+router.delete("/override", requireRole("teacher", "admin"), async (_req: AuthRequest, res: Response) => {
+  try {
+    await db.prepare(
+      "INSERT INTO admin_settings (key, value) VALUES ('store_override_until', '0') ON CONFLICT (key) DO UPDATE SET value = '0'"
+    ).run();
+    res.json({ open: false, until: null });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
   }
 });
 

@@ -47,9 +47,25 @@ export function CashoutPage() {
       .catch(() => setClassId(null));
   }, [user?.id, user?.role]);
   const currentBlock = useCurrentBlock(classId);
+  // Teacher override — when set, ALL students can spend regardless
+  // of the schedule block. Polls every 30s so banner flips live.
+  const [override, setOverride] = useState<{ open: boolean; until: string | null }>({ open: false, until: null });
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const o = await api.getStoreOverride();
+        if (!cancelled) setOverride(o);
+      } catch {}
+    };
+    tick();
+    const iv = setInterval(tick, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
   const isStoreOpen =
     user?.role !== "student" ||
-    (currentBlock?.subject || "").toLowerCase() === "cashout";
+    (currentBlock?.subject || "").toLowerCase() === "cashout" ||
+    override.open;
 
   const load = async () => {
     try {
@@ -151,6 +167,54 @@ export function CashoutPage() {
       )}
 
       {/* Header + balance */}
+      {/* Teacher/admin control bar — open the store anytime for students.
+          Renders only for non-students. Shows a countdown when active and
+          a "Close now" button to revoke. ── */}
+      {user?.role !== "student" && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 14px", marginBottom: 18,
+          borderRadius: 12,
+          background: override.open ? "rgba(34,197,94,0.10)" : "rgba(99,102,241,0.08)",
+          border: override.open ? "1px solid rgba(34,197,94,0.40)" : "1px solid rgba(99,102,241,0.30)",
+          flexWrap: "wrap", gap: 10,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: override.open ? "#15803d" : "#4338ca" }}>
+            {override.open
+              ? `🟢 Store is OPEN for students until ${override.until ? new Date(override.until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "?"}`
+              : "🔒 Store is closed outside the cashout block. Open it now for students:"}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {override.open ? (
+              <button
+                onClick={async () => {
+                  try { const r = await api.closeStoreOverride(); setOverride(r); showFlash("ok", "Store closed."); } catch (e: any) { showFlash("err", e?.message || "failed"); }
+                }}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.4)",
+                  background: "rgba(220,38,38,0.08)", color: "#dc2626",
+                  fontWeight: 700, fontSize: 12, cursor: "pointer",
+                }}
+              >Close now</button>
+            ) : (
+              [15, 30, 60].map((m) => (
+                <button
+                  key={m}
+                  onClick={async () => {
+                    try { const r = await api.openStoreOverride(m); setOverride({ open: r.open, until: r.until }); showFlash("ok", `Store open ${m} min.`); } catch (e: any) { showFlash("err", e?.message || "failed"); }
+                  }}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.4)",
+                    background: "rgba(99,102,241,0.10)", color: "#4338ca",
+                    fontWeight: 700, fontSize: 12, cursor: "pointer",
+                  }}
+                >Open {m} min</button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <header className="text-center mb-8">
         <div className="text-5xl mb-3" aria-hidden>💰</div>
         <h1 className="text-3xl font-extrabold mb-1 text-t1">Classroom Store</h1>

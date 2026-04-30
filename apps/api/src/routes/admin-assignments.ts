@@ -1304,10 +1304,14 @@ import {
 } from "./assignments.js";
 router.post("/regenerate-today-content", async (_req, res) => {
   try {
+    // Case-insensitive match on Postgres needs ILIKE; fall back to first
+    // class if nothing matches "Star".
     const cls: any = await db.prepare(
-      "SELECT id::text AS id FROM classes WHERE name LIKE '%star%' ORDER BY created_at LIMIT 1"
+      "SELECT id::text AS id FROM classes WHERE LOWER(name) LIKE '%star%' ORDER BY created_at LIMIT 1"
+    ).get() || await db.prepare(
+      "SELECT id::text AS id FROM classes ORDER BY created_at LIMIT 1"
     ).get();
-    if (!cls) return res.status(500).json({ error: "Star class not found" });
+    if (!cls) return res.status(500).json({ error: "no class in DB" });
     const teacher: any = await db.prepare(
       "SELECT id::text AS id FROM users WHERE role IN ('teacher','admin') ORDER BY created_at LIMIT 1"
     ).get();

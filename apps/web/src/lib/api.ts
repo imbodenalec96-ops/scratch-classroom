@@ -522,6 +522,11 @@ export const api = {
   },
   getStoreTransactions: (studentId?: string) =>
     request<any[]>(`/store/transactions${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ""}`),
+  getStoreOverride: () => request<{ open: boolean; until: string | null }>(`/store/override`),
+  openStoreOverride: (minutes = 30) => request<{ open: boolean; until: string; minutes: number }>(`/store/override`, {
+    method: "POST", body: JSON.stringify({ minutes }),
+  }),
+  closeStoreOverride: () => request<{ open: boolean; until: null }>(`/store/override`, { method: "DELETE" }),
   getStoreClassTransactions: (classId: string) =>
     request<any[]>(`/store/transactions/class/${classId}`),
   createStoreItem: (data: { name: string; emoji?: string; price: number; stock?: number | null }) =>
