@@ -7,6 +7,9 @@ import { useAuth } from "../lib/auth.tsx";
 import BoardConsole from "./BoardConsole.tsx";
 import PinPad from "./PinPad.tsx";
 import BirthdayCelebration from "./BirthdayCelebration.tsx";
+import FlashLeaderboard from "./FlashLeaderboard.tsx";
+import ReactionRain from "./ReactionRain.tsx";
+import StudentWallet from "./StudentWallet.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -268,6 +271,8 @@ export default function ClassroomBoard() {
   // Store-only mode: opens the BoardConsole already on the Store tab,
   // skipping the teacher PIN. Kids still need their own PIN to redeem.
   const [showStoreOnly, setShowStoreOnly] = useState(false);
+  // Student wallet — kid taps face, types PIN, sees own points + badges.
+  const [showWallet, setShowWallet] = useState(false);
   // PIN gate before opening the console — keeps kids from poking at
   // teacher tools when they walk past the projector. PIN is checked
   // against admin_settings.remote_access_pin / teacher_password via
@@ -940,6 +945,19 @@ export default function ClassroomBoard() {
           }}>{timeStr}</div>
           {isTeacher && (
             <>
+              {/* Wallet — kids walk up, tap their face, type PIN, see
+                  their own points + badges. Read-only kiosk. */}
+              <button
+                onClick={() => setShowWallet(true)}
+                title="My wallet — students unlock with their PIN"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid rgba(124,58,237,0.55)`,
+                  background: "rgba(124,58,237,0.18)", color: "#c4b5fd",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >💼 Wallet</button>
               {/* Store — kids walk up, tap their face, type their PIN.
                   No teacher gate; each redemption is PIN-locked already. */}
               <button
@@ -1764,6 +1782,22 @@ export default function ClassroomBoard() {
         birthday is today (Pacific). Once-per-day per kid via localStorage. */}
     {board?.students?.length > 0 && (
       <BirthdayCelebration students={board.students as any} />
+    )}
+
+    {/* Flash leaderboard — periodic toast in the bottom-right
+        celebrating top earners + recent McDonald's earners. */}
+    {cls?.id && <FlashLeaderboard classId={cls.id} />}
+
+    {/* Reaction emojis — bottom-center pill, kids tap to react silently. */}
+    <ReactionRain />
+
+    {/* Student wallet — overlay opened from the 💼 button. */}
+    {showWallet && cls?.id && (
+      <StudentWallet
+        students={(board?.students || []) as any}
+        classId={cls.id}
+        onClose={() => setShowWallet(false)}
+      />
     )}
 
     {/* PIN gate before the console opens. Locks teacher tools so
