@@ -2966,6 +2966,35 @@ export default function StudentDashboard() {
   );
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
+  // Extras: streak, daily goal, mood. All purely additive; if the
+  // /extras endpoints are 404 or 500 these stay null and nothing renders.
+  const [streak, setStreak] = useState<number>(0);
+  const [todayGoal, setTodayGoal] = useState<{ goal: string | null; done: boolean }>({ goal: null, done: false });
+  const [todayMood, setTodayMood] = useState<string | null>(null);
+  const [showMoodPrompt, setShowMoodPrompt] = useState(false);
+  const [showGoalEditor, setShowGoalEditor] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
+  useEffect(() => {
+    if (!user || user.role !== "student") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [s, g, m] = await Promise.all([
+          api.getMyStreak().catch(() => ({ streak: 0 })),
+          api.getMyGoal().catch(() => ({ goal: null, done: false })),
+          api.getMyMood().catch(() => ({ mood: null })),
+        ]);
+        if (cancelled) return;
+        setStreak(s?.streak ?? 0);
+        setTodayGoal({ goal: g?.goal ?? null, done: !!g?.done });
+        setTodayMood(m?.mood ?? null);
+        // Prompt for mood once per day if not set
+        if (!m?.mood) setShowMoodPrompt(true);
+      } catch { /* extras are optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   // Welcome → loading transition
   useEffect(() => {
     const t = setTimeout(() => setPhase("loading"), 1800);
@@ -3826,6 +3855,205 @@ export default function StudentDashboard() {
             </h1>
           </div>
         </header>
+
+        {/* ── Additive: streak + daily goal + mood. Chips render only
+            when there's data, so a logged-out / fresh-account state shows
+            nothing here (zero layout impact). ── */}
+        {(streak > 0 || todayGoal.goal || todayMood) && (
+          <div style={{
+            marginTop: 12,
+            display: "flex", flexWrap: "wrap", gap: 8,
+            animation: "dbSlide .4s ease both",
+          }}>
+            {streak > 0 && (
+              <div title={`${streak}-day submission streak`} style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 999,
+                fontSize: 13, fontWeight: 700,
+                background: isStudentDb ? "rgba(217,119,6,0.12)" : "rgba(245,158,11,0.18)",
+                color: isStudentDb ? "#92400e" : "#fde68a",
+                border: isStudentDb ? "1px solid rgba(217,119,6,0.30)" : "1px solid rgba(245,158,11,0.40)",
+              }}>
+                <span>🔥</span> {streak}-day streak
+              </div>
+            )}
+            {todayMood && (
+              <div title="Today's mood" style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 999,
+                fontSize: 16, lineHeight: 1,
+                background: isStudentDb ? "rgba(178,58,72,0.08)" : "rgba(139,92,246,0.18)",
+                border: isStudentDb ? "1px solid rgba(178,58,72,0.18)" : "1px solid rgba(139,92,246,0.40)",
+              }}>{todayMood}</div>
+            )}
+            {todayGoal.goal ? (
+              <button
+                onClick={() => {
+                  if (todayGoal.done) return;
+                  api.markGoalDone().then(() => setTodayGoal({ ...todayGoal, done: true })).catch(() => {});
+                }}
+                title={todayGoal.done ? "Goal complete!" : "Tap when you finish your goal"}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 12px", borderRadius: 999,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: todayGoal.done ? "default" : "pointer",
+                  background: todayGoal.done
+                    ? (isStudentDb ? "rgba(15,118,110,0.15)" : "rgba(34,197,94,0.20)")
+                    : (isStudentDb ? "rgba(15,118,110,0.08)" : "rgba(15,118,110,0.18)"),
+                  color: todayGoal.done
+                    ? (isStudentDb ? "#0f766e" : "#86efac")
+                    : (isStudentDb ? "#0f766e" : "#7dd3c5"),
+                  border: isStudentDb ? "1px solid rgba(15,118,110,0.25)" : "1px solid rgba(15,118,110,0.40)",
+                  maxWidth: 280,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}
+              >
+                {todayGoal.done ? "✓" : "🎯"} {todayGoal.goal}
+              </button>
+            ) : (
+              <button
+                onClick={() => { setGoalDraft(""); setShowGoalEditor(true); }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 12px", borderRadius: 999,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: "pointer",
+                  background: "transparent",
+                  color: isStudentDb ? "#5a4632" : "rgba(245,241,232,0.55)",
+                  border: isStudentDb ? "1px dashed rgba(58,36,16,0.20)" : "1px dashed rgba(255,255,255,0.18)",
+                }}
+              >🎯 Set today's goal</button>
+            )}
+          </div>
+        )}
+
+        {/* Mood prompt (one tap, once per day) */}
+        {showMoodPrompt && (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setShowMoodPrompt(false); }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 9050,
+              background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <div style={{
+              background: isStudentDb ? "linear-gradient(180deg, #fffaed, #fef5dc)" : "#1e1b2e",
+              borderRadius: 22,
+              padding: "26px 30px",
+              maxWidth: 420, width: "100%",
+              border: isStudentDb ? "1px solid rgba(58,36,16,0.12)" : "1px solid rgba(255,255,255,0.10)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+              color: isStudentDb ? "#3a2410" : "#f5f1e8",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: isStudentDb ? "#b23a48" : "#a5b4fc", marginBottom: 6 }}>How are you?</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 18 }}>Pick one to start your day</div>
+              <div style={{ display: "flex", justifyContent: "space-around", gap: 10 }}>
+                {["😊","😐","😕","😴","🤩"].map((m) => (
+                  <button
+                    key={m}
+                    onClick={async () => {
+                      try {
+                        await api.setMyMood(m);
+                        setTodayMood(m);
+                      } catch {}
+                      setShowMoodPrompt(false);
+                    }}
+                    style={{
+                      fontSize: 38, lineHeight: 1, padding: 10,
+                      background: "transparent", border: "none",
+                      cursor: "pointer", borderRadius: 14,
+                      transition: "transform .12s, background .12s",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1.18)"; (e.currentTarget as HTMLElement).style.background = isStudentDb ? "rgba(178,58,72,0.08)" : "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                  >{m}</button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowMoodPrompt(false)}
+                style={{
+                  marginTop: 14, width: "100%",
+                  background: "transparent", border: "none",
+                  fontSize: 12, color: isStudentDb ? "#9b7950" : "rgba(245,241,232,0.5)",
+                  cursor: "pointer",
+                }}
+              >maybe later</button>
+            </div>
+          </div>
+        )}
+
+        {/* Goal editor modal */}
+        {showGoalEditor && (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setShowGoalEditor(false); }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 9050,
+              background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <div style={{
+              background: isStudentDb ? "linear-gradient(180deg, #fffaed, #fef5dc)" : "#1e1b2e",
+              borderRadius: 22, padding: "26px 30px",
+              maxWidth: 480, width: "100%",
+              border: isStudentDb ? "1px solid rgba(58,36,16,0.12)" : "1px solid rgba(255,255,255,0.10)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+              color: isStudentDb ? "#3a2410" : "#f5f1e8",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: isStudentDb ? "#b23a48" : "#a5b4fc", marginBottom: 6 }}>🎯 Today's goal</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>What do you want to finish today?</div>
+              <input
+                autoFocus
+                value={goalDraft}
+                onChange={(e) => setGoalDraft(e.target.value)}
+                placeholder="e.g. finish 3 math assignments"
+                maxLength={140}
+                style={{
+                  width: "100%", padding: "12px 14px", borderRadius: 12,
+                  border: isStudentDb ? "1px solid rgba(58,36,16,0.18)" : "1px solid rgba(255,255,255,0.18)",
+                  background: isStudentDb ? "white" : "rgba(255,255,255,0.05)",
+                  color: isStudentDb ? "#3a2410" : "#f5f1e8",
+                  fontSize: 16, fontWeight: 600, outline: "none", marginBottom: 14,
+                }}
+              />
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setShowGoalEditor(false)}
+                  style={{
+                    padding: "8px 16px", borderRadius: 999,
+                    background: "transparent",
+                    border: isStudentDb ? "1px solid rgba(58,36,16,0.20)" : "1px solid rgba(255,255,255,0.18)",
+                    color: isStudentDb ? "#5a4632" : "rgba(245,241,232,0.7)",
+                    fontWeight: 700, cursor: "pointer",
+                  }}
+                >cancel</button>
+                <button
+                  disabled={!goalDraft.trim()}
+                  onClick={async () => {
+                    const g = goalDraft.trim();
+                    if (!g) return;
+                    try {
+                      await api.setMyGoal(g);
+                      setTodayGoal({ goal: g, done: false });
+                    } catch {}
+                    setShowGoalEditor(false);
+                  }}
+                  style={{
+                    padding: "8px 16px", borderRadius: 999,
+                    background: "linear-gradient(135deg, #b23a48, #d97706)",
+                    border: "none", color: "white",
+                    fontWeight: 800, cursor: goalDraft.trim() ? "pointer" : "not-allowed",
+                    opacity: goalDraft.trim() ? 1 : 0.5,
+                  }}
+                >save</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Stats row: Points (big) + Stars (compact) — one clean line ── */}
         <div

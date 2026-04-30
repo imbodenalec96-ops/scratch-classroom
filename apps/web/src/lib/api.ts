@@ -576,4 +576,41 @@ export const api = {
     request<any>(`/classes/${classId}/schedule/${blockId}`, { method: "PUT", body: JSON.stringify(patch) }),
   getMyActiveOverride: (studentId: string) =>
     request<any>(`/students/${studentId}/schedule-override/active`),
+
+  // ── Extras (additive features: birthday, mood, goals, announcements) ──
+  setBirthday: (userId: string, birthday: string) =>
+    request<{ ok: boolean; birthday: string | null }>(`/extras/users/${userId}/birthday`, {
+      method: "PUT",
+      body: JSON.stringify({ birthday }),
+    }),
+  getBirthday: (userId: string) =>
+    request<{ birthday: string | null }>(`/extras/users/${userId}/birthday`),
+  setMyMood: (mood: string) =>
+    request<{ ok: boolean; mood: string }>(`/extras/me/mood`, {
+      method: "POST", body: JSON.stringify({ mood }),
+    }),
+  getMyMood: () => request<{ mood: string | null }>(`/extras/me/mood`),
+  getClassMoodSummary: (classId: string) =>
+    request<{ day: string; counts: Array<{ mood: string; n: number }> }>(`/extras/classes/${classId}/mood-summary`),
+  setMyGoal: (goal: string) =>
+    request<{ ok: boolean; goal: string; done: boolean }>(`/extras/me/goal`, {
+      method: "POST", body: JSON.stringify({ goal }),
+    }),
+  getMyGoal: () => request<{ goal: string | null; done: boolean }>(`/extras/me/goal`),
+  markGoalDone: () => request<{ ok: boolean }>(`/extras/me/goal/done`, { method: "POST", body: "{}" }),
+  getMyStreak: () => request<{ streak: number; today?: string }>(`/extras/me/streak`),
+  postAnnouncement: (classId: string, message: string, pinned = false) =>
+    request<{ ok: boolean; id: string }>(`/extras/classes/${classId}/announcements`, {
+      method: "POST", body: JSON.stringify({ message, pinned }),
+    }),
+  getAnnouncements: (classId: string) =>
+    request<Array<{ id: string; message: string; pinned: number; created_at: string }>>(`/extras/classes/${classId}/announcements`),
+  deleteAnnouncement: (classId: string, id: string) =>
+    request<{ ok: boolean }>(`/extras/classes/${classId}/announcements/${id}`, { method: "DELETE" }),
+  getHelperOfDay: (classId: string) =>
+    request<{ helper: { id: string; name: string; count: number } | null; day?: string }>(`/extras/classes/${classId}/helper-of-day`),
+  bulkAddStars: (classId: string, studentIds: string[], delta: number) =>
+    request<{ updated: number; delta: number }>(`/extras/classes/${classId}/bulk-stars`, {
+      method: "POST", body: JSON.stringify({ studentIds, delta }),
+    }),
 };

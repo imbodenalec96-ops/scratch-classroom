@@ -198,6 +198,43 @@ export default function ClassroomBoard() {
     } catch {}
   };
 
+  // Helper-of-the-day (additive — picks the kid with the most
+  // submissions today; renders as a small pill if available, otherwise
+  // nothing). Polls on the same cadence as live-progress.
+  const [helperOfDay, setHelperOfDay] = useState<{ id: string; name: string; count: number } | null>(null);
+  useEffect(() => {
+    if (!cls?.id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const d = await api.getHelperOfDay(cls.id);
+        if (!cancelled) setHelperOfDay(d?.helper ?? null);
+      } catch { /* extras optional */ }
+    };
+    tick();
+    const iv = setInterval(tick, 30_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [cls?.id]);
+
+  // Birthdays for the roster cards. Map of student_id → MM-DD string.
+  // Quietly fetched per-student; missing = no ribbon.
+  const [birthdaysByStudent, setBirthdaysByStudent] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!cls?.id || !board?.students?.length) return;
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, string> = {};
+      await Promise.all(board.students.map(async (s: any) => {
+        try {
+          const r = await api.getBirthday(s.id);
+          if (r?.birthday) next[s.id] = r.birthday;
+        } catch { /* skip on failure */ }
+      }));
+      if (!cancelled) setBirthdaysByStudent(next);
+    })();
+    return () => { cancelled = true; };
+  }, [cls?.id, board?.students?.length]);
+
   // Live class progress (teacher-only widget on the board)
   const [classProgress, setClassProgress] = useState<{
     pct: number;
@@ -627,6 +664,22 @@ export default function ClassroomBoard() {
               · just turned in: {(classProgress.recent[0].name || "?").split(" ")[0]} — {classProgress.recent[0].title}
             </div>
           )}
+          {/* Helper of the day — kid with most submissions today.
+              Renders inline with the bottom strip; vanishes if nobody
+              has submitted yet. ── */}
+          {helperOfDay && helperOfDay.count > 0 && (
+            <div style={{
+              fontFamily: serif, fontStyle: "italic",
+              fontSize: 11, color: "#fcd34d",
+              whiteSpace: "nowrap",
+              padding: "2px 8px",
+              borderRadius: 2,
+              background: "rgba(217,119,6,0.18)",
+              border: "1px solid rgba(217,119,6,0.45)",
+            }}>
+              ⭐ helper of the day: {helperOfDay.name.split(" ")[0]} ({helperOfDay.count})
+            </div>
+          )}
         </div>
       )}
 
@@ -1001,6 +1054,13 @@ export default function ClassroomBoard() {
               const lc = BEHAVIOR_LEVELS[lv];
               const initial = (s.name || "?")[0].toUpperCase();
               const firstName = (s.name || "?").split(" ")[0];
+              // Birthday check — Pacific MM-DD vs stored YYYY-MM-DD or MM-DD.
+              const bday = birthdaysByStudent[s.id];
+              const todayMD = (() => {
+                const d = new Date(Date.now() - 7 * 3600_000);
+                return `${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+              })();
+              const isBirthday = !!bday && bday.slice(-5) === todayMD;
               return (
                 <div key={s.id} style={{
                   borderRadius: 4, display: "flex", flexDirection: "column",
@@ -1078,6 +1138,27 @@ export default function ClassroomBoard() {
                       <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
                         {firstName}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Birthday ribbon — diagonal corner banner across the
+                      top-right of the card on the kid's birthday. Stays
+                      out of the existing layout (absolute, no flow). */}
+                  {isBirthday && (
+                    <div style={{
+                      position: "absolute",
+                      top: 6, left: 6,
+                      zIndex: 4, pointerEvents: "none",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: "linear-gradient(135deg, #f472b6, #ec4899)",
+                      color: "white",
+                      fontSize: 11, fontWeight: 800,
+                      letterSpacing: "0.04em",
+                      boxShadow: "0 2px 6px rgba(236,72,153,0.45)",
+                      animation: "starGlow 2.4s ease-in-out infinite",
+                    }}>
+                      🎂 Birthday!
                     </div>
                   )}
 
@@ -1380,9 +1461,18 @@ export default function ClassroomBoard() {
                       minWidth: 0,
                     }}>
                       <div style={{
-                        fontFamily: serif, fontSize: 22, fontWeight: 700,
-                        color: gc.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        lineHeight: 1.05, letterSpacing: "-0.01em",
+                        fontFamily: serif, fontSize: 22, fontWeight: 800,
+                        color: gc.text,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        lineHeight: 1.1,
+                        // Drop the negative letter-spacing — when the board's
+                        // 1920px design is scaled down to fit a small browser
+                        // window, sub-pixel rendering with -0.01em was eating
+                        // glyph stems on short words like "Art" / "PE".
+                        letterSpacing: "0.005em",
+                        textRendering: "geometricPrecision" as any,
+                        WebkitFontSmoothing: "antialiased",
+                        textShadow: "0 1px 0 rgba(0,0,0,0.25)",
                       }}>
                         {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
                       </div>
