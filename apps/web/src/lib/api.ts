@@ -621,4 +621,18 @@ export const api = {
     request<{ updated: number; delta: number }>(`/extras/classes/${classId}/bulk-stars`, {
       method: "POST", body: JSON.stringify({ studentIds, delta }),
     }),
+  // Manual paper-work progress entry — teacher tallies done counts.
+  setManualProgress: (studentId: string, count: number) =>
+    request<{ ok: boolean; day: string; count: number }>(`/extras/students/${studentId}/manual-progress`, {
+      method: "PUT", body: JSON.stringify({ count }),
+    }),
+  getManualProgress: (classId: string) =>
+    request<{ day: string; byStudent: Array<{ student_id: string; count: number }> }>(`/extras/classes/${classId}/manual-progress`),
+  // Board-side store redemption — teacher initiates, student PIN approves.
+  boardRedeem: (studentId: string, pin: string, itemId: string) =>
+    request<{ ok: boolean; student_name: string; item_name: string; price: number; dojo_points: number }>(`/extras/board-redeem`, {
+      method: "POST", body: JSON.stringify({ studentId, pin, itemId }),
+    }),
+  clearStudentHelpAdmin: (studentId: string) =>
+    request<{ cleared: number }>(`/extras/clear-help/${studentId}`, { method: "POST", body: "{}" }),
 };

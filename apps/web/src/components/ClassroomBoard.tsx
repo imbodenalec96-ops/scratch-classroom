@@ -4,6 +4,7 @@ import { api } from "../lib/api.ts";
 import { findCurrentBlock, findNextBlock, type ScheduleBlock } from "../lib/useCurrentBlock.ts";
 import { getSocket } from "../lib/ws.ts";
 import { useAuth } from "../lib/auth.tsx";
+import BoardConsole from "./BoardConsole.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -261,6 +262,7 @@ export default function ClassroomBoard() {
   }, [cls?.id, isTeacher]);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicLoaded, setMusicLoaded] = useState(false);
   const musicRef = useRef<HTMLIFrameElement>(null);
@@ -895,6 +897,19 @@ export default function ClassroomBoard() {
             fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
             color: "#f5f1e8",
           }}>{timeStr}</div>
+          {isTeacher && (
+            <button
+              onClick={() => setShowConsole(true)}
+              title="Open teacher console — store, manual progress, etc."
+              style={{
+                padding: "5px 11px", borderRadius: 3,
+                border: `1px solid ${blockAccent}88`,
+                background: `${blockAccent}22`, color: blockAccent,
+                cursor: "pointer", fontSize: 11, fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+              }}
+            >🛠 Tools</button>
+          )}
           <button onClick={toggleFullscreen} style={{
             padding: "5px 9px", borderRadius: 3, border: `1px solid ${g(0.16)}`,
             background: "transparent", color: g(0.55), cursor: "pointer",
@@ -1648,6 +1663,16 @@ export default function ClassroomBoard() {
         />
       )}
     </div>
+    {/* Teacher console — manual progress + board store. Mounted at the
+        wrapper level so it overlays the whole board view, not the
+        scaled inner workspace. */}
+    {showConsole && cls?.id && (
+      <BoardConsole
+        classId={cls.id}
+        students={(board?.students || []) as any}
+        onClose={() => setShowConsole(false)}
+      />
+    )}
     </div>
   );
 }

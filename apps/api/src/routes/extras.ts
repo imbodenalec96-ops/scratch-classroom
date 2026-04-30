@@ -429,6 +429,151 @@ router.get("/classes/:classId/helper-of-day", async (req: AuthRequest, res: Resp
   }
 });
 
+// ── Manual assignment progress ────────────────────────────────────────
+// Teacher manually credits a student with N completed assignments today.
+// Used now that iPads are away — kids do work on paper, teacher tallies.
+// Stored as a daily counter per (student, day). Board's live-progress
+// reads this and adds it to the bucket-credit done count, so the bar
+// reflects total work whether digital or paper.
+let manualSchemaReady = false;
+async function ensureManualSchema() {
+  if (manualSchemaReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS manual_progress (
+      student_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT '',
+      updated_by TEXT,
+      PRIMARY KEY (student_id, day)
+    )`);
+  } catch {}
+  manualSchemaReady = true;
+}
+
+router.put("/students/:studentId/manual-progress", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const studentId = req.params.studentId;
+  const count = Math.max(0, Math.min(999, Number(req.body?.count ?? 0) | 0));
+  try {
+    await ensureManualSchema();
+    const day = todayPacific();
+    await db.prepare(
+      `INSERT INTO manual_progress (student_id, day, count, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (student_id, day) DO UPDATE SET
+         count = EXCLUDED.count,
+         updated_at = EXCLUDED.updated_at,
+         updated_by = EXCLUDED.updated_by`
+    ).run(studentId, day, count, new Date().toISOString(), req.user?.id ?? null);
+    res.json({ ok: true, day, count });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
+router.get("/classes/:classId/manual-progress", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureManualSchema();
+    const day = todayPacific();
+    const rows: any[] = await db.prepare(
+      `SELECT mp.student_id::text AS student_id, mp.count
+       FROM manual_progress mp
+       JOIN class_members cm ON cm.user_id::text = mp.student_id::text
+       WHERE cm.class_id::text = ? AND mp.day = ?`
+    ).all(req.params.classId, day);
+    res.json({ day, byStudent: rows });
+  } catch {
+    res.json({ day: todayPacific(), byStudent: [] });
+  }
+});
+
+// ── Board-side store redemption (4-digit PIN) ─────────────────────────
+// iPads are gone — kids walk up to the projector, the teacher opens
+// the store, kid types their personal 4-digit code (their student-login
+// password), picks an item. PIN is verified server-side; no token
+// needed. Teacher/admin override works via store_override_until same
+// as the cashout block check.
+
+router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
+  // Teacher must initiate (this endpoint runs from the board view)
+  if (req.user?.role !== "teacher" && req.user?.role !== "admin") {
+    return res.status(403).json({ error: "teacher only" });
+  }
+  const studentId = String(req.body?.studentId || "").trim();
+  const pin = String(req.body?.pin || "").trim();
+  const itemId = String(req.body?.itemId || "").trim();
+  if (!studentId || !pin || !itemId) {
+    return res.status(400).json({ error: "studentId, pin, and itemId required" });
+  }
+  try {
+    // Verify the kid's PIN
+    const bcrypt = await import("bcrypt");
+    const userRow: any = await db.prepare(
+      "SELECT id::text AS id, name, password_hash, role FROM users WHERE id::text = ?"
+    ).get(studentId);
+    if (!userRow) return res.status(404).json({ error: "Student not found" });
+    if (userRow.role !== "student") return res.status(400).json({ error: "Not a student" });
+    const valid = await bcrypt.default.compare(pin, userRow.password_hash);
+    if (!valid) return res.status(401).json({ error: "Wrong PIN" });
+
+    // Pull the item + balance, then run the same redemption flow as
+    // /store/redeem but without the cashout-block gate (teacher already
+    // explicitly opened the redemption flow on the board).
+    const item: any = await db.prepare(
+      `SELECT id, name, price, stock, enabled FROM store_items WHERE id = ?`
+    ).get(itemId);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    if (!item.enabled) return res.status(400).json({ error: "Item disabled" });
+    if (item.stock != null && item.stock <= 0) return res.status(400).json({ error: "Out of stock" });
+    const balanceRow: any = await db.prepare(
+      `SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id::text = ?`
+    ).get(studentId);
+    if ((balanceRow?.dojo_points ?? 0) < item.price) {
+      return res.status(400).json({ error: `Not enough points — needs ${item.price - (balanceRow?.dojo_points ?? 0)} more` });
+    }
+
+    await db.prepare(
+      `UPDATE users SET dojo_points = COALESCE(dojo_points, 0) - ? WHERE id::text = ?`
+    ).run(item.price, studentId);
+    if (item.stock != null) {
+      await db.prepare(`UPDATE store_items SET stock = stock - 1 WHERE id = ?`).run(item.id);
+    }
+    const txId = (globalThis as any).crypto?.randomUUID?.() || String(Date.now());
+    try {
+      await db.prepare(
+        `INSERT INTO store_transactions (id, student_id, item_id, item_name, price, kind, delta, reason, actor_id)
+         VALUES (?, ?, ?, ?, ?, 'redeem', ?, ?, ?)`
+      ).run(txId, studentId, item.id, item.name, item.price, -item.price, "board redeem", req.user!.id);
+    } catch { /* if tx table missing, ignore */ }
+
+    const newBalRow: any = await db.prepare(
+      `SELECT COALESCE(dojo_points, 0) AS dojo_points FROM users WHERE id::text = ?`
+    ).get(studentId);
+    res.json({
+      ok: true,
+      student_name: userRow.name,
+      item_name: item.name,
+      price: item.price,
+      dojo_points: newBalRow?.dojo_points ?? 0,
+    });
+  } catch (e: any) {
+    console.error("[board-redeem]", e?.message || e);
+    res.status(500).json({ error: e?.message || "redemption failed" });
+  }
+});
+
+// ── One-shot help-request clearer (no auth — diagnostic) ──────────────
+router.post("/clear-help/:studentId", async (req: AuthRequest, res: Response) => {
+  try {
+    const r = await db.prepare(
+      "UPDATE help_requests SET cleared_at = ?, cleared_by = ? WHERE student_id::text = ? AND cleared_at IS NULL"
+    ).run(new Date().toISOString(), req.user?.id ?? null, req.params.studentId);
+    res.json({ cleared: (r as any)?.changes ?? 0 });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
 // ── Bulk star adjust ──────────────────────────────────────────────────
 // Teacher hands out stars to many kids at once. Body: { studentIds: string[], delta: number }.
 // Caps stars at [0, 5] like the single endpoint.

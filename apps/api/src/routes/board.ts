@@ -447,6 +447,20 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
     //   - A kid with 2 reading rows + 1 reading submission shows 1/2.
     //   - A kid with 0 submissions shows 0/total cleanly.
     const byStudent: Record<string, { open: number; done: number; total: number; pct: number }> = {};
+    // Manual progress entries — teacher tallies paper-work counts per
+    // student per day. Adds on top of submission credit so the bar
+    // reflects total work (digital + paper).
+    const manualByStudent = new Map<string, number>();
+    try {
+      const mp: any[] = await db.prepare(
+        `SELECT mp.student_id::text AS student_id, mp.count
+         FROM manual_progress mp
+         JOIN class_members cm ON cm.user_id::text = mp.student_id::text
+         WHERE cm.class_id::text = ? AND mp.day = ?`
+      ).all(classId, todayStr);
+      for (const r of mp) manualByStudent.set(String(r.student_id), Number(r.count) || 0);
+    } catch { /* manual_progress table may not exist yet */ }
+
     let studentsDone = 0;
     let totalOpenAcrossClass = 0;
     for (const s of students) {
@@ -465,6 +479,10 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
         total += count;
         done += Math.min(subCount, count);
       }
+      // Add the teacher's manual paper-tally on top, capped at total
+      // so we don't show 200% if the teacher over-tallies.
+      const manual = manualByStudent.get(String(s.id)) || 0;
+      done = Math.min(done + manual, total);
       const open = total - done;
       const sPct = total > 0 ? Math.round((done / total) * 100) : 0;
       byStudent[String(s.id)] = { open, done, total, pct: sPct };
