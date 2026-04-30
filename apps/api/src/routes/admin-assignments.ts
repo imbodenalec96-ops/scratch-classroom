@@ -1497,6 +1497,30 @@ router.post("/regenerate-today-content", async (req, res) => {
   }
 });
 
+// POST /admin/set-stars/:studentId body {stars: 0-5} — set a student's
+// behavior stars directly. No auth (admin route). Used to mark a kid
+// as having earned McDonald's without going through the +/− flow.
+router.post("/set-stars/:studentId", async (req, res) => {
+  const stars = Math.max(0, Math.min(5, Math.floor(Number(req.body?.stars ?? 0))));
+  try {
+    try {
+      await db.exec(`CREATE TABLE IF NOT EXISTS board_user_data (
+        user_id TEXT PRIMARY KEY,
+        behavior_stars INTEGER NOT NULL DEFAULT 0,
+        reward_count INTEGER NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 1
+      )`);
+    } catch {}
+    await db.prepare(
+      `INSERT INTO board_user_data (user_id, behavior_stars) VALUES (?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET behavior_stars = EXCLUDED.behavior_stars`
+    ).run(req.params.studentId, stars);
+    res.json({ ok: true, stars });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // POST /admin/clear-help/:studentId — clears any open help request
 // for the student. No auth (admin route mount); used to wipe a stale
 // "needs help" overlay from the board roster.

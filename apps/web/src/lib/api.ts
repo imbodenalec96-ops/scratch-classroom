@@ -623,7 +623,7 @@ export const api = {
     }),
   // Manual paper-work progress entry — teacher tallies done counts.
   setManualProgress: (studentId: string, count: number) =>
-    request<{ ok: boolean; day: string; count: number }>(`/extras/students/${studentId}/manual-progress`, {
+    request<{ ok: boolean; day: string; count: number; pointsDelta: number; dojo_points: number | null }>(`/extras/students/${studentId}/manual-progress`, {
       method: "PUT", body: JSON.stringify({ count }),
     }),
   getManualProgress: (classId: string) =>

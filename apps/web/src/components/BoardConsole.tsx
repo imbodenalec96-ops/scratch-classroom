@@ -82,7 +82,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -122,7 +122,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           </div>
           {!storeOnly && (
             <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
-              {(["progress", "points", "spinner", "groups", "store", "pins"] as const).map((t) => (
+              {(["progress", "points", "stars", "spinner", "groups", "store", "pins"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -138,6 +138,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                 >
                   {t === "progress" ? "📋 Progress"
                     : t === "points" ? "🪙 Points"
+                    : t === "stars" ? "⭐ Stars"
                     : t === "spinner" ? "🎲 Spinner"
                     : t === "groups" ? "👥 Groups"
                     : t === "store" ? "🛒 Store"
@@ -164,6 +165,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           {tab === "progress" && <ProgressTab classId={classId} students={students} />}
           {tab === "points"   && <PointsTab classId={classId} students={students} />}
+          {tab === "stars"    && <StarsTab students={students} />}
           {tab === "spinner"  && <SpinnerTab students={students} />}
           {tab === "groups"   && <GroupsTab students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
@@ -181,6 +183,9 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  // Show "+N pts" badge that pops on the kid's card after save so the
+  // teacher can SEE the points award happened.
+  const [pointsFlash, setPointsFlash] = useState<{ id: string; pts: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,9 +208,14 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
     setSavingId(s.id);
     setCounts({ ...counts, [s.id]: next });
     try {
-      await api.setManualProgress(s.id, next);
+      const result = await api.setManualProgress(s.id, next);
       setSavedFlash(s.id);
-      setTimeout(() => setSavedFlash((id) => id === s.id ? null : id), 800);
+      // Surface the dojo-points award so the teacher sees it
+      if (typeof result.pointsDelta === "number" && result.pointsDelta !== 0) {
+        setPointsFlash({ id: s.id, pts: result.pointsDelta });
+        setTimeout(() => setPointsFlash((p) => p?.id === s.id ? null : p), 1800);
+      }
+      setTimeout(() => setSavedFlash((id) => id === s.id ? null : id), 1200);
     } catch {
       // Revert on failure
       setCounts({ ...counts, [s.id]: cur });
@@ -216,9 +226,16 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
 
   return (
     <div>
+      <style>{`
+        @keyframes pointsPop {
+          0%   { opacity: 0; transform: translateY(8px) scale(0.7); }
+          25%  { opacity: 1; transform: translateY(-6px) scale(1.1); }
+          70%  { opacity: 1; transform: translateY(-14px) scale(1); }
+          100% { opacity: 0; transform: translateY(-30px) scale(0.95); }
+        }
+      `}</style>
       <div style={{ fontSize: 13, color: "rgba(245,241,232,0.55)", marginBottom: 18 }}>
-        Tap + and − to tally how many assignments each student has finished today.
-        Numbers add to the board's progress bar in real time.
+        Tap + and − to tally assignments. Each one earns the kid <strong style={{ color: "#fde68a" }}>+1 🪙</strong> automatically.
       </div>
 
       {loading ? (
@@ -235,6 +252,7 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
             const flashing = savedFlash === s.id;
             return (
               <div key={s.id} style={{
+                position: "relative",
                 background: flashing
                   ? "linear-gradient(135deg, rgba(34,197,94,0.20), rgba(16,185,129,0.10))"
                   : "rgba(255,255,255,0.04)",
@@ -246,6 +264,26 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
                 display: "flex", alignItems: "center", gap: 12,
                 transition: "background .25s, border .25s",
               }}>
+                {/* +N pts pop — floats up + fades when teacher
+                    awards points via the +/− buttons */}
+                {pointsFlash?.id === s.id && (
+                  <div style={{
+                    position: "absolute",
+                    top: -10, right: 16,
+                    padding: "4px 10px", borderRadius: 999,
+                    background: pointsFlash.pts > 0
+                      ? "linear-gradient(135deg, #15803d, #22c55e)"
+                      : "linear-gradient(135deg, #b91c1c, #ef4444)",
+                    color: "white",
+                    fontSize: 12, fontWeight: 900,
+                    fontVariantNumeric: "tabular-nums",
+                    boxShadow: "0 4px 12px rgba(34,197,94,0.45)",
+                    pointerEvents: "none",
+                    animation: "pointsPop 1.6s ease-out both",
+                  }}>
+                    {pointsFlash.pts > 0 ? "+" : ""}{pointsFlash.pts} pt{Math.abs(pointsFlash.pts)===1?"":"s"} 🪙
+                  </div>
+                )}
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%",
                   background: "linear-gradient(135deg, #b23a48, #7c3aed)",
@@ -294,6 +332,144 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Stars tab — manage McDonald's progress per kid ─────────────── */
+// Each kid's stars (0–5). 5 = "earned McDonald's" — the 🍔 pill on
+// their roster card lights up automatically. Reset (after handing
+// out McDonald's) by tapping the 🍔 button which clears their stars
+// and bumps reward_count.
+
+function StarsTab({ students }: { students: Student[] }) {
+  const [stars, setStars] = useState<Record<string, number>>(
+    Object.fromEntries(students.map((s: any) => [s.id, Number(s.behavior_stars) || 0]))
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const bump = async (s: Student, delta: number) => {
+    const cur = stars[s.id] || 0;
+    const next = Math.max(0, Math.min(5, cur + delta));
+    if (next === cur) return;
+    setBusyId(s.id);
+    try {
+      const r: any = await api.bumpStudentStars(s.id, delta);
+      setStars((prev) => ({ ...prev, [s.id]: typeof r?.behavior_stars === "number" ? r.behavior_stars : next }));
+      if (next === 5 && cur < 5) {
+        setFlash(`🍔 ${s.name.split(" ")[0]} earned McDonald's!`);
+        setTimeout(() => setFlash(null), 2400);
+      }
+    } catch {}
+    setBusyId(null);
+  };
+
+  const reset = async (s: Student) => {
+    if (!confirm(`Reset ${s.name.split(" ")[0]}'s stars after giving them McDonald's?`)) return;
+    setBusyId(s.id);
+    try {
+      const r: any = await api.bumpStudentStars(s.id, -5);
+      setStars((prev) => ({ ...prev, [s.id]: typeof r?.behavior_stars === "number" ? r.behavior_stars : 0 }));
+      setFlash(`✓ ${s.name.split(" ")[0]} cashed in McDonald's`);
+      setTimeout(() => setFlash(null), 1800);
+    } catch {}
+    setBusyId(null);
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)", marginBottom: 18 }}>
+        Tap stars to add or remove. <strong style={{ color: "#fde68a" }}>5 stars = McDonald's earned!</strong> 🍔 pill shows on their roster card. Tap 🍔 to reset stars after handing out the reward.
+      </div>
+
+      {flash && (
+        <div style={{
+          padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+          background: "linear-gradient(135deg, rgba(217,119,6,0.30), rgba(178,58,72,0.18))",
+          border: "1px solid rgba(217,119,6,0.50)",
+          color: "#fde68a", fontWeight: 800, fontSize: 14, textAlign: "center",
+          animation: "pointsPop 1.4s ease-out both",
+        }}>{flash}</div>
+      )}
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gap: 12,
+      }}>
+        {students.map((s) => {
+          const count = stars[s.id] || 0;
+          const isFull = count >= 5;
+          const initial = (s.name || "?")[0].toUpperCase();
+          return (
+            <div key={s.id} style={{
+              position: "relative",
+              background: isFull
+                ? "linear-gradient(135deg, rgba(217,119,6,0.18), rgba(178,58,72,0.10))"
+                : "rgba(255,255,255,0.04)",
+              border: isFull ? "1px solid rgba(217,119,6,0.55)" : "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 14,
+              padding: "14px 14px",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%",
+                background: isFull
+                  ? "linear-gradient(135deg, #fbbf24, #d97706)"
+                  : "linear-gradient(135deg, #b23a48, #7c3aed)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20, color: "white", fontWeight: 800, flexShrink: 0,
+              }}>{s.avatar_emoji || initial}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {s.name.split(" ")[0]}
+                </div>
+                <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        // Tap a star slot: if it's already filled, reduce to that index;
+                        // if it's empty, set to that index + 1.
+                        const target = i + 1;
+                        const delta = target - count;
+                        if (delta === 0) bump(s, -1);
+                        else bump(s, delta);
+                      }}
+                      disabled={busyId === s.id}
+                      style={{
+                        fontSize: 22, lineHeight: 1,
+                        background: "transparent", border: "none",
+                        cursor: "pointer",
+                        color: i < count ? (isFull ? "#fbbf24" : "#fcd34d") : "rgba(245,241,232,0.20)",
+                        filter: i < count ? `drop-shadow(0 0 ${isFull ? 8 : 3}px rgba(251,191,36,${isFull ? 0.7 : 0.4}))` : "none",
+                        padding: 2,
+                        transition: "color .15s, filter .15s",
+                      }}
+                    >★</button>
+                  ))}
+                </div>
+              </div>
+              {isFull && (
+                <button
+                  onClick={() => reset(s)}
+                  disabled={busyId === s.id}
+                  title="Cashed in McDonald's — reset stars"
+                  style={{
+                    padding: "8px 12px", borderRadius: 999,
+                    background: "linear-gradient(135deg, #dc2626, #f97316)",
+                    border: "none", color: "white", fontSize: 12, fontWeight: 800,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    boxShadow: "0 0 12px rgba(249,115,22,0.55)",
+                  }}
+                >🍔 Reset</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
