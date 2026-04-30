@@ -1415,6 +1415,9 @@ function WorkScreen({
 }) {
   const [helpState, setHelpState] = useState<"idle" | "raising" | "raised">("idle");
   const [showLesson, setShowLesson] = useState(false);
+  // Voice-input state for short-answer questions. "listening" means
+  // the mic is hot and the recognizer is collecting audio.
+  const [voiceState, setVoiceState] = useState<"idle" | "listening">("idle");
   // Stop any in-flight lesson TTS when the modal closes so speech
   // doesn't leak into the next screen. Reading itself is manual —
   // kids tap the 🔊 button to start it, never auto-plays.
@@ -2274,6 +2277,34 @@ function WorkScreen({
                     String(parsed?.subject || "").toLowerCase() === "math";
                   const isShort =
                     q.q.type === "short_answer" && (q.q.lines || 0) > 1;
+                  // Voice-to-text via Web Speech API. Available on Chrome/
+                  // Edge/Safari/iOS — feature-detected at click time so
+                  // unsupported browsers just don't show the button.
+                  const SpeechRec: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                  const speechSupported = !!SpeechRec;
+                  const startVoiceInput = () => {
+                    if (!speechSupported) return;
+                    try {
+                      const rec = new SpeechRec();
+                      rec.lang = "en-US";
+                      rec.interimResults = false;
+                      rec.continuous = false;
+                      rec.maxAlternatives = 1;
+                      setVoiceState("listening");
+                      rec.onresult = (e: any) => {
+                        const transcript = String(e?.results?.[0]?.[0]?.transcript || "").trim();
+                        if (transcript) {
+                          // Append if there's already text — don't blow away typed work
+                          const existing = String(currentAnswer || "").trim();
+                          handleSelect(existing ? `${existing} ${transcript}` : transcript);
+                        }
+                        setVoiceState("idle");
+                      };
+                      rec.onerror = () => setVoiceState("idle");
+                      rec.onend = () => setVoiceState((s) => s === "listening" ? "idle" : s);
+                      rec.start();
+                    } catch { setVoiceState("idle"); }
+                  };
                   const onEnter = (
                     e: React.KeyboardEvent<
                       HTMLInputElement | HTMLTextAreaElement
@@ -2308,48 +2339,80 @@ function WorkScreen({
                     : isMath
                       ? "Type your answer…"
                       : "Type your answer…";
+                  // Show the 🎤 only when voice makes sense: not for math
+                  // (numeric input), not for short spelling-style fills.
+                  // Spelling kids should TYPE, not say the word.
+                  const showMic = speechSupported && !isMath && String(parsed?.subject || "").toLowerCase() !== "spelling";
+                  const MicButton = showMic ? (
+                    <button
+                      type="button"
+                      onClick={startVoiceInput}
+                      disabled={voiceState === "listening"}
+                      title={voiceState === "listening" ? "Listening…" : "Talk to type your answer"}
+                      aria-label="Talk to type your answer"
+                      style={{
+                        flexShrink: 0,
+                        width: 44, height: 44, borderRadius: "50%",
+                        background: voiceState === "listening" ? "#ef4444" : `${starfall.accent}14`,
+                        color: voiceState === "listening" ? "white" : starfall.accent,
+                        border: voiceState === "listening" ? "2px solid #fca5a5" : `1px solid ${starfall.accent}33`,
+                        cursor: voiceState === "listening" ? "wait" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 18, lineHeight: 1,
+                        touchAction: "manipulation",
+                        animation: voiceState === "listening" ? "pulse 1.2s ease-in-out infinite" : undefined,
+                      }}
+                    >🎤</button>
+                  ) : null;
                   return (
                     <div>
-                      {isShort ? (
-                        <textarea
-                          value={currentAnswer}
-                          onChange={(e) => handleSelect(e.target.value)}
-                          placeholder={placeholder}
-                          rows={q.q.lines || 4}
-                          style={{ ...sharedStyle, resize: "vertical" }}
-                          onFocus={(e) =>
-                            (e.currentTarget.style.borderColor =
-                              starfall.accent)
-                          }
-                          onBlur={(e) =>
-                            (e.currentTarget.style.borderColor = `${starfall.accent}33`)
-                          }
-                        />
-                      ) : (
-                        <input
-                          type={isMath ? "text" : "text"}
-                          inputMode={isMath ? "numeric" : "text"}
-                          autoComplete="off"
-                          autoCorrect={isMath ? "off" : "on"}
-                          value={currentAnswer}
-                          onChange={(e) => handleSelect(e.target.value)}
-                          onKeyDown={onEnter}
-                          placeholder={placeholder}
-                          style={sharedStyle}
-                          onFocus={(e) =>
-                            (e.currentTarget.style.borderColor =
-                              starfall.accent)
-                          }
-                          onBlur={(e) =>
-                            (e.currentTarget.style.borderColor = `${starfall.accent}33`)
-                          }
-                        />
-                      )}
+                      <div style={{ display: "flex", gap: 10, alignItems: isShort ? "flex-start" : "center" }}>
+                        <div style={{ flex: 1 }}>
+                        {isShort ? (
+                          <textarea
+                            value={currentAnswer}
+                            onChange={(e) => handleSelect(e.target.value)}
+                            placeholder={placeholder}
+                            rows={q.q.lines || 4}
+                            style={{ ...sharedStyle, resize: "vertical" }}
+                            onFocus={(e) =>
+                              (e.currentTarget.style.borderColor =
+                                starfall.accent)
+                            }
+                            onBlur={(e) =>
+                              (e.currentTarget.style.borderColor = `${starfall.accent}33`)
+                            }
+                          />
+                        ) : (
+                          <input
+                            type={isMath ? "text" : "text"}
+                            inputMode={isMath ? "numeric" : "text"}
+                            autoComplete="off"
+                            autoCorrect={isMath ? "off" : "on"}
+                            value={currentAnswer}
+                            onChange={(e) => handleSelect(e.target.value)}
+                            onKeyDown={onEnter}
+                            placeholder={placeholder}
+                            style={sharedStyle}
+                            onFocus={(e) =>
+                              (e.currentTarget.style.borderColor =
+                                starfall.accent)
+                            }
+                            onBlur={(e) =>
+                              (e.currentTarget.style.borderColor = `${starfall.accent}33`)
+                            }
+                          />
+                        )}
+                        </div>
+                        {MicButton}
+                      </div>
                       <div
                         className="text-[11px] mt-2"
                         style={{ color: "#8A867E" }}
                       >
-                        {isShort
+                        {voiceState === "listening"
+                          ? "🎤 Listening… speak your answer"
+                          : isShort
                           ? "Shift + Enter for a new line"
                           : "Press Enter to continue"}
                       </div>
@@ -3001,34 +3064,50 @@ export default function StudentDashboard() {
   );
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
-  // Extras: streak, daily goal, mood. All purely additive; if the
-  // /extras endpoints are 404 or 500 these stay null and nothing renders.
+  // Extras: streak, daily goal, mood, next badge. All purely additive.
+  // If /extras endpoints fail, these stay null and nothing renders.
   const [streak, setStreak] = useState<number>(0);
   const [todayGoal, setTodayGoal] = useState<{ goal: string | null; done: boolean }>({ goal: null, done: false });
   const [todayMood, setTodayMood] = useState<string | null>(null);
   const [showMoodPrompt, setShowMoodPrompt] = useState(false);
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [goalDraft, setGoalDraft] = useState("");
+  const [nextBadge, setNextBadge] = useState<{
+    id: string; icon: string; label: string; target: number; current: number; gap: number;
+  } | null>(null);
   useEffect(() => {
     if (!user || user.role !== "student") return;
     let cancelled = false;
     (async () => {
       try {
-        const [s, g, m] = await Promise.all([
+        const [s, g, m, nb] = await Promise.all([
           api.getMyStreak().catch(() => ({ streak: 0 })),
           api.getMyGoal().catch(() => ({ goal: null, done: false })),
           api.getMyMood().catch(() => ({ mood: null })),
+          api.getNextBadge().catch(() => ({ next: null })),
         ]);
         if (cancelled) return;
         setStreak(s?.streak ?? 0);
         setTodayGoal({ goal: g?.goal ?? null, done: !!g?.done });
         setTodayMood(m?.mood ?? null);
-        // Prompt for mood once per day if not set
+        setNextBadge(nb?.next ?? null);
         if (!m?.mood) setShowMoodPrompt(true);
       } catch { /* extras are optional */ }
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  // Pet stage from cumulative dojo points — tiny companion that grows
+  // as kids accumulate teacher-awarded points. Pure visual, no DB.
+  const petStage = (() => {
+    const p = dojoPoints || 0;
+    if (p >= 200) return { emoji: "🦅", name: "Eagle",   stage: 5, next: null };
+    if (p >= 100) return { emoji: "🦉", name: "Owl",     stage: 4, next: { at: 200, name: "Eagle" } };
+    if (p >= 50)  return { emoji: "🐦", name: "Bird",    stage: 3, next: { at: 100, name: "Owl" } };
+    if (p >= 25)  return { emoji: "🐤", name: "Chick",   stage: 2, next: { at: 50,  name: "Bird" } };
+    if (p >= 10)  return { emoji: "🐣", name: "Hatching",stage: 1, next: { at: 25,  name: "Chick" } };
+    return { emoji: "🥚", name: "Egg", stage: 0, next: { at: 10, name: "Hatching" } };
+  })();
 
   // Welcome → loading transition
   useEffect(() => {
@@ -3891,10 +3970,65 @@ export default function StudentDashboard() {
           </div>
         </header>
 
-        {/* ── Additive: streak + daily goal + mood. Chips render only
-            when there's data, so a logged-out / fresh-account state shows
-            nothing here (zero layout impact). ── */}
-        {(streak > 0 || todayGoal.goal || todayMood) && (
+        {/* ── Pet companion + next-badge. Both purely additive and
+            render only when data is present. Pet sits in its own slim
+            card; next-badge is an inline chip in the streak/goal/mood
+            row below. Zero impact on the existing tiles grid. ── */}
+        {dojoPoints != null && dojoPoints > 0 && (() => {
+          const next = petStage.next;
+          const fromPrev = next ? Math.max(0, next.at - (dojoPoints || 0)) : 0;
+          const range = next ? (next.at - (petStage.stage > 0 ? [0,10,25,50,100,200][petStage.stage] : 0)) : 1;
+          const filled = next ? Math.max(0, Math.min(100, ((dojoPoints || 0) - [0,10,25,50,100,200][petStage.stage]) / range * 100)) : 100;
+          return (
+            <div style={{
+              marginTop: 12,
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "10px 14px",
+              borderRadius: 16,
+              background: isStudentDb
+                ? "linear-gradient(135deg, rgba(217,119,6,0.10), rgba(178,58,72,0.05))"
+                : "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(79,70,229,0.10))",
+              border: isStudentDb ? "1px solid rgba(58,36,16,0.10)" : "1px solid rgba(255,255,255,0.10)",
+              animation: "dbSlide .4s ease both",
+            }}>
+              <div title={petStage.name} style={{
+                fontSize: 36, lineHeight: 1, flexShrink: 0,
+                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.20))",
+              }}>{petStage.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, opacity: 0.55,
+                  textTransform: "uppercase", letterSpacing: "0.16em",
+                }}>Your buddy</div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>
+                  {petStage.name}{next ? <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.6, marginLeft: 8 }}>· {fromPrev} pts to {next.name}</span> : <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.6, marginLeft: 8 }}>· max level</span>}
+                </div>
+                <div style={{
+                  marginTop: 6,
+                  height: 5,
+                  background: isStudentDb ? "rgba(58,36,16,0.10)" : "rgba(255,255,255,0.08)",
+                  borderRadius: 999,
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${filled}%`,
+                    background: isStudentDb
+                      ? "linear-gradient(90deg, #d97706, #b23a48)"
+                      : "linear-gradient(90deg, #fbbf24, #f59e0b)",
+                    borderRadius: 999,
+                    transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+                  }} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Additive: streak + daily goal + mood + next-badge.
+            Chips render only when there's data, so a logged-out /
+            fresh-account state shows nothing here. ── */}
+        {(streak > 0 || todayGoal.goal || todayMood || nextBadge) && (
           <div style={{
             marginTop: 12,
             display: "flex", flexWrap: "wrap", gap: 8,
@@ -3959,6 +4093,27 @@ export default function StudentDashboard() {
                   border: isStudentDb ? "1px dashed rgba(58,36,16,0.20)" : "1px dashed rgba(255,255,255,0.18)",
                 }}
               >🎯 Set today's goal</button>
+            )}
+            {/* Next-badge nudge — surfaces the closest unearned milestone.
+                Tap to jump to the achievements page. */}
+            {nextBadge && (
+              <Link
+                to="/achievements"
+                title={`${nextBadge.gap} more for ${nextBadge.label}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 12px", borderRadius: 999,
+                  fontSize: 13, fontWeight: 700,
+                  textDecoration: "none",
+                  background: isStudentDb ? "rgba(124,58,237,0.10)" : "rgba(124,58,237,0.20)",
+                  color: isStudentDb ? "#6d28d9" : "#c4b5fd",
+                  border: isStudentDb ? "1px solid rgba(124,58,237,0.25)" : "1px solid rgba(124,58,237,0.40)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>{nextBadge.icon}</span>
+                <span>{nextBadge.gap} more for {nextBadge.label}</span>
+              </Link>
             )}
           </div>
         )}

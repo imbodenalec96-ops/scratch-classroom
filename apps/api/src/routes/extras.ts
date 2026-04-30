@@ -190,6 +190,148 @@ router.post("/me/goal/done", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── Next badge — "you're N away from X" ───────────────────────────────
+// Pulls the kid's current counts and finds the closest unearned
+// milestone, so the dashboard can surface a "1 more for Reading
+// Master!" tile that makes progress legible. Returns null if every
+// milestone is already earned (good problem).
+router.get("/me/next-badge", async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "auth required" });
+  const userId = req.user.id;
+  try {
+    // Same counts the auto-award computes — kept in sync intentionally
+    const totalSub: any = await db.prepare(
+      "SELECT COUNT(*)::int AS n FROM submissions WHERE student_id::text = ?"
+    ).get(userId).catch(() => ({ n: 0 }));
+    const submittedCount = Number(totalSub?.n ?? 0);
+
+    const today: any = await db.prepare(
+      `SELECT COUNT(*)::int AS n FROM submissions
+       WHERE student_id::text = ?
+         AND COALESCE(submitted_at, created_at) >= (CURRENT_DATE - INTERVAL '1 day')`
+    ).get(userId).catch(() => ({ n: 0 }));
+    const todayCount = Number(today?.n ?? 0);
+
+    const perfect: any = await db.prepare(
+      `SELECT COUNT(*)::int AS n FROM submissions
+       WHERE student_id::text = ? AND (grade = 100 OR human_grade_score = 100)`
+    ).get(userId).catch(() => ({ n: 0 }));
+    const perfectCount = Number(perfect?.n ?? 0);
+
+    const subjectCounts: Record<string, number> = {
+      reading: 0, math: 0, writing: 0, spelling: 0,
+      sel: 0, history: 0, science: 0, vocabulary: 0,
+    };
+    try {
+      const subjects: any[] = await db.prepare(
+        `SELECT LOWER(a.target_subject) AS subject, COUNT(*)::int AS n
+         FROM submissions s JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE s.student_id::text = ? AND a.target_subject IS NOT NULL
+         GROUP BY 1`
+      ).all(userId);
+      for (const r of subjects) {
+        if (r?.subject in subjectCounts) subjectCounts[r.subject] = Number(r.n) || 0;
+      }
+    } catch {}
+
+    let bonusCount = 0;
+    try {
+      const r: any = await db.prepare(
+        `SELECT COUNT(*)::int AS n FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE s.student_id::text = ?
+           AND (COALESCE(a.is_afternoon, 0) = 1 OR (a.title IS NOT NULL AND a.title LIKE '🌅%'))`
+      ).get(userId);
+      bonusCount = Number(r?.n ?? 0);
+    } catch {}
+
+    let streakDays = 0;
+    try {
+      const dates: any[] = await db.prepare(
+        `SELECT DISTINCT SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) AS d
+         FROM submissions WHERE student_id::text = ?
+         ORDER BY d DESC LIMIT 30`
+      ).all(userId);
+      const set = new Set(dates.map((r: any) => r.d));
+      const today2 = todayPacific();
+      const yesterday = new Date(Date.now() - 7 * 3600_000 - 86_400_000).toISOString().slice(0, 10);
+      let cursor: string | null = set.has(today2) ? today2 : (set.has(yesterday) ? yesterday : null);
+      while (cursor && set.has(cursor)) {
+        streakDays += 1;
+        const d = new Date(cursor + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 1);
+        cursor = d.toISOString().slice(0, 10);
+      }
+    } catch {}
+
+    // Already earned set
+    let earned = new Set<string>();
+    try {
+      const lb: any = await db.prepare("SELECT badges FROM leaderboard WHERE user_id::text = ?").get(userId);
+      if (lb?.badges) {
+        try {
+          const parsed = typeof lb.badges === "string" ? JSON.parse(lb.badges) : lb.badges;
+          if (Array.isArray(parsed)) earned = new Set(parsed);
+        } catch {}
+      }
+    } catch {}
+
+    // Threshold table — must stay in sync with leaderboard.ts milestones.
+    type M = { id: string; icon: string; label: string; target: number; current: number };
+    const all: M[] = [
+      { id: "first_assignment", icon: "🎯", label: "First One Done",  target: 1,    current: submittedCount },
+      { id: "5_assignments",    icon: "🔥", label: "On a Roll",        target: 5,    current: submittedCount },
+      { id: "10_assignments",   icon: "⭐", label: "Star Student",     target: 10,   current: submittedCount },
+      { id: "25_assignments",   icon: "🏆", label: "Champion",         target: 25,   current: submittedCount },
+      { id: "50_assignments",   icon: "💎", label: "Diamond Worker",   target: 50,   current: submittedCount },
+      { id: "100_assignments",  icon: "👑", label: "Hall of Fame",     target: 100,  current: submittedCount },
+      { id: "200_assignments",  icon: "🌌", label: "Cosmic Worker",    target: 200,  current: submittedCount },
+      { id: "500_assignments",  icon: "🦄", label: "Legend",           target: 500,  current: submittedCount },
+      { id: "1000_assignments", icon: "🌠", label: "Mythic",           target: 1000, current: submittedCount },
+      { id: "perfect_score",    icon: "💯", label: "Perfect Score",    target: 1,    current: perfectCount },
+      { id: "3_perfect",        icon: "✨", label: "Triple Perfect",   target: 3,    current: perfectCount },
+      { id: "10_perfect",       icon: "🥇", label: "Always Right",     target: 10,   current: perfectCount },
+      { id: "25_perfect",       icon: "🎖️",label: "Genius",           target: 25,   current: perfectCount },
+      { id: "50_perfect",       icon: "💠", label: "Perfectionist",    target: 50,   current: perfectCount },
+      { id: "100_perfect",      icon: "🪐", label: "Hall of Mind",     target: 100,  current: perfectCount },
+      { id: "3_in_a_day",       icon: "⚡", label: "Speedster",        target: 3,    current: todayCount },
+      { id: "5_in_a_day",       icon: "🚀", label: "Power Day",        target: 5,    current: todayCount },
+      { id: "7_in_a_day",       icon: "🌪️",label: "Tornado Day",      target: 7,    current: todayCount },
+      { id: "10_in_a_day",      icon: "🏃", label: "Marathon Day",     target: 10,   current: todayCount },
+      { id: "reading_master",   icon: "📚", label: "Reading Master",   target: 10,   current: subjectCounts.reading },
+      { id: "math_master",      icon: "🔢", label: "Math Master",      target: 10,   current: subjectCounts.math },
+      { id: "writing_master",   icon: "✍️", label: "Writing Master",   target: 10,   current: subjectCounts.writing },
+      { id: "spelling_master",  icon: "🔤", label: "Spelling Master",  target: 10,   current: subjectCounts.spelling },
+      { id: "reading_legend",   icon: "🦉", label: "Reading Legend",   target: 50,   current: subjectCounts.reading },
+      { id: "math_legend",      icon: "🧮", label: "Math Legend",      target: 50,   current: subjectCounts.math },
+      { id: "writing_legend",   icon: "🪶", label: "Writing Legend",   target: 50,   current: subjectCounts.writing },
+      { id: "spelling_legend",  icon: "🏰", label: "Spelling Legend",  target: 50,   current: subjectCounts.spelling },
+      { id: "sel_master",       icon: "🧠", label: "Mindful",          target: 3,    current: subjectCounts.sel },
+      { id: "history_master",   icon: "📜", label: "Historian",        target: 3,    current: subjectCounts.history },
+      { id: "science_master",   icon: "🔬", label: "Scientist",        target: 3,    current: subjectCounts.science },
+      { id: "vocab_master",     icon: "📖", label: "Word Wizard",      target: 3,    current: subjectCounts.vocabulary },
+      { id: "bonus_buster",     icon: "🌅", label: "Bonus Buster",     target: 1,    current: bonusCount },
+      { id: "5_bonus",          icon: "✨", label: "Bonus Champion",   target: 5,    current: bonusCount },
+      { id: "10_bonus",         icon: "🌇", label: "Bonus Hero",       target: 10,   current: bonusCount },
+      { id: "25_bonus",         icon: "🌃", label: "Sunset Sage",      target: 25,   current: bonusCount },
+      { id: "streak_3",         icon: "📅", label: "3-Day Streak",     target: 3,    current: streakDays },
+      { id: "streak_5",         icon: "🔥", label: "5-Day Streak",     target: 5,    current: streakDays },
+      { id: "streak_10",        icon: "🏅", label: "10-Day Streak",    target: 10,   current: streakDays },
+      { id: "streak_15",        icon: "⚡", label: "Lightning Streak", target: 15,   current: streakDays },
+      { id: "streak_30",        icon: "💫", label: "Unstoppable",      target: 30,   current: streakDays },
+      { id: "streak_50",        icon: "👑", label: "Living Legend",    target: 50,   current: streakDays },
+    ];
+    const candidates = all
+      .filter((m) => !earned.has(m.id) && m.current < m.target)
+      .map((m) => ({ ...m, gap: m.target - m.current }))
+      .sort((a, b) => a.gap - b.gap);
+    const top = candidates[0] || null;
+    res.json({ next: top });
+  } catch (e: any) {
+    res.json({ next: null });
+  }
+});
+
 // ── Streak (read-only) ────────────────────────────────────────────────
 // Walks the kid's last 14 distinct submission days backward from today
 // to compute their current consecutive-day streak. Cheap, no extra

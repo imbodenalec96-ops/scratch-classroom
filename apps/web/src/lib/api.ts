@@ -599,6 +599,9 @@ export const api = {
   getMyGoal: () => request<{ goal: string | null; done: boolean }>(`/extras/me/goal`),
   markGoalDone: () => request<{ ok: boolean }>(`/extras/me/goal/done`, { method: "POST", body: "{}" }),
   getMyStreak: () => request<{ streak: number; today?: string }>(`/extras/me/streak`),
+  getNextBadge: () => request<{
+    next: { id: string; icon: string; label: string; target: number; current: number; gap: number } | null;
+  }>(`/extras/me/next-badge`),
   postAnnouncement: (classId: string, message: string, pinned = false) =>
     request<{ ok: boolean; id: string }>(`/extras/classes/${classId}/announcements`, {
       method: "POST", body: JSON.stringify({ message, pinned }),
