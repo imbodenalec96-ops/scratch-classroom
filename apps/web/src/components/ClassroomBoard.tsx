@@ -268,10 +268,8 @@ export default function ClassroomBoard() {
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
-  // Store-only mode: opens the BoardConsole already on the Store tab,
-  // skipping the teacher PIN. Kids still need their own PIN to redeem.
-  const [showStoreOnly, setShowStoreOnly] = useState(false);
-  // Student wallet — kid taps face, types PIN, sees own points + badges.
+  // Student wallet — kid taps face, types PIN, sees own points + badges
+  // and can spend at the store from the same view.
   const [showWallet, setShowWallet] = useState(false);
   // PIN gate before opening the console — keeps kids from poking at
   // teacher tools when they walk past the projector. PIN is checked
@@ -946,7 +944,7 @@ export default function ClassroomBoard() {
           {isTeacher && (
             <>
               {/* Wallet — kids walk up, tap their face, type PIN, see
-                  their own points + badges. Read-only kiosk. */}
+                  their points, badges, AND can spend at the store. */}
               <button
                 onClick={() => setShowWallet(true)}
                 title="My wallet — students unlock with their PIN"
@@ -958,19 +956,6 @@ export default function ClassroomBoard() {
                   letterSpacing: "0.08em", textTransform: "uppercase",
                 }}
               >💼 Wallet</button>
-              {/* Store — kids walk up, tap their face, type their PIN.
-                  No teacher gate; each redemption is PIN-locked already. */}
-              <button
-                onClick={() => setShowStoreOnly(true)}
-                title="Classroom store — students unlock with their PIN"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid #d9770688`,
-                  background: "rgba(217,119,6,0.20)", color: "#fbbf24",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >🛒 Store</button>
               {/* Tools — teacher-only utilities (manual progress entry).
                   Locked behind the teacher PIN so kids can't tamper. */}
               <button
@@ -1769,15 +1754,6 @@ export default function ClassroomBoard() {
         onClose={() => setShowConsole(false)}
       />
     )}
-    {showStoreOnly && cls?.id && (
-      <BoardConsole
-        classId={cls.id}
-        students={(board?.students || []) as any}
-        storeOnly
-        onClose={() => setShowStoreOnly(false)}
-      />
-    )}
-
     {/* Birthday auto-celebration — full-board takeover when any kid's
         birthday is today (Pacific). Once-per-day per kid via localStorage. */}
     {board?.students?.length > 0 && (
