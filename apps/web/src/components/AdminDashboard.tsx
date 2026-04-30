@@ -3,6 +3,7 @@ import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { api } from "../lib/api.ts";
 import { Link } from "react-router-dom";
+import { PinsTab } from "./BoardConsole.tsx";
 import {
   Users, GraduationCap, BookOpen, School, Eye,
   LockOpen, Youtube, BarChart3, Trophy,
@@ -346,6 +347,16 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {/* ─── Student PINs (kiosk store on the board) ─── */}
+        {classes[0]?.id && (
+          <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .14s both" }}>
+            <Divider label="Student PINs" />
+            <div style={{ ...cardStyle, padding:"20px 22px" }}>
+              <PinsTab classId={classes[0].id} />
+            </div>
+          </div>
+        )}
 
         {/* ─── Classrooms + People ─── */}
         <div style={{ marginBottom:36, animation:"ad-fadeUp .5s ease .18s both" }}>

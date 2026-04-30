@@ -247,8 +247,9 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
 }
 
 /* ── PINs tab — teacher manages each kid's 4-digit kiosk PIN ─────── */
+// Exported so the AdminDashboard can drop the same UI into its own page.
 
-function PinsTab({ classId }: { classId: string }) {
+export function PinsTab({ classId }: { classId: string }) {
   const [list, setList] = useState<Array<{ id: string; name: string; kiosk_pin: string | null; avatar_emoji: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
