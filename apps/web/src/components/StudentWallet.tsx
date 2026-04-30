@@ -13,10 +13,42 @@ interface Student {
   avatar_url?: string | null;
 }
 
+interface StoreItem {
+  id: string;
+  name: string;
+  emoji: string | null;
+  price: number;
+  stock: number | null;
+  enabled: number;
+}
+
 interface Props {
   students: Student[];
   classId: string;
   onClose: () => void;
+}
+
+// Same ka-ching used in BoardConsole — synthesized via Web Audio so
+// no mp3 needed. Two quick descending tones.
+function playKaching() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const playTone = (freq: number, when: number, dur = 0.18) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = "triangle";
+      gain.gain.setValueAtTime(0, ctx.currentTime + when);
+      gain.gain.linearRampToValueAtTime(0.30, ctx.currentTime + when + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + when);
+      osc.stop(ctx.currentTime + when + dur + 0.02);
+    };
+    playTone(1318, 0);
+    playTone(1760, 0.10);
+    setTimeout(() => ctx.close().catch(() => {}), 600);
+  } catch {}
 }
 
 export default function StudentWallet({ students, classId, onClose }: Props) {
@@ -32,12 +64,50 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
     behavior_stars?: number;
   } | null>(null);
 
+  // Store — list catalog once verified so the kid can spend without
+  // bouncing to a separate Store button.
+  const [items, setItems] = useState<StoreItem[]>([]);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const showFlash = (kind: "ok" | "err", text: string) => {
+    setFlash({ kind, text });
+    setTimeout(() => setFlash(null), 2800);
+  };
+
   const reset = () => {
     setPicked(null);
     setPin("");
     setPinError("");
     setVerified(false);
     setData(null);
+    setItems([]);
+    setFlash(null);
+  };
+
+  const redeem = async (item: StoreItem) => {
+    if (!picked || !pin) return;
+    if (item.stock != null && item.stock <= 0) {
+      showFlash("err", `${item.name} is out of stock`);
+      return;
+    }
+    if (!data || data.dojo_points < item.price) {
+      showFlash("err", `Need ${item.price - (data?.dojo_points || 0)} more pts`);
+      return;
+    }
+    setBusyItemId(item.id);
+    try {
+      const r = await api.boardRedeem(picked.id, pin, item.id);
+      setData((d) => d ? { ...d, dojo_points: r.dojo_points } : d);
+      showFlash("ok", `🎉 Got ${r.item_name}! Show your teacher.`);
+      playKaching();
+      // Refresh items in case stock dropped
+      try { setItems(await api.getStoreItems()); } catch {}
+    } catch (e: any) {
+      showFlash("err", e?.message || "Could not redeem");
+    } finally {
+      setBusyItemId(null);
+    }
   };
 
   // Load wallet data once verified by attempting a free PIN-only check.
@@ -66,28 +136,23 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
       setVerified(true);
       setPinError("");
     }
-    // Pull the kid's stats
+    // Pull the kid's stats AND the store catalog in parallel so the
+    // wallet view shows everything at once
     try {
-      const [lb, streak, ann] = await Promise.all([
+      const [lb, storeItems] = await Promise.all([
         api.getLeaderboard().catch(() => [] as any[]),
-        api.getMyStreak().catch(() => ({ streak: 0 })),
-        api.getAnnouncements(classId).catch(() => [] as any[]),
+        api.getStoreItems().catch(() => [] as StoreItem[]),
       ]);
-      // streak from /me/streak applies to the current user, NOT the
-      // kid we're showing here. We can't get a kid-specific streak
-      // without a backend change. For now we just display 0 unless
-      // we add an endpoint.
-      void streak;
-      void ann;
       const me = lb.find((r: any) => r.user_id === picked.id);
       const rank = me ? (lb.findIndex((r: any) => r.user_id === picked.id) + 1) : undefined;
       setData({
         dojo_points: me?.dojo_points ?? 0,
-        streak: 0, // TODO: backend support for streak by other student
+        streak: 0, // streak by other student needs backend support
         badges: Array.isArray(me?.badges) ? me.badges : [],
         rank,
         behavior_stars: me?.behavior_stars,
       });
+      setItems(storeItems);
     } catch {
       setData({ dojo_points: 0, streak: 0, badges: [] });
     }
@@ -222,6 +287,17 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
 
         {picked && verified && data && (
           <div>
+            {/* Flash toast for store actions */}
+            {flash && (
+              <div style={{
+                padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+                background: flash.kind === "ok" ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
+                border: flash.kind === "ok" ? "1px solid rgba(34,197,94,0.4)" : "1px solid rgba(239,68,68,0.4)",
+                color: flash.kind === "ok" ? "#bbf7d0" : "#fca5a5",
+                fontWeight: 700, fontSize: 14,
+                textAlign: "center",
+              }}>{flash.text}</div>
+            )}
             {/* Hero stat row */}
             <div style={{
               display: "grid",
@@ -233,10 +309,76 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
               <StatCard label="Badges" value={`🎖️ ${data.badges.length}`} />
               {data.rank && <StatCard label="Class Rank" value={`#${data.rank}`} />}
             </div>
+
+            {/* Store — spend the points right here */}
+            {items.filter((it) => it.enabled).length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 10,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.65 }}>
+                    🛒 Spend Points
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.55 }}>
+                    Tap an item to redeem
+                  </div>
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                  gap: 10,
+                }}>
+                  {items.filter((it) => it.enabled).map((it) => {
+                    const canAfford = data.dojo_points >= it.price;
+                    const oos = it.stock != null && it.stock <= 0;
+                    const disabled = !canAfford || oos || busyItemId === it.id;
+                    return (
+                      <button
+                        key={it.id}
+                        onClick={() => redeem(it)}
+                        disabled={disabled}
+                        style={{
+                          background: canAfford && !oos
+                            ? "linear-gradient(135deg, rgba(217,119,6,0.20), rgba(178,58,72,0.10))"
+                            : "rgba(255,255,255,0.04)",
+                          border: canAfford && !oos
+                            ? "1px solid rgba(217,119,6,0.50)"
+                            : "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: 14,
+                          padding: "16px 12px",
+                          color: "white",
+                          cursor: disabled ? "default" : "pointer",
+                          opacity: disabled ? 0.55 : 1,
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                          transition: "transform .15s",
+                        }}
+                        onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+                      >
+                        <div style={{ fontSize: 32, lineHeight: 1 }}>{it.emoji || "🎁"}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>{it.name}</div>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700,
+                          color: canAfford && !oos ? "#fde68a" : "rgba(245,241,232,0.55)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {oos ? "Out of stock"
+                            : !canAfford ? `Need ${it.price - data.dojo_points} more`
+                            : busyItemId === it.id ? "…"
+                            : `🪙 ${it.price}`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {data.badges.length > 0 && (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 8 }}>
-                  Badges Earned
+                  🎖️ Badges Earned
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {data.badges.slice(0, 30).map((b) => (
@@ -260,7 +402,7 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
                   color: "rgba(245,241,232,0.85)", fontSize: 13, fontWeight: 700,
                   cursor: "pointer",
                 }}
-              >Switch student</button>
+              >Done</button>
             </div>
           </div>
         )}
