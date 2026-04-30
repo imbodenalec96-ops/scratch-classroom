@@ -371,32 +371,39 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
     // on a prior day from today's queue, matching /pending), and which
     // were submitted TODAY (those count toward the daily bar so kids
     // see progress accumulate as they work).
-    const submittedEverPairs = new Set<string>();
-    const submittedTodayPairs = new Set<string>();
-    if (dayAssignments.length > 0) {
-      const ids = dayAssignments.map((a) => a.id);
-      const placeholders = ids.map(() => "?").join(",");
-      try {
-        // Bucket submissions by Pacific date, NOT UTC. submitted_at /
-        // created_at are UTC timestamps; subtracting 7 hours before
-        // slicing gives the Pacific calendar day. Without this fix,
-        // anything submitted between 5 PM Pacific and midnight Pacific
-        // shows up as "tomorrow" UTC and silently disappears from
-        // today's "done" count on the board.
-        const subs = await db.prepare(
-          `SELECT student_id::text AS student_id,
-                  assignment_id::text AS assignment_id,
-                  SUBSTR((COALESCE(submitted_at, created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS day
-           FROM submissions WHERE assignment_id::text IN (${placeholders})`
-        ).all(...ids) as any[];
-        for (const r of subs) {
-          const k = `${r.student_id}|${r.assignment_id}`;
-          submittedEverPairs.add(k);
-          if (r.day === todayStr) submittedTodayPairs.add(k);
-        }
-      } catch (e: any) {
-        console.error("[live-progress submittedPairs]", e?.message);
+    // Submission credit by BUCKET (subject + grade + round), not by
+    // exact assignment id. Lets a submission to yesterday's "Reading R1"
+    // row credit today's rotated "Reading R1" row in the same student's
+    // queue when the rotation wipes + replaces phantom rows. Without
+    // this, every wipe + rotate makes the board look like nobody has
+    // done anything.
+    type Bucket = string; // `${subject}|${grade}|${round}`
+    const bucketKey = (subj: string, grade: any, title: string): Bucket => {
+      const round = /— Round 2/.test(title) ? "r2" : "r1";
+      return `${(subj || "").toLowerCase()}|${grade ?? ""}|${round}`;
+    };
+
+    // For each (student, bucket): how many submissions exist that are
+    // visible to that student, all-time and today (Pacific).
+    const submittedPerStudentBucket = new Map<string, { ever: number; today: number }>();
+    try {
+      const allSubs: any[] = await db.prepare(
+        `SELECT s.student_id::text AS student_id,
+                a.title, a.target_subject, a.target_grade_min,
+                SUBSTR((COALESCE(s.submitted_at, s.created_at)::timestamp - INTERVAL '7 hours')::text, 1, 10) AS day
+         FROM submissions s
+         JOIN assignments a ON a.id::text = s.assignment_id::text
+         WHERE a.class_id::text = ?`
+      ).all(classId);
+      for (const r of allSubs) {
+        const k = `${r.student_id}|${bucketKey(r.target_subject, r.target_grade_min, String(r.title || ""))}`;
+        const entry = submittedPerStudentBucket.get(k) || { ever: 0, today: 0 };
+        entry.ever += 1;
+        if (r.day === todayStr) entry.today += 1;
+        submittedPerStudentBucket.set(k, entry);
       }
+    } catch (e: any) {
+      console.error("[live-progress bucketSubs]", e?.message);
     }
 
     // Visibility: legacy student_id column (a single student lock) takes
@@ -421,35 +428,42 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       return Number(g) >= tMin && Number(g) <= tMax;
     };
 
-    // Per-student daily progress — resets every morning so the bar
-    // shows TODAY'S work, not "everything you've ever done".
+    // Per-student daily progress — bucketed so prior submissions to
+    // a now-rotated row still credit today's slot. For each (subject,
+    // grade, round) bucket in the kid's queue:
     //
-    //   total = visible-and-bonus-passing assignments that the kid
-    //           hasn't already finished on a prior day. Null-scheduled
-    //           always-on assignments (SEL/History/Science/Vocab) drop
-    //           out once submitted, same as /pending hides them.
-    //   done  = how many of those they've submitted *today*.
-    //   open  = total - done (still on their queue today).
-    //   pct   = done / total.
+    //   queue_count    = how many rows of that bucket are visible
+    //   submissions    = how many submissions of that bucket the kid
+    //                    has made (any time)
+    //   done_in_bucket = min(submissions, queue_count) — capped so we
+    //                    don't credit more than the queue has
     //
-    // A kid who finished yesterday's reading shows nothing for it
-    // today; a kid who finished today's reading this morning sees it
-    // counted as done; a kid who hasn't done it sees it open.
+    // total = sum of queue_count across buckets
+    // done  = sum of done_in_bucket
+    //
+    // This way:
+    //   - Yesterday's reading submission (against a wiped row) still
+    //     credits today's reading row in the same bucket.
+    //   - A kid with 2 reading rows + 1 reading submission shows 1/2.
+    //   - A kid with 0 submissions shows 0/total cleanly.
     const byStudent: Record<string, { open: number; done: number; total: number; pct: number }> = {};
     let studentsDone = 0;
     let totalOpenAcrossClass = 0;
     for (const s of students) {
-      let total = 0, done = 0;
+      // Build the kid's queue grouped by bucket
+      const queueByBucket = new Map<string, number>();
       for (const a of dayAssignments) {
         if (!passesBonusRules(a)) continue;
         if (!isVisibleTo(a, s)) continue;
-        const key = `${s.id}|${a.id}`;
-        const submittedEver = submittedEverPairs.has(key);
-        const submittedToday = submittedTodayPairs.has(key);
-        // Already finished before today → not in today's queue at all.
-        if (submittedEver && !submittedToday) continue;
-        total += 1;
-        if (submittedToday) done += 1;
+        const k = bucketKey(a.target_subject, a.target_grade_min, String(a.title || ""));
+        queueByBucket.set(k, (queueByBucket.get(k) || 0) + 1);
+      }
+      let total = 0, done = 0;
+      for (const [bucket, count] of queueByBucket.entries()) {
+        const subs = submittedPerStudentBucket.get(`${s.id}|${bucket}`);
+        const subCount = subs?.ever || 0;
+        total += count;
+        done += Math.min(subCount, count);
       }
       const open = total - done;
       const sPct = total > 0 ? Math.round((done / total) * 100) : 0;
