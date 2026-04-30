@@ -82,7 +82,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -122,7 +122,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           </div>
           {!storeOnly && (
             <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
-              {(["progress", "points", "store", "pins"] as const).map((t) => (
+              {(["progress", "points", "spinner", "groups", "store", "pins"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -138,6 +138,8 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                 >
                   {t === "progress" ? "📋 Progress"
                     : t === "points" ? "🪙 Points"
+                    : t === "spinner" ? "🎲 Spinner"
+                    : t === "groups" ? "👥 Groups"
                     : t === "store" ? "🛒 Store"
                     : "🔑 PINs"}
                 </button>
@@ -162,6 +164,8 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           {tab === "progress" && <ProgressTab classId={classId} students={students} />}
           {tab === "points"   && <PointsTab classId={classId} students={students} />}
+          {tab === "spinner"  && <SpinnerTab students={students} />}
+          {tab === "groups"   && <GroupsTab students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
           {tab === "pins"     && <PinsTab classId={classId} />}
         </div>
@@ -284,6 +288,295 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
                       cursor: "pointer",
                     }}
                   >+</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Spinner tab — pick a random kid, fun roulette animation ────── */
+
+function SpinnerTab({ students }: { students: Student[] }) {
+  const [spinning, setSpinning] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState<number | null>(null);
+  const [winner, setWinner] = useState<Student | null>(null);
+  const [excludeIds, setExcludeIds] = useState<Set<string>>(new Set());
+
+  const eligible = students.filter((s) => !excludeIds.has(s.id));
+
+  const spin = () => {
+    if (spinning || eligible.length === 0) return;
+    setWinner(null);
+    setSpinning(true);
+    // Roulette: cycle through highlights, slowing down, landing on a random kid
+    const targetIdx = Math.floor(Math.random() * eligible.length);
+    let i = 0;
+    const total = 24 + targetIdx; // enough cycles to look random
+    let delay = 60;
+    const step = () => {
+      setHighlightIdx(i % eligible.length);
+      i += 1;
+      if (i >= total) {
+        const finalIdx = (i - 1) % eligible.length;
+        setHighlightIdx(finalIdx);
+        setWinner(eligible[finalIdx]);
+        setSpinning(false);
+        return;
+      }
+      // Ease-out: slow down toward the end
+      const remaining = total - i;
+      delay = remaining < 8 ? delay + 30 : delay;
+      setTimeout(step, delay);
+    };
+    step();
+  };
+
+  const reset = () => { setWinner(null); setHighlightIdx(null); };
+  const exclude = (id: string) => {
+    setExcludeIds((prev) => new Set([...prev, id]));
+    setWinner(null);
+    setHighlightIdx(null);
+  };
+  const reseed = () => {
+    setExcludeIds(new Set());
+    setWinner(null);
+    setHighlightIdx(null);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
+          Pick a random student. Tap a name to exclude them from future spins.
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {excludeIds.size > 0 && (
+            <button
+              onClick={reseed}
+              style={{
+                padding: "8px 14px", borderRadius: 999,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "rgba(245,241,232,0.85)", fontSize: 12, fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >🔄 Reset ({excludeIds.size})</button>
+          )}
+          <button
+            onClick={spin}
+            disabled={spinning || eligible.length === 0}
+            style={{
+              padding: "10px 22px", borderRadius: 999,
+              background: spinning ? "rgba(255,255,255,0.10)" : "linear-gradient(135deg,#b23a48,#d97706)",
+              border: "none", color: "white", fontSize: 14, fontWeight: 800,
+              cursor: spinning || eligible.length === 0 ? "default" : "pointer",
+              opacity: spinning || eligible.length === 0 ? 0.6 : 1,
+            }}
+          >🎲 {spinning ? "Spinning…" : "Spin!"}</button>
+        </div>
+      </div>
+
+      {/* Big winner display */}
+      {winner && (
+        <div style={{
+          marginBottom: 24, padding: "26px 24px", borderRadius: 18,
+          background: "linear-gradient(135deg, rgba(217,119,6,0.18), rgba(178,58,72,0.10))",
+          border: "1px solid rgba(217,119,6,0.50)",
+          display: "flex", alignItems: "center", gap: 18,
+          animation: "dbPop .4s cubic-bezier(0.34,1.56,0.64,1) both",
+        }}>
+          <div style={{
+            width: 84, height: 84, borderRadius: "50%",
+            background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 42, color: "white", fontWeight: 900,
+            boxShadow: "0 0 24px rgba(178,58,72,0.55)",
+          }}>{winner.avatar_emoji || winner.name[0].toUpperCase()}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55 }}>
+              You're up!
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: "#fde68a", lineHeight: 1.05, marginTop: 4 }}>
+              {winner.name}
+            </div>
+          </div>
+          <button
+            onClick={() => exclude(winner.id)}
+            style={{
+              padding: "10px 16px", borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "rgba(245,241,232,0.85)", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >Exclude next time</button>
+        </div>
+      )}
+
+      {/* Roulette grid */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+        gap: 10,
+      }}>
+        {students.map((s, i) => {
+          const eligibleIdx = eligible.indexOf(s);
+          const isHighlighted = highlightIdx === eligibleIdx && eligibleIdx >= 0;
+          const isExcluded = excludeIds.has(s.id);
+          const initial = (s.name || "?")[0].toUpperCase();
+          return (
+            <div
+              key={s.id}
+              onClick={() => !spinning && exclude(s.id)}
+              style={{
+                background: isHighlighted
+                  ? "linear-gradient(135deg, #b23a48, #d97706)"
+                  : isExcluded
+                    ? "rgba(255,255,255,0.02)"
+                    : "rgba(255,255,255,0.04)",
+                border: isHighlighted
+                  ? "2px solid #fbbf24"
+                  : "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 14,
+                padding: "14px 10px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                opacity: isExcluded ? 0.30 : 1,
+                cursor: spinning ? "default" : "pointer",
+                transform: isHighlighted ? "scale(1.06)" : "none",
+                transition: "transform .12s, background .12s",
+                textDecoration: isExcluded ? "line-through" : "none",
+              }}
+            >
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 24, fontWeight: 800, color: "white",
+              }}>{s.avatar_emoji || initial}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "white", textAlign: "center" }}>
+                {s.name.split(" ")[0]}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Groups tab — split the class into random groups of N ────────── */
+
+function GroupsTab({ students }: { students: Student[] }) {
+  const [groupSize, setGroupSize] = useState<number>(3);
+  const [groups, setGroups] = useState<Student[][] | null>(null);
+
+  const make = () => {
+    const shuffled = [...students].sort(() => Math.random() - 0.5);
+    const result: Student[][] = [];
+    for (let i = 0; i < shuffled.length; i += groupSize) {
+      result.push(shuffled.slice(i, i + groupSize));
+    }
+    setGroups(result);
+  };
+
+  const colors = [
+    { from: "#b23a48", to: "#d97706" },
+    { from: "#0f766e", to: "#10b981" },
+    { from: "#7c3aed", to: "#4f46e5" },
+    { from: "#dc2626", to: "#f97316" },
+    { from: "#0284c7", to: "#0ea5e9" },
+    { from: "#c026d3", to: "#a21caf" },
+    { from: "#ca8a04", to: "#facc15" },
+    { from: "#65a30d", to: "#84cc16" },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
+          Shuffle the class into random groups for centers or pair work.
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, opacity: 0.55, fontWeight: 700 }}>Group size:</span>
+          {[2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              onClick={() => setGroupSize(n)}
+              style={{
+                width: 36, height: 36, borderRadius: 8,
+                background: groupSize === n ? "linear-gradient(135deg,#b23a48,#d97706)" : "rgba(255,255,255,0.05)",
+                border: groupSize === n ? "none" : "1px solid rgba(255,255,255,0.10)",
+                color: "white", fontWeight: 800, fontSize: 14,
+                cursor: "pointer",
+              }}
+            >{n}</button>
+          ))}
+          <button
+            onClick={make}
+            style={{
+              padding: "10px 18px", borderRadius: 999,
+              background: "linear-gradient(135deg,#b23a48,#d97706)",
+              border: "none", color: "white", fontSize: 13, fontWeight: 800,
+              cursor: "pointer",
+              marginLeft: 8,
+            }}
+          >🎲 {groups ? "Re-shuffle" : "Make Groups"}</button>
+        </div>
+      </div>
+
+      {!groups && (
+        <div style={{
+          textAlign: "center", padding: 60, opacity: 0.55,
+          border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 14,
+        }}>
+          Pick a group size and tap "Make Groups".
+        </div>
+      )}
+
+      {groups && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 14,
+        }}>
+          {groups.map((g, gi) => {
+            const c = colors[gi % colors.length];
+            return (
+              <div key={gi} style={{
+                borderRadius: 16,
+                background: `linear-gradient(160deg, ${c.from}33, ${c.to}11)`,
+                border: `1px solid ${c.from}88`,
+                padding: "14px 16px",
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 800, letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: c.from,
+                  marginBottom: 4,
+                }}>Group {gi + 1}</div>
+                <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>
+                  {g.length} {g.length === 1 ? "student" : "students"}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {g.map((s) => (
+                    <div key={s.id} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 10px", borderRadius: 10,
+                      background: "rgba(255,255,255,0.04)",
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        background: `linear-gradient(135deg, ${c.from}, ${c.to})`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 16, fontWeight: 800, color: "white",
+                      }}>{s.avatar_emoji || s.name[0].toUpperCase()}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{s.name}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
