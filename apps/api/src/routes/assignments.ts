@@ -3342,4 +3342,17 @@ router.delete("/class/:classId/afternoon", requireRole("teacher", "admin"), asyn
   }
 });
 
+// Re-export the content bundles so admin tooling can call generate-today
+// logic without going through the auth middleware. Read-only consts.
+export {
+  PREMADE as PREMADE_CONTENT,
+  EXTRA_PREMADE as EXTRA_PREMADE_CONTENT,
+  SEL_CONTENT as SEL_CONTENT_EXPORT,
+  HISTORY_CONTENT as HISTORY_CONTENT_EXPORT,
+  SCIENCE_CONTENT as SCIENCE_CONTENT_EXPORT,
+  VOCABULARY_CONTENT as VOCABULARY_CONTENT_EXPORT,
+  GEOGRAPHY_CONTENT as GEOGRAPHY_CONTENT_EXPORT,
+  ART_CONTENT as ART_CONTENT_EXPORT,
+};
+
 export default router;

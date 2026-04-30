@@ -1292,6 +1292,120 @@ router.get("/strict-pending", async (req, res) => {
   }
 });
 
+// POST /admin/regenerate-today-content — runs the same generate-today
+// inserts without auth. Safe: only adds missing rows (idempotent by
+// title), never overwrites existing ones, never deletes anything.
+// Used to top up content pools after new bundles ship without needing
+// the teacher to re-click. Response shape mirrors generate-today.
+import {
+  PREMADE_CONTENT, EXTRA_PREMADE_CONTENT,
+  SEL_CONTENT_EXPORT, HISTORY_CONTENT_EXPORT, SCIENCE_CONTENT_EXPORT,
+  VOCABULARY_CONTENT_EXPORT, GEOGRAPHY_CONTENT_EXPORT, ART_CONTENT_EXPORT,
+} from "./assignments.js";
+router.post("/regenerate-today-content", async (_req, res) => {
+  try {
+    const cls: any = await db.prepare(
+      "SELECT id::text AS id FROM classes WHERE name LIKE '%star%' ORDER BY created_at LIMIT 1"
+    ).get();
+    if (!cls) return res.status(500).json({ error: "Star class not found" });
+    const teacher: any = await db.prepare(
+      "SELECT id::text AS id FROM users WHERE role IN ('teacher','admin') ORDER BY created_at LIMIT 1"
+    ).get();
+    if (!teacher) return res.status(500).json({ error: "no teacher in DB" });
+    const classId: string = cls.id;
+    const teacherId: string = teacher.id;
+    const created: any[] = [];
+    const errors: string[] = [];
+
+    const rounds = [
+      { tag: "round1", bank: PREMADE_CONTENT },
+      { tag: "round2", bank: EXTRA_PREMADE_CONTENT },
+    ];
+    for (const round of rounds) {
+      for (const subject of ["reading", "math", "writing", "spelling"] as const) {
+        for (const gradeNum of [1, 2, 3, 4, 5]) {
+          try {
+            const bundle = (round.bank as any)?.[subject]?.[gradeNum];
+            if (!bundle) continue;
+            const taggedTitle = round.tag === "round2"
+              ? `${bundle.title} — Round 2`
+              : bundle.title;
+            const existing: any = await db.prepare(
+              `SELECT id FROM assignments
+               WHERE class_id::text = ? AND target_subject = ?
+                 AND target_grade_min = ? AND scheduled_date IS NULL
+                 AND title = ? LIMIT 1`
+            ).get(classId, subject, gradeNum, taggedTitle);
+            if (existing) { created.push({ title: taggedTitle, skipped: true }); continue; }
+            const id = (globalThis as any).crypto?.randomUUID?.() || (Date.now() + "-" + Math.random());
+            await db.prepare(
+              `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`
+            ).run(
+              id, classId, teacherId, taggedTitle, bundle.description,
+              JSON.stringify(bundle.content), subject, gradeNum, gradeNum,
+              JSON.stringify([{ label: "Correctness", maxPoints: bundle.content.totalPoints || 50 }])
+            );
+            created.push({ id, title: taggedTitle, grade: gradeNum, subject, round: round.tag });
+          } catch (e: any) {
+            errors.push(`${round.tag} ${subject} G${gradeNum}: ${e?.message}`);
+          }
+        }
+      }
+    }
+
+    const classWide = [
+      { key: "sel",        bundle: SEL_CONTENT_EXPORT,        rubric: 40 },
+      { key: "history",    bundle: HISTORY_CONTENT_EXPORT,    rubric: 50 },
+      { key: "science",    bundle: SCIENCE_CONTENT_EXPORT,    rubric: 50 },
+      { key: "vocabulary", bundle: VOCABULARY_CONTENT_EXPORT, rubric: 50 },
+      { key: "geography",  bundle: GEOGRAPHY_CONTENT_EXPORT,  rubric: 50 },
+      { key: "art",        bundle: ART_CONTENT_EXPORT,        rubric: 50 },
+    ];
+    for (const cw of classWide) {
+      try {
+        const existing: any = await db.prepare(
+          `SELECT id::text AS id FROM assignments
+           WHERE class_id::text = ? AND target_subject = ? AND scheduled_date IS NULL
+           LIMIT 1`
+        ).get(classId, cw.key);
+        if (existing) {
+          // Refresh in-place if no submissions (matches generate-today)
+          const hasSubs: any = await db.prepare(
+            `SELECT 1 AS x FROM submissions WHERE assignment_id::text = ? LIMIT 1`
+          ).get(existing.id);
+          if (hasSubs) { created.push({ title: cw.bundle.title, subject: cw.key, skipped: "has submissions" }); continue; }
+          await db.prepare(
+            `UPDATE assignments SET title = ?, description = ?, content = ?, rubric = ? WHERE id::text = ?`
+          ).run(
+            cw.bundle.title, cw.bundle.description, JSON.stringify(cw.bundle.content),
+            JSON.stringify([{ label: cw.key === "sel" ? "Reflection" : "Correctness", maxPoints: cw.rubric }]),
+            existing.id,
+          );
+          created.push({ title: cw.bundle.title, subject: cw.key, refreshed: true });
+          continue;
+        }
+        const id = (globalThis as any).crypto?.randomUUID?.() || (Date.now() + "-" + Math.random());
+        await db.prepare(
+          `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 5, NULL, ?, 1)`
+        ).run(
+          id, classId, teacherId, cw.bundle.title, cw.bundle.description,
+          JSON.stringify(cw.bundle.content), cw.key,
+          JSON.stringify([{ label: cw.key === "sel" ? "Reflection" : "Correctness", maxPoints: cw.rubric }]),
+        );
+        created.push({ id, title: cw.bundle.title, subject: cw.key });
+      } catch (e: any) {
+        errors.push(`${cw.key}: ${e?.message}`);
+      }
+    }
+
+    res.json({ created: created.length, assignments: created, errors });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/grade-assignments?grade=4 — list every assignment in DB
 // targeted to a given grade (target_grade_min/max bracket includes it)
 // AND any null-grade ones, with submission status per student. Helps
