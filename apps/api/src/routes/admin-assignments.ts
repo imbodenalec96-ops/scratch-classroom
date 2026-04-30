@@ -1292,6 +1292,27 @@ router.get("/strict-pending", async (req, res) => {
   }
 });
 
+// GET /admin/grade-assignments?grade=4 — list every assignment in DB
+// targeted to a given grade (target_grade_min/max bracket includes it)
+// AND any null-grade ones, with submission status per student. Helps
+// answer "why does student X have only N assignments left".
+router.get("/grade-assignments", async (req, res) => {
+  const grade = Number(req.query.grade ?? 4);
+  try {
+    const rows: any[] = await db.prepare(
+      `SELECT id::text AS id, title, target_subject, target_grade_min, target_grade_max,
+              target_student_ids, scheduled_date, is_afternoon
+       FROM assignments
+       WHERE (target_grade_min IS NULL OR (target_grade_min <= ? AND COALESCE(target_grade_max, target_grade_min) >= ?))
+         AND scheduled_date IS NULL
+       ORDER BY target_subject, title`
+    ).all(grade, grade);
+    res.json({ grade, count: rows.length, assignments: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/students — list all active students for the assignment builder
 router.get("/students", async (_req, res) => {
   try {
