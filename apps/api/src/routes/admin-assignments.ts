@@ -1298,10 +1298,30 @@ router.get("/strict-pending", async (req, res) => {
 // Used to top up content pools after new bundles ship without needing
 // the teacher to re-click. Response shape mirrors generate-today.
 import {
-  PREMADE_CONTENT, EXTRA_PREMADE_CONTENT,
+  PREMADE_CONTENT, EXTRA_PREMADE_CONTENT, BONUS_PREMADE_CONTENT,
   SEL_CONTENT_EXPORT, HISTORY_CONTENT_EXPORT, SCIENCE_CONTENT_EXPORT,
   VOCABULARY_CONTENT_EXPORT, GEOGRAPHY_CONTENT_EXPORT, ART_CONTENT_EXPORT,
 } from "./assignments.js";
+
+// Deterministic daily rotation across the 3 content banks so the
+// assignment a kid sees on Monday is different from Tuesday is
+// different from Wednesday. djb2-style string hash + offset = stable
+// per (date, subject, grade, round) with no DB state needed.
+function pickDailyBundle(subject: string, grade: number, dateStr: string, roundIdx: number) {
+  const banks = [PREMADE_CONTENT, EXTRA_PREMADE_CONTENT, BONUS_PREMADE_CONTENT];
+  let h = 5381;
+  const seed = `${dateStr}|${subject}|${grade}`;
+  for (let i = 0; i < seed.length; i++) h = ((h * 33) ^ seed.charCodeAt(i)) >>> 0;
+  // Offset for round 2 so it picks a different bank than round 1
+  const idx = (h + roundIdx) % 3;
+  // Pick from chosen bank, fall back to the others if missing entry
+  for (let i = 0; i < 3; i++) {
+    const bank = banks[(idx + i) % 3];
+    const bundle = (bank as any)?.[subject]?.[grade];
+    if (bundle) return bundle;
+  }
+  return null;
+}
 router.post("/regenerate-today-content", async (_req, res) => {
   try {
     // Case-insensitive match on Postgres needs ILIKE; fall back to first
@@ -1321,26 +1341,67 @@ router.post("/regenerate-today-content", async (_req, res) => {
     const created: any[] = [];
     const errors: string[] = [];
 
-    const rounds = [
-      { tag: "round1", bank: PREMADE_CONTENT },
-      { tag: "round2", bank: EXTRA_PREMADE_CONTENT },
-    ];
-    for (const round of rounds) {
+    // Today's Pacific date — used as the rotation seed so Mon/Tue/Wed
+    // each pick a different content bank for the same (subject, grade).
+    const todayStr = new Date(Date.now() - 7 * 3600_000).toISOString().slice(0, 10);
+
+    // Two rounds per day; offset within the rotation guarantees
+    // round 1 and round 2 pull from different banks.
+    for (const roundIdx of [0, 1]) {
+      const roundTag = roundIdx === 0 ? "round1" : "round2";
       for (const subject of ["reading", "math", "writing", "spelling"] as const) {
         for (const gradeNum of [1, 2, 3, 4, 5]) {
           try {
-            const bundle = (round.bank as any)?.[subject]?.[gradeNum];
+            const bundle = pickDailyBundle(subject, gradeNum, todayStr, roundIdx);
             if (!bundle) continue;
-            const taggedTitle = round.tag === "round2"
-              ? `${bundle.title} — Round 2`
-              : bundle.title;
-            const existing: any = await db.prepare(
-              `SELECT id FROM assignments
-               WHERE class_id::text = ? AND target_subject = ?
-                 AND target_grade_min = ? AND scheduled_date IS NULL
-                 AND title = ? LIMIT 1`
-            ).get(classId, subject, gradeNum, taggedTitle);
-            if (existing) { created.push({ title: taggedTitle, skipped: true }); continue; }
+            const taggedTitle = roundIdx === 1 ? `${bundle.title} — Round 2` : bundle.title;
+
+            // Idempotency now keyed by (class, subject, grade, round),
+            // not exact title — so when the rotation picks a different
+            // bank tomorrow, we update the existing row's title +
+            // content instead of inserting a stray duplicate. Stable
+            // tag in title lets us find the right row.
+            const roundMarker = roundIdx === 1 ? '%— Round 2%' : '%';
+            // For round 1, find any row WITHOUT "— Round 2" in the title
+            const existing: any = roundIdx === 0
+              ? await db.prepare(
+                  `SELECT id::text AS id FROM assignments
+                   WHERE class_id::text = ? AND target_subject = ?
+                     AND target_grade_min = ? AND scheduled_date IS NULL
+                     AND title NOT LIKE '%— Round 2%'
+                     AND title NOT LIKE '🌅%'
+                     AND title NOT LIKE '📝%'
+                   ORDER BY created_at ASC LIMIT 1`
+                ).get(classId, subject, gradeNum)
+              : await db.prepare(
+                  `SELECT id::text AS id FROM assignments
+                   WHERE class_id::text = ? AND target_subject = ?
+                     AND target_grade_min = ? AND scheduled_date IS NULL
+                     AND title LIKE ?
+                   ORDER BY created_at ASC LIMIT 1`
+                ).get(classId, subject, gradeNum, roundMarker);
+
+            if (existing) {
+              // Refresh content + title in-place IF no submissions yet,
+              // so the daily rotation actually changes what kids see.
+              // Rows with submissions are kept untouched — we never
+              // swap content out from under a kid mid-assignment.
+              const hasSubs: any = await db.prepare(
+                `SELECT 1 AS x FROM submissions WHERE assignment_id::text = ? LIMIT 1`
+              ).get(existing.id);
+              if (hasSubs) { created.push({ title: taggedTitle, skipped: "has submissions" }); continue; }
+              await db.prepare(
+                `UPDATE assignments SET title = ?, content = ?, description = ?, rubric = ? WHERE id::text = ?`
+              ).run(
+                taggedTitle,
+                JSON.stringify(bundle.content),
+                bundle.description,
+                JSON.stringify([{ label: "Correctness", maxPoints: bundle.content.totalPoints || 50 }]),
+                existing.id,
+              );
+              created.push({ id: existing.id, title: taggedTitle, refreshed: true, round: roundTag });
+              continue;
+            }
             const id = (globalThis as any).crypto?.randomUUID?.() || (Date.now() + "-" + Math.random());
             await db.prepare(
               `INSERT INTO assignments (id, class_id, teacher_id, title, description, content, target_subject, target_grade_min, target_grade_max, scheduled_date, rubric, hints_allowed)
@@ -1350,9 +1411,9 @@ router.post("/regenerate-today-content", async (_req, res) => {
               JSON.stringify(bundle.content), subject, gradeNum, gradeNum,
               JSON.stringify([{ label: "Correctness", maxPoints: bundle.content.totalPoints || 50 }])
             );
-            created.push({ id, title: taggedTitle, grade: gradeNum, subject, round: round.tag });
+            created.push({ id, title: taggedTitle, grade: gradeNum, subject, round: roundTag });
           } catch (e: any) {
-            errors.push(`${round.tag} ${subject} G${gradeNum}: ${e?.message}`);
+            errors.push(`${roundTag} ${subject} G${gradeNum}: ${e?.message}`);
           }
         }
       }
