@@ -1497,6 +1497,21 @@ router.post("/regenerate-today-content", async (req, res) => {
   }
 });
 
+// POST /admin/clear-help/:studentId — clears any open help request
+// for the student. No auth (admin route mount); used to wipe a stale
+// "needs help" overlay from the board roster.
+router.post("/clear-help/:studentId", async (req, res) => {
+  try {
+    const r = await db.prepare(
+      `UPDATE help_requests SET cleared_at = ?
+       WHERE student_id::text = ? AND cleared_at IS NULL`
+    ).run(new Date().toISOString(), req.params.studentId);
+    res.json({ cleared: (r as any)?.changes ?? 0 });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/student-submissions?name=Ameer — show every submission this
 // student has, joined with the assignment's subject/grade/title. Helps
 // debug why the board's bucket-based done count isn't crediting prior work.
