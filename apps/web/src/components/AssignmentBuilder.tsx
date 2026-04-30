@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.ts";
+import { getPetStage, useDojoPoints } from "../lib/petCompanion.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { useAuth } from "../lib/auth.tsx";
 import { useCurrentBlock } from "../lib/useCurrentBlock.ts";
@@ -157,6 +158,36 @@ function PaperPreview({ assignment, dk }: { assignment: GeneratedAssignment; dk:
           <div className="text-sm font-bold text-gray-600">/ {assignment.totalPoints}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Floating PetChip for the assignment builder ──
+   Same look as the StudentDashboard's WorkScreen chip but lives here
+   so kids see their pet here too. Instant render from localStorage
+   cache; quietly refreshes from /store/me/balance. ── */
+function BuilderPetChip() {
+  const { points } = useDojoPoints();
+  const stage = getPetStage(points);
+  return (
+    <div style={{
+      position: "fixed",
+      top: 12, right: 12,
+      zIndex: 60,
+      display: "flex", alignItems: "center", gap: 6,
+      padding: "6px 10px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.92)",
+      border: "1px solid rgba(217,119,6,0.30)",
+      boxShadow: "0 2px 6px rgba(58,36,16,0.10)",
+      pointerEvents: "none",
+    }}>
+      <span style={{ fontSize: 22, lineHeight: 1, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
+        {stage.emoji}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>
+        {points}
+      </span>
     </div>
   );
 }
@@ -887,6 +918,11 @@ function StudentAssignmentView({ dk }: { dk: boolean }) {
         @keyframes sfFadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
         @keyframes sfBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
       `}</style>
+
+      {/* Floating PetChip — instant render from localStorage cache so
+          kids see their buddy while doing assignments here too. ── */}
+      <BuilderPetChip />
+
 
       {/* Top bar — friendly soft-white card sitting on cream */}
       <div style={{

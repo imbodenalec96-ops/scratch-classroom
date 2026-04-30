@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.tsx";
 import { useTheme } from "../lib/theme.tsx";
 import { api } from "../lib/api.ts";
+import { PetChip, getPetStage, useDojoPoints } from "../lib/petCompanion.tsx";
 import { useSocket } from "../lib/ws.ts";
 import ClickableText from "./ClickableText.tsx";
 import {
@@ -163,6 +164,36 @@ async function speakViaTtsApi(word: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Floating pet chip — top-right corner of the WorkScreen so kids
+ *  see their buddy while doing assignments. Uses the cached
+ *  dojo_points so it appears instantly on first paint, then quietly
+ *  updates from the server. ── */
+function FloatingPetChip() {
+  const { points } = useDojoPoints();
+  const stage = getPetStage(points);
+  return (
+    <div style={{
+      position: "absolute",
+      top: 12, right: 12,
+      zIndex: 60,
+      display: "flex", alignItems: "center", gap: 6,
+      padding: "6px 10px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.92)",
+      border: "1px solid rgba(217,119,6,0.30)",
+      boxShadow: "0 2px 6px rgba(58,36,16,0.10)",
+      pointerEvents: "none",
+    }}>
+      <span style={{ fontSize: 22, lineHeight: 1, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
+        {stage.emoji}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>
+        {points}
+      </span>
+    </div>
+  );
 }
 
 function getBestVoice(): SpeechSynthesisVoice | null {
@@ -1687,6 +1718,11 @@ function WorkScreen({
       className="fixed inset-0 z-50 overflow-auto starfall-doer"
       style={{ background: starfallBg, touchAction: "pan-y" }}
     >
+      {/* Floating PetChip — instant render from localStorage cache so
+          kids see their buddy alongside their work without waiting for
+          a network round-trip. Sits in the top-right, above content,
+          out of the way of the question and answer area. */}
+      <FloatingPetChip />
       <div
         className="mx-auto px-6 py-12 space-y-7"
         style={{ maxWidth: 720 }}
@@ -3038,8 +3074,27 @@ export default function StudentDashboard() {
   }, [user?.role]);
 
   // Classroom-store points (ClassDojo-style). Separate from behavior stars —
-  // cumulative teacher-awarded currency students spend at /cashout.
-  const [dojoPoints, setDojoPoints] = useState<number | null>(null);
+  // cumulative teacher-awarded currency students spend at /cashout. Seeded
+  // from localStorage so the pet companion renders instantly on first
+  // paint instead of flashing in a beat after the network round-trip.
+  const PET_CACHE_KEY = "thign:dojoPoints";
+  const cachedPoints = (() => {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(PET_CACHE_KEY);
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  })();
+  const [dojoPoints, setDojoPointsRaw] = useState<number | null>(cachedPoints);
+  const setDojoPoints = (n: number | null) => {
+    setDojoPointsRaw(n);
+    try {
+      if (typeof window !== "undefined") {
+        if (n == null) window.localStorage.removeItem(PET_CACHE_KEY);
+        else window.localStorage.setItem(PET_CACHE_KEY, String(n));
+      }
+    } catch {}
+  };
   useEffect(() => {
     if (user?.role !== "student") return;
     let cancelled = false;
