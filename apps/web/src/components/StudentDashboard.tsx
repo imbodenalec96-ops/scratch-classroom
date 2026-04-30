@@ -4573,42 +4573,53 @@ export default function StudentDashboard() {
 
 
 
-        {/* ── ACHIEVEMENTS: loot-box cards (one per earned badge) ── */}
-        {Array.isArray(myEntry?.badges) && myEntry.badges.length > 0 && (
-          <div style={{ marginTop: 22 }}>
-            <div
-              style={{
-                marginBottom: 10,
-                fontSize: 10,
-                fontWeight: 700,
-                opacity: 0.4,
-                textTransform: "uppercase",
-                letterSpacing: "0.2em",
-              }}
-            >
-              🎁 Achievements — Tap a box to claim your bonus points!
+        {/* ── ACHIEVEMENTS: loot-box cards — only NEW (unclaimed) ones.
+              Kids said the wall of opened cards was overwhelming and the
+              dashboard kept showing achievements they'd already cashed
+              in. Now the list only renders unclaimed badges, so each
+              new badge gets a fresh "tap to open" moment and the row
+              empties out as they claim everything. Full grid (claimed +
+              unclaimed) still lives on the /achievements page. ── */}
+        {(() => {
+          const allBadges = Array.isArray(myEntry?.badges) ? (myEntry.badges as string[]) : [];
+          const unclaimed = allBadges.filter((b) => !badgeClaims.includes(b));
+          if (unclaimed.length === 0) return null;
+          return (
+            <div style={{ marginTop: 22 }}>
+              <div
+                style={{
+                  marginBottom: 10,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  opacity: 0.4,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.2em",
+                }}
+              >
+                🎁 New Achievements — Tap a box to claim your bonus points!
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {unclaimed.map((badgeId) => (
+                  <LootBox
+                    key={badgeId}
+                    badgeId={badgeId}
+                    alreadyClaimed={false}
+                    onClaimed={(newBalance) => {
+                      setBadgeClaims((prev) => prev.includes(badgeId) ? prev : [...prev, badgeId]);
+                      if (typeof newBalance === "number") setDojoPoints(newBalance);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {(myEntry.badges as string[]).map((badgeId) => (
-                <LootBox
-                  key={badgeId}
-                  badgeId={badgeId}
-                  alreadyClaimed={badgeClaims.includes(badgeId)}
-                  onClaimed={(newBalance) => {
-                    setBadgeClaims((prev) => prev.includes(badgeId) ? prev : [...prev, badgeId]);
-                    if (typeof newBalance === "number") setDojoPoints(newBalance);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
       {/* end max-width wrapper */}

@@ -366,20 +366,28 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       return sd === todayStr;
     };
 
-    // ALL submissions for the day's assignments, regardless of
-    // when they were submitted — once a kid turns something in, that
-    // assignment is permanently off their queue (matches /pending which
-    // LEFT-JOINs submissions and filters s.id IS NULL).
-    const submittedPairs = new Set<string>();
+    // Two submission lookups: which (student, assignment) pairs are
+    // already submitted EVER (so we can hide assignments a kid finished
+    // on a prior day from today's queue, matching /pending), and which
+    // were submitted TODAY (those count toward the daily bar so kids
+    // see progress accumulate as they work).
+    const submittedEverPairs = new Set<string>();
+    const submittedTodayPairs = new Set<string>();
     if (dayAssignments.length > 0) {
       const ids = dayAssignments.map((a) => a.id);
       const placeholders = ids.map(() => "?").join(",");
       try {
         const subs = await db.prepare(
-          `SELECT student_id::text AS student_id, assignment_id::text AS assignment_id
+          `SELECT student_id::text AS student_id,
+                  assignment_id::text AS assignment_id,
+                  SUBSTR(COALESCE(submitted_at, created_at)::text, 1, 10) AS day
            FROM submissions WHERE assignment_id::text IN (${placeholders})`
         ).all(...ids) as any[];
-        for (const r of subs) submittedPairs.add(`${r.student_id}|${r.assignment_id}`);
+        for (const r of subs) {
+          const k = `${r.student_id}|${r.assignment_id}`;
+          submittedEverPairs.add(k);
+          if (r.day === todayStr) submittedTodayPairs.add(k);
+        }
       } catch (e: any) {
         console.error("[live-progress submittedPairs]", e?.message);
       }
@@ -407,10 +415,20 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       return Number(g) >= tMin && Number(g) <= tMax;
     };
 
-    // For each student, total = visible+bonus-pass assignments.
-    //   done = how many of those they've submitted (any time).
-    //   open = total - done (still on their queue).
-    //   pct  = done / total. Class progress aggregates these.
+    // Per-student daily progress — resets every morning so the bar
+    // shows TODAY'S work, not "everything you've ever done".
+    //
+    //   total = visible-and-bonus-passing assignments that the kid
+    //           hasn't already finished on a prior day. Null-scheduled
+    //           always-on assignments (SEL/History/Science/Vocab) drop
+    //           out once submitted, same as /pending hides them.
+    //   done  = how many of those they've submitted *today*.
+    //   open  = total - done (still on their queue today).
+    //   pct   = done / total.
+    //
+    // A kid who finished yesterday's reading shows nothing for it
+    // today; a kid who finished today's reading this morning sees it
+    // counted as done; a kid who hasn't done it sees it open.
     const byStudent: Record<string, { open: number; done: number; total: number; pct: number }> = {};
     let studentsDone = 0;
     let totalOpenAcrossClass = 0;
@@ -419,8 +437,13 @@ router.get("/classes/:classId/live-progress", async (req: AuthRequest, res: Resp
       for (const a of dayAssignments) {
         if (!passesBonusRules(a)) continue;
         if (!isVisibleTo(a, s)) continue;
+        const key = `${s.id}|${a.id}`;
+        const submittedEver = submittedEverPairs.has(key);
+        const submittedToday = submittedTodayPairs.has(key);
+        // Already finished before today → not in today's queue at all.
+        if (submittedEver && !submittedToday) continue;
         total += 1;
-        if (submittedPairs.has(`${s.id}|${a.id}`)) done += 1;
+        if (submittedToday) done += 1;
       }
       const open = total - done;
       const sPct = total > 0 ? Math.round((done / total) * 100) : 0;
