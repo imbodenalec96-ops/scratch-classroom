@@ -1497,6 +1497,31 @@ router.post("/regenerate-today-content", async (req, res) => {
   }
 });
 
+// GET /admin/student-submissions?name=Ameer — show every submission this
+// student has, joined with the assignment's subject/grade/title. Helps
+// debug why the board's bucket-based done count isn't crediting prior work.
+router.get("/student-submissions", async (req, res) => {
+  const name = String(req.query?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "?name= required" });
+  try {
+    const u: any = await db.prepare(
+      `SELECT id::text AS id, name FROM users WHERE LOWER(name) LIKE ? AND role='student' LIMIT 1`
+    ).get(`%${name.toLowerCase()}%`);
+    if (!u) return res.json({ error: `Student '${name}' not found` });
+    const rows: any[] = await db.prepare(
+      `SELECT a.id::text AS aid, a.title, a.target_subject, a.target_grade_min,
+              COALESCE(s.submitted_at, s.created_at)::text AS ts
+       FROM submissions s
+       JOIN assignments a ON a.id::text = s.assignment_id::text
+       WHERE s.student_id::text = ?
+       ORDER BY ts DESC LIMIT 60`
+    ).all(u.id);
+    res.json({ student: u, count: rows.length, submissions: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // GET /admin/grade-assignments?grade=4 — list every assignment in DB
 // targeted to a given grade (target_grade_min/max bracket includes it)
 // AND any null-grade ones, with submission status per student. Helps
