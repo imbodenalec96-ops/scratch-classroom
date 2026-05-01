@@ -633,6 +633,9 @@ export const api = {
     }),
   getManualProgress: (classId: string) =>
     request<{ day: string; byStudent: Array<{ student_id: string; count: number }> }>(`/extras/classes/${classId}/manual-progress`),
+  // Whether the kid can spend right now (override active OR cashout block live).
+  isStoreOpenForStudent: (studentId: string) =>
+    request<{ open: boolean; source: "override" | "schedule" | "closed"; until: string | null }>(`/extras/store/is-open?studentId=${encodeURIComponent(studentId)}`),
   // Board-side store redemption — teacher initiates, student PIN approves.
   boardRedeem: (studentId: string, pin: string, itemId: string) =>
     request<{ ok: boolean; student_name: string; item_name: string; price: number; dojo_points: number }>(`/extras/board-redeem`, {

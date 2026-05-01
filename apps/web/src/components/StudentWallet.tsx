@@ -69,6 +69,10 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
   const [items, setItems] = useState<StoreItem[]>([]);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Store-open status — kid can only spend during the cashout block
+  // OR while the teacher's override is active. We check this once on
+  // verify and re-check after a failed redemption.
+  const [storeOpen, setStoreOpen] = useState<{ open: boolean; source: string; until: string | null } | null>(null);
 
   const showFlash = (kind: "ok" | "err", text: string) => {
     setFlash({ kind, text });
@@ -83,6 +87,7 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
     setData(null);
     setItems([]);
     setFlash(null);
+    setStoreOpen(null);
   };
 
   const redeem = async (item: StoreItem) => {
@@ -136,13 +141,15 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
       setVerified(true);
       setPinError("");
     }
-    // Pull the kid's stats AND the store catalog in parallel so the
-    // wallet view shows everything at once
+    // Pull the kid's stats AND the store catalog AND the open-status
+    // in parallel so the wallet view shows everything at once
     try {
-      const [lb, storeItems] = await Promise.all([
+      const [lb, storeItems, openStatus] = await Promise.all([
         api.getLeaderboard().catch(() => [] as any[]),
         api.getStoreItems().catch(() => [] as StoreItem[]),
+        api.isStoreOpenForStudent(picked.id).catch(() => ({ open: false, source: "closed" as const, until: null })),
       ]);
+      setStoreOpen(openStatus);
       const me = lb.find((r: any) => r.user_id === picked.id);
       const rank = me ? (lb.findIndex((r: any) => r.user_id === picked.id) + 1) : undefined;
       setData({
@@ -310,7 +317,7 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
               {data.rank && <StatCard label="Class Rank" value={`#${data.rank}`} />}
             </div>
 
-            {/* Store — spend the points right here */}
+            {/* Store — spend the points right here, only if open */}
             {items.filter((it) => it.enabled).length > 0 && (
               <div style={{ marginBottom: 18 }}>
                 <div style={{
@@ -321,9 +328,28 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
                     🛒 Spend Points
                   </div>
                   <div style={{ fontSize: 12, opacity: 0.55 }}>
-                    Tap an item to redeem
+                    {storeOpen?.open
+                      ? (storeOpen.source === "override" ? "Open by teacher" : "Cashout time")
+                      : "Closed"}
                   </div>
                 </div>
+
+                {/* Locked banner — blocks redeem when store isn't open */}
+                {!storeOpen?.open && (
+                  <div style={{
+                    padding: "14px 16px", borderRadius: 12, marginBottom: 12,
+                    background: "rgba(148,163,184,0.10)",
+                    border: "1px solid rgba(148,163,184,0.30)",
+                    color: "rgba(245,241,232,0.80)",
+                    display: "flex", alignItems: "center", gap: 12,
+                  }}>
+                    <span style={{ fontSize: 24 }}>🔒</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Store is closed</div>
+                      <div style={{ fontSize: 12, opacity: 0.75 }}>You can look at the items, but you can only buy during cashout time. Ask your teacher to open the store!</div>
+                    </div>
+                  </div>
+                )}
                 <div style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
@@ -332,26 +358,29 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
                   {items.filter((it) => it.enabled).map((it) => {
                     const canAfford = data.dojo_points >= it.price;
                     const oos = it.stock != null && it.stock <= 0;
-                    const disabled = !canAfford || oos || busyItemId === it.id;
+                    const closed = !storeOpen?.open;
+                    const disabled = !canAfford || oos || closed || busyItemId === it.id;
                     return (
                       <button
                         key={it.id}
                         onClick={() => redeem(it)}
                         disabled={disabled}
+                        title={closed ? "Store is closed" : oos ? "Out of stock" : !canAfford ? `Need ${it.price - data.dojo_points} more pts` : ""}
                         style={{
-                          background: canAfford && !oos
+                          background: canAfford && !oos && !closed
                             ? "linear-gradient(135deg, rgba(217,119,6,0.20), rgba(178,58,72,0.10))"
                             : "rgba(255,255,255,0.04)",
-                          border: canAfford && !oos
+                          border: canAfford && !oos && !closed
                             ? "1px solid rgba(217,119,6,0.50)"
                             : "1px solid rgba(255,255,255,0.08)",
                           borderRadius: 14,
                           padding: "16px 12px",
                           color: "white",
-                          cursor: disabled ? "default" : "pointer",
+                          cursor: disabled ? "not-allowed" : "pointer",
                           opacity: disabled ? 0.55 : 1,
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                           transition: "transform .15s",
+                          filter: closed ? "grayscale(0.6)" : "none",
                         }}
                         onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.transform = "scale(1.04)"; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
@@ -360,10 +389,11 @@ export default function StudentWallet({ students, classId, onClose }: Props) {
                         <div style={{ fontSize: 13, fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>{it.name}</div>
                         <div style={{
                           fontSize: 11, fontWeight: 700,
-                          color: canAfford && !oos ? "#fde68a" : "rgba(245,241,232,0.55)",
+                          color: canAfford && !oos && !closed ? "#fde68a" : "rgba(245,241,232,0.55)",
                           fontVariantNumeric: "tabular-nums",
                         }}>
-                          {oos ? "Out of stock"
+                          {closed ? "🔒 Closed"
+                            : oos ? "Out of stock"
                             : !canAfford ? `Need ${it.price - data.dojo_points} more`
                             : busyItemId === it.id ? "…"
                             : `🪙 ${it.price}`}

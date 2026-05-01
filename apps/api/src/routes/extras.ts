@@ -551,6 +551,63 @@ function generatePin(): string {
   return String(1000 + Math.floor(Math.random() * 9000));
 }
 
+// Returns whether the store is currently spendable for any kid in
+// the class. Two ways to be open:
+//   1. Teacher override (admin_settings.store_override_until in the future)
+//   2. Current Pacific time falls within a "cashout" schedule block for the class
+// Returns: { open: bool, source: "override" | "schedule" | "closed", until?: string }
+async function checkStoreOpenForStudent(studentId: string): Promise<{ open: boolean; source: "override" | "schedule" | "closed"; until?: string | null }> {
+  // 1. Teacher override
+  try {
+    const o: any = await db.prepare(
+      "SELECT value FROM admin_settings WHERE key='store_override_until'"
+    ).get();
+    if (o?.value) {
+      const until = Date.parse(String(o.value));
+      if (Number.isFinite(until) && until > Date.now()) {
+        return { open: true, source: "override", until: new Date(until).toISOString() };
+      }
+    }
+  } catch {}
+
+  // 2. Schedule cashout block. Compute Pacific HHMM + day-of-week.
+  const pacific = new Date(Date.now() - 7 * 3600_000);
+  const hhmm = `${String(pacific.getUTCHours()).padStart(2, "0")}:${String(pacific.getUTCMinutes()).padStart(2, "0")}`;
+  const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][pacific.getUTCDay()];
+  try {
+    const row: any = await db.prepare(
+      `SELECT cs.subject, cs.start_time, cs.end_time, cs.active_days
+         FROM class_schedule cs
+         JOIN class_members cm ON cm.class_id::text = cs.class_id
+        WHERE cm.user_id = ?::uuid
+          AND cs.subject = 'cashout'
+          AND cs.start_time <= ?
+          AND cs.end_time > ?
+        LIMIT 1`
+    ).get(studentId, hhmm, hhmm);
+    const active = row && (
+      !row.active_days ||
+      String(row.active_days).toLowerCase().includes(dayName.toLowerCase())
+    );
+    if (active) return { open: true, source: "schedule", until: null };
+  } catch {}
+
+  return { open: false, source: "closed" };
+}
+
+// GET /extras/store/is-open?studentId=X — UI checks this to render
+// a "Store closed" banner instead of showing items the kid can't buy.
+router.get("/store/is-open", async (req: AuthRequest, res: Response) => {
+  const studentId = String(req.query?.studentId || "").trim();
+  if (!studentId) return res.status(400).json({ error: "studentId required" });
+  try {
+    const r = await checkStoreOpenForStudent(studentId);
+    res.json(r);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
 router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
   // Teacher must initiate (this endpoint runs from the board view)
   if (req.user?.role !== "teacher" && req.user?.role !== "admin") {
@@ -581,6 +638,15 @@ router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
       try { valid = await bcrypt.default.compare(pin, userRow.password_hash); } catch { valid = false; }
     }
     if (!valid) return res.status(401).json({ error: "Wrong PIN" });
+
+    // Store-open gate. Even though the teacher initiates board-redeem,
+    // we still enforce that the store is officially open (override or
+    // cashout block). Keeps kids from spending whenever they want; the
+    // teacher uses the override toggle to open the store on demand.
+    const openCheck = await checkStoreOpenForStudent(studentId);
+    if (!openCheck.open) {
+      return res.status(423).json({ error: "Store is closed. Open it from Tools → 🛒 Store or wait for the cashout block." });
+    }
 
     // Pull the item + balance, then run the same redemption flow as
     // /store/redeem but without the cashout-block gate (teacher already
