@@ -259,7 +259,7 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
         }
       `}</style>
       <div style={{ fontSize: 13, color: "rgba(245,241,232,0.55)", marginBottom: 18 }}>
-        Tap + and − to tally assignments. Each one earns the kid <strong style={{ color: "#fde68a" }}>+1 🪙</strong> automatically.
+        Tap + and − to tally assignments. Each one earns the kid <strong style={{ color: "#fde68a" }}>+4 🪙</strong> automatically.
       </div>
 
       {loading ? (

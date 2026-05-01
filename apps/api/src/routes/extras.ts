@@ -451,10 +451,10 @@ async function ensureManualSchema() {
   manualSchemaReady = true;
 }
 
-// Each completed assignment is worth this many dojo points. Tuned to
-// give kids a clear earn rate (1 assignment = 1 store point) without
-// making the store feel cheap.
-const POINTS_PER_ASSIGNMENT = 1;
+// Each completed assignment is worth this many dojo points. Bumped
+// to 4 because everything now flows through manual paper-tally entry
+// (kids do real work on paper; teacher tallies it on the board).
+const POINTS_PER_ASSIGNMENT = 4;
 
 router.put("/students/:studentId/manual-progress", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
   const studentId = req.params.studentId;
