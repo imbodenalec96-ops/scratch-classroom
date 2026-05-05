@@ -10,6 +10,7 @@ import BirthdayCelebration from "./BirthdayCelebration.tsx";
 import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import StudentWallet from "./StudentWallet.tsx";
+import MorningSlide from "./MorningSlide.tsx";
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -291,6 +292,8 @@ export default function ClassroomBoard() {
   // Student wallet — kid taps face, types PIN, sees own points + badges
   // and can spend at the store from the same view.
   const [showWallet, setShowWallet] = useState(false);
+  // Morning slide — full-screen instructions overlay, teacher-toggleable.
+  const [showMorningSlide, setShowMorningSlide] = useState(false);
   // PIN gate before opening the console — keeps kids from poking at
   // teacher tools when they walk past the projector. PIN is checked
   // against admin_settings.remote_access_pin / teacher_password via
@@ -963,6 +966,20 @@ export default function ClassroomBoard() {
           }}>{timeStr}</div>
           {isTeacher && (
             <>
+              {/* Morning slide — opens the full-screen instructions
+                  overlay. Teacher toggles whenever class needs the
+                  routine on the board. */}
+              <button
+                onClick={() => setShowMorningSlide(true)}
+                title="Morning slide — class instructions"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid rgba(217,119,6,0.55)`,
+                  background: "rgba(217,119,6,0.18)", color: "#fde68a",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >🌅 Morning</button>
               {/* Wallet — kids walk up, tap their face, type PIN, see
                   their points, badges, AND can spend at the store. */}
               <button
@@ -1812,6 +1829,15 @@ export default function ClassroomBoard() {
         students={(board?.students || []) as any}
         classId={cls.id}
         onClose={() => setShowWallet(false)}
+      />
+    )}
+
+    {/* Morning slide — full-screen instructions, teacher-toggleable
+        from the 🌅 Morning button or from Tools → 🌅 Morning tab. */}
+    {showMorningSlide && cls?.id && (
+      <MorningSlide
+        classId={cls.id}
+        onClose={() => setShowMorningSlide(false)}
       />
     )}
 

@@ -429,6 +429,83 @@ router.get("/classes/:classId/helper-of-day", async (req: AuthRequest, res: Resp
   }
 });
 
+// ── Morning slide ─────────────────────────────────────────────────────
+// Per-class editable slide that the teacher pops up at the start of
+// the day. Stored as JSON: { title, lines[], warning }.
+
+let morningSchemaReady = false;
+async function ensureMorningSchema() {
+  if (morningSchemaReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS morning_slides (
+      class_id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      lines TEXT NOT NULL DEFAULT '[]',
+      warning TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT '',
+      updated_by TEXT
+    )`);
+  } catch {}
+  morningSchemaReady = true;
+}
+
+const DEFAULT_MORNING_SLIDE = {
+  title: "Good Morning Star Students!",
+  lines: [
+    "Sit down in your seat",
+    "Be quiet",
+    "Wait for today's work packet",
+    "Every hour you'll have an IEP goal assignment to complete",
+  ],
+  warning: "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.",
+};
+
+router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureMorningSchema();
+    const row: any = await db.prepare(
+      "SELECT title, lines, warning FROM morning_slides WHERE class_id::text = ?"
+    ).get(req.params.classId);
+    if (!row) return res.json(DEFAULT_MORNING_SLIDE);
+    let lines: string[] = [];
+    try {
+      const parsed = typeof row.lines === "string" ? JSON.parse(row.lines) : row.lines;
+      if (Array.isArray(parsed)) lines = parsed.map((s) => String(s));
+    } catch {}
+    res.json({
+      title: String(row.title || DEFAULT_MORNING_SLIDE.title),
+      lines: lines.length ? lines : DEFAULT_MORNING_SLIDE.lines,
+      warning: String(row.warning || DEFAULT_MORNING_SLIDE.warning),
+    });
+  } catch {
+    res.json(DEFAULT_MORNING_SLIDE);
+  }
+});
+
+router.put("/classes/:classId/morning-slide", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  const title = String(req.body?.title || "").slice(0, 200);
+  const lines = Array.isArray(req.body?.lines)
+    ? req.body.lines.map((s: any) => String(s || "").slice(0, 200)).filter(Boolean).slice(0, 20)
+    : [];
+  const warning = String(req.body?.warning || "").slice(0, 500);
+  try {
+    await ensureMorningSchema();
+    await db.prepare(
+      `INSERT INTO morning_slides (class_id, title, lines, warning, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET
+         title = EXCLUDED.title,
+         lines = EXCLUDED.lines,
+         warning = EXCLUDED.warning,
+         updated_at = EXCLUDED.updated_at,
+         updated_by = EXCLUDED.updated_by`
+    ).run(req.params.classId, title, JSON.stringify(lines), warning, new Date().toISOString(), req.user?.id ?? null);
+    res.json({ ok: true, title, lines, warning });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
 // ── Manual assignment progress ────────────────────────────────────────
 // Teacher manually credits a student with N completed assignments today.
 // Used now that iPads are away — kids do work on paper, teacher tallies.

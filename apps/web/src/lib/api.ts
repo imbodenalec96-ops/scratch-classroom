@@ -626,6 +626,13 @@ export const api = {
     request<{ updated: number; delta: number }>(`/extras/classes/${classId}/bulk-stars`, {
       method: "POST", body: JSON.stringify({ studentIds, delta }),
     }),
+  // Morning slide content — teacher edits, board displays
+  getMorningSlide: (classId: string) =>
+    request<{ title: string; lines: string[]; warning: string }>(`/extras/classes/${classId}/morning-slide`),
+  setMorningSlide: (classId: string, slide: { title: string; lines: string[]; warning: string }) =>
+    request<{ ok: boolean; title: string; lines: string[]; warning: string }>(`/extras/classes/${classId}/morning-slide`, {
+      method: "PUT", body: JSON.stringify(slide),
+    }),
   // Manual paper-work progress entry — teacher tallies done counts.
   setManualProgress: (studentId: string, count: number) =>
     request<{ ok: boolean; day: string; count: number; pointsDelta: number; dojo_points: number | null }>(`/extras/students/${studentId}/manual-progress`, {

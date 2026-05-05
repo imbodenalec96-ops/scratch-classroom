@@ -100,7 +100,7 @@ interface Props {
 }
 
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings" | "morning">(storeOnly ? "store" : "progress");
 
   return (
     <div
@@ -140,7 +140,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           </div>
           {!storeOnly && (
             <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
-              {(["progress", "points", "stars", "spinner", "groups", "store", "pins", "settings"] as const).map((t) => (
+              {(["progress", "points", "stars", "morning", "spinner", "groups", "store", "pins", "settings"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -157,6 +157,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
                   {t === "progress" ? "📋 Progress"
                     : t === "points" ? "🪙 Points"
                     : t === "stars" ? "⭐ Stars"
+                    : t === "morning" ? "🌅 Morning"
                     : t === "spinner" ? "🎲 Spinner"
                     : t === "groups" ? "👥 Groups"
                     : t === "store" ? "🛒 Store"
@@ -185,6 +186,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
           {tab === "progress" && <ProgressTab classId={classId} students={students} />}
           {tab === "points"   && <PointsTab classId={classId} students={students} />}
           {tab === "stars"    && <StarsTab students={students} />}
+          {tab === "morning"  && <MorningTab classId={classId} />}
           {tab === "spinner"  && <SpinnerTab students={students} />}
           {tab === "groups"   && <GroupsTab students={students} />}
           {tab === "store"    && <StoreTab classId={classId} students={students} />}
@@ -358,6 +360,180 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
       )}
     </div>
   );
+}
+
+/* ── Morning tab — edit the slide that pops on the board ───────── */
+
+function MorningTab({ classId }: { classId: string }) {
+  const [title, setTitle] = useState("");
+  const [lines, setLines] = useState<string[]>([]);
+  const [warning, setWarning] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getMorningSlide(classId)
+      .then((s) => {
+        if (cancelled) return;
+        setTitle(s.title);
+        setLines(s.lines.length ? s.lines : [""]);
+        setWarning(s.warning);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoading(false));
+    return () => { cancelled = true; };
+  }, [classId]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.setMorningSlide(classId, {
+        title: title.trim(),
+        lines: lines.map((l) => l.trim()).filter(Boolean),
+        warning: warning.trim(),
+      });
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1800);
+    } catch {}
+    setSaving(false);
+  };
+
+  const updateLine = (i: number, v: string) => {
+    setLines((cur) => cur.map((l, idx) => idx === i ? v : l));
+  };
+  const addLine = () => setLines((cur) => [...cur, ""]);
+  const removeLine = (i: number) => setLines((cur) => cur.filter((_, idx) => idx !== i));
+  const moveLine = (i: number, dir: -1 | 1) => {
+    setLines((cur) => {
+      const next = [...cur];
+      const j = i + dir;
+      if (j < 0 || j >= next.length) return cur;
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
+          Edit the morning routine slide. Tap <strong style={{ color: "#fde68a" }}>🌅 Morning</strong> on the board to show it.
+        </div>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{
+            padding: "10px 22px", borderRadius: 999,
+            background: savedFlash
+              ? "linear-gradient(135deg, #15803d, #22c55e)"
+              : "linear-gradient(135deg, #b23a48, #d97706)",
+            border: "none", color: "white", fontSize: 13, fontWeight: 800,
+            cursor: saving ? "wait" : "pointer",
+            opacity: saving ? 0.7 : 1,
+            transition: "background .25s",
+          }}
+        >{saving ? "Saving…" : savedFlash ? "✓ Saved" : "Save"}</button>
+      </div>
+
+      {/* Title */}
+      <Field label="Title">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Good Morning Star Students!"
+          maxLength={200}
+          style={inputStyle()}
+        />
+      </Field>
+
+      {/* Lines */}
+      <Field label="Routine steps (numbered on the slide)">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {lines.map((line, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: "linear-gradient(135deg,#b23a48,#d97706)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 800, color: "white",
+                flexShrink: 0,
+              }}>{i + 1}</span>
+              <input
+                value={line}
+                onChange={(e) => updateLine(i, e.target.value)}
+                placeholder="Step…"
+                maxLength={200}
+                style={{ ...inputStyle(), flex: 1 }}
+              />
+              <button onClick={() => moveLine(i, -1)} disabled={i === 0} title="Move up" style={smallBtn(i === 0)}>↑</button>
+              <button onClick={() => moveLine(i, 1)} disabled={i === lines.length - 1} title="Move down" style={smallBtn(i === lines.length - 1)}>↓</button>
+              <button onClick={() => removeLine(i)} disabled={lines.length <= 1} title="Remove" style={smallBtn(lines.length <= 1, true)}>✕</button>
+            </div>
+          ))}
+          <button
+            onClick={addLine}
+            style={{
+              alignSelf: "flex-start",
+              padding: "8px 14px", borderRadius: 999,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px dashed rgba(255,255,255,0.20)",
+              color: "rgba(245,241,232,0.85)", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >+ Add step</button>
+        </div>
+      </Field>
+
+      {/* Warning */}
+      <Field label="Warning (red panel at the bottom)">
+        <textarea
+          value={warning}
+          onChange={(e) => setWarning(e.target.value)}
+          placeholder="Refuse to complete an assignment → fill out form…"
+          maxLength={500}
+          rows={3}
+          style={{ ...inputStyle(), resize: "vertical", fontFamily: "inherit" }}
+        />
+      </Field>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,241,232,0.55)", marginBottom: 6 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+function inputStyle(): React.CSSProperties {
+  return {
+    width: "100%", boxSizing: "border-box",
+    padding: "10px 14px", borderRadius: 10,
+    background: "rgba(0,0,0,0.30)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    color: "white", fontSize: 14, fontWeight: 600,
+    outline: "none",
+  };
+}
+function smallBtn(disabled: boolean, danger = false): React.CSSProperties {
+  return {
+    width: 30, height: 30, borderRadius: 8,
+    background: danger ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.05)",
+    border: danger ? "1px solid rgba(239,68,68,0.30)" : "1px solid rgba(255,255,255,0.10)",
+    color: danger ? "#fca5a5" : "white",
+    fontSize: 14, fontWeight: 700,
+    cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.3 : 1,
+    flexShrink: 0,
+  };
 }
 
 /* ── Stars tab — manage McDonald's progress per kid ─────────────── */
