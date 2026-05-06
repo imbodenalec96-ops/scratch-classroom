@@ -1497,6 +1497,67 @@ router.post("/regenerate-today-content", async (req, res) => {
   }
 });
 
+// POST /admin/seed-map-notice — drops a "MAP Test" yellow notice on
+// the morning slide for the Star class. No auth (admin route).
+router.post("/seed-map-notice", async (_req, res) => {
+  try {
+    const cls: any = await db.prepare(
+      "SELECT id::text AS id FROM classes WHERE LOWER(name) LIKE '%star%' ORDER BY created_at LIMIT 1"
+    ).get() || await db.prepare(
+      "SELECT id::text AS id FROM classes ORDER BY created_at LIMIT 1"
+    ).get();
+    if (!cls) return res.status(500).json({ error: "no class" });
+
+    // Make sure the column exists
+    try {
+      await db.exec(`CREATE TABLE IF NOT EXISTS morning_slides (
+        class_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL DEFAULT '',
+        lines TEXT NOT NULL DEFAULT '[]',
+        warning TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT '',
+        updated_by TEXT
+      )`);
+    } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN cashout_times TEXT NOT NULL DEFAULT '[]'`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN vr_note TEXT NOT NULL DEFAULT ''`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN latitude REAL`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN longitude REAL`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN notices TEXT NOT NULL DEFAULT '[]'`); } catch {}
+
+    const notices = [{ title: "MAP Test", names: ["Ameer", "Jaida", "Kaleb", "Rayden"] }];
+
+    // Read existing row so we don't blow away other fields
+    const existing: any = await db.prepare(
+      "SELECT title, lines, warning, cashout_times, vr_note, latitude, longitude FROM morning_slides WHERE class_id::text = ?"
+    ).get(cls.id);
+    const title = existing?.title || "Good Morning Star Students!";
+    const lines = existing?.lines || JSON.stringify([
+      "Sit down in your seat",
+      "Be quiet",
+      "Wait for today's work packet",
+      "Every hour you'll have an IEP goal assignment to complete",
+    ]);
+    const warning = existing?.warning || "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.";
+    const cashoutTimes = existing?.cashout_times || JSON.stringify(["10:10", "11:00", "2:45"]);
+    const vrNote = existing?.vr_note || "VR is only on Friday";
+    const lat = existing?.latitude ?? 36.1716;
+    const lon = existing?.longitude ?? -115.1391;
+
+    await db.prepare(
+      `INSERT INTO morning_slides (class_id, title, lines, warning, cashout_times, vr_note, latitude, longitude, notices, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (class_id) DO UPDATE SET
+         notices = EXCLUDED.notices,
+         updated_at = EXCLUDED.updated_at`
+    ).run(cls.id, title, lines, warning, cashoutTimes, vrNote, lat, lon, JSON.stringify(notices), new Date().toISOString());
+
+    res.json({ ok: true, classId: cls.id, notices });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // POST /admin/clear-mcdonalds-week — wipes behavior_stars=5 to 0 for
 // every student in the class (no auth). Intended for Sunday auto-run
 // after the McDonald's reward day passes. Called from the board's
