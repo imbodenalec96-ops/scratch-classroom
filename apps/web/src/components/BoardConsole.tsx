@@ -372,6 +372,7 @@ function MorningTab({ classId }: { classId: string }) {
   const [vrNote, setVrNote] = useState("");
   const [latitude, setLatitude] = useState<string>("");
   const [longitude, setLongitude] = useState<string>("");
+  const [notices, setNotices] = useState<Array<{ title: string; names: string[] }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -388,6 +389,7 @@ function MorningTab({ classId }: { classId: string }) {
         setVrNote(s.vr_note);
         setLatitude(s.latitude != null ? String(s.latitude) : "");
         setLongitude(s.longitude != null ? String(s.longitude) : "");
+        setNotices(s.notices || []);
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false));
@@ -405,6 +407,9 @@ function MorningTab({ classId }: { classId: string }) {
         vr_note: vrNote.trim(),
         latitude: latitude.trim() ? Number(latitude) : null,
         longitude: longitude.trim() ? Number(longitude) : null,
+        notices: notices
+          .map((n) => ({ title: n.title.trim(), names: n.names.map((x) => x.trim()).filter(Boolean) }))
+          .filter((n) => n.title),
       });
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1800);
@@ -554,6 +559,56 @@ function MorningTab({ classId }: { classId: string }) {
           rows={3}
           style={{ ...inputStyle(), resize: "vertical", fontFamily: "inherit" }}
         />
+      </Field>
+
+      {/* Notices — yellow flashing sidebar callouts */}
+      <Field label="Notices (yellow flashing sidebar — MAP testing, IEP groups, etc.)">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {notices.map((n, i) => (
+            <div key={i} style={{
+              padding: 12, borderRadius: 12,
+              background: "rgba(250,204,21,0.06)",
+              border: "1px solid rgba(250,204,21,0.30)",
+              display: "flex", flexDirection: "column", gap: 8,
+            }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  value={n.title}
+                  onChange={(e) => setNotices((cur) => cur.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))}
+                  placeholder="Notice title (e.g. MAP Test)"
+                  maxLength={100}
+                  style={{ ...inputStyle(), flex: 1, fontWeight: 800 }}
+                />
+                <button
+                  onClick={() => setNotices((cur) => cur.filter((_, idx) => idx !== i))}
+                  title="Remove notice"
+                  style={smallBtn(false, true)}
+                >✕</button>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.55, marginLeft: 2 }}>Names (comma-separated)</div>
+              <input
+                value={n.names.join(", ")}
+                onChange={(e) => {
+                  const list = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                  setNotices((cur) => cur.map((x, idx) => idx === i ? { ...x, names: list } : x));
+                }}
+                placeholder="Ameer, Jaida, Kaleb, Rayden"
+                style={inputStyle()}
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => setNotices((cur) => [...cur, { title: "", names: [] }])}
+            style={{
+              alignSelf: "flex-start",
+              padding: "8px 14px", borderRadius: 999,
+              background: "rgba(250,204,21,0.10)",
+              border: "1px dashed rgba(250,204,21,0.35)",
+              color: "#fde68a", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >+ Add notice</button>
+        </div>
       </Field>
 
       {/* Weather location */}

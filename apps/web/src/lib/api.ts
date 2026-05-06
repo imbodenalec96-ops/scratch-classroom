@@ -632,11 +632,13 @@ export const api = {
       title: string; lines: string[]; warning: string;
       cashout_times: string[]; vr_note: string;
       latitude: number | null; longitude: number | null;
+      notices: Array<{ title: string; names: string[] }>;
     }>(`/extras/classes/${classId}/morning-slide`),
   setMorningSlide: (classId: string, slide: {
     title: string; lines: string[]; warning: string;
     cashout_times?: string[]; vr_note?: string;
     latitude?: number | null; longitude?: number | null;
+    notices?: Array<{ title: string; names: string[] }>;
   }) =>
     request<{ ok: boolean }>(`/extras/classes/${classId}/morning-slide`, {
       method: "PUT", body: JSON.stringify(slide),

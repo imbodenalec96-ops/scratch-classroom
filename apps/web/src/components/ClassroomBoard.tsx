@@ -1833,11 +1833,15 @@ export default function ClassroomBoard() {
     )}
 
     {/* Morning slide — full-screen instructions, teacher-toggleable
-        from the 🌅 Morning button or from Tools → 🌅 Morning tab. */}
+        from the 🌅 Morning button or from Tools → 🌅 Morning tab.
+        Wallet + Tools shortcuts inside the slide so kids/teacher
+        don't have to dismiss-then-tap to access them. */}
     {showMorningSlide && cls?.id && (
       <MorningSlide
         classId={cls.id}
         onClose={() => setShowMorningSlide(false)}
+        onOpenWallet={() => setShowWallet(true)}
+        onOpenTools={isTeacher ? () => { setConsolePin(""); setConsolePinError(""); setConsolePinModal(true); } : undefined}
       />
     )}
 

@@ -450,6 +450,9 @@ async function ensureMorningSchema() {
     try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN vr_note TEXT NOT NULL DEFAULT ''`); } catch {}
     try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN latitude REAL`); } catch {}
     try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN longitude REAL`); } catch {}
+    // Notices: array of { title, names[] } objects for yellow-flashing
+    // sidebar callouts (MAP testing, field-trip groups, etc).
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN notices TEXT NOT NULL DEFAULT '[]'`); } catch {}
   } catch {}
   morningSchemaReady = true;
 }
@@ -465,16 +468,17 @@ const DEFAULT_MORNING_SLIDE = {
   warning: "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.",
   cashout_times: ["10:10", "11:00", "2:45"],
   vr_note: "VR is only on Friday",
-  // Default to a generic continental US location — teachers can update.
-  latitude: 36.7378 as number | null,
-  longitude: -119.7871 as number | null, // Fresno, CA — central Pacific
+  // Las Vegas, NV
+  latitude: 36.1716 as number | null,
+  longitude: -115.1391 as number | null,
+  notices: [] as Array<{ title: string; names: string[] }>,
 };
 
 router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Response) => {
   try {
     await ensureMorningSchema();
     const row: any = await db.prepare(
-      "SELECT title, lines, warning, cashout_times, vr_note, latitude, longitude FROM morning_slides WHERE class_id::text = ?"
+      "SELECT title, lines, warning, cashout_times, vr_note, latitude, longitude, notices FROM morning_slides WHERE class_id::text = ?"
     ).get(req.params.classId);
     if (!row) return res.json(DEFAULT_MORNING_SLIDE);
     let lines: string[] = [];
@@ -487,6 +491,18 @@ router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Resp
       const parsed = typeof row.cashout_times === "string" ? JSON.parse(row.cashout_times || "[]") : row.cashout_times;
       if (Array.isArray(parsed)) cashoutTimes = parsed.map((s) => String(s));
     } catch {}
+    let notices: Array<{ title: string; names: string[] }> = [];
+    try {
+      const parsed = typeof row.notices === "string" ? JSON.parse(row.notices || "[]") : row.notices;
+      if (Array.isArray(parsed)) {
+        notices = parsed
+          .filter((n: any) => n && typeof n.title === "string")
+          .map((n: any) => ({
+            title: String(n.title),
+            names: Array.isArray(n.names) ? n.names.map((s: any) => String(s)) : [],
+          }));
+      }
+    } catch {}
     res.json({
       title: String(row.title || DEFAULT_MORNING_SLIDE.title),
       lines: lines.length ? lines : DEFAULT_MORNING_SLIDE.lines,
@@ -495,6 +511,7 @@ router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Resp
       vr_note: row.vr_note != null ? String(row.vr_note) : DEFAULT_MORNING_SLIDE.vr_note,
       latitude: row.latitude != null ? Number(row.latitude) : DEFAULT_MORNING_SLIDE.latitude,
       longitude: row.longitude != null ? Number(row.longitude) : DEFAULT_MORNING_SLIDE.longitude,
+      notices,
     });
   } catch {
     res.json(DEFAULT_MORNING_SLIDE);
@@ -513,11 +530,20 @@ router.put("/classes/:classId/morning-slide", requireRole("teacher", "admin"), a
   const vrNote = String(req.body?.vr_note || "").slice(0, 200);
   const lat = req.body?.latitude != null && Number.isFinite(Number(req.body.latitude)) ? Number(req.body.latitude) : null;
   const lon = req.body?.longitude != null && Number.isFinite(Number(req.body.longitude)) ? Number(req.body.longitude) : null;
+  const notices = Array.isArray(req.body?.notices)
+    ? req.body.notices
+        .filter((n: any) => n && typeof n.title === "string" && n.title.trim())
+        .map((n: any) => ({
+          title: String(n.title).slice(0, 100),
+          names: Array.isArray(n.names) ? n.names.map((s: any) => String(s).slice(0, 60)).filter(Boolean) : [],
+        }))
+        .slice(0, 8)
+    : [];
   try {
     await ensureMorningSchema();
     await db.prepare(
-      `INSERT INTO morning_slides (class_id, title, lines, warning, cashout_times, vr_note, latitude, longitude, updated_at, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO morning_slides (class_id, title, lines, warning, cashout_times, vr_note, latitude, longitude, notices, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (class_id) DO UPDATE SET
          title = EXCLUDED.title,
          lines = EXCLUDED.lines,
@@ -526,10 +552,11 @@ router.put("/classes/:classId/morning-slide", requireRole("teacher", "admin"), a
          vr_note = EXCLUDED.vr_note,
          latitude = EXCLUDED.latitude,
          longitude = EXCLUDED.longitude,
+         notices = EXCLUDED.notices,
          updated_at = EXCLUDED.updated_at,
          updated_by = EXCLUDED.updated_by`
-    ).run(req.params.classId, title, JSON.stringify(lines), warning, JSON.stringify(cashoutTimes), vrNote, lat, lon, new Date().toISOString(), req.user?.id ?? null);
-    res.json({ ok: true, title, lines, warning, cashout_times: cashoutTimes, vr_note: vrNote, latitude: lat, longitude: lon });
+    ).run(req.params.classId, title, JSON.stringify(lines), warning, JSON.stringify(cashoutTimes), vrNote, lat, lon, JSON.stringify(notices), new Date().toISOString(), req.user?.id ?? null);
+    res.json({ ok: true, title, lines, warning, cashout_times: cashoutTimes, vr_note: vrNote, latitude: lat, longitude: lon, notices });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "failed" });
   }

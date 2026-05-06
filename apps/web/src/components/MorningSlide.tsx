@@ -9,8 +9,13 @@ import { api } from "../lib/api.ts";
 interface Props {
   classId: string;
   onClose: () => void;
+  // Optional shortcuts so the slide doesn't trap people behind itself.
+  // Wallet is for kids walking up; Tools is for the teacher.
+  onOpenWallet?: () => void;
+  onOpenTools?: () => void;
 }
 
+type Notice = { title: string; names: string[] };
 type Slide = {
   title: string;
   lines: string[];
@@ -19,6 +24,7 @@ type Slide = {
   vr_note: string;
   latitude: number | null;
   longitude: number | null;
+  notices: Notice[];
 };
 
 // Open-Meteo weather code → emoji + label.
@@ -38,7 +44,7 @@ function weatherEmoji(code: number): { emoji: string; label: string } {
   return { emoji: "🌡️", label: "Weather" };
 }
 
-export default function MorningSlide({ classId, onClose }: Props) {
+export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenTools }: Props) {
   const [slide, setSlide] = useState<Slide | null>(null);
   const [weather, setWeather] = useState<{ temperature: number; code: number; high: number; low: number } | null>(null);
 
@@ -58,8 +64,9 @@ export default function MorningSlide({ classId, onClose }: Props) {
           warning: "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.",
           cashout_times: ["10:10", "11:00", "2:45"],
           vr_note: "VR is only on Friday",
-          latitude: 36.7378,
-          longitude: -119.7871,
+          latitude: 36.1716,
+          longitude: -115.1391,
+          notices: [],
         });
       });
     return () => { cancelled = true; };
@@ -158,6 +165,24 @@ export default function MorningSlide({ classId, onClose }: Props) {
           0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(178,58,72,0.40); }
           50%      { transform: scale(1.08); box-shadow: 0 6px 20px rgba(178,58,72,0.65); }
         }
+        /* Yellow notice — sibling of warnPulse but in school-bus yellow */
+        @keyframes noticePulse {
+          0%, 100% {
+            box-shadow: 0 0 18px rgba(250,204,21,0.30), inset 0 0 0 0 rgba(250,204,21,0.0);
+            border-color: rgba(250,204,21,0.55);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 48px rgba(250,204,21,0.75), inset 0 0 24px 4px rgba(250,204,21,0.18);
+            border-color: rgba(254,240,138,0.95);
+            transform: scale(1.012);
+          }
+        }
+        @keyframes noticeBlink {
+          0%, 49%   { opacity: 1; }
+          50%, 100% { opacity: 0.4; }
+        }
+
         /* Floating background sparkles */
         @keyframes morningFloat {
           0%   { transform: translateY(0) rotate(0); opacity: 0; }
@@ -231,33 +256,66 @@ export default function MorningSlide({ classId, onClose }: Props) {
           );
         })()}
 
-        <button
-          onClick={onClose}
-          style={{
-            padding: "9px 18px", borderRadius: 999,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            color: "white", fontSize: 13, fontWeight: 700,
-            cursor: "pointer",
-            marginLeft: "auto",
-          }}
-        >✕ Dismiss</button>
+        {/* Always-accessible shortcuts so the slide doesn't trap people:
+            kids can tap 💼 Wallet from here; teacher can tap 🔒 Tools.
+            We close the slide first so the modal isn't behind it. */}
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {onOpenWallet && (
+            <button
+              onClick={() => { onClose(); onOpenWallet(); }}
+              title="My wallet — students unlock with their PIN"
+              style={{
+                padding: "9px 16px", borderRadius: 999,
+                background: "rgba(124,58,237,0.20)",
+                border: "1px solid rgba(124,58,237,0.55)",
+                color: "#c4b5fd", fontSize: 13, fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >💼 Wallet</button>
+          )}
+          {onOpenTools && (
+            <button
+              onClick={() => { onClose(); onOpenTools(); }}
+              title="Teacher tools — requires PIN"
+              style={{
+                padding: "9px 16px", borderRadius: 999,
+                background: "rgba(178,58,72,0.22)",
+                border: "1px solid rgba(178,58,72,0.55)",
+                color: "#fca5a5", fontSize: 13, fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >🔒 Tools</button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              padding: "9px 18px", borderRadius: 999,
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "white", fontSize: 13, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >✕ Dismiss</button>
+        </div>
       </div>
 
-      {/* Body — flex-fills, no scroll. Inner content uses per-density
-          sizes so 3 lines look big, 8 lines stay readable. */}
+      {/* Body — flex-fills, no scroll. Two-column when there are
+          notices, single-column otherwise. Notices column is the
+          flashing yellow MAP/IEP callout. */}
       <div style={{
         flex: "1 1 auto",
-        minHeight: 0, // critical for flex children that shouldn't overflow
-        display: "flex", alignItems: "center", justifyContent: "center",
+        minHeight: 0,
+        display: "flex", alignItems: "stretch", justifyContent: "center",
         padding: `${tier.padVH * 1.5}vh ${tier.padVH * 2.5}vh`,
+        gap: `${tier.padVH * 1.5}vh`,
         overflow: "hidden",
       }}>
         {!slide ? (
-          <div style={{ color: "rgba(245,241,232,0.5)" }}>Loading…</div>
+          <div style={{ color: "rgba(245,241,232,0.5)", margin: "auto" }}>Loading…</div>
         ) : (
+        <>
           <div style={{
-            maxWidth: 1200, width: "100%",
+            flex: 1, maxWidth: slide.notices.length ? 900 : 1200,
             height: "100%",
             display: "flex", flexDirection: "column",
             justifyContent: "center",
@@ -422,6 +480,61 @@ export default function MorningSlide({ classId, onClose }: Props) {
               </div>
             )}
           </div>
+
+          {/* Notices column — yellow flashing callouts (MAP testing,
+              IEP groups, etc). Only renders when there's at least one. */}
+          {slide.notices.length > 0 && (
+            <div style={{
+              flex: "0 0 auto",
+              width: "min(28vw, 360px)",
+              maxHeight: "100%",
+              overflow: "auto",
+              display: "flex", flexDirection: "column", gap: `${tier.gapVH * 0.8}vh`,
+              animation: "morningSlideIn .5s ease .25s both",
+            }}>
+              {slide.notices.map((n, i) => (
+                <div key={i} className="morning-notice-pulse" style={{
+                  padding: `${tier.padVH * 0.8}vh ${tier.padVH * 1.2}vh`,
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, rgba(250,204,21,0.22), rgba(245,158,11,0.10))",
+                  border: "2px solid rgba(250,204,21,0.55)",
+                  willChange: "box-shadow, border-color, transform",
+                  animation: `noticePulse 1.4s ease-in-out ${i * 0.25}s infinite`,
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 900, letterSpacing: "0.20em",
+                    textTransform: "uppercase",
+                    color: "#fde68a",
+                    marginBottom: 8,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    <span style={{
+                      fontSize: 16, display: "inline-block",
+                      animation: "noticeBlink 0.8s ease-in-out infinite",
+                    }}>📢</span>
+                    {n.title}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {n.names.map((name, j) => (
+                      <div key={j} style={{
+                        padding: "6px 12px", borderRadius: 10,
+                        background: "rgba(250,204,21,0.12)",
+                        border: "1px solid rgba(250,204,21,0.35)",
+                        fontSize: `clamp(13px, ${tier.warnVH * 0.95}vw, 18px)`,
+                        fontWeight: 800, color: "#fef3c7",
+                      }}>{name}</div>
+                    ))}
+                    {n.names.length === 0 && (
+                      <div style={{ fontSize: 12, opacity: 0.55, color: "#fef3c7", fontStyle: "italic" }}>
+                        No names yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
         )}
       </div>
     </div>
