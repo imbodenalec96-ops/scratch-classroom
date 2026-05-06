@@ -11,8 +11,36 @@ interface Props {
   onClose: () => void;
 }
 
+type Slide = {
+  title: string;
+  lines: string[];
+  warning: string;
+  cashout_times: string[];
+  vr_note: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+// Open-Meteo weather code → emoji + label.
+// https://open-meteo.com/en/docs#weathervariables
+function weatherEmoji(code: number): { emoji: string; label: string } {
+  if (code === 0)                   return { emoji: "☀️",  label: "Clear" };
+  if ([1, 2].includes(code))        return { emoji: "🌤️", label: "Mostly sunny" };
+  if (code === 3)                   return { emoji: "☁️",  label: "Cloudy" };
+  if ([45, 48].includes(code))      return { emoji: "🌫️", label: "Foggy" };
+  if ([51, 53, 55].includes(code))  return { emoji: "🌦️", label: "Drizzle" };
+  if ([61, 63, 65].includes(code))  return { emoji: "🌧️", label: "Rain" };
+  if ([66, 67].includes(code))      return { emoji: "🌧️", label: "Freezing rain" };
+  if ([71, 73, 75, 77].includes(code)) return { emoji: "🌨️", label: "Snow" };
+  if ([80, 81, 82].includes(code))  return { emoji: "🌧️", label: "Showers" };
+  if ([85, 86].includes(code))      return { emoji: "🌨️", label: "Snow showers" };
+  if ([95, 96, 99].includes(code))  return { emoji: "⛈️",  label: "Thunderstorms" };
+  return { emoji: "🌡️", label: "Weather" };
+}
+
 export default function MorningSlide({ classId, onClose }: Props) {
-  const [slide, setSlide] = useState<{ title: string; lines: string[]; warning: string } | null>(null);
+  const [slide, setSlide] = useState<Slide | null>(null);
+  const [weather, setWeather] = useState<{ temperature: number; code: number; high: number; low: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,10 +56,24 @@ export default function MorningSlide({ classId, onClose }: Props) {
             "Every hour you'll have an IEP goal assignment to complete",
           ],
           warning: "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.",
+          cashout_times: ["10:10", "11:00", "2:45"],
+          vr_note: "VR is only on Friday",
+          latitude: 36.7378,
+          longitude: -119.7871,
         });
       });
     return () => { cancelled = true; };
   }, [classId]);
+
+  // Fetch weather once we know the lat/lon
+  useEffect(() => {
+    if (!slide?.latitude || !slide?.longitude) return;
+    let cancelled = false;
+    api.getWeather(slide.latitude, slide.longitude)
+      .then((w) => { if (!cancelled && Number.isFinite(w?.temperature)) setWeather(w); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [slide?.latitude, slide?.longitude]);
 
   // Auto-shrink size class based on how much content there is. Goal:
   // every byte of the slide fits in the viewport with no scroll, even
@@ -143,7 +185,7 @@ export default function MorningSlide({ classId, onClose }: Props) {
         );
       })}
 
-      {/* Top bar — fixed-ish height so the body can compute remaining room */}
+      {/* Top bar — date + weather on one side, dismiss on the other */}
       <div style={{
         flex: "0 0 auto",
         height: tier.headerH,
@@ -151,18 +193,44 @@ export default function MorningSlide({ classId, onClose }: Props) {
         padding: "0 28px",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
         background: "rgba(0,0,0,0.20)",
+        gap: 16, flexWrap: "wrap",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 32, lineHeight: 1, animation: "morningSunrise 3.6s ease-in-out infinite" }}>🌅</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <span style={{ fontSize: 38, lineHeight: 1, animation: "morningSunrise 3.6s ease-in-out infinite" }}>🌅</span>
           <div>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(245,241,232,0.45)" }}>
-              Morning Routine
+              {new Date().toLocaleDateString("en-US", { weekday: "long" })}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(245,241,232,0.85)", marginTop: 2 }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            <div style={{ fontSize: 22, fontWeight: 800, color: "white", marginTop: 2, lineHeight: 1.05 }}>
+              {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </div>
           </div>
         </div>
+
+        {/* Weather chip — only renders once Open-Meteo responds */}
+        {weather && (() => {
+          const w = weatherEmoji(weather.code);
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "8px 18px", borderRadius: 999,
+              background: "linear-gradient(135deg, rgba(56,189,248,0.18), rgba(14,165,233,0.10))",
+              border: "1px solid rgba(56,189,248,0.40)",
+              animation: "morningSlideIn .5s ease .35s both",
+            }}>
+              <span style={{ fontSize: 32, lineHeight: 1 }} title={w.label}>{w.emoji}</span>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "white", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                  {weather.temperature}°
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(245,241,232,0.65)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                  H {weather.high}° · L {weather.low}°
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <button
           onClick={onClose}
           style={{
@@ -171,6 +239,7 @@ export default function MorningSlide({ classId, onClose }: Props) {
             border: "1px solid rgba(255,255,255,0.15)",
             color: "white", fontSize: 13, fontWeight: 700,
             cursor: "pointer",
+            marginLeft: "auto",
           }}
         >✕ Dismiss</button>
       </div>
@@ -257,41 +326,98 @@ export default function MorningSlide({ classId, onClose }: Props) {
               ))}
             </ol>
 
-            {/* Warning panel — pulsing red glow + blinking label.
-                Pops in last after the line cards, then loops forever
-                so it can't be ignored. */}
-            {slide.warning && (
+            {/* Cashout times row — pinned just above the warning */}
+            {slide.cashout_times.length > 0 && (
               <div style={{
                 maxWidth: 980, alignSelf: "center", width: "100%",
-                padding: `${tier.padVH * 0.9}vh ${tier.padVH * 1.5}vh`,
+                padding: `${tier.padVH * 0.7}vh ${tier.padVH * 1.2}vh`,
                 borderRadius: 14,
-                background: "linear-gradient(135deg, rgba(220,38,38,0.22), rgba(249,115,22,0.12))",
-                border: "2px solid rgba(220,38,38,0.55)",
-                animation: `morningSlideIn .5s ease .65s both, warnPulse 1.4s ease-in-out 1.2s infinite`,
+                background: "linear-gradient(135deg, rgba(15,118,110,0.22), rgba(56,189,248,0.10))",
+                border: "1.5px solid rgba(15,118,110,0.45)",
+                display: "flex", alignItems: "center", gap: 12,
+                flexWrap: "wrap",
+                animation: "morningSlideIn .5s ease .55s both",
                 flexShrink: 0,
               }}>
                 <div style={{
                   fontSize: 11, fontWeight: 900, letterSpacing: "0.22em",
                   textTransform: "uppercase",
-                  marginBottom: 6,
+                  color: "#7dd3c5",
                   display: "flex", alignItems: "center", gap: 6,
-                  animation: "warnLabelBlink 0.9s ease-in-out infinite",
                 }}>
-                  <span style={{
-                    fontSize: 18,
-                    display: "inline-block",
-                    animation: "warnShake 1.2s ease-in-out infinite",
-                  }}>⚠️</span>
-                  Warning
+                  <span style={{ fontSize: 16 }}>🪙</span> Cashout
                 </div>
-                <div style={{
-                  fontSize: `clamp(13px, ${tier.warnVH}vw, 22px)`,
-                  fontWeight: 700,
-                  lineHeight: 1.4,
-                  color: "#fee2e2",
-                  textShadow: "0 0 8px rgba(220,38,38,0.30)",
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {slide.cashout_times.map((t, i) => (
+                    <span key={i} style={{
+                      padding: "6px 14px", borderRadius: 999,
+                      background: "rgba(125,211,197,0.18)",
+                      border: "1px solid rgba(125,211,197,0.45)",
+                      fontSize: `clamp(13px, ${tier.warnVH * 0.9}vw, 20px)`,
+                      fontWeight: 800, color: "#a7f3d0",
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "0.04em",
+                    }}>{t}</span>
+                  ))}
+                </div>
+                {slide.vr_note && (
+                  <div style={{
+                    marginLeft: "auto",
+                    padding: "6px 14px", borderRadius: 999,
+                    background: "linear-gradient(135deg, rgba(124,58,237,0.20), rgba(99,102,241,0.10))",
+                    border: "1px solid rgba(124,58,237,0.50)",
+                    fontSize: `clamp(12px, ${tier.warnVH * 0.85}vw, 18px)`,
+                    fontWeight: 800, color: "#c4b5fd",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    🥽 {slide.vr_note}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Warning panel — pulsing red glow + blinking label.
+                Wrap the box in a separate span that owns the loop
+                animation so the entry transition doesn't override
+                the pulse (chained animations on the same element
+                with a delayed second one don't reliably loop). */}
+            {slide.warning && (
+              <div style={{
+                animation: "morningSlideIn .5s ease .65s both",
+                maxWidth: 980, alignSelf: "center", width: "100%",
+                flexShrink: 0,
+              }}>
+                <div className="morning-warn-pulse" style={{
+                  padding: `${tier.padVH * 0.9}vh ${tier.padVH * 1.5}vh`,
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, rgba(220,38,38,0.22), rgba(249,115,22,0.12))",
+                  border: "2px solid rgba(220,38,38,0.55)",
+                  willChange: "box-shadow, transform, border-color",
+                  animation: "warnPulse 1.4s ease-in-out infinite",
                 }}>
-                  {slide.warning}
+                  <div style={{
+                    fontSize: 11, fontWeight: 900, letterSpacing: "0.22em",
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                    display: "flex", alignItems: "center", gap: 6,
+                    animation: "warnLabelBlink 0.9s ease-in-out infinite",
+                  }}>
+                    <span style={{
+                      fontSize: 18,
+                      display: "inline-block",
+                      animation: "warnShake 1.2s ease-in-out infinite",
+                    }}>⚠️</span>
+                    Warning
+                  </div>
+                  <div style={{
+                    fontSize: `clamp(13px, ${tier.warnVH}vw, 22px)`,
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                    color: "#fee2e2",
+                    textShadow: "0 0 8px rgba(220,38,38,0.30)",
+                  }}>
+                    {slide.warning}
+                  </div>
                 </div>
               </div>
             )}

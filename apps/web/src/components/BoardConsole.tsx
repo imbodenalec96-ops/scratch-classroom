@@ -368,6 +368,10 @@ function MorningTab({ classId }: { classId: string }) {
   const [title, setTitle] = useState("");
   const [lines, setLines] = useState<string[]>([]);
   const [warning, setWarning] = useState("");
+  const [cashoutTimes, setCashoutTimes] = useState<string[]>([]);
+  const [vrNote, setVrNote] = useState("");
+  const [latitude, setLatitude] = useState<string>("");
+  const [longitude, setLongitude] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -380,6 +384,10 @@ function MorningTab({ classId }: { classId: string }) {
         setTitle(s.title);
         setLines(s.lines.length ? s.lines : [""]);
         setWarning(s.warning);
+        setCashoutTimes(s.cashout_times.length ? s.cashout_times : [""]);
+        setVrNote(s.vr_note);
+        setLatitude(s.latitude != null ? String(s.latitude) : "");
+        setLongitude(s.longitude != null ? String(s.longitude) : "");
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false));
@@ -393,6 +401,10 @@ function MorningTab({ classId }: { classId: string }) {
         title: title.trim(),
         lines: lines.map((l) => l.trim()).filter(Boolean),
         warning: warning.trim(),
+        cashout_times: cashoutTimes.map((t) => t.trim()).filter(Boolean),
+        vr_note: vrNote.trim(),
+        latitude: latitude.trim() ? Number(latitude) : null,
+        longitude: longitude.trim() ? Number(longitude) : null,
       });
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1800);
@@ -488,8 +500,52 @@ function MorningTab({ classId }: { classId: string }) {
         </div>
       </Field>
 
+      {/* Cashout times */}
+      <Field label="Cashout times (shown in the teal pill row)">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {cashoutTimes.map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                value={t}
+                onChange={(e) => setCashoutTimes((cur) => cur.map((v, idx) => idx === i ? e.target.value : v))}
+                placeholder="10:10"
+                maxLength={12}
+                style={{ ...inputStyle(), width: 100, textAlign: "center", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: 800 }}
+              />
+              <button
+                onClick={() => setCashoutTimes((cur) => cur.filter((_, idx) => idx !== i))}
+                disabled={cashoutTimes.length <= 1}
+                title="Remove"
+                style={smallBtn(cashoutTimes.length <= 1, true)}
+              >✕</button>
+            </div>
+          ))}
+          <button
+            onClick={() => setCashoutTimes((cur) => [...cur, ""])}
+            style={{
+              padding: "8px 14px", borderRadius: 999,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px dashed rgba(255,255,255,0.20)",
+              color: "rgba(245,241,232,0.85)", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >+ Add time</button>
+        </div>
+      </Field>
+
+      {/* VR note */}
+      <Field label="VR / special note (purple chip on the right)">
+        <input
+          value={vrNote}
+          onChange={(e) => setVrNote(e.target.value)}
+          placeholder="VR is only on Friday"
+          maxLength={200}
+          style={inputStyle()}
+        />
+      </Field>
+
       {/* Warning */}
-      <Field label="Warning (red panel at the bottom)">
+      <Field label="Warning (pulsing red panel at the bottom)">
         <textarea
           value={warning}
           onChange={(e) => setWarning(e.target.value)}
@@ -498,6 +554,47 @@ function MorningTab({ classId }: { classId: string }) {
           rows={3}
           style={{ ...inputStyle(), resize: "vertical", fontFamily: "inherit" }}
         />
+      </Field>
+
+      {/* Weather location */}
+      <Field label="Weather location (latitude / longitude)">
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={latitude}
+            onChange={(e) => setLatitude(e.target.value.replace(/[^0-9.\-]/g, ""))}
+            placeholder="36.7378"
+            style={{ ...inputStyle(), width: 140, fontVariantNumeric: "tabular-nums" }}
+          />
+          <input
+            value={longitude}
+            onChange={(e) => setLongitude(e.target.value.replace(/[^0-9.\-]/g, ""))}
+            placeholder="-119.7871"
+            style={{ ...inputStyle(), width: 140, fontVariantNumeric: "tabular-nums" }}
+          />
+          <button
+            onClick={() => {
+              if (!navigator.geolocation) return;
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  setLatitude(pos.coords.latitude.toFixed(4));
+                  setLongitude(pos.coords.longitude.toFixed(4));
+                },
+                () => {},
+              );
+            }}
+            title="Use this device's location"
+            style={{
+              padding: "8px 14px", borderRadius: 10,
+              background: "rgba(56,189,248,0.18)",
+              border: "1px solid rgba(56,189,248,0.40)",
+              color: "#7dd3fc", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >📍 Use my location</button>
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(245,241,232,0.45)", marginTop: 6 }}>
+          Free Open-Meteo weather. Default is Fresno, CA. Look up your school's coordinates on Google Maps if you want exact local weather.
+        </div>
       </Field>
     </div>
   );

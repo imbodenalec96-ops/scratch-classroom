@@ -445,6 +445,11 @@ async function ensureMorningSchema() {
       updated_at TEXT NOT NULL DEFAULT '',
       updated_by TEXT
     )`);
+    // Idempotent migrations for the new columns
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN cashout_times TEXT NOT NULL DEFAULT '[]'`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN vr_note TEXT NOT NULL DEFAULT ''`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN latitude REAL`); } catch {}
+    try { await db.exec(`ALTER TABLE morning_slides ADD COLUMN longitude REAL`); } catch {}
   } catch {}
   morningSchemaReady = true;
 }
@@ -458,13 +463,18 @@ const DEFAULT_MORNING_SLIDE = {
     "Every hour you'll have an IEP goal assignment to complete",
   ],
   warning: "Refuse to complete an assignment → fill out the form. Admin will be contacted and parents. No freetime until the assignment is complete.",
+  cashout_times: ["10:10", "11:00", "2:45"],
+  vr_note: "VR is only on Friday",
+  // Default to a generic continental US location — teachers can update.
+  latitude: 36.7378 as number | null,
+  longitude: -119.7871 as number | null, // Fresno, CA — central Pacific
 };
 
 router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Response) => {
   try {
     await ensureMorningSchema();
     const row: any = await db.prepare(
-      "SELECT title, lines, warning FROM morning_slides WHERE class_id::text = ?"
+      "SELECT title, lines, warning, cashout_times, vr_note, latitude, longitude FROM morning_slides WHERE class_id::text = ?"
     ).get(req.params.classId);
     if (!row) return res.json(DEFAULT_MORNING_SLIDE);
     let lines: string[] = [];
@@ -472,10 +482,19 @@ router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Resp
       const parsed = typeof row.lines === "string" ? JSON.parse(row.lines) : row.lines;
       if (Array.isArray(parsed)) lines = parsed.map((s) => String(s));
     } catch {}
+    let cashoutTimes: string[] = [];
+    try {
+      const parsed = typeof row.cashout_times === "string" ? JSON.parse(row.cashout_times || "[]") : row.cashout_times;
+      if (Array.isArray(parsed)) cashoutTimes = parsed.map((s) => String(s));
+    } catch {}
     res.json({
       title: String(row.title || DEFAULT_MORNING_SLIDE.title),
       lines: lines.length ? lines : DEFAULT_MORNING_SLIDE.lines,
       warning: String(row.warning || DEFAULT_MORNING_SLIDE.warning),
+      cashout_times: cashoutTimes.length ? cashoutTimes : DEFAULT_MORNING_SLIDE.cashout_times,
+      vr_note: row.vr_note != null ? String(row.vr_note) : DEFAULT_MORNING_SLIDE.vr_note,
+      latitude: row.latitude != null ? Number(row.latitude) : DEFAULT_MORNING_SLIDE.latitude,
+      longitude: row.longitude != null ? Number(row.longitude) : DEFAULT_MORNING_SLIDE.longitude,
     });
   } catch {
     res.json(DEFAULT_MORNING_SLIDE);
@@ -488,21 +507,55 @@ router.put("/classes/:classId/morning-slide", requireRole("teacher", "admin"), a
     ? req.body.lines.map((s: any) => String(s || "").slice(0, 200)).filter(Boolean).slice(0, 20)
     : [];
   const warning = String(req.body?.warning || "").slice(0, 500);
+  const cashoutTimes = Array.isArray(req.body?.cashout_times)
+    ? req.body.cashout_times.map((s: any) => String(s || "").slice(0, 12)).filter(Boolean).slice(0, 12)
+    : [];
+  const vrNote = String(req.body?.vr_note || "").slice(0, 200);
+  const lat = req.body?.latitude != null && Number.isFinite(Number(req.body.latitude)) ? Number(req.body.latitude) : null;
+  const lon = req.body?.longitude != null && Number.isFinite(Number(req.body.longitude)) ? Number(req.body.longitude) : null;
   try {
     await ensureMorningSchema();
     await db.prepare(
-      `INSERT INTO morning_slides (class_id, title, lines, warning, updated_at, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO morning_slides (class_id, title, lines, warning, cashout_times, vr_note, latitude, longitude, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (class_id) DO UPDATE SET
          title = EXCLUDED.title,
          lines = EXCLUDED.lines,
          warning = EXCLUDED.warning,
+         cashout_times = EXCLUDED.cashout_times,
+         vr_note = EXCLUDED.vr_note,
+         latitude = EXCLUDED.latitude,
+         longitude = EXCLUDED.longitude,
          updated_at = EXCLUDED.updated_at,
          updated_by = EXCLUDED.updated_by`
-    ).run(req.params.classId, title, JSON.stringify(lines), warning, new Date().toISOString(), req.user?.id ?? null);
-    res.json({ ok: true, title, lines, warning });
+    ).run(req.params.classId, title, JSON.stringify(lines), warning, JSON.stringify(cashoutTimes), vrNote, lat, lon, new Date().toISOString(), req.user?.id ?? null);
+    res.json({ ok: true, title, lines, warning, cashout_times: cashoutTimes, vr_note: vrNote, latitude: lat, longitude: lon });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "failed" });
+  }
+});
+
+// Free, no-key weather via Open-Meteo. Returns today's high/low + a
+// weather code we map to an emoji client-side.
+router.get("/weather", async (req: AuthRequest, res: Response) => {
+  const lat = Number(req.query?.lat);
+  const lon = Number(req.query?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ error: "lat and lon required" });
+  }
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=1`;
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).json({ error: "weather api failed" });
+    const data: any = await r.json();
+    res.json({
+      temperature: Math.round(Number(data?.current?.temperature_2m ?? NaN)),
+      code: Number(data?.current?.weather_code ?? NaN),
+      high: Math.round(Number(data?.daily?.temperature_2m_max?.[0] ?? NaN)),
+      low: Math.round(Number(data?.daily?.temperature_2m_min?.[0] ?? NaN)),
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "weather fetch failed" });
   }
 });
 

@@ -628,11 +628,22 @@ export const api = {
     }),
   // Morning slide content — teacher edits, board displays
   getMorningSlide: (classId: string) =>
-    request<{ title: string; lines: string[]; warning: string }>(`/extras/classes/${classId}/morning-slide`),
-  setMorningSlide: (classId: string, slide: { title: string; lines: string[]; warning: string }) =>
-    request<{ ok: boolean; title: string; lines: string[]; warning: string }>(`/extras/classes/${classId}/morning-slide`, {
+    request<{
+      title: string; lines: string[]; warning: string;
+      cashout_times: string[]; vr_note: string;
+      latitude: number | null; longitude: number | null;
+    }>(`/extras/classes/${classId}/morning-slide`),
+  setMorningSlide: (classId: string, slide: {
+    title: string; lines: string[]; warning: string;
+    cashout_times?: string[]; vr_note?: string;
+    latitude?: number | null; longitude?: number | null;
+  }) =>
+    request<{ ok: boolean }>(`/extras/classes/${classId}/morning-slide`, {
       method: "PUT", body: JSON.stringify(slide),
     }),
+  // Free Open-Meteo weather (no key needed)
+  getWeather: (lat: number, lon: number) =>
+    request<{ temperature: number; code: number; high: number; low: number }>(`/extras/weather?lat=${lat}&lon=${lon}`),
   // Manual paper-work progress entry — teacher tallies done counts.
   setManualProgress: (studentId: string, count: number) =>
     request<{ ok: boolean; day: string; count: number; pointsDelta: number; dojo_points: number | null }>(`/extras/students/${studentId}/manual-progress`, {
