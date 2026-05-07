@@ -15,10 +15,12 @@ import { StarStore, rehydrateBcDB, type BcEntry } from "../../lib/star/storage.t
 import { scanReceivedBeep, successBeep, errorBeep } from "../../lib/star/sounds.ts";
 import RefusalModal from "./RefusalModal.tsx";
 import GradebookModal from "./GradebookModal.tsx";
+import PassModal from "./PassModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
   gradebook?: { barcode: string };
+  pass?: { barcode: string; passKind: "Bathroom" | "Water" | "Break" };
 }
 
 export default function StarScanner() {
@@ -79,6 +81,8 @@ export default function StarScanner() {
           setScan({ refusal: { barcode: v, type: "Work Refusal" } });
         } else if (entry.type === "specials-refusal-form") {
           setScan({ refusal: { barcode: v, type: "Specials Refusal" } });
+        } else if (entry.type === "pass-action") {
+          setScan({ pass: { barcode: v, passKind: entry.passKind } });
         }
       } else {
         errorBeep();
@@ -107,6 +111,12 @@ export default function StarScanner() {
       {scan.gradebook && (
         <GradebookModal
           barcode={scan.gradebook.barcode}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.pass && (
+        <PassModal
+          passKind={scan.pass.passKind}
           onClose={() => setScan({})}
         />
       )}

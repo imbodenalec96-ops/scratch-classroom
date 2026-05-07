@@ -40,6 +40,16 @@ export const api = {
   studentLogin: (id: string, password: string) => request<any>("/auth/student-login", { method: "POST", body: JSON.stringify({ id, password }) }),
 
   // Classes
+  // STAR cross-device event relay
+  starEventsList: (classId: string, since?: string) =>
+    request<{ events: Array<{ id: string; kind: string; payload: any; created_at: string }> }>(
+      `/classes/${classId}/star-events${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+    ),
+  starEventPost: (classId: string, kind: string, payload: any) =>
+    request<{ ok: boolean; id: string; created_at: string }>(
+      `/classes/${classId}/star-events`,
+      { method: "POST", body: JSON.stringify({ kind, payload }) },
+    ),
   getClasses: () => request<any[]>("/classes"),
   createClass: (name: string) => request<any>("/classes", { method: "POST", body: JSON.stringify({ name }) }),
   getClass: (id: string) => request<any>(`/classes/${id}`),
@@ -632,13 +642,13 @@ export const api = {
       title: string; lines: string[]; warning: string;
       cashout_times: string[]; vr_note: string;
       latitude: number | null; longitude: number | null;
-      notices: Array<{ title: string; names: string[] }>;
+      notices: Array<{ title: string; names: string[]; enabled: boolean }>;
     }>(`/extras/classes/${classId}/morning-slide`),
   setMorningSlide: (classId: string, slide: {
     title: string; lines: string[]; warning: string;
     cashout_times?: string[]; vr_note?: string;
     latitude?: number | null; longitude?: number | null;
-    notices?: Array<{ title: string; names: string[] }>;
+    notices?: Array<{ title: string; names: string[]; enabled?: boolean }>;
   }) =>
     request<{ ok: boolean }>(`/extras/classes/${classId}/morning-slide`, {
       method: "PUT", body: JSON.stringify(slide),

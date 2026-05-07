@@ -14,6 +14,8 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { syncFromClassroom, type SyncResult } from "../../lib/star/sync.ts";
+import { setActiveClassId } from "../../lib/star/boardEvents.ts";
+import { api } from "../../lib/api.ts";
 import { importStarCsv, type ImportResult } from "../../lib/star/importCsv.ts";
 import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
@@ -54,6 +56,11 @@ export default function StarPage() {
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.
     runSync();
+    // Capture the active class id so STAR events fired from this device
+    // (iPad) get relayed to the server and picked up by the projector.
+    api.getClasses().then((cs) => {
+      if (Array.isArray(cs) && cs[0]?.id) setActiveClassId(cs[0].id);
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,10 +122,15 @@ export default function StarPage() {
       </div>
 
       {tab === "generator" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <AssignmentGenerator />
-          <RefusalFormGenerator />
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <AssignmentGenerator />
+            <RefusalFormGenerator />
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <PassBarcodesPanel />
+          </div>
+        </>
       )}
 
       {tab === "manual" && <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />}
@@ -130,6 +142,80 @@ export default function StarPage() {
       {openGradebook && (
         <GradebookModal barcode={openGradebook} onClose={() => setOpenGradebook(null)} />
       )}
+    </div>
+  );
+}
+
+/* ── pass barcode print sheet ────────────────────────────────────── */
+
+function PassBarcodesPanel() {
+  const print = () => {
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) return;
+    const passes = [
+      { id: "PASS-BATHROOM", label: "🚻 Bathroom Pass", note: "Scan + tap student to send out. Scan again + tap to mark return." },
+      { id: "PASS-WATER",    label: "💧 Water Break",    note: "Scan + tap student. Tracks elapsed time on the board." },
+      { id: "PASS-BREAK",    label: "🛋 Sensory Break",  note: "Scan + tap student. Alerts after 5 minutes." },
+    ];
+    const cells = passes.map((p) => `
+      <div style="border:2px dashed #999;border-radius:14px;padding:24px;text-align:center;page-break-inside:avoid">
+        <div style="font-size:24px;font-weight:800;margin-bottom:8px">${p.label}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:14px">${p.note}</div>
+        ${bc128svg(p.id, 0, 100, true, 2.4)}
+      </div>
+    `).join("");
+    w.document.write(`<!doctype html><html><head><title>STAR pass barcodes</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.5in; } }
+        body { font-family: -apple-system, sans-serif; padding: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+        h2 { font-size: 18px; margin: 0 0 12px; }
+      </style>
+    </head><body>
+      <h2>STAR — Pass Barcodes (laminate + tape near the door)</h2>
+      <div class="grid">${cells}</div>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+    </body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 14, padding: 16, color: "#f5f1e8",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>🚻 Pass Barcodes</div>
+          <p style={{ fontSize: 12, opacity: 0.7, margin: "4px 0 0" }}>
+            Laminate these and tape them near the door. Scan a pass, tap a student in the popup
+            to send them out — scan again + tap to mark return. Active passes show on the board with running timers; alerts after 5 minutes.
+          </p>
+        </div>
+        <button onClick={print} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "linear-gradient(135deg,#6366f1,#b23a48)", color: "white",
+          border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
+        }}>🖨 Print pass sheet</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 14 }}>
+        {[
+          { id: "PASS-BATHROOM", label: "🚻 Bathroom" },
+          { id: "PASS-WATER",    label: "💧 Water" },
+          { id: "PASS-BREAK",    label: "🛋 Sensory Break" },
+        ].map((p) => (
+          <div key={p.id} style={{
+            padding: 10, borderRadius: 10,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>{p.label}</div>
+            <div dangerouslySetInnerHTML={{ __html: bc128svg(p.id, 0, 56, true, 1.4) }} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import BirthdayCelebration from "./BirthdayCelebration.tsx";
 import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
+import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -1827,6 +1828,10 @@ export default function ClassroomBoard() {
     {/* STAR board overlays — full-screen popups when refusal logged or
         completed grade saved. Fires via BroadcastChannel from STAR modals. */}
     <StarBoardOverlay />
+
+    {/* STAR active passes — bottom-left strip of students currently out
+        on a bathroom / water / sensory break with running timers. */}
+    <ActivePassesStrip />
 
     {/* Student wallet — overlay opened from the 💼 button. */}
     {showWallet && cls?.id && (

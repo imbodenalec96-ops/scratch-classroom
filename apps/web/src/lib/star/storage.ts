@@ -56,7 +56,22 @@ export type BcEntry =
       name: string;
       studentName: string;
       createdDate: string;
+    }
+  | {
+      id: string;
+      type: "pass-action";
+      name: string;
+      // Which kind of pass this barcode triggers.
+      passKind: "Bathroom" | "Water" | "Break";
+      createdDate: string;
     };
+
+export interface ActivePass {
+  studentId: string;
+  studentName: string;
+  passKind: "Bathroom" | "Water" | "Break";
+  startedAt: string; // ISO
+}
 
 export interface StarSubmission {
   studentId: string;
@@ -143,6 +158,8 @@ const KEYS = {
   aiModel: "star_ai_model",
   tpls: "star_tpls",
   pointsPerCompletion: "star_points_per_completion",
+  activePasses: "star_active_passes",
+  passLog: "star_pass_log",
 } as const;
 
 // LocalStorage with safe parse + default fallback
@@ -195,6 +212,10 @@ export const StarStore = {
   setTpls:       (v: string[]) => ls.set(KEYS.tpls, v),
   getPointsPerCompletion: () => ls.get<number>(KEYS.pointsPerCompletion, 5),
   setPointsPerCompletion: (v: number) => ls.set(KEYS.pointsPerCompletion, v),
+  getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
+  setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),
+  getPassLog: () => ls.get<Array<ActivePass & { endedAt: string; elapsedSec: number }>>(KEYS.passLog, []),
+  setPassLog: (v: Array<ActivePass & { endedAt: string; elapsedSec: number }>) => ls.set(KEYS.passLog, v),
 };
 
 // Save EVERYTHING in one shot — matches the original spec's saveAll().
@@ -217,7 +238,15 @@ export function saveAll(state: {
 }
 
 // Auto-register every assignment from star_a + star_asntrack into bcDB
-// so a freshly cleared scanner database stays usable.
+// so a freshly cleared scanner database stays usable. Also seeds the
+// fixed pass-action barcodes (Bathroom / Water / Break) so the printable
+// scan sheet works out of the box.
+const PASS_BARCODES: Array<{ id: string; passKind: "Bathroom" | "Water" | "Break"; name: string }> = [
+  { id: "PASS-BATHROOM", passKind: "Bathroom", name: "🚻 Bathroom Pass" },
+  { id: "PASS-WATER",    passKind: "Water",    name: "💧 Water Break" },
+  { id: "PASS-BREAK",    passKind: "Break",    name: "🛋 Sensory Break" },
+];
+
 export function rehydrateBcDB(): Record<string, BcEntry> {
   const bcDB = StarStore.getBcDB();
   const asnTrack = StarStore.getAsnTrack();
@@ -231,6 +260,11 @@ export function rehydrateBcDB(): Record<string, BcEntry> {
         goal: a.goal, questions: a.questions, lesson: a.lesson,
         createdDate: a.createdDate,
       };
+    }
+  }
+  for (const p of PASS_BARCODES) {
+    if (!bcDB[p.id]) {
+      bcDB[p.id] = { id: p.id, type: "pass-action", name: p.name, passKind: p.passKind, createdDate: new Date().toISOString() };
     }
   }
   StarStore.setBcDB(bcDB);

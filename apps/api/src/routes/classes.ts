@@ -1495,6 +1495,72 @@ async function ensureHelpRequestsTable() {
   } catch { helpReqsReady = true; }
 }
 
+/* ── STAR events relay ───────────────────────────────────────────
+ * Tiny ring buffer of recent STAR events (assignment completion,
+ * refusal logged, bathroom pass start/end). The teacher's iPad POSTs
+ * an event when they save in a STAR modal; the projector / board
+ * polls GET ?since=<ts> every second so popups + active passes
+ * appear on the projector even though the scan happened on iPad.
+ */
+let starEventsReady = false;
+async function ensureStarEvents() {
+  if (starEventsReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS star_events (
+      id TEXT PRIMARY KEY,
+      class_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    )`);
+    try { await db.exec(`CREATE INDEX IF NOT EXISTS idx_star_events_class_time ON star_events (class_id, created_at)`); } catch {}
+    starEventsReady = true;
+  } catch { starEventsReady = true; }
+}
+
+router.post("/:classId/star-events", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureStarEvents();
+  const kind = String(req.body?.kind || "").slice(0, 32);
+  const payload = JSON.stringify(req.body?.payload || {});
+  if (!kind) return res.status(400).json({ error: "missing kind" });
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(
+      "INSERT INTO star_events (id, class_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, req.params.classId, kind, payload, now);
+    // Sweep events older than 5 minutes — keeps the table tiny.
+    const cutoff = new Date(Date.now() - 5 * 60_000).toISOString();
+    db.prepare("DELETE FROM star_events WHERE class_id = ? AND created_at < ?")
+      .run(req.params.classId, cutoff).catch(() => {});
+    res.json({ ok: true, id, created_at: now });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "insert failed" });
+  }
+});
+
+// Anyone in the class (board polls without auth in some setups, but the
+// route is auth-gated to match the rest). Returns events newer than ?since.
+router.get("/:classId/star-events", async (req: AuthRequest, res: Response) => {
+  await ensureStarEvents();
+  const since = String(req.query?.since || "");
+  try {
+    const rows = await db.prepare(
+      since
+        ? `SELECT id, kind, payload, created_at FROM star_events WHERE class_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT 50`
+        : `SELECT id, kind, payload, created_at FROM star_events WHERE class_id = ? ORDER BY created_at DESC LIMIT 20`
+    ).all(...(since ? [req.params.classId, since] : [req.params.classId])) as any[];
+    const events = rows.map((r) => {
+      let p: any = {};
+      try { p = JSON.parse(r.payload || "{}"); } catch {}
+      return { id: r.id, kind: r.kind, payload: p, created_at: r.created_at };
+    });
+    res.json({ events });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "fetch failed" });
+  }
+});
+
 router.post("/:classId/help", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   const classId = req.params.classId;

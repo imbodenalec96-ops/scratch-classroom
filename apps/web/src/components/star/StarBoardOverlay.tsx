@@ -6,30 +6,66 @@
 // Auto-dismisses after a few seconds. If multiple events stack, the
 // newest one replaces the current one.
 
-import { useEffect, useState } from "react";
-import { onStarBoardEvent, type StarBoardEvent, type StarBoardKind } from "../../lib/star/boardEvents.ts";
+import { useEffect, useRef, useState } from "react";
+import { onStarBoardEvent, type StarBoardEvent, type StarBoardKind, getActiveClassId, wasSeenLocally, markSeenLocally } from "../../lib/star/boardEvents.ts";
 import { successBeep, alertBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
+import { api } from "../../lib/api.ts";
 
 const SHOW_MS = 6000;
 
 export default function StarBoardOverlay() {
   const [evt, setEvt] = useState<StarBoardEvent | null>(null);
 
+  const handleEvent = (e: StarBoardEvent) => {
+    // Skip pass events here — they belong on the ActivePassesStrip,
+    // not the full takeover. Pass timing is shown in the strip.
+    if (e.kind === "pass-out" || e.kind === "pass-in") return;
+    setEvt(e);
+    if (e.kind === "completion") {
+      successBeep();
+      setTimeout(() => loggedBeep(), 200);
+    } else {
+      alertBeep();
+      setTimeout(() => errorBeep(), 350);
+    }
+    if (e.studentId) highlightRosterCard(e.studentId, e.kind);
+  };
+
+  useEffect(() => onStarBoardEvent(handleEvent), []);
+
+  // 1-second cross-device poller. Picks up STAR events fired on
+  // another device (teacher iPad → projector). Each new server event is
+  // re-broadcast locally via fireStarBoardEvent path — just dispatch it
+  // through the same handler. De-duped by id.
+  const seenRef = useRef<Set<string>>(new Set());
+  const sinceRef = useRef<string>(new Date(Date.now() - 30_000).toISOString());
   useEffect(() => {
-    return onStarBoardEvent((e) => {
-      setEvt(e);
-      if (e.kind === "completion") {
-        // Triumphant: rising chord + four-note sparkle
-        successBeep();
-        setTimeout(() => loggedBeep(), 200);
-      } else {
-        // Alert: triple square pulse + descending sweep
-        alertBeep();
-        setTimeout(() => errorBeep(), 350);
-      }
-      // Highlight the matching roster card on the board for a few seconds.
-      if (e.studentId) highlightRosterCard(e.studentId, e.kind);
-    });
+    const classId = getActiveClassId();
+    if (!classId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { events } = await api.starEventsList(classId, sinceRef.current);
+        if (cancelled) return;
+        for (const ev of events || []) {
+          if (seenRef.current.has(ev.id)) continue;
+          seenRef.current.add(ev.id);
+          sinceRef.current = ev.created_at;
+          const payload = ev.payload as StarBoardEvent;
+          // Skip events we already fired locally on this device — they
+          // already played their sound + animation when fired.
+          if (payload?.uuid && wasSeenLocally(payload.uuid)) continue;
+          if (payload?.uuid) markSeenLocally(payload.uuid);
+          // Local dispatch — drives the overlay AND active passes strip.
+          try {
+            window.dispatchEvent(new CustomEvent("star-board-event", { detail: payload }));
+          } catch {}
+        }
+      } catch { /* poll silently */ }
+    };
+    tick();
+    const iv = window.setInterval(tick, 1000);
+    return () => { cancelled = true; window.clearInterval(iv); };
   }, []);
 
   useEffect(() => {
