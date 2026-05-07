@@ -72,14 +72,17 @@ export default function StarPage() {
               Use the tabs below to mint new barcodes, log paper assignments, and review reports.
             </p>
           </div>
-          <button onClick={runSync} disabled={syncing} style={{
-            padding: "10px 14px", borderRadius: 10,
-            background: "rgba(99,102,241,0.15)", color: "white",
-            border: "1px solid rgba(99,102,241,0.40)",
-            fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
-          }}>
-            {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <ManualBarcodeInput />
+            <button onClick={runSync} disabled={syncing} style={{
+              padding: "10px 14px", borderRadius: 10,
+              background: "rgba(99,102,241,0.15)", color: "white",
+              border: "1px solid rgba(99,102,241,0.40)",
+              fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
+            }}>
+              {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
+            </button>
+          </div>
         </div>
         {syncStatus && (
           <div style={{
@@ -127,6 +130,32 @@ export default function StarPage() {
         <GradebookModal barcode={openGradebook} onClose={() => setOpenGradebook(null)} />
       )}
     </div>
+  );
+}
+
+/* ── manual barcode input — works without a USB scanner ─────────── */
+// The id="star-barcode-input" matches the special-case in StarScanner —
+// keypresses while focused on this input flow into the same buffer the
+// USB scanner uses. So the global handler pops the right modal on Enter;
+// we just clear the visible value here.
+function ManualBarcodeInput() {
+  const [v, setV] = useState("");
+  return (
+    <input
+      id="star-barcode-input"
+      value={v}
+      onChange={(e) => setV(e.target.value.toUpperCase())}
+      onKeyDown={(e) => { if (e.key === "Enter") setTimeout(() => setV(""), 50); }}
+      placeholder="📷 Scan or type barcode + Enter"
+      autoFocus
+      style={{
+        padding: "10px 12px", borderRadius: 10,
+        background: "rgba(0,0,0,0.30)", color: "white",
+        border: "1px solid rgba(255,255,255,0.18)",
+        fontFamily: "Menlo, monospace", fontSize: 13, outline: "none",
+        width: 280,
+      }}
+    />
   );
 }
 

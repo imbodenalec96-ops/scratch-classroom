@@ -386,10 +386,12 @@ function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQu
     </div>
   `;
 
+  const lessonAny: any = lesson;
   const lessonHtml = lesson ? `
     <div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">${escapeHtml(lesson.title)}</div>
-      <div style="font-size:13px;margin-bottom:8px">${escapeHtml(lesson.intro)}</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">📖 ${escapeHtml(lesson.title)}</div>
+      ${lesson.intro ? `<div style="font-size:13px;margin-bottom:8px">${escapeHtml(lesson.intro)}</div>` : ""}
+      ${lessonAny.body ? `<div style="font-size:13px;margin-bottom:8px;line-height:1.55;white-space:pre-wrap">${escapeHtml(String(lessonAny.body))}</div>` : ""}
       ${lesson.keyPoints?.length ? `<ul style="margin:0 0 8px 18px;padding:0;font-size:13px">${lesson.keyPoints.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
       ${lesson.workedExample ? `<div style="font-size:13px;margin-top:6px"><b>Example:</b> ${escapeHtml(lesson.workedExample.problem)} → <span style="color:#16a34a;font-weight:700">${escapeHtml(lesson.workedExample.solution)}</span></div>` : ""}
       ${lesson.vocab?.length ? `<div style="font-size:13px;margin-top:6px"><b>Vocab:</b> ${lesson.vocab.map((v) => `<span style="margin-right:10px"><b>${escapeHtml(v.term)}</b>: ${escapeHtml(v.definition)}</span>`).join("")}</div>` : ""}

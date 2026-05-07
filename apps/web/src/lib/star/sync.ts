@@ -148,10 +148,18 @@ export async function syncFromClassroom(): Promise<SyncResult> {
         const seq = todaySeq[prefix]++;
         const barcode = `${prefix}-${datePart}-${String(seq).padStart(3, "0")}`;
 
-        const qCount = Math.max(1, Number(a.question_count) || 10);
-        const questions: StarQuestion[] = Array.from({ length: qCount }, (_, i) => ({
-          num: i + 1, text: `Question ${i + 1}`, answer: "—",
-        }));
+        // The classroom AssignmentBuilder stores the full teacher-generated
+        // lesson + question bank as JSON in `content`. Pull that through so
+        // STAR shows the same lesson + real answer keys instead of placeholders.
+        const parsed = parseAssignmentContent(a.content, a.description);
+        const fallbackCount = Math.max(1, Number(a.question_count) || 10);
+        const questions: StarQuestion[] = parsed.questions.length > 0
+          ? parsed.questions
+          : Array.from({ length: fallbackCount }, (_, i) => ({
+              num: i + 1, text: `Question ${i + 1}`, answer: "—",
+            }));
+
+        const lesson = parsed.lesson;
 
         const created = a.scheduled_date || a.due_date || a.created_at || new Date().toISOString();
 
@@ -163,7 +171,7 @@ export async function syncFromClassroom(): Promise<SyncResult> {
           gradeLevel: grade,
           goal: a.learning_objective || undefined,
           questions,
-          lesson: null,
+          lesson,
           createdDate: created,
           sourceId: a.id,
         };
@@ -175,7 +183,7 @@ export async function syncFromClassroom(): Promise<SyncResult> {
           subject, gradeLevel: grade,
           goal: entry.goal,
           questions,
-          lesson: null,
+          lesson,
           createdDate: created,
           status: "assigned",
           submissions: [],
@@ -202,4 +210,84 @@ export async function syncFromClassroom(): Promise<SyncResult> {
     assignmentsAdded, assignmentsTotal,
     message: `Synced ${studentsTotal} students · ${assignmentsAdded} new barcodes from ${assignmentsTotal} assignments.`,
   };
+}
+
+/* ── content parser ──────────────────────────────────────────────── */
+
+interface ParsedContent {
+  lesson: {
+    title: string;
+    intro: string;
+    keyPoints: string[];
+    workedExample?: { problem: string; solution: string };
+    body?: string;
+  } | null;
+  questions: StarQuestion[];
+}
+
+// Parse the JSON content field stored on a classroom assignment row.
+// The AssignmentBuilder writes shapes like:
+//   { title, instructions, lesson: "<paragraph>", sections: [{ questions: [...] }] }
+// where each question has `text` plus either `correctIndex`+`options` (multiple
+// choice) or `correctAnswer` (short answer). Older rows may have a flat
+// `questions` array. We normalize both into StarQuestion[].
+function parseAssignmentContent(content: any, description?: string): ParsedContent {
+  let parsed: any = null;
+  if (typeof content === "string") {
+    const s = content.trim();
+    if (s.startsWith("{") || s.startsWith("[")) {
+      try { parsed = JSON.parse(s); } catch { /* fall through */ }
+    }
+  } else if (content && typeof content === "object") {
+    parsed = content;
+  }
+
+  if (!parsed) {
+    return {
+      lesson: description ? { title: "Instructions", intro: String(description), keyPoints: [] } : null,
+      questions: [],
+    };
+  }
+
+  // Collect questions from sections[*].questions, or top-level questions array
+  const sections: any[] = Array.isArray(parsed.sections) ? parsed.sections : [];
+  const flatQuestions: any[] = sections.flatMap((sec) => Array.isArray(sec?.questions) ? sec.questions : []);
+  const fromTop: any[] = Array.isArray(parsed.questions) ? parsed.questions : [];
+  const allQs = flatQuestions.length ? flatQuestions : fromTop;
+
+  const questions: StarQuestion[] = allQs.map((q, i) => {
+    const text = String(q?.text || q?.question || `Question ${i + 1}`);
+    let answer = "";
+    if (typeof q?.correctIndex === "number" && Array.isArray(q?.options)) {
+      // strip leading "A. " etc. from option text so the answer is just the value
+      const raw = String(q.options[q.correctIndex] || "");
+      answer = raw.replace(/^[A-Da-d][.)]\s*/, "").trim();
+    } else if (q?.correctAnswer != null) {
+      answer = String(q.correctAnswer);
+    } else if (q?.answer != null) {
+      answer = String(q.answer);
+    }
+    return { num: i + 1, text, answer };
+  });
+
+  // Build lesson block. The classroom format puts the teaching paragraph in
+  // `lesson` (a string) plus an `instructions` blurb. Pack both into our
+  // structured Lesson shape so the modal + print template can render them.
+  const lessonText = typeof parsed.lesson === "string" ? parsed.lesson.trim() : "";
+  const instructions = typeof parsed.instructions === "string" ? parsed.instructions.trim() : "";
+  const title = typeof parsed.title === "string" ? parsed.title.trim() : "Lesson";
+
+  let lesson: ParsedContent["lesson"] = null;
+  if (lessonText || instructions) {
+    lesson = {
+      title: title || "Lesson",
+      intro: instructions || (lessonText.split(/[.!?]\s/)[0] + "."),
+      keyPoints: [],
+      body: lessonText || undefined,
+    };
+  } else if (description) {
+    lesson = { title: "Instructions", intro: String(description), keyPoints: [] };
+  }
+
+  return { lesson, questions };
 }

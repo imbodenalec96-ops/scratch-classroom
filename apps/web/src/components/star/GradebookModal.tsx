@@ -182,6 +182,9 @@ export default function GradebookModal({ barcode, onClose }: Props) {
           <InfoCard label="Created" value={entry.createdDate ? new Date(entry.createdDate).toLocaleDateString() : "—"} />
         </div>
 
+        {/* Lesson — what the student was supposed to learn */}
+        <LessonPanel lesson={entry.lesson} />
+
         {/* Grade history */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 8 }}>
@@ -381,6 +384,60 @@ function shellStyle(): React.CSSProperties {
     boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
   };
 }
+function LessonPanel({ lesson }: { lesson: any }) {
+  const [open, setOpen] = useState(true);
+  if (!lesson) return null;
+  const title: string = lesson.title || "Lesson";
+  const intro: string = lesson.intro || "";
+  const body: string  = lesson.body || "";
+  const keyPoints: string[] = Array.isArray(lesson.keyPoints) ? lesson.keyPoints : [];
+  const example = lesson.workedExample || null;
+  const vocab: { term: string; definition: string }[] = Array.isArray(lesson.vocab) ? lesson.vocab : [];
+
+  return (
+    <div style={{
+      marginBottom: 16, padding: 14, borderRadius: 12,
+      background: "rgba(99,102,241,0.07)",
+      border: "1px solid rgba(99,102,241,0.30)",
+    }}>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, color: "#a5b4fc" }}>
+            📖 Lesson — what the student should know
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>{title}</div>
+        </div>
+        <span style={{ fontSize: 18, opacity: 0.7 }}>{open ? "▾" : "▸"}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+          {intro && <p style={{ margin: "0 0 8px", opacity: 0.95 }}>{intro}</p>}
+          {body && <p style={{ margin: "0 0 8px", opacity: 0.85, whiteSpace: "pre-wrap" }}>{body}</p>}
+          {keyPoints.length > 0 && (
+            <ul style={{ margin: "0 0 8px 18px", padding: 0 }}>
+              {keyPoints.map((p, i) => <li key={i} style={{ marginBottom: 2 }}>{p}</li>)}
+            </ul>
+          )}
+          {example && (
+            <div style={{ padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.25)", marginBottom: 8 }}>
+              <b>Example:</b> {example.problem} → <span style={{ color: "#86efac", fontWeight: 700 }}>{example.solution}</span>
+            </div>
+          )}
+          {vocab.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {vocab.map((v, i) => (
+                <span key={i} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.25)" }}>
+                  <b>{v.term}:</b> {v.definition}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={{
