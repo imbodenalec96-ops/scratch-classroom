@@ -9,6 +9,7 @@ import PinPad from "./PinPad.tsx";
 import BirthdayCelebration from "./BirthdayCelebration.tsx";
 import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
+import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -1175,7 +1176,7 @@ export default function ClassroomBoard() {
               })();
               const isBirthday = !!bday && bday.slice(-5) === todayMD;
               return (
-                <div key={s.id} style={{
+                <div key={s.id} data-student-id={s.id} className="star-roster-card" style={{
                   borderRadius: 4, display: "flex", flexDirection: "column",
                   alignItems: "stretch", textAlign: "center",
                   background: isFull
@@ -1822,6 +1823,10 @@ export default function ClassroomBoard() {
 
     {/* Reaction emojis — bottom-center pill, kids tap to react silently. */}
     <ReactionRain />
+
+    {/* STAR board overlays — full-screen popups when refusal logged or
+        completed grade saved. Fires via BroadcastChannel from STAR modals. */}
+    <StarBoardOverlay />
 
     {/* Student wallet — overlay opened from the 💼 button. */}
     {showWallet && cls?.id && (

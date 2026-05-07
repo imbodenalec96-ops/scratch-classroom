@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { StarStore, saveAll, type StarRefusalLog, type StarRfgTrackerEntry, type StarStudent } from "../../lib/star/storage.ts";
 import { loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
+import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
 
 interface Props {
   barcode: string;
@@ -107,6 +108,16 @@ export default function RefusalModal({ barcode, type, onClose }: Props) {
     tracker.unshift(trackEntry);
 
     saveAll({ log, rfgTracker: tracker });
+
+    // Broadcast to the ClassroomBoard so it can show the big alert overlay.
+    fireStarBoardEvent({
+      kind: "refusal",
+      studentName: `${student.firstName} ${student.lastName}`.trim(),
+      studentId: student.id,
+      refusalType,
+      detail: subject ? `${subject}${task ? ` · ${task}` : ""}` : task || undefined,
+    });
+
     loggedBeep();
     setSaving(false);
     setSavedFlash(true);

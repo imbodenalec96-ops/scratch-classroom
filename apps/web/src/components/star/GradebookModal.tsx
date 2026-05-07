@@ -9,6 +9,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
+import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
 
 interface Props {
   barcode: string;
@@ -138,12 +139,25 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     // status counts; only when the student looks like a real DB id (a UUID
     // — locally added STU-### students don't exist in the API). Failures
     // are silent so a points API outage never blocks grading.
+    let pointsAwarded = 0;
     if (status === "completed") {
       const ppc = StarStore.getPointsPerCompletion();
       const looksLikeUuid = /^[0-9a-f-]{20,}$/i.test(s.id);
       if (ppc > 0 && looksLikeUuid) {
+        pointsAwarded = ppc;
         api.adjustStudentPoints(s.id, ppc, `STAR: ${entry.name} — ${letter}`).catch(() => {});
       }
+    }
+
+    // Broadcast to the ClassroomBoard so it can show the big celebration.
+    if (status === "completed") {
+      fireStarBoardEvent({
+        kind: "completion",
+        studentName: `${s.firstName} ${s.lastName}`.trim(),
+        studentId: s.id,
+        detail: entry.name,
+        pct, letter, pointsAwarded,
+      });
     }
 
     loggedBeep();
