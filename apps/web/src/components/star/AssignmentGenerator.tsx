@@ -277,6 +277,16 @@ function ghostBtn(): React.CSSProperties {
   };
 }
 
+function gradeMathScope(grade: string): string {
+  const g = (grade || "").toUpperCase();
+  if (g === "K" || g === "KG") return "Kindergarten: ONLY addition within 5 (e.g., 2+3, 4+1). No subtraction, no multiplication, no division. Use objects and finger counting.";
+  if (g.startsWith("1")) return "1st grade: addition and subtraction within 20 ONLY. NO multiplication. NO division. NO 2-digit operations.";
+  if (g.startsWith("2")) return "2nd grade: addition and subtraction within 100 ONLY. ABSOLUTELY NO multiplication and NO division — those start in 3rd grade. Skip counting (2s, 5s, 10s) is okay.";
+  if (g.startsWith("3")) return "3rd grade: addition/subtraction within 1000, AND beginning multiplication facts ×0 through ×10. Light division as the inverse of multiplication. NO long division, NO multi-digit multiplication.";
+  if (g.startsWith("4")) return "4th grade: multi-digit addition/subtraction, multiplication facts to ×12, 2-digit × 1-digit multiplication, simple division with whole-number quotients. Beginning fractions.";
+  return "5th grade: all four operations with larger numbers, multi-digit multiplication, long division with whole-number quotients, fractions with same denominator.";
+}
+
 function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string }) {
   const subjectGuidance: Record<string, string> = {
     "Social Studies":
@@ -288,7 +298,7 @@ function buildPrompt(opts: { subject: Subject; grade: string; count: number; dif
     "Writing":
       "Write the lesson as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences). Each question gives a prompt and the answer field shows a model sentence/short response.",
     "Math":
-      "Write the lesson as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: \"To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5.\" Every question is a problem that uses the same rule; answers must be exact.",
+      `Write the lesson as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: "To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5." Every question is a problem that uses the same rule; answers must be exact. STRICT GRADE SCOPE: ${gradeMathScope(opts.grade)} Do NOT introduce operations above the listed grade. A 2nd grader does NOT do multiplication.`,
     "PE": "Write the lesson as a short story about exercise/teamwork (4–6 sentences) with clear facts. Questions test recall.",
     "Art": "Write the lesson as a short story about an art technique or famous artist (4–6 sentences). Questions test recall.",
     "Music": "Write the lesson as a short story about music basics (4–6 sentences). Questions test recall.",
@@ -518,6 +528,134 @@ const WRITING_TOPICS: LocalTopic[] = [
   },
 ];
 
+// Grade → which math operations are appropriate, and the number range
+// each one should stay within. Pulled from common elementary scope &
+// sequence: K and 1st never multiply, 2nd is +/− to 100 with skip counting,
+// 3rd introduces basic multiplication facts (×0–10), 4th adds simple
+// division and 2-digit × 1-digit, 5th allows larger numbers + light division.
+interface GradeMath {
+  ops: Array<"+" | "-" | "×" | "÷">;
+  // Per-op number bounds: [maxA, maxB]
+  range: Partial<Record<"+" | "-" | "×" | "÷", [number, number]>>;
+  intro: string;
+  body: string;
+  keyPoints: string[];
+  workedExample: { problem: string; solution: string };
+}
+
+function gradeKey(grade: string): "K" | "1" | "2" | "3" | "4" | "5" {
+  const g = (grade || "").trim().toUpperCase();
+  if (g === "K" || g === "KG" || g === "KINDERGARTEN") return "K";
+  const n = parseInt(g, 10);
+  if (n === 1) return "1";
+  if (n === 2) return "2";
+  if (n === 3) return "3";
+  if (n === 4) return "4";
+  return "5";
+}
+
+const GRADE_MATH: Record<"K" | "1" | "2" | "3" | "4" | "5", GradeMath> = {
+  K: {
+    ops: ["+"],
+    range: { "+": [5, 5] },
+    intro: "Today we are adding small numbers. We add when we put things together.",
+    body: "When we ADD, we put two groups together to find how many in all. The symbol + means add. Example: 2 + 3. We can count: 1, 2 … then keep going 3, 4, 5. So 2 + 3 = 5. Try counting on your fingers if you need help.",
+    keyPoints: ["+ means add", "Count to find the total", "You can use your fingers"],
+    workedExample: { problem: "2 + 3 = ?", solution: "5" },
+  },
+  "1": {
+    ops: ["+", "-"],
+    range: { "+": [10, 10], "-": [10, 5] },
+    intro: "Today we are adding and subtracting up to 20.",
+    body: "When we ADD (+), we put two numbers together. Example: 6 + 4 = 10. When we SUBTRACT (−), we take one number away. Example: 8 − 3 = 5. We can count up for adding and count back for subtracting.",
+    keyPoints: ["+ means put together", "− means take away", "Add by counting up, subtract by counting back"],
+    workedExample: { problem: "6 + 4 = ?", solution: "10" },
+  },
+  "2": {
+    ops: ["+", "-"],
+    range: { "+": [50, 50], "-": [50, 30] },
+    intro: "Today we are adding and subtracting numbers up to 100. (No multiplication yet — that starts in 3rd grade.)",
+    body: "When we ADD (+), we put numbers together. Example: 23 + 14 = 37. When we SUBTRACT (−), we take one number from another. Example: 50 − 18 = 32. For 2-digit numbers, line up the ones place and the tens place. Add or subtract the ones first, then the tens.",
+    keyPoints: ["Line up the ones and tens", "Ones place first, then tens", "+ adds, − takes away"],
+    workedExample: { problem: "23 + 14 = ?", solution: "37" },
+  },
+  "3": {
+    ops: ["+", "-", "×"],
+    range: { "+": [100, 100], "-": [100, 50], "×": [10, 10] },
+    intro: "Today we are practicing addition, subtraction, and beginning multiplication facts (×0 to ×10).",
+    body: "When we MULTIPLY (×), we add a number to itself in equal groups. Example: 4 × 3 means 3 groups of 4, or 4 + 4 + 4 = 12. When we ADD (+), we put numbers together: 45 + 27 = 72. When we SUBTRACT (−), we take one away: 80 − 35 = 45. The × symbol means \"groups of\" or \"times.\"",
+    keyPoints: ["× means groups of", "3 × 4 = 4 + 4 + 4 = 12", "Multiplication is fast adding"],
+    workedExample: { problem: "4 × 3 = ?", solution: "12" },
+  },
+  "4": {
+    ops: ["+", "-", "×", "÷"],
+    range: { "+": [500, 500], "-": [500, 200], "×": [12, 9], "÷": [99, 9] },
+    intro: "Today we are practicing addition, subtraction, multiplication facts, and beginning division.",
+    body: "When we MULTIPLY (×), we count equal groups: 7 × 8 = 56. When we DIVIDE (÷), we split into equal groups: 56 ÷ 8 = 7. Multiplication and division are opposite operations — if 7 × 8 = 56, then 56 ÷ 8 = 7. We also keep practicing larger addition and subtraction.",
+    keyPoints: ["× and ÷ are opposites", "If 7×8=56 then 56÷8=7", "Bigger numbers — line them up"],
+    workedExample: { problem: "56 ÷ 8 = ?", solution: "7" },
+  },
+  "5": {
+    ops: ["+", "-", "×", "÷"],
+    range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
+    intro: "Today we are practicing all four operations with larger numbers.",
+    body: "All four operations are tools for solving problems. ADDITION (+) puts amounts together. SUBTRACTION (−) finds the difference. MULTIPLICATION (×) is fast adding of equal groups. DIVISION (÷) splits into equal groups. Multiplication and division are opposites — and so are addition and subtraction. Read carefully and pick the right operation.",
+    keyPoints: ["+ and − are opposites", "× and ÷ are opposites", "Pick the right operation"],
+    workedExample: { problem: "12 × 11 = ?", solution: "132" },
+  },
+};
+
+function buildMathLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
+  const g = gradeKey(opts.grade);
+  const cfg = GRADE_MATH[g];
+
+  // Honor difficulty by scaling up or down WITHIN the grade band — never
+  // crossing into operations the student hasn't learned yet.
+  const scale = opts.difficulty === "Easy" ? 0.5 : opts.difficulty === "Hard" ? 1.0 : 0.75;
+
+  const questions: StarQuestion[] = [];
+  for (let i = 0; i < opts.count; i++) {
+    const op = cfg.ops[i % cfg.ops.length];
+    const [maxA, maxB] = cfg.range[op]!;
+    let a = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA * scale)) + 1);
+    let b = Math.max(1, Math.floor(Math.random() * Math.ceil(maxB * scale)) + 1);
+
+    let ans: number;
+    let text: string;
+    if (op === "+") {
+      ans = a + b;
+      text = `${a} + ${b} = ?`;
+    } else if (op === "-") {
+      // Always positive result for elementary
+      if (b > a) [a, b] = [b, a];
+      ans = a - b;
+      text = `${a} − ${b} = ?`;
+    } else if (op === "×") {
+      ans = a * b;
+      text = `${a} × ${b} = ?`;
+    } else {
+      // Division: pick a clean problem so the answer is a whole number
+      const divisor = Math.max(2, b);
+      const quotient = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA / divisor)) + 1);
+      const dividend = divisor * quotient;
+      ans = quotient;
+      text = `${dividend} ÷ ${divisor} = ?`;
+    }
+    questions.push({ num: i + 1, text, answer: String(ans) });
+  }
+
+  return {
+    questions,
+    lesson: {
+      title: `Math — ${opts.grade} Grade`,
+      intro: opts.goal ? `Today we're practicing ${opts.goal}.` : cfg.intro,
+      body: cfg.body,
+      keyPoints: cfg.keyPoints,
+      workedExample: cfg.workedExample,
+    },
+  };
+}
+
 function pickTopic(bank: LocalTopic[], goal: string): LocalTopic {
   if (goal) {
     const g = goal.toLowerCase();
@@ -530,32 +668,13 @@ function pickTopic(bank: LocalTopic[], goal: string): LocalTopic {
 function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
   const { subject, count, difficulty, goal } = opts;
 
-  // Math is procedural — keep generating fresh problems but anchor them
-  // to a worked example in the lesson body so the answer pattern is visible.
+  // Math is procedural — generate fresh problems, but the operations and
+  // number ranges have to follow the student's actual grade level. A 2nd
+  // grader does NOT do multiplication; a kindergartener does NOT subtract
+  // past 10. Multiplication starts in 3rd; multi-digit multiplication and
+  // long division in 4th–5th.
   if (subject === "Math") {
-    const range = difficulty === "Easy" ? 12 : difficulty === "Medium" ? 50 : 200;
-    const questions: StarQuestion[] = [];
-    for (let i = 0; i < count; i++) {
-      const a = Math.floor(Math.random() * range) + 1;
-      const b = Math.floor(Math.random() * range) + 1;
-      const op = ["+", "-", "×"][i % 3];
-      const ans = op === "+" ? a + b : op === "-" ? a - b : a * b;
-      questions.push({ num: i + 1, text: `${a} ${op} ${b} = ?`, answer: String(ans) });
-    }
-    return {
-      questions,
-      lesson: {
-        title: `Math Practice — ${opts.grade}`,
-        intro: goal ? `Today we're practicing ${goal}.` : `Let's practice addition, subtraction, and multiplication.`,
-        body: "When you ADD, you put two numbers together to get a total. Example: 5 + 3 = 8. When you SUBTRACT, you take one number away from another. Example: 9 − 4 = 5. When you MULTIPLY, you add a number to itself many times. Example: 4 × 3 = 12 (which is the same as 4 + 4 + 4). The symbol × means \"times\" or \"groups of\". Read each problem, look at the symbol, then solve.",
-        keyPoints: [
-          "+ means add (put together)",
-          "− means subtract (take away)",
-          "× means multiply (groups of)",
-        ],
-        workedExample: { problem: "6 × 4 = ?", solution: "24" },
-      },
-    };
+    return buildMathLesson(opts);
   }
 
   const bank: LocalTopic[] =
