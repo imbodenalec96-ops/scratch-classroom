@@ -19,6 +19,7 @@ const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 interface Lesson {
   title: string;
   intro: string;
+  body?: string;
   keyPoints: string[];
   workedExample?: { problem: string; solution: string };
   vocab?: { term: string; definition: string }[];
@@ -277,22 +278,49 @@ function ghostBtn(): React.CSSProperties {
 }
 
 function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string }) {
-  return `Create a ${opts.difficulty.toLowerCase()} ${opts.subject} worksheet for a ${opts.grade}-grade student${opts.studentName ? ` named ${opts.studentName}` : ""}.
-${opts.goal ? `IEP goal focus: ${opts.goal}\n` : ""}
-Return ONLY this JSON shape (no markdown):
+  const subjectGuidance: Record<string, string> = {
+    "Social Studies":
+      "Write the lesson as a SHORT NARRATIVE STORY (5–9 kid-friendly sentences) that names every fact a student needs. Example: \"Long ago, the United States needed a way to vote on big choices. The men who wrote the Constitution met in Philadelphia in 1787. They decided every state would send people called representatives to Washington, D.C. The President leads the country. Today the President lives in the White House…\" Then every question should be answered by a sentence in the story.",
+    "Science":
+      "Write the lesson as a SHORT EXPLANATION + EXAMPLE (5–9 sentences) that names every fact. Example: \"Plants are living things that make their own food. They use three things: sunlight, water, and soil. The leaves take in sunlight. The roots take in water. This whole process is called photosynthesis.\" Every question must be answerable from the explanation.",
+    "Reading":
+      "Write the lesson as a SHORT STORY OR PASSAGE (5–9 sentences) at the student's grade level. Then every comprehension question is answered by a sentence in the passage.",
+    "Writing":
+      "Write the lesson as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences). Each question gives a prompt and the answer field shows a model sentence/short response.",
+    "Math":
+      "Write the lesson as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: \"To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5.\" Every question is a problem that uses the same rule; answers must be exact.",
+    "PE": "Write the lesson as a short story about exercise/teamwork (4–6 sentences) with clear facts. Questions test recall.",
+    "Art": "Write the lesson as a short story about an art technique or famous artist (4–6 sentences). Questions test recall.",
+    "Music": "Write the lesson as a short story about music basics (4–6 sentences). Questions test recall.",
+    "Library": "Write the lesson as a short story about a book topic (4–6 sentences). Questions test recall.",
+  };
+  const guidance = subjectGuidance[opts.subject] || subjectGuidance["Reading"];
+
+  return `You are a special-education teacher building a SELF-CONTAINED ${opts.subject} worksheet for a ${opts.grade}-grade student${opts.studentName ? ` named ${opts.studentName}` : ""}.
+${opts.goal ? `IEP / topic focus: ${opts.goal}\n` : ""}
+
+CRITICAL RULES:
+1. The "lesson" must teach EVERYTHING the student needs to answer every question — no outside knowledge.
+2. ${guidance}
+3. Use kid-friendly vocabulary appropriate for ${opts.grade} grade. Difficulty: ${opts.difficulty}.
+4. Aim for the EASIER end of grade level — confidence-building, not challenging.
+5. Every "answer" field must be the exact correct answer that can be found in the lesson.body.
+6. Generate exactly ${opts.count} questions.
+
+Return ONLY raw JSON in this exact shape (no markdown, no fences):
 {
   "lesson": {
-    "title": "...",
-    "intro": "1-2 sentence student-friendly explanation",
-    "keyPoints": ["..."],
-    "workedExample": { "problem": "...", "solution": "..." },
-    "vocab": [{ "term": "...", "definition": "..." }]
+    "title": "Catchy student-friendly title",
+    "intro": "1-sentence what we're learning today",
+    "body": "5-9 sentence STORY/PASSAGE that contains every answer (this is the most important field)",
+    "keyPoints": ["3-5 short bullet recap points pulled from the body"],
+    "workedExample": { "problem": "(optional) one example problem", "solution": "the answer" },
+    "vocab": [{ "term": "key word", "definition": "kid-friendly meaning" }]
   },
   "questions": [
-    { "text": "...", "answer": "..." }
+    { "text": "Question that's answered in the body above", "answer": "Exact answer from the body" }
   ]
-}
-Generate exactly ${opts.count} questions. Keep math clean, reading short, language age-appropriate.`;
+}`;
 }
 
 function safeParseJSON(s: string): any | null {
@@ -305,64 +333,255 @@ function safeParseJSON(s: string): any | null {
   return null;
 }
 
-function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
-  const { subject, count, difficulty } = opts;
-  const lesson: Lesson = {
-    title: `${subject} Practice — ${opts.grade}`,
-    intro: opts.goal ? `Today we're practicing ${opts.goal}.` : `Let's practice some ${subject.toLowerCase()}!`,
-    keyPoints: [
-      "Read each question carefully.",
-      "Show your work in the space provided.",
-      "Check your answer before moving on.",
-    ],
-  };
+// Topic banks. Each topic carries a self-contained passage that holds
+// every answer, plus a question/answer pair list. The generator picks
+// a topic (preferring one matched by the IEP-goal text) and returns
+// `count` questions. This is the no-API-key fallback — the AI prompt
+// produces fresher content when a key is set.
+interface LocalTopic {
+  title: string;
+  intro: string;
+  body: string;
+  qa: { text: string; answer: string }[];
+  keyPoints?: string[];
+  vocab?: { term: string; definition: string }[];
+}
 
-  const questions: StarQuestion[] = [];
+const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
+  {
+    title: "American Symbols",
+    intro: "Today we'll learn what some of America's symbols stand for.",
+    body: "The United States has special symbols that stand for the country. The American flag has 13 stripes — one for each of the first 13 states — and 50 white stars on a blue square — one for each state today. The colors mean something too: red stands for bravery, white for peace, and blue for justice. The bald eagle is the national bird. It was chosen because it is strong, free, and lives only in North America. The Statue of Liberty stands in New York Harbor and welcomes new people to America. The Liberty Bell is in Philadelphia and rang to celebrate freedom.",
+    qa: [
+      { text: "How many stripes does the American flag have?", answer: "13" },
+      { text: "How many stars are on the American flag?", answer: "50" },
+      { text: "What does each star stand for?", answer: "A state" },
+      { text: "What is the national bird?", answer: "The bald eagle" },
+      { text: "Which color on the flag stands for bravery?", answer: "Red" },
+      { text: "What does the color white stand for?", answer: "Peace" },
+      { text: "What does the color blue stand for?", answer: "Justice" },
+      { text: "Where is the Statue of Liberty?", answer: "New York Harbor" },
+      { text: "Where is the Liberty Bell?", answer: "Philadelphia" },
+      { text: "Why was the bald eagle chosen?", answer: "It is strong and free" },
+    ],
+    keyPoints: ["13 stripes = first 13 states", "50 stars = 50 states today", "Eagle = strong + free"],
+  },
+  {
+    title: "Branches of Government",
+    intro: "The U.S. government has three branches that work together.",
+    body: "The United States government has three branches. The first branch is the Legislative branch — it is called Congress, and Congress writes the laws. Congress has two parts: the Senate and the House of Representatives. The second branch is the Executive branch. The President leads this branch and signs laws. The President lives in the White House in Washington, D.C. The third branch is the Judicial branch. Judges work in this branch, and the highest court is the Supreme Court. The Supreme Court has nine judges called Justices. Each branch checks the others so no one branch has too much power.",
+    qa: [
+      { text: "How many branches of government are there?", answer: "Three" },
+      { text: "What does Congress do?", answer: "Writes the laws" },
+      { text: "Which branch does the President lead?", answer: "Executive" },
+      { text: "Where does the President live?", answer: "The White House" },
+      { text: "What is the highest court?", answer: "The Supreme Court" },
+      { text: "How many Justices are on the Supreme Court?", answer: "Nine" },
+      { text: "Which branch has judges?", answer: "Judicial" },
+      { text: "What are the two parts of Congress?", answer: "The Senate and the House of Representatives" },
+      { text: "Which branch writes laws?", answer: "Legislative" },
+      { text: "Why do the branches check each other?", answer: "So no branch has too much power" },
+    ],
+    keyPoints: ["Legislative = makes laws", "Executive = President signs laws", "Judicial = judges decide cases"],
+  },
+  {
+    title: "The Thirteen Colonies",
+    intro: "Long ago, America began as 13 small colonies along the East Coast.",
+    body: "Before the United States was a country, it was 13 colonies belonging to England. The colonies were on the East Coast of North America. Some of the colonies were Massachusetts, Virginia, New York, and Georgia. The first colony settled was Virginia in 1607 at Jamestown. The Pilgrims came to Massachusetts in 1620 on a ship called the Mayflower. The colonists wanted to be free from England's king. In 1776, the colonies wrote the Declaration of Independence and became the United States of America. The man who wrote most of the Declaration was Thomas Jefferson. The first President was George Washington.",
+    qa: [
+      { text: "How many colonies were there?", answer: "13" },
+      { text: "Which country owned the colonies?", answer: "England" },
+      { text: "What was the first colony?", answer: "Virginia" },
+      { text: "What ship did the Pilgrims sail on?", answer: "The Mayflower" },
+      { text: "When did the Pilgrims arrive?", answer: "1620" },
+      { text: "When was the Declaration of Independence written?", answer: "1776" },
+      { text: "Who wrote most of the Declaration of Independence?", answer: "Thomas Jefferson" },
+      { text: "Who was the first President?", answer: "George Washington" },
+      { text: "On which coast were the colonies?", answer: "The East Coast" },
+      { text: "What did the colonists want?", answer: "To be free from England's king" },
+    ],
+  },
+];
+
+const SCIENCE_TOPICS: LocalTopic[] = [
+  {
+    title: "How Plants Grow",
+    intro: "Plants are living things — let's learn what they need to grow.",
+    body: "Plants are living things that make their own food. They need three things to grow: sunlight, water, and soil. The leaves of a plant catch sunlight. The roots of a plant pull water and nutrients from the soil. When a plant uses sunlight, water, and a gas called carbon dioxide, it makes its own food. This whole process is called photosynthesis. The food the plant makes is a kind of sugar. Plants give off oxygen, which is the gas people and animals need to breathe. So plants help us live, and we help plants by giving them water and sunlight.",
+    qa: [
+      { text: "What three things do plants need to grow?", answer: "Sunlight, water, and soil" },
+      { text: "What part of a plant catches sunlight?", answer: "The leaves" },
+      { text: "What part of a plant takes in water?", answer: "The roots" },
+      { text: "What is the process of plants making food called?", answer: "Photosynthesis" },
+      { text: "What gas do plants give off?", answer: "Oxygen" },
+      { text: "What kind of food do plants make?", answer: "Sugar" },
+      { text: "What gas do plants take in?", answer: "Carbon dioxide" },
+      { text: "Are plants living things?", answer: "Yes" },
+      { text: "How can people help plants?", answer: "By giving them water and sunlight" },
+      { text: "What do plants give us that we need to breathe?", answer: "Oxygen" },
+    ],
+    vocab: [
+      { term: "photosynthesis", definition: "How plants use sunlight to make food" },
+      { term: "roots", definition: "The part of a plant that goes into the soil" },
+    ],
+  },
+  {
+    title: "The Water Cycle",
+    intro: "Water moves around our planet in a never-ending cycle.",
+    body: "Water on Earth keeps moving in a pattern called the water cycle. First, the sun heats water in lakes, rivers, and oceans. The water turns into a gas called water vapor. This step is called evaporation. The water vapor rises high in the sky and cools down. When it cools, it turns back into tiny water drops that form clouds. This step is called condensation. When the clouds get too heavy, the water falls back down as rain or snow. This step is called precipitation. The water then collects in rivers and oceans, and the whole cycle starts again.",
+    qa: [
+      { text: "What is it called when water turns into a gas?", answer: "Evaporation" },
+      { text: "What heats up water in the water cycle?", answer: "The sun" },
+      { text: "What is water vapor?", answer: "Water that has turned into a gas" },
+      { text: "What forms when water vapor cools?", answer: "Clouds" },
+      { text: "What is it called when water vapor turns back to liquid?", answer: "Condensation" },
+      { text: "What is it called when water falls from clouds?", answer: "Precipitation" },
+      { text: "What are two examples of precipitation?", answer: "Rain and snow" },
+      { text: "Where does water collect after it falls?", answer: "Rivers and oceans" },
+      { text: "Does the water cycle ever stop?", answer: "No" },
+      { text: "What is the whole pattern called?", answer: "The water cycle" },
+    ],
+  },
+  {
+    title: "States of Matter",
+    intro: "Everything around us is made of matter, and matter has states.",
+    body: "Matter is anything that takes up space. Matter has three main states: solid, liquid, and gas. A solid keeps its shape — like a rock or an ice cube. A liquid takes the shape of its container — like water in a cup. A gas spreads out to fill its space — like air in a balloon. Matter can change from one state to another. When ice gets warm, it melts into water. When water gets very hot, it turns into a gas called steam. When steam cools, it turns back into water. Water freezes back into ice when it gets very cold.",
+    qa: [
+      { text: "What is matter?", answer: "Anything that takes up space" },
+      { text: "What are the three main states of matter?", answer: "Solid, liquid, and gas" },
+      { text: "Which state keeps its shape?", answer: "Solid" },
+      { text: "Which state takes the shape of its container?", answer: "Liquid" },
+      { text: "Which state spreads out to fill its space?", answer: "Gas" },
+      { text: "What happens when ice gets warm?", answer: "It melts into water" },
+      { text: "What is steam?", answer: "Water as a gas" },
+      { text: "What happens when water gets very cold?", answer: "It freezes into ice" },
+      { text: "Give one example of a solid.", answer: "A rock" },
+      { text: "Give one example of a gas.", answer: "Air" },
+    ],
+  },
+];
+
+const READING_TOPICS: LocalTopic[] = [
+  {
+    title: "Maya's Garden",
+    intro: "Read the passage carefully — every answer is in the story.",
+    body: "Maya planted a garden in her backyard last spring. She planted three things: red tomatoes, sweet carrots, and tall sunflowers. Every morning before school, Maya watered her garden with a small green watering can. Her dog Buddy followed her around but was not allowed to dig. After two months, Maya's tomatoes turned bright red. The sunflowers grew taller than Maya. Maya picked the carrots and gave one to her grandmother, who said it was the best carrot she had ever tasted.",
+    qa: [
+      { text: "Whose garden is in the story?", answer: "Maya's" },
+      { text: "What three things did Maya plant?", answer: "Tomatoes, carrots, and sunflowers" },
+      { text: "What color is Maya's watering can?", answer: "Green" },
+      { text: "What is the name of Maya's dog?", answer: "Buddy" },
+      { text: "What was Buddy not allowed to do?", answer: "Dig" },
+      { text: "When did Maya water the garden?", answer: "Every morning before school" },
+      { text: "Who did Maya give a carrot to?", answer: "Her grandmother" },
+      { text: "How tall did the sunflowers grow?", answer: "Taller than Maya" },
+      { text: "What color did the tomatoes turn?", answer: "Bright red" },
+      { text: "What did Grandmother say about the carrot?", answer: "It was the best carrot she had ever tasted" },
+    ],
+  },
+  {
+    title: "The Lost Backpack",
+    intro: "Read carefully and find clues in the story.",
+    body: "Liam left his blue backpack on the bus on Monday. Inside the backpack were his math book, a green pencil case, and his lunchbox. The bus driver, Mr. Park, found the backpack at the end of the day. He brought it to the school office. The next morning, Liam went to the office and got his backpack back. Liam thanked Mr. Park and promised to be more careful. The school secretary gave Liam a sticker for being polite.",
+    qa: [
+      { text: "What is the boy's name?", answer: "Liam" },
+      { text: "What color is the backpack?", answer: "Blue" },
+      { text: "Where did Liam leave the backpack?", answer: "On the bus" },
+      { text: "On what day did this happen?", answer: "Monday" },
+      { text: "Who found the backpack?", answer: "Mr. Park" },
+      { text: "Where did Mr. Park bring the backpack?", answer: "The school office" },
+      { text: "What was inside the backpack?", answer: "A math book, a green pencil case, and a lunchbox" },
+      { text: "What did Liam promise?", answer: "To be more careful" },
+      { text: "Who gave Liam a sticker?", answer: "The school secretary" },
+      { text: "Why did Liam get a sticker?", answer: "For being polite" },
+    ],
+  },
+];
+
+const WRITING_TOPICS: LocalTopic[] = [
+  {
+    title: "Writing Complete Sentences",
+    intro: "A complete sentence has a subject and a verb.",
+    body: "Every complete sentence needs two parts. The first part is the SUBJECT — who or what the sentence is about. The second part is the VERB — what the subject does. A complete sentence also starts with a capital letter and ends with a period, question mark, or exclamation mark. \"The dog runs.\" is a complete sentence: \"the dog\" is the subject and \"runs\" is the verb. \"Runs fast\" is NOT a complete sentence because it has no subject.",
+    qa: [
+      { text: "What two parts does every complete sentence need?", answer: "A subject and a verb" },
+      { text: "What does the subject tell?", answer: "Who or what the sentence is about" },
+      { text: "What does the verb tell?", answer: "What the subject does" },
+      { text: "What letter must a sentence start with?", answer: "A capital letter" },
+      { text: "Name one mark a sentence can end with.", answer: "A period" },
+      { text: "Is 'Runs fast' a complete sentence?", answer: "No" },
+      { text: "Why is 'Runs fast' not a complete sentence?", answer: "It has no subject" },
+      { text: "In 'The dog runs.' what is the subject?", answer: "The dog" },
+      { text: "In 'The dog runs.' what is the verb?", answer: "runs" },
+      { text: "Name another end mark besides a period.", answer: "Question mark" },
+    ],
+  },
+];
+
+function pickTopic(bank: LocalTopic[], goal: string): LocalTopic {
+  if (goal) {
+    const g = goal.toLowerCase();
+    const matched = bank.find((t) => t.title.toLowerCase().includes(g) || t.body.toLowerCase().includes(g));
+    if (matched) return matched;
+  }
+  return bank[Math.floor(Math.random() * bank.length)];
+}
+
+function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
+  const { subject, count, difficulty, goal } = opts;
+
+  // Math is procedural — keep generating fresh problems but anchor them
+  // to a worked example in the lesson body so the answer pattern is visible.
   if (subject === "Math") {
+    const range = difficulty === "Easy" ? 12 : difficulty === "Medium" ? 50 : 200;
+    const questions: StarQuestion[] = [];
     for (let i = 0; i < count; i++) {
-      const range = difficulty === "Easy" ? 12 : difficulty === "Medium" ? 50 : 200;
       const a = Math.floor(Math.random() * range) + 1;
       const b = Math.floor(Math.random() * range) + 1;
       const op = ["+", "-", "×"][i % 3];
       const ans = op === "+" ? a + b : op === "-" ? a - b : a * b;
       questions.push({ num: i + 1, text: `${a} ${op} ${b} = ?`, answer: String(ans) });
     }
-    lesson.workedExample = { problem: "12 + 7 = ?", solution: "12 + 7 = 19" };
-  } else if (subject === "Reading") {
-    const passage = "The fox spotted a rabbit by the old oak tree.";
-    for (let i = 0; i < count; i++) {
-      const qs = [
-        { text: "Who spotted the rabbit?", answer: "The fox" },
-        { text: "Where was the rabbit?", answer: "By the old oak tree" },
-        { text: "What kind of tree is mentioned?", answer: "Oak tree" },
-        { text: "What did the fox see?", answer: "A rabbit" },
-        { text: "Was the tree young or old?", answer: "Old" },
-      ];
-      questions.push({ num: i + 1, ...qs[i % qs.length] });
-    }
-    lesson.intro = `Read the passage: "${passage}"`;
-  } else if (subject === "Writing") {
-    for (let i = 0; i < count; i++) {
-      questions.push({ num: i + 1, text: `Write a complete sentence using the word "${["happy","quick","brave","quiet","kind"][i % 5]}".`, answer: "Sample sentence." });
-    }
-  } else if (subject === "Science") {
-    const facts = [
-      { text: "Plants need ___ and water to grow.", answer: "sunlight" },
-      { text: "The largest planet in our solar system is ___.", answer: "Jupiter" },
-      { text: "Water boils at ___ °C.", answer: "100" },
-      { text: "Animals that eat only plants are called ___.", answer: "herbivores" },
-      { text: "The Earth orbits the ___.", answer: "Sun" },
-    ];
-    for (let i = 0; i < count; i++) questions.push({ num: i + 1, ...facts[i % facts.length] });
-  } else {
-    const facts = [
-      { text: "The capital of the United States is ___.", answer: "Washington, D.C." },
-      { text: "The first president was ___.", answer: "George Washington" },
-      { text: "The 4th of July celebrates ___.", answer: "Independence Day" },
-      { text: "The 50 stars on the U.S. flag represent the ___.", answer: "states" },
-    ];
-    for (let i = 0; i < count; i++) questions.push({ num: i + 1, ...facts[i % facts.length] });
+    return {
+      questions,
+      lesson: {
+        title: `Math Practice — ${opts.grade}`,
+        intro: goal ? `Today we're practicing ${goal}.` : `Let's practice addition, subtraction, and multiplication.`,
+        body: "When you ADD, you put two numbers together to get a total. Example: 5 + 3 = 8. When you SUBTRACT, you take one number away from another. Example: 9 − 4 = 5. When you MULTIPLY, you add a number to itself many times. Example: 4 × 3 = 12 (which is the same as 4 + 4 + 4). The symbol × means \"times\" or \"groups of\". Read each problem, look at the symbol, then solve.",
+        keyPoints: [
+          "+ means add (put together)",
+          "− means subtract (take away)",
+          "× means multiply (groups of)",
+        ],
+        workedExample: { problem: "6 × 4 = ?", solution: "24" },
+      },
+    };
   }
+
+  const bank: LocalTopic[] =
+    subject === "Social Studies" ? SOCIAL_STUDIES_TOPICS :
+    subject === "Science"        ? SCIENCE_TOPICS :
+    subject === "Reading"        ? READING_TOPICS :
+    subject === "Writing"        ? WRITING_TOPICS :
+    /* Art / Music / Library / PE */ READING_TOPICS;
+
+  const topic = pickTopic(bank, goal);
+
+  // Shuffle a copy of the q/a pairs so retakes feel different, then take `count`.
+  const pool = [...topic.qa].sort(() => Math.random() - 0.5);
+  const questions: StarQuestion[] = Array.from({ length: count }, (_, i) => {
+    const q = pool[i % pool.length];
+    return { num: i + 1, text: q.text, answer: q.answer };
+  });
+
+  const lesson: Lesson = {
+    title: topic.title,
+    intro: topic.intro,
+    body: topic.body,
+    keyPoints: topic.keyPoints || [],
+    vocab: topic.vocab,
+  };
+
   return { questions, lesson };
 }
 
