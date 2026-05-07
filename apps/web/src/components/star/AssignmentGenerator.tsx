@@ -697,6 +697,55 @@ const GRADE_MATH: Record<"K" | "1" | "2" | "3" | "4" | "5", GradeMath> = {
   },
 };
 
+// Random helpers — keep word problems feeling fresh from one generation
+// to the next. The names/items rotate so two assignments back-to-back
+// don't read identically.
+const NAMES = ["Maya", "Liam", "Aiden", "Zoey", "Anna", "Ryan", "Kaleb", "Rayden", "Ameer", "Jaida", "Ava", "Noah", "Mia", "Eli", "Sofia"];
+const FRUITS = ["apples", "oranges", "strawberries", "grapes", "bananas", "pears", "peaches"];
+const ITEMS  = ["stickers", "marbles", "pencils", "blocks", "books", "crayons", "cards", "shells"];
+const ANIMALS = ["birds", "puppies", "kittens", "fish", "rabbits", "ducks"];
+const PLACES  = ["jar", "box", "basket", "bag", "shelf", "tray"];
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function rand(maxA: number, maxB: number): [number, number] {
+  return [Math.max(1, Math.floor(Math.random() * maxA) + 1), Math.max(1, Math.floor(Math.random() * maxB) + 1)];
+}
+
+// Word-problem builders per operation. Each returns { text, answer }
+// using grade-bounded numbers passed in. The builder picks fresh actors,
+// items, and phrasing so successive calls don't repeat.
+type WordBuilder = (a: number, b: number) => { text: string; answer: string };
+
+const WORD_ADD: WordBuilder[] = [
+  (a, b) => ({ text: `${pick(NAMES)} has ${a} ${pick(FRUITS)}. Then ${pick(NAMES)} gives ${pick(["her","him"])} ${b} more. How many ${pick(FRUITS)} does ${pick(NAMES)} have in all?`, answer: String(a + b) }),
+  (a, b) => {
+    const item = pick(ITEMS);
+    return { text: `There are ${a} ${item} in a ${pick(PLACES)}. ${pick(NAMES)} adds ${b} more ${item}. How many ${item} are in the ${pick(PLACES)} now?`, answer: String(a + b) };
+  },
+  (a, b) => ({ text: `${pick(NAMES)} read ${a} pages on Monday and ${b} pages on Tuesday. How many pages in total?`, answer: String(a + b) }),
+  (a, b) => ({ text: `A pet store has ${a} ${pick(ANIMALS)} and gets ${b} more. How many ${pick(ANIMALS)} now?`, answer: String(a + b) }),
+];
+
+const WORD_SUB: WordBuilder[] = [
+  (a, b) => ({ text: `${pick(NAMES)} had ${a} ${pick(ITEMS)}. ${pick(NAMES)} gave away ${b}. How many are left?`, answer: String(a - b) }),
+  (a, b) => ({ text: `There were ${a} ${pick(ANIMALS)} on a fence. ${b} flew away. How many are still on the fence?`, answer: String(a - b) }),
+  (a, b) => ({ text: `A bag had ${a} ${pick(FRUITS)}. ${pick(NAMES)} ate ${b}. How many ${pick(FRUITS)} are left in the bag?`, answer: String(a - b) }),
+  (a, b) => ({ text: `${pick(NAMES)} saved $${a}. Then ${pick(["she","he"])} spent $${b} on a toy. How much money is left?`, answer: String(a - b) }),
+];
+
+const WORD_MUL: WordBuilder[] = [
+  (a, b) => ({ text: `Each ${pick(PLACES)} has ${a} ${pick(ITEMS)}. There are ${b} ${pick(PLACES)}s. How many ${pick(ITEMS)} in all?`, answer: String(a * b) }),
+  (a, b) => ({ text: `${pick(NAMES)} packs ${a} ${pick(FRUITS)} into each lunch. ${pick(["She","He"])} packs ${b} lunches. How many ${pick(FRUITS)} did ${pick(NAMES)} use?`, answer: String(a * b) }),
+  (a, b) => ({ text: `A class has ${b} tables. Each table has ${a} students. How many students in the class?`, answer: String(a * b) }),
+  (a, b) => ({ text: `There are ${a} rows of seats with ${b} seats in each row. How many seats are there?`, answer: String(a * b) }),
+];
+
+const WORD_DIV: WordBuilder[] = [
+  // a is the dividend, b is the divisor (caller ensures clean division).
+  (a, b) => ({ text: `${pick(NAMES)} has ${a} ${pick(ITEMS)} to share equally with ${b} friends. How many ${pick(ITEMS)} does each friend get?`, answer: String(a / b) }),
+  (a, b) => ({ text: `${a} ${pick(FRUITS)} are split into ${b} equal ${pick(PLACES)}s. How many ${pick(FRUITS)} are in each ${pick(PLACES)}?`, answer: String(a / b) }),
+  (a, b) => ({ text: `A baker bakes ${a} cookies and packs them into bags of ${b}. How many bags can be filled?`, answer: String(a / b) }),
+];
+
 function buildMathLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
   const g = gradeKey(opts.grade);
   const cfg = GRADE_MATH[g];
@@ -712,28 +761,31 @@ function buildMathLesson(opts: { subject: Subject; grade: string; count: number;
     let a = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA * scale)) + 1);
     let b = Math.max(1, Math.floor(Math.random() * Math.ceil(maxB * scale)) + 1);
 
-    let ans: number;
-    let text: string;
+    // Roughly half computation, half word problems — but K and 1st lean
+    // word-problem since concrete contexts help young learners.
+    const wordChance = g === "K" || g === "1" ? 0.7 : 0.5;
+    const isWord = Math.random() < wordChance;
+
+    let text: string; let answer: string;
     if (op === "+") {
-      ans = a + b;
-      text = `${a} + ${b} = ?`;
+      if (isWord) ({ text, answer } = pick(WORD_ADD)(a, b));
+      else { answer = String(a + b); text = `${a} + ${b} = ?`; }
     } else if (op === "-") {
-      // Always positive result for elementary
-      if (b > a) [a, b] = [b, a];
-      ans = a - b;
-      text = `${a} − ${b} = ?`;
+      if (b > a) [a, b] = [b, a]; // keep positive
+      if (isWord) ({ text, answer } = pick(WORD_SUB)(a, b));
+      else { answer = String(a - b); text = `${a} − ${b} = ?`; }
     } else if (op === "×") {
-      ans = a * b;
-      text = `${a} × ${b} = ?`;
+      if (isWord) ({ text, answer } = pick(WORD_MUL)(a, b));
+      else { answer = String(a * b); text = `${a} × ${b} = ?`; }
     } else {
-      // Division: pick a clean problem so the answer is a whole number
+      // Division: build a clean problem so the answer is a whole number.
       const divisor = Math.max(2, b);
       const quotient = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA / divisor)) + 1);
       const dividend = divisor * quotient;
-      ans = quotient;
-      text = `${dividend} ÷ ${divisor} = ?`;
+      if (isWord) ({ text, answer } = pick(WORD_DIV)(dividend, divisor));
+      else { answer = String(quotient); text = `${dividend} ÷ ${divisor} = ?`; }
     }
-    questions.push({ num: i + 1, text, answer: String(ans) });
+    questions.push({ num: i + 1, text, answer });
   }
 
   return {
