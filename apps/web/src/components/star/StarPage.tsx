@@ -13,6 +13,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep } from "../../lib/star/sounds.ts";
+import { syncFromClassroom, type SyncResult } from "../../lib/star/sync.ts";
 import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -26,22 +27,70 @@ const GRADES = ["K","1st","2nd","3rd","4th","5th"];
 export default function StarPage() {
   const [tab, setTab] = useState<Tab>("generator");
   const [openGradebook, setOpenGradebook] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncResult | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  // Bumped each time we sync — child tabs (manual entry) read fresh storage on remount.
+  const [syncStamp, setSyncStamp] = useState(0);
 
-  useEffect(() => { rehydrateBcDB(); }, []);
+  const runSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncFromClassroom();
+      setSyncStatus(result);
+      if (result.ok) {
+        setSyncStamp((n) => n + 1);
+        if (result.assignmentsAdded > 0 || result.studentsTotal > 0) successBeep();
+      } else {
+        errorBeep();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    rehydrateBcDB();
+    // Best-effort silent sync on first mount so the roster + assignment
+    // barcodes are always fresh when a teacher opens the page.
+    runSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ padding: 22, color: "#f5f1e8", maxWidth: 1280, margin: "0 auto" }}>
       <header style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
-          ⭐ STAR Program
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+              ⭐ STAR Program
+            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 900, margin: "4px 0 6px" }}>
+              Special-Ed Tracker, Assessment & Refusal Log
+            </h1>
+            <p style={{ opacity: 0.7, fontSize: 13, margin: 0 }}>
+              Plug in a USB barcode scanner — scans pop the right modal anywhere in the app.
+              Use the tabs below to mint new barcodes, log paper assignments, and review reports.
+            </p>
+          </div>
+          <button onClick={runSync} disabled={syncing} style={{
+            padding: "10px 14px", borderRadius: 10,
+            background: "rgba(99,102,241,0.15)", color: "white",
+            border: "1px solid rgba(99,102,241,0.40)",
+            fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
+          }}>
+            {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
+          </button>
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, margin: "4px 0 6px" }}>
-          Special-Ed Tracker, Assessment & Refusal Log
-        </h1>
-        <p style={{ opacity: 0.7, fontSize: 13, margin: 0 }}>
-          Plug in a USB barcode scanner — scans pop the right modal anywhere in the app.
-          Use the tabs below to mint new barcodes, log paper assignments, and review reports.
-        </p>
+        {syncStatus && (
+          <div style={{
+            marginTop: 10, padding: "8px 12px", borderRadius: 8,
+            background: syncStatus.ok ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
+            border: `1px solid ${syncStatus.ok ? "rgba(16,185,129,0.30)" : "rgba(239,68,68,0.30)"}`,
+            fontSize: 12,
+          }}>
+            {syncStatus.message}
+          </div>
+        )}
       </header>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
@@ -68,7 +117,7 @@ export default function StarPage() {
         </div>
       )}
 
-      {tab === "manual" && <ManualAssignmentEntry onOpenGradebook={(id) => setOpenGradebook(id)} />}
+      {tab === "manual" && <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />}
 
       {tab === "reports"  && <StarReports />}
 
@@ -235,7 +284,12 @@ function ManualAssignmentEntry({ onOpenGradebook }: { onOpenGradebook: (id: stri
         border: "1px solid rgba(255,255,255,0.10)",
         borderRadius: 14, padding: 16, color: "#f5f1e8",
       }}>
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🗂 Existing Assignments</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>🗂 Existing Assignments</div>
+          {sorted.length > 0 && (
+            <button onClick={() => printAllBarcodes(sorted)} style={ghostBtn()}>🖨 Print all labels</button>
+          )}
+        </div>
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>Click any to open its gradebook.</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 540, overflow: "auto" }}>
           {sorted.length === 0 ? (
@@ -259,6 +313,34 @@ function ManualAssignmentEntry({ onOpenGradebook }: { onOpenGradebook: (id: stri
       </div>
     </div>
   );
+}
+
+function printAllBarcodes(rows: StarTrackerEntry[]) {
+  const w = window.open("", "_blank", "width=900,height=1100");
+  if (!w) return;
+  const cells = rows.map((r) => `
+    <div style="border:1px dashed #999;border-radius:8px;padding:10px;margin:0;page-break-inside:avoid;text-align:center">
+      <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">${escapeHtml(r.name)}</div>
+      <div style="font-size:10px;color:#666;margin-bottom:6px">${escapeHtml(r.subject)} · ${escapeHtml(r.gradeLevel || "")}</div>
+      ${bc128svg(r.id, 0, 60, true, 1.4)}
+    </div>
+  `).join("");
+  w.document.write(`<!doctype html><html><head><title>STAR barcode labels</title>
+    <style>
+      @media print { @page { size: letter; margin: 0.4in; } }
+      body { font-family: -apple-system, sans-serif; padding: 12px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      h2 { font-size: 16px; margin: 0 0 10px; }
+    </style>
+  </head><body>
+    <h2>STAR barcode labels (${rows.length})</h2>
+    <div class="grid">${cells}</div>
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+  </body></html>`);
+  w.document.close();
+}
+function escapeHtml(s: string): string {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
 /* ── settings — API key, students, templates ─────────────────────── */

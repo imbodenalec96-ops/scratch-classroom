@@ -43,6 +43,9 @@ export type BcEntry =
       questions: StarQuestion[];
       lesson?: any;
       createdDate: string;
+      // Optional link back to the real classroom DB assignment id, so a
+      // re-sync from the API won't double-create the STAR entry.
+      sourceId?: string;
     }
   | {
       id: string;
