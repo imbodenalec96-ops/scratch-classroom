@@ -67,6 +67,8 @@ const TeacherBoardSettings = lazy(() => import("./components/TeacherBoardSetting
 const TeacherStore = lazy(() => import("./components/TeacherStore.tsx"));
 const StudentVideoPage = lazy(() => import("./components/StudentVideoPage.tsx"));
 const PrintAssignment = lazy(() => import("./components/PrintAssignment.tsx"));
+const StarPage = lazy(() => import("./components/star/StarPage.tsx"));
+import StarScanner from "./components/star/StarScanner.tsx";
 
 import { useClassConfig } from "./lib/useClassConfig.ts";
 
@@ -172,6 +174,7 @@ export default function App() {
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
+        <StarScanner />
         <Suspense fallback={<AppLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -208,6 +211,7 @@ export default function App() {
             <Route path="teacher/board-settings" element={<TeacherBoardSettings />} />
             <Route path="teacher/store" element={<TeacherStore />} />
             <Route path="teacher/assignment-schedule" element={<AssignmentSchedulePage />} />
+            <Route path="star" element={<StarPage />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />
