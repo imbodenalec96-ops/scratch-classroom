@@ -14,6 +14,7 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { syncFromClassroom, type SyncResult } from "../../lib/star/sync.ts";
+import { importStarCsv, type ImportResult } from "../../lib/star/importCsv.ts";
 import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -467,6 +468,96 @@ function SettingsPanel() {
           {savedFlash ? "✓ Saved" : "Save settings"}
         </button>
       </div>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <CsvImportPanel />
+      </div>
+    </div>
+  );
+}
+
+/* ── CSV import — bring legacy STAR_Scanner.html exports in ──────── */
+
+function CsvImportPanel() {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const t = await f.text();
+    setText(t);
+  };
+
+  const run = () => {
+    if (!text.trim()) { errorBeep(); return; }
+    setBusy(true);
+    try {
+      const r = importStarCsv(text);
+      setResult(r);
+      if (r.imported > 0) successBeep();
+      else errorBeep();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 14, padding: 16, color: "#f5f1e8",
+    }}>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>📋 Import Legacy STAR CSV</div>
+      <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 10px" }}>
+        Paste or upload the CSV exported from the original STAR_Scanner.html app
+        (header row: Barcode ID, Type, Name, Subject, Grade, Student, Week, Day,
+        IEP Goal, Questions, Created, Submissions, Avg %, Avg Grade). Already-known
+        barcodes are skipped — re-imports are safe.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <input type="file" accept=".csv,text/csv" onChange={onFile} style={{ fontSize: 12, color: "white" }} />
+        <button onClick={() => setText(LEGACY_STAR_CSV)} style={ghostBtn()}>📂 Load my legacy CSV</button>
+        <button onClick={() => setText("")} style={ghostBtn()}>Clear</button>
+        <button onClick={run} disabled={busy || !text.trim()} style={primaryBtn()}>
+          {busy ? "Importing…" : "📥 Import rows"}
+        </button>
+      </div>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder='Paste CSV here…  e.g. "WR-260507-503","assignment","Reading","Reading","5th",...'
+        rows={6}
+        style={{
+          width: "100%", padding: "9px 10px", borderRadius: 8,
+          background: "rgba(0,0,0,0.30)", color: "white",
+          border: "1px solid rgba(255,255,255,0.12)",
+          fontSize: 11, fontFamily: "Menlo, monospace",
+          outline: "none", resize: "vertical",
+        }}
+      />
+
+      {result && (
+        <div style={{
+          marginTop: 10, padding: "10px 12px", borderRadius: 8,
+          background: result.imported > 0 ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
+          border: `1px solid ${result.imported > 0 ? "rgba(16,185,129,0.30)" : "rgba(239,68,68,0.30)"}`,
+          fontSize: 12,
+        }}>
+          {result.message}
+          {result.errors.length > 0 && (
+            <details style={{ marginTop: 6 }}>
+              <summary style={{ cursor: "pointer", opacity: 0.7 }}>{result.errors.length} errors</summary>
+              <ul style={{ margin: "6px 0 0 18px", padding: 0 }}>
+                {result.errors.slice(0, 10).map((e, i) => <li key={i} style={{ fontSize: 11, opacity: 0.8 }}>{e}</li>)}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -503,3 +594,49 @@ function ghostBtn(): React.CSSProperties {
     fontWeight: 700, cursor: "pointer", fontSize: 12,
   };
 }
+
+// Pre-baked CSV from the legacy STAR_Scanner.html app — the teacher's
+// existing assignments + refusal forms. One-click load in the importer.
+const LEGACY_STAR_CSV = `"Barcode ID","Type","Name","Subject","Grade","Student","Week","Day","IEP Goal","Questions","Created","Submissions","Avg %","Avg Grade"
+"WR-260506-411","assignment","Math","Math","3rd","Kaleb ","1","Monday","","10","5/6/2026","","",""
+"WR-260506-085","assignment","Math","Math","3rd","Kaleb ","1","Monday","","10","5/6/2026","2","100%","A"
+"WR-260506-228","assignment","Writing","Writing","1st","Anna ","1","Wednesday","","10","5/6/2026","","",""
+"WR-250901-001","assignment","Multiplication WS p.12","Math","3rd","All","","","","","","","",""
+"WR-250901-002","assignment","Fluency Passage Week 1","Reading","4th","All","","","","","","","",""
+"WR-250902-003","assignment","Opinion Writing Draft","Writing","3rd","All","","","","","","","",""
+"WR-250903-004","work-refusal-form","Life Cycles Worksheet","Science","4th","All","","","","","","","",""
+"WR-250904-006","work-refusal-form","Division Practice p.8","Math","5th","All","","","","","","","",""
+"SP-250901-001","specials-refusal-form","Physical Education","PE","All","All","","","","","","","",""
+"SP-250901-002","specials-refusal-form","Art Class","Art","All","All","","","","","","","",""
+"SP-250901-003","specials-refusal-form","Library Time","Library","All","All","","","","","","","",""
+"SP-250901-004","specials-refusal-form","Music Class","Music","All","All","","","","","","","",""
+"WR-260506-998","assignment","Reading","Reading","4th","Ameer ","1","Thursday","","10","5/6/2026","","",""
+"WR-260506-283","assignment","Reading","Reading","4th","Ameer ","1","Thursday","","10","5/6/2026","1","90%","A"
+"WR-260506-639","assignment","Math","Math","4th","Ameer ","1","Thursday","","10","5/6/2026","1","60%","D"
+"WR-260506-835","assignment","Math","Math","4th","Ameer ","1","Thursday","","8","5/6/2026","","",""
+"WR-260506-731","assignment","Science","Science","4th","Ameer ","1","Thursday","","8","5/6/2026","1","100%","A"
+"WR-260506-493","assignment","Social Studies","Social Studies","4th","Ameer ","1","Thursday","","10","5/6/2026","","",""
+"WR-260506-471","assignment","Writing","Writing","4th","Ameer ","1","Thursday","","10","5/6/2026","1","80%","B"
+"WR-260507-067","assignment","Reading","Reading","5th","Ryan ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-420","assignment","Math","Math","5th","Ryan ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-821","assignment","Math","Math","5th","Ryan ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-995","assignment","Writing","Writing","5th","Ryan ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-238","assignment","Science","Science","5th","Ryan ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-941","assignment","Math","Math","4th","Rayden ","1","Thursday","","10","5/7/2026","1","90%","A"
+"WR-260507-187","assignment","Math","Math","5th","Ryan ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-503","assignment","Reading","Reading","5th","Ryan ","1","Thursday","","10","5/7/2026","1","90%","A"
+"WR-260507-786","assignment","Reading","Reading","1st","Kaleb ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-931","assignment","Math","Math","1st","Kaleb ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-419","assignment","Writing","Writing","2nd","Anna ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-736","assignment","Math","Math","3rd","Kaleb ","1","Monday","","10","5/7/2026","","",""
+"WR-260507-199","assignment","Math","Math","2nd","Kaleb ","1","Monday","","10","5/7/2026","1","100%","A"
+"WR-260507-509","assignment","Science","Science","2nd","Kaleb ","1","Monday","","10","5/7/2026","","",""
+"WR-260507-550","assignment","Reading","Reading","2nd","Kaleb ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-923","assignment","Reading","Reading","2nd","Aiden ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-120","assignment","Math","Math","2nd","Aiden ","1","Thursday","","10","5/7/2026","","",""
+"WR-260507-617","assignment","Reading","Reading","2nd","Zoey ","1","Monday","","10","5/7/2026","1","100%","A"
+"WR-260507-350","assignment","Math","Math","2nd","Zoey ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-330","assignment","Writing","Writing","2nd","Zoey ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-247","assignment","Science","Science","2nd","Zoey ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-697","assignment","Reading","Reading","2nd","Anna ","1","Thursday","","10","5/7/2026","1","100%","A"
+"WR-260507-100","assignment","Math","Math","2nd","Anna ","1","Thursday","","10","5/7/2026","","",""`;

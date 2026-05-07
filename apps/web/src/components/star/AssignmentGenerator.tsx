@@ -355,9 +355,69 @@ interface LocalTopic {
   qa: { text: string; answer: string }[];
   keyPoints?: string[];
   vocab?: { term: string; definition: string }[];
+  // Grade scope: 0 = Kindergarten, 1..5 = 1st..5th. A topic is "in scope"
+  // for the picked grade if gradeMin <= g <= gradeMax. If unset, the
+  // topic is treated as 3rd–5th (the original default).
+  gradeMin?: number;
+  gradeMax?: number;
+}
+
+function gradeNum(grade: string): number {
+  const g = (grade || "").trim().toUpperCase();
+  if (g === "K" || g === "KG" || g === "KINDERGARTEN") return 0;
+  const n = parseInt(g, 10);
+  return Number.isFinite(n) ? n : 3;
 }
 
 const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
+  // ── K–1 ──────────────────────────────────────────────────
+  {
+    title: "Community Helpers",
+    intro: "Today we will learn about people who help us.",
+    body: "Community helpers are people who help us in our town. A teacher helps us learn. A doctor helps us when we are sick. A firefighter helps put out fires and keeps us safe. A police officer helps keep our town safe. A mail carrier brings letters to our home. We can thank our community helpers for the work they do.",
+    qa: [
+      { text: "Who helps us learn?", answer: "A teacher" },
+      { text: "Who helps us when we are sick?", answer: "A doctor" },
+      { text: "Who puts out fires?", answer: "A firefighter" },
+      { text: "Who keeps our town safe?", answer: "A police officer" },
+      { text: "Who brings letters to our home?", answer: "A mail carrier" },
+      { text: "What is a community helper?", answer: "A person who helps us in our town" },
+      { text: "Should we thank community helpers?", answer: "Yes" },
+    ],
+    keyPoints: ["Helpers help our town", "Teachers, doctors, firefighters, police, mail carriers"],
+    gradeMin: 0, gradeMax: 1,
+  },
+  {
+    title: "My Family",
+    intro: "Families are the people who love us.",
+    body: "A family is a group of people who love each other. Some families are big and some families are small. A mom and a dad are parents. Children are sons and daughters. Brothers and sisters are siblings. Grandparents are the parents of your parents. We help our family by being kind and listening.",
+    qa: [
+      { text: "What is a family?", answer: "A group of people who love each other" },
+      { text: "What are mom and dad called?", answer: "Parents" },
+      { text: "What are brothers and sisters called?", answer: "Siblings" },
+      { text: "Who are the parents of your parents?", answer: "Grandparents" },
+      { text: "How can we help our family?", answer: "By being kind and listening" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  // ── 2nd ──────────────────────────────────────────────────
+  {
+    title: "Maps and Globes",
+    intro: "Maps and globes help us see where places are.",
+    body: "A map is a flat picture of a place. A globe is a round model of the Earth. Maps and globes help us find places. The Earth has seven continents: North America, South America, Africa, Europe, Asia, Australia, and Antarctica. The Earth has five oceans: the Pacific, Atlantic, Indian, Arctic, and Southern. We live on the continent of North America. The United States is a country in North America.",
+    qa: [
+      { text: "What is a map?", answer: "A flat picture of a place" },
+      { text: "What is a globe?", answer: "A round model of the Earth" },
+      { text: "How many continents are there?", answer: "Seven" },
+      { text: "How many oceans are there?", answer: "Five" },
+      { text: "On which continent do we live?", answer: "North America" },
+      { text: "Name one ocean.", answer: "Pacific" },
+      { text: "Is the United States a country?", answer: "Yes" },
+    ],
+    keyPoints: ["Map = flat picture", "Globe = round Earth", "7 continents, 5 oceans"],
+    gradeMin: 1, gradeMax: 3,
+  },
+  // ── 3rd–5th ──────────────────────────────────────────────
   {
     title: "American Symbols",
     intro: "Today we'll learn what some of America's symbols stand for.",
@@ -375,6 +435,7 @@ const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
       { text: "Why was the bald eagle chosen?", answer: "It is strong and free" },
     ],
     keyPoints: ["13 stripes = first 13 states", "50 stars = 50 states today", "Eagle = strong + free"],
+    gradeMin: 2, gradeMax: 5,
   },
   {
     title: "Branches of Government",
@@ -393,6 +454,7 @@ const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
       { text: "Why do the branches check each other?", answer: "So no branch has too much power" },
     ],
     keyPoints: ["Legislative = makes laws", "Executive = President signs laws", "Judicial = judges decide cases"],
+    gradeMin: 4, gradeMax: 5,
   },
   {
     title: "The Thirteen Colonies",
@@ -410,10 +472,40 @@ const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
       { text: "On which coast were the colonies?", answer: "The East Coast" },
       { text: "What did the colonists want?", answer: "To be free from England's king" },
     ],
+    gradeMin: 4, gradeMax: 5,
   },
 ];
 
 const SCIENCE_TOPICS: LocalTopic[] = [
+  // ── K–1 ──────────────────────────────────────────────────
+  {
+    title: "Living and Non-Living",
+    intro: "Some things are alive and some things are not.",
+    body: "Living things grow and need food and water. A dog is a living thing. A tree is a living thing. A person is a living thing. Non-living things do not grow. A rock is non-living. A toy is non-living. A book is non-living. Living things move and change. Non-living things stay the same.",
+    qa: [
+      { text: "Do living things grow?", answer: "Yes" },
+      { text: "Is a dog living or non-living?", answer: "Living" },
+      { text: "Is a rock living or non-living?", answer: "Non-living" },
+      { text: "Is a tree living?", answer: "Yes" },
+      { text: "What do living things need?", answer: "Food and water" },
+      { text: "Is a toy living?", answer: "No" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  {
+    title: "The Five Senses",
+    intro: "We use our five senses to learn about the world.",
+    body: "We have five senses. We use our EYES to see. We use our EARS to hear. We use our NOSE to smell. We use our TONGUE to taste. We use our SKIN to touch and feel. The five senses help us understand the world around us.",
+    qa: [
+      { text: "How many senses do we have?", answer: "Five" },
+      { text: "What do we use to see?", answer: "Our eyes" },
+      { text: "What do we use to hear?", answer: "Our ears" },
+      { text: "What do we use to smell?", answer: "Our nose" },
+      { text: "What do we use to taste?", answer: "Our tongue" },
+      { text: "What do we use to touch?", answer: "Our skin" },
+    ],
+    gradeMin: 0, gradeMax: 2,
+  },
   {
     title: "How Plants Grow",
     intro: "Plants are living things — let's learn what they need to grow.",
