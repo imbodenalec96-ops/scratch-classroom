@@ -5,7 +5,7 @@
 import { useState } from "react";
 import {
   StarStore, saveAll,
-  type Subject, type StarQuestion, type StarTrackerEntry, type BcEntry,
+  type Subject, type StarQuestion, type StarTrackerEntry, type BcEntry, type StarStudent,
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
@@ -26,7 +26,11 @@ interface Lesson {
 }
 
 export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: string) => void }) {
-  const [studentName, setStudentName] = useState("");
+  const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
+  const [studentId, setStudentId] = useState("");
+  const studentName = studentId
+    ? (() => { const s = students.find((x) => x.id === studentId); return s ? `${s.firstName} ${s.lastName}`.trim() : ""; })()
+    : "";
   const [subject, setSubject] = useState<Subject>("Math");
   const [grade, setGrade] = useState("3rd");
   const [week, setWeek] = useState("1");
@@ -109,14 +113,14 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
       const tracker = StarStore.getAsnTrack();
       const entry: BcEntry = {
         id, type: "assignment", name, subject, gradeLevel: grade,
-        studentName: studentName || undefined, week, day, goal: goal || undefined,
+        studentName: studentName || undefined, studentId: studentId || undefined, week, day, goal: goal || undefined,
         questions: questions!, lesson, createdDate: now.toISOString(),
       };
       bcDB[id] = entry;
 
       const trk: StarTrackerEntry = {
         id, name, subject, gradeLevel: grade,
-        studentName: studentName || undefined, week, day, goal: goal || undefined,
+        studentName: studentName || undefined, studentId: studentId || undefined, week, day, goal: goal || undefined,
         questions: questions!, lesson, createdDate: now.toISOString(),
         status: "assigned", submissions: [],
       };
@@ -166,7 +170,14 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <Field label="Student (optional)">
-          <input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="e.g. Ryan Carter" style={inp()} />
+          <select value={studentId} onChange={(e) => setStudentId(e.target.value)} style={inp()}>
+            <option value="">— Pick a student —</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {`${s.firstName} ${s.lastName}`.trim()}{s.grade ? ` (${s.grade})` : ""}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="IEP Goal (optional)">
           <input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="e.g. multi-digit subtraction with regrouping" style={inp()} />

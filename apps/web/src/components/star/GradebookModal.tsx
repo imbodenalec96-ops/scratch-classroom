@@ -8,6 +8,7 @@ import {
   type BcEntry, type StarStudent, type StarSubmission, type StarTrackerEntry,
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { api } from "../../lib/api.ts";
 
 interface Props {
   barcode: string;
@@ -51,6 +52,7 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         subject: bc.subject,
         gradeLevel: bc.gradeLevel,
         studentName: bc.studentName,
+        studentId: bc.studentId,
         week: bc.week,
         day: bc.day,
         goal: bc.goal,
@@ -62,8 +64,22 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       };
       setTracker(fresh);
     }
+    // Auto-pick the assigned student so a single scan + Save works.
+    // Prefer the explicit studentId saved on the entry; fall back to a
+    // first-name match against the roster.
+    let preselect = "";
+    if (bc.studentId) preselect = bc.studentId;
+    else if (bc.studentName) {
+      const needle = bc.studentName.trim().toLowerCase();
+      const match = students.find((s) => {
+        const full = `${s.firstName} ${s.lastName}`.trim().toLowerCase();
+        return full === needle || s.firstName.trim().toLowerCase() === needle;
+      });
+      if (match) preselect = match.id;
+    }
+    if (preselect) setStudentId(preselect);
     successBeep();
-  }, [barcode]);
+  }, [barcode, students]);
 
   const questions = useMemo(() => entry?.type === "assignment" ? entry.questions || [] : [], [entry]);
   const totalQ = questions.length;
@@ -117,6 +133,19 @@ export default function GradebookModal({ barcode, onClose }: Props) {
 
     saveAll({ asnTracker: allTrack, bcDB });
     setTracker(trk);
+
+    // Award class-store points for a completed assignment. Only completed
+    // status counts; only when the student looks like a real DB id (a UUID
+    // — locally added STU-### students don't exist in the API). Failures
+    // are silent so a points API outage never blocks grading.
+    if (status === "completed") {
+      const ppc = StarStore.getPointsPerCompletion();
+      const looksLikeUuid = /^[0-9a-f-]{20,}$/i.test(s.id);
+      if (ppc > 0 && looksLikeUuid) {
+        api.adjustStudentPoints(s.id, ppc, `STAR: ${entry.name} — ${letter}`).catch(() => {});
+      }
+    }
+
     loggedBeep();
     setSaving(false);
     setSavedFlash(true);
@@ -346,11 +375,18 @@ export default function GradebookModal({ barcode, onClose }: Props) {
             )}
           </div>
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
-            <button onClick={onClose} style={btnGhost()}>Close</button>
-            <button onClick={save} disabled={saving} style={btnPrimary(savedFlash)}>
-              {saving ? "Saving…" : savedFlash ? "✓ Saved" : "✅ Save Grade"}
-            </button>
+          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              {status === "completed" && StarStore.getPointsPerCompletion() > 0
+                ? `🎁 +${StarStore.getPointsPerCompletion()} points to ${students.find((x) => x.id === studentId)?.firstName || "student"} on save`
+                : ""}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={onClose} style={btnGhost()}>Close</button>
+              <button onClick={save} disabled={saving} style={btnPrimary(savedFlash)}>
+                {saving ? "Saving…" : savedFlash ? "✓ Saved" : "✅ Save Grade"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -380,6 +380,7 @@ function SettingsPanel() {
   const [model, setModel] = useState(() => StarStore.getAiModel() || "openrouter/auto");
   const [students, setStudents] = useState<StarStudent[]>(() => StarStore.getStudents());
   const [tpls, setTpls] = useState<string[]>(() => StarStore.getTpls());
+  const [pointsPerCompletion, setPointsPerCompletion] = useState<number>(() => StarStore.getPointsPerCompletion());
   const [savedFlash, setSavedFlash] = useState(false);
 
   const save = () => {
@@ -387,6 +388,7 @@ function SettingsPanel() {
     StarStore.setAiModel(model.trim() || "openrouter/auto");
     StarStore.setStudents(students);
     StarStore.setTpls(tpls.filter((t) => t.trim()));
+    StarStore.setPointsPerCompletion(Math.max(0, Math.floor(pointsPerCompletion) || 0));
     setSavedFlash(true);
     successBeep();
     setTimeout(() => setSavedFlash(false), 1200);
@@ -421,6 +423,16 @@ function SettingsPanel() {
         </Field>
         <p style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
           Stored locally only. The generator falls back to a built-in lesson if no key is set.
+        </p>
+
+        <div style={{ height: 18 }} />
+
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>🎁 Class Store Points</div>
+        <Field label="Points per completed assignment">
+          <input type="number" min={0} value={pointsPerCompletion} onChange={(e) => setPointsPerCompletion(Number(e.target.value))} style={inp()} />
+        </Field>
+        <p style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+          Awarded when a grade is saved with status "completed". Set 0 to disable.
         </p>
 
         <div style={{ height: 18 }} />

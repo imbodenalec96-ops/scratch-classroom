@@ -183,7 +183,13 @@ function openPrintWindow(c: { id: string; type: FormType; studentName: string })
       <div style="border-bottom:1px solid #444;height:24px"></div>
     </div>
 
-    <div class="grid2" style="margin-top:18px">
+    <div class="box" style="margin-top:18px;background:#fffbe8;border-color:#fbbf24">
+      <div class="label" style="color:#7c2d12">Student signature (required)</div>
+      <div class="line" style="border-bottom-width:2px;height:30px"></div>
+      <div style="font-size:10px;color:#666;margin-top:4px">By signing, the student acknowledges this incident was discussed with them.</div>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
       <div><div class="label">Staff signature</div><div class="line"></div></div>
       <div><div class="label">Admin signature</div><div class="line"></div></div>
     </div>

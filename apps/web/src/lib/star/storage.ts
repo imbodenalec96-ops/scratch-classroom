@@ -46,6 +46,9 @@ export type BcEntry =
       // Optional link back to the real classroom DB assignment id, so a
       // re-sync from the API won't double-create the STAR entry.
       sourceId?: string;
+      // Optional assigned student id (real DB id) so the gradebook can
+      // pre-select that student when this barcode is scanned.
+      studentId?: string;
     }
   | {
       id: string;
@@ -77,6 +80,7 @@ export interface StarTrackerEntry {
   subject: Subject;
   gradeLevel: string;
   studentName?: string;
+  studentId?: string;
   week?: string;
   day?: string;
   goal?: string;
@@ -138,6 +142,7 @@ const KEYS = {
   apiKey: "star_api_key",
   aiModel: "star_ai_model",
   tpls: "star_tpls",
+  pointsPerCompletion: "star_points_per_completion",
 } as const;
 
 // LocalStorage with safe parse + default fallback
@@ -163,19 +168,10 @@ export const DEFAULT_TPLS = [
   "Transition difficulty — needed extra time",
 ];
 
-// Defaults for the original STAR roster — only used if nothing else
-// is loaded. The active app overrides these with the real classroom
-// students at boot.
-export const DEFAULT_STUDENTS: StarStudent[] = [
-  { id: "STU-001", firstName: "Jaida",  lastName: "Thomas",     grade: "3rd", disability: "ASD"  },
-  { id: "STU-002", firstName: "Ryan",   lastName: "Carter",     grade: "4th", disability: "EBD"  },
-  { id: "STU-003", firstName: "Kaleb",  lastName: "Reed",       grade: "3rd", disability: "ADHD" },
-  { id: "STU-004", firstName: "Zoey",   lastName: "Nguyen",     grade: "4th", disability: "ASD"  },
-  { id: "STU-005", firstName: "Anna",   lastName: "Harris",     grade: "3rd", disability: "SLD"  },
-  { id: "STU-006", firstName: "Aiden",  lastName: "Brooks",     grade: "5th", disability: "EBD"  },
-  { id: "STU-007", firstName: "Rayden", lastName: "Flores",     grade: "4th", disability: "ADHD" },
-  { id: "STU-008", firstName: "Ameer",  lastName: "Washington", grade: "3rd", disability: "ASD"  },
-];
+// Roster starts empty — the sync pulls the real classroom roster from
+// the API on first /star visit. (Earlier versions seeded STU-001..STU-008
+// placeholders; those get wiped the first time sync runs in replace mode.)
+export const DEFAULT_STUDENTS: StarStudent[] = [];
 
 // All 7 keys read/written through these helpers.
 export const StarStore = {
@@ -197,6 +193,8 @@ export const StarStore = {
   setAiModel:    (v: string) => ls.set(KEYS.aiModel, v),
   getTpls:       () => ls.get<string[]>(KEYS.tpls, DEFAULT_TPLS),
   setTpls:       (v: string[]) => ls.set(KEYS.tpls, v),
+  getPointsPerCompletion: () => ls.get<number>(KEYS.pointsPerCompletion, 5),
+  setPointsPerCompletion: (v: number) => ls.set(KEYS.pointsPerCompletion, v),
 };
 
 // Save EVERYTHING in one shot — matches the original spec's saveAll().

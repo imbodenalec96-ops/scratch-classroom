@@ -91,13 +91,12 @@ export async function syncFromClassroom(): Promise<SyncResult> {
           email: r.email,
         };
       });
-      // Preserve any locally added students that aren't in the API roster.
+      // Replace the roster entirely so legacy STU-### placeholders get
+      // cleaned out — the only source of truth is the API.
       const existing = StarStore.getStudents();
-      const apiIds = new Set(next.map((s) => s.id));
-      const merged = [...next, ...existing.filter((s) => !apiIds.has(s.id))];
-      const beforeCount = existing.filter((s) => apiIds.has(s.id)).length;
-      studentsAdded = next.length - beforeCount;
-      StarStore.setStudents(merged);
+      const existingIds = new Set(existing.map((s) => s.id));
+      studentsAdded = next.filter((s) => !existingIds.has(s.id)).length;
+      StarStore.setStudents(next);
     }
   } catch (e) {
     console.warn("[star sync] students:", e);
