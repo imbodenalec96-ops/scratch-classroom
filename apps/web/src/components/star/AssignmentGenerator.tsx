@@ -10,7 +10,7 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 
-const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies"];
+const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies", "SEL"];
 const GRADES = ["K", "1st", "2nd", "3rd", "4th", "5th"];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const Q_COUNTS = [5, 10, 15, 20];
@@ -310,6 +310,7 @@ const SUBJECT_RULES: Record<string, string> = {
   Reading:          "ONLY reading comprehension, vocabulary, or phonics questions whose answers come from the lesson body.",
   Writing:          "ONLY grammar, punctuation, sentence-correction, or capitalization questions.",
   Spelling:         "ONLY spelling questions. Every question must be about how to spell a target word — multiple choice between correct/incorrect spellings, fill-in-the-missing-letter, or 'spell this word' prompts. NEVER ask trivia, NEVER ask history, science, or vocabulary definitions.",
+  SEL:              "ONLY social-emotional learning questions about feelings, calming strategies, friendship, kindness, empathy, growth mindset, conflict resolution, or self-awareness. No academic content (no math, no science, no history). Use kid-friendly language.",
   Science:          "ONLY science questions about plants, animals, weather, earth, the human body, matter, or the water cycle. No history or math.",
   "Social Studies": "ONLY social studies questions about community, citizenship, maps, geography, or U.S. history. No math or science.",
   PE:               "ONLY questions about physical activity, sportsmanship, body movement, or healthy habits.",
@@ -330,6 +331,8 @@ function buildPrompt(opts: { subject: Subject; grade: string; count: number; dif
       "Write the lesson body as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences).",
     "Spelling":
       "Write the lesson body as a SPELLING RULE or WORD LIST + 1 WORKED EXAMPLE (3–6 sentences). Pick 5–8 grade-appropriate target words and quiz only on those. Acceptable question patterns: 'Which spelling is correct: A. recieve B. receive C. receeve?', 'Fill in the missing letter: fri___nd', 'Spell the word that means a small dog: p_pp_'. NEVER ask trivia or content questions — only spelling.",
+    "SEL":
+      "Write the lesson body as a SHORT KID-FRIENDLY EXPLANATION + 1 RELATABLE EXAMPLE (4–7 sentences) about a feeling, friendship skill, calming strategy, or growth-mindset idea. Questions ask the student to identify feelings, name a strategy, or pick the kind/empathetic choice. No academic content.",
     "Math":
       `Write the lesson body as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: "To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5." STRICT GRADE SCOPE: ${gradeMathScope(opts.grade)} Do NOT introduce operations above the listed grade. A 2nd grader does NOT do multiplication.`,
     "PE":      "Write the lesson body as a short paragraph about exercise/teamwork (4–6 sentences) with clear facts.",
@@ -951,6 +954,126 @@ const SPELLING_TOPICS: LocalTopic[] = [
   },
 ];
 
+const SEL_TOPICS: LocalTopic[] = [
+  // ── K–1 ──────────────────────────────────────────────────
+  {
+    title: "Big Feelings",
+    intro: "We all have feelings every day.",
+    body: "Everyone has feelings. Sometimes we feel HAPPY — like when we play with friends or get a hug. Sometimes we feel SAD — like when we miss someone or lose a toy. Sometimes we feel ANGRY — like when something feels unfair. Sometimes we feel SCARED — like when there's a loud noise. All feelings are okay. We can talk about our feelings with a grown-up.",
+    qa: [
+      { text: "Does everyone have feelings?", answer: "Yes" },
+      { text: "What feeling might you have when you play with friends?", answer: "Happy" },
+      { text: "What feeling might you have when you miss someone?", answer: "Sad" },
+      { text: "What feeling might you have when something feels unfair?", answer: "Angry" },
+      { text: "What feeling might you have when there's a loud noise?", answer: "Scared" },
+      { text: "Are all feelings okay?", answer: "Yes" },
+      { text: "Who can you talk to about your feelings?", answer: "A grown-up" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  {
+    title: "What My Body Tells Me",
+    intro: "Our bodies give us clues about how we feel.",
+    body: "Our body sends us signals when we have feelings. When we're happy, we might smile and feel light. When we're sad, our eyes might fill with tears. When we're angry, our hands might curl into fists and our face might feel hot. When we're scared, our heart might beat fast. When we notice these body clues, we know it's time to take a breath and ask for help.",
+    qa: [
+      { text: "What might your body do when you're happy?", answer: "Smile" },
+      { text: "What might your eyes do when you're sad?", answer: "Fill with tears" },
+      { text: "What might your hands do when you're angry?", answer: "Curl into fists" },
+      { text: "What might your heart do when you're scared?", answer: "Beat fast" },
+      { text: "What should you do when you notice body clues?", answer: "Take a breath and ask for help" },
+    ],
+    gradeMin: 0, gradeMax: 2,
+  },
+  // ── 1st–2nd ──────────────────────────────────────────────
+  {
+    title: "Calming Down",
+    intro: "Three calming tricks that work.",
+    body: "When big feelings come, we can calm our body down. Try BELLY BREATHING: put your hand on your belly and breathe in slow through your nose, then out through your mouth. Try the COUNT TO 10 trick: slowly count from 1 to 10. Try the FIVE SENSES trick: name five things you can see, four things you can touch, three things you can hear, two things you can smell, and one thing you can taste. These tricks tell your brain it's okay.",
+    qa: [
+      { text: "Where do you put your hand for belly breathing?", answer: "On your belly" },
+      { text: "How do you breathe in for belly breathing?", answer: "Slow through your nose" },
+      { text: "What do you count to in the counting trick?", answer: "Ten" },
+      { text: "How many things do you SEE in the five senses trick?", answer: "Five" },
+      { text: "How many things do you HEAR in the five senses trick?", answer: "Three" },
+      { text: "What do calming tricks tell your brain?", answer: "It's okay" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Being a Good Friend",
+    intro: "What it takes to be a good friend.",
+    body: "Good friends help each other. A good friend SHARES — like sharing crayons or a book. A good friend LISTENS when the other person is talking. A good friend says KIND words instead of mean words. A good friend INCLUDES others in games. A good friend tells the TRUTH. When we are a good friend, we feel proud and happy too.",
+    qa: [
+      { text: "What does a good friend do with crayons?", answer: "Shares" },
+      { text: "What should a good friend do when someone else is talking?", answer: "Listen" },
+      { text: "Should a good friend say kind or mean words?", answer: "Kind" },
+      { text: "Who should a good friend include in games?", answer: "Others" },
+      { text: "Should a good friend tell the truth?", answer: "Yes" },
+      { text: "How do you feel when you are a good friend?", answer: "Proud and happy" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  // ── 3rd–4th ──────────────────────────────────────────────
+  {
+    title: "Empathy: Feeling With Others",
+    intro: "Empathy means understanding how someone else feels.",
+    body: "EMPATHY is when you imagine how another person feels. If your friend falls down, you might feel sad with them — that's empathy. People show empathy by saying kind things like \"Are you okay?\" or by giving a hug. Empathy is different from SYMPATHY — sympathy is feeling sorry FOR someone, while empathy is feeling WITH them. When we use empathy, we treat others the way we would want to be treated.",
+    qa: [
+      { text: "What is empathy?", answer: "Imagining how another person feels" },
+      { text: "If your friend falls down, what feeling might empathy give you?", answer: "Sad" },
+      { text: "Name one way to show empathy.", answer: "Saying 'Are you okay?'" },
+      { text: "What is the difference between empathy and sympathy?", answer: "Empathy is feeling WITH them, sympathy is feeling sorry FOR them" },
+      { text: "How should we treat others when we use empathy?", answer: "The way we would want to be treated" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "Apologies and Repair",
+    intro: "How to make things right when you mess up.",
+    body: "Everyone makes mistakes. When we hurt someone — even by accident — we make it right by APOLOGIZING. A real apology has three parts. First, say what you did: \"I'm sorry I broke your pencil.\" Second, name how the other person might feel: \"I bet you're upset.\" Third, offer to FIX it: \"I'll get you a new one.\" An apology is not just \"sorry\" — it's three steps. After you apologize, listen to the other person.",
+    qa: [
+      { text: "Does everyone make mistakes?", answer: "Yes" },
+      { text: "How many parts does a real apology have?", answer: "Three" },
+      { text: "What is the first part of a real apology?", answer: "Say what you did" },
+      { text: "What is the second part?", answer: "Name how the other person might feel" },
+      { text: "What is the third part?", answer: "Offer to fix it" },
+      { text: "Is just saying 'sorry' a real apology?", answer: "No" },
+      { text: "What should you do after you apologize?", answer: "Listen to the other person" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  // ── 4th–5th ──────────────────────────────────────────────
+  {
+    title: "Growth Mindset",
+    intro: "Your brain grows when you try hard things.",
+    body: "A GROWTH MINDSET is the belief that you can get smarter and better at things by working at them. The opposite is a FIXED MINDSET — thinking you can't change. Brains have something called NEURONS that make new connections every time you learn. Mistakes actually help your brain GROW. Instead of saying \"I can't do this,\" try \"I can't do this YET.\" That one word — yet — opens the door to growth.",
+    qa: [
+      { text: "What is a growth mindset?", answer: "The belief that you can get smarter by working at things" },
+      { text: "What is the opposite of growth mindset?", answer: "Fixed mindset" },
+      { text: "What in your brain makes new connections when you learn?", answer: "Neurons" },
+      { text: "Do mistakes hurt or help your brain grow?", answer: "Help" },
+      { text: "What word should you add to 'I can't do this'?", answer: "Yet" },
+      { text: "What does 'yet' open the door to?", answer: "Growth" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
+  {
+    title: "Solving Problems With Others",
+    intro: "Conflict happens — here's how to work it out.",
+    body: "When two people disagree, that's a CONFLICT. Conflicts are normal — even friends have them. To solve a conflict, follow four steps: COOL DOWN first (use a calming trick). LISTEN to the other person without interrupting. SAY YOUR SIDE using \"I feel\" words instead of blame, like \"I feel hurt when you take my pencil.\" Last, BRAINSTORM a fair solution together. If you can't solve it, ask an adult for help.",
+    qa: [
+      { text: "What is a conflict?", answer: "When two people disagree" },
+      { text: "How many steps are there to solve a conflict?", answer: "Four" },
+      { text: "What is the first step?", answer: "Cool down" },
+      { text: "What is the second step?", answer: "Listen" },
+      { text: "What kind of words should you use when you say your side?", answer: "I feel words" },
+      { text: "What is the fourth step?", answer: "Brainstorm a fair solution" },
+      { text: "Who can you ask if you can't solve the conflict?", answer: "An adult" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
+];
+
 // Grade → which math operations are appropriate, and the number range
 // each one should stay within. Pulled from common elementary scope &
 // sequence: K and 1st never multiply, 2nd is +/− to 100 with skip counting,
@@ -1181,6 +1304,7 @@ function buildLocalLesson(opts: { subject: Subject; grade: string; count: number
     subject === "Reading"        ? READING_TOPICS :
     subject === "Writing"        ? WRITING_TOPICS :
     subject === "Spelling"       ? SPELLING_TOPICS :
+    subject === "SEL"            ? SEL_TOPICS :
     /* Art / Music / Library / PE */ READING_TOPICS;
 
   const topic = pickTopic(bank, goal, opts.grade);

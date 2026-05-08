@@ -16,13 +16,14 @@ const SUBJECT_NORMALIZE: Record<string, Subject> = {
   ela: "Reading", spelling: "Spelling", science: "Science",
   "social studies": "Social Studies",
   socialstudies: "Social Studies", history: "Social Studies",
+  sel: "SEL", "social emotional": "SEL", "social-emotional learning": "SEL",
   pe: "PE", "physical education": "PE", art: "Art", music: "Music", library: "Library",
 };
 
 // Map a subject string to a 2-char barcode prefix.
 const SUBJECT_PREFIX: Record<Subject, string> = {
   Math: "MA", Reading: "RD", Writing: "WR", Spelling: "SP", Science: "SC",
-  "Social Studies": "SS", PE: "PE", Art: "AR", Music: "MU", Library: "LB",
+  "Social Studies": "SS", SEL: "SE", PE: "PE", Art: "AR", Music: "MU", Library: "LB",
 };
 
 function normalizeSubject(s: string | null | undefined): Subject {

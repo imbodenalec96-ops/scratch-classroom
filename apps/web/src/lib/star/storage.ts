@@ -2,7 +2,7 @@
 // All data lives in localStorage so it's offline-friendly and per-device.
 // Keys mirror the original STAR_Scanner.html spec exactly.
 
-export type Subject = "Math" | "Reading" | "Writing" | "Spelling" | "Science" | "Social Studies" | "PE" | "Art" | "Library" | "Music";
+export type Subject = "Math" | "Reading" | "Writing" | "Spelling" | "Science" | "Social Studies" | "SEL" | "PE" | "Art" | "Library" | "Music";
 
 export interface StarStudent {
   id: string;
