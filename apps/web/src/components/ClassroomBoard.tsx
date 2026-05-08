@@ -11,7 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
-import BoardStarPanel from "./star/BoardStarPanel.tsx";
+import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import { StarStore } from "../lib/star/storage.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
@@ -1078,6 +1078,18 @@ export default function ClassroomBoard() {
                   letterSpacing: "0.08em", textTransform: "uppercase",
                 }}
               >🔒 Tools</button>
+              {/* STAR — opens the slide-over panel (gradebook + completion). */}
+              <button
+                onClick={() => { toggleStarPanel(); }}
+                title="STAR — gradebook + completion"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid rgba(251,191,36,0.55)`,
+                  background: "rgba(251,191,36,0.18)", color: "#fde68a",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >⭐ STAR</button>
             </>
           )}
           <button onClick={toggleFullscreen} style={{
@@ -1526,6 +1538,54 @@ export default function ClassroomBoard() {
                             textAlign: "center",
                           }}>
                             {sp_.done}/{sp_.total}{fillsClass ? " ✓" : ""}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* STAR-only sub-bar — shows progress on barcoded
+                        STAR assignments specifically, separate from the
+                        combined classroom+STAR bar above. Hidden when
+                        the kid has zero STAR work today. */}
+                    {(() => {
+                      const sp = starProgressById[String(s.id)];
+                      if (!sp || sp.total <= 0) return null;
+                      const fillsStar = sp.pct >= 100;
+                      return (
+                        <div style={{
+                          width: "82%",
+                          display: "flex", flexDirection: "column", alignItems: "stretch", gap: 2,
+                          padding: "1px 0 0",
+                        }}>
+                          <div style={{
+                            height: 3,
+                            background: "rgba(245,241,232,0.08)",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                            position: "relative",
+                          }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${sp.pct}%`,
+                              background: fillsStar
+                                ? "linear-gradient(90deg, #c4b5fd 0%, #fbbf24 100%)"
+                                : "linear-gradient(90deg, #6366f1 0%, #b23a48 100%)",
+                              borderRadius: 2,
+                              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+                              boxShadow: fillsStar
+                                ? "0 0 6px rgba(251,191,36,0.55)"
+                                : "0 0 4px rgba(99,102,241,0.45)",
+                            }} />
+                          </div>
+                          <div style={{
+                            fontFamily: serif, fontStyle: "italic",
+                            fontSize: 9, lineHeight: 1,
+                            color: fillsStar ? "#fbbf24" : "rgba(196,181,253,0.85)",
+                            fontVariantNumeric: "tabular-nums",
+                            textAlign: "center",
+                            letterSpacing: "0.04em",
+                          }}>
+                            ★ {sp.done}/{sp.total}
                           </div>
                         </div>
                       );
