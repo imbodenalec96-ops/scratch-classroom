@@ -24,6 +24,7 @@ interface ScanState {
   gradebook?: { barcode: string };
   pass?: { barcode: string; passKind: "Bathroom" | "Water" | "Break" };
   status?: { barcode: string; statusKind: "Absent" | "Skipped" | "Excused" | "Makeup" };
+  unknown?: { barcode: string };
 }
 
 export default function StarScanner() {
@@ -117,9 +118,10 @@ export default function StarScanner() {
         }
       } else {
         errorBeep();
-        // Unknown — guess from prefix
-        const type: "Work Refusal" | "Specials Refusal" = v.startsWith("SP-") ? "Specials Refusal" : "Work Refusal";
-        setScan({ refusal: { barcode: v, type } });
+        // Used to fall through and open a Refusal modal, which surprised
+        // teachers ("why did it log a refusal?"). Now shows a clear
+        // "barcode not found" overlay with a Sync hint instead.
+        setScan({ unknown: { barcode: v } });
       }
     }
 
@@ -157,6 +159,73 @@ export default function StarScanner() {
           onClose={() => setScan({})}
         />
       )}
+      {scan.unknown && (
+        <UnknownBarcodeOverlay
+          barcode={scan.unknown.barcode}
+          onClose={() => setScan({})}
+          onForceRefusal={() => {
+            const code = scan.unknown!.barcode;
+            const type: "Work Refusal" | "Specials Refusal" = code.startsWith("SP-") ? "Specials Refusal" : "Work Refusal";
+            setScan({ refusal: { barcode: code, type } });
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/* ── unknown-barcode overlay ─────────────────────────────────────── */
+
+function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal }: {
+  barcode: string;
+  onClose: () => void;
+  onForceRefusal: () => void;
+}) {
+  const guessRefusal = barcode.startsWith("WR-") || barcode.startsWith("SP-");
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{
+      position: "fixed", inset: 0, zIndex: 800,
+      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div style={{
+        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
+        border: "1px solid rgba(239,68,68,0.40)",
+        borderRadius: 18, width: "min(520px, 96vw)", padding: 22, color: "#f5f1e8",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
+          ⚠️ Barcode Not Found
+        </div>
+        <div style={{ fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 800, color: "#fde68a", marginBottom: 12 }}>
+          {barcode}
+        </div>
+        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.55, marginBottom: 16 }}>
+          This barcode isn't in this device's STAR database. Most likely the
+          barcode was created on another device and hasn't synced yet, or
+          the localStorage was cleared.
+          <br /><br />
+          Open <b>/star</b> and hit <b>🔄 Sync from Classroom</b> to refresh,
+          or check the <b>💾 Data</b> tab to see what's stored.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={onClose} style={{
+            padding: "12px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #6366f1, #b23a48)",
+            color: "white", border: "none", fontWeight: 800, cursor: "pointer", fontSize: 14,
+          }}>OK — try another barcode</button>
+          {guessRefusal && (
+            <button onClick={onForceRefusal} style={{
+              padding: "10px 14px", borderRadius: 10,
+              background: "rgba(255,255,255,0.05)", color: "white",
+              border: "1px solid rgba(255,255,255,0.15)",
+              fontWeight: 700, cursor: "pointer", fontSize: 13,
+            }}>
+              ↳ Open as a refusal log anyway
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
