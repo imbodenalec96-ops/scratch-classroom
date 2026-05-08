@@ -9,7 +9,7 @@
 
 import { api } from "../api.ts";
 
-export type StarBoardKind = "refusal" | "completion" | "pass-out" | "pass-in";
+export type StarBoardKind = "refusal" | "completion" | "pass-out" | "pass-in" | "scan-to-phone";
 
 export interface StarBoardEvent {
   // Random id per event — used to dedupe the cross-device server poll
@@ -29,6 +29,8 @@ export interface StarBoardEvent {
   refusalType?: string;
   // For pass-in: how long they were gone, in seconds.
   elapsedSec?: number;
+  // For scan-to-phone: the assignment barcode the phone should open camera for.
+  barcode?: string;
   ts: number;
 }
 

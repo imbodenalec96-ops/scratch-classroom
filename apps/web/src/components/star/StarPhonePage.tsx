@@ -14,6 +14,8 @@ import {
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, scanReceivedBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { syncFromClassroom } from "../../lib/star/sync.ts";
+import { onStarBoardEvent, getActiveClassId, setActiveClassId } from "../../lib/star/boardEvents.ts";
+import { api } from "../../lib/api.ts";
 
 type Step = "scan" | "pick-student" | "camera" | "saved" | "unknown";
 
@@ -53,7 +55,47 @@ export default function StarPhonePage() {
     rehydrateBcDB();
     refreshCounts();
     runSync();
+    // Also make sure the cross-device relay's class id is set on this
+    // phone so it polls for incoming "scan-to-phone" events from the
+    // computer/iPad. App.tsx already does this, but on slow loads it
+    // races; setting it here too is safe + idempotent.
+    api.getClasses().then((cs: any[]) => {
+      if (Array.isArray(cs) && cs[0]?.id && !getActiveClassId()) setActiveClassId(cs[0].id);
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for "scan-to-phone" events from the computer / iPad. Whenever
+  // a teacher scans an assignment somewhere, the phone auto-jumps to the
+  // camera step for that barcode + pre-selects the assigned student.
+  useEffect(() => {
+    return onStarBoardEvent((e) => {
+      if (e.kind !== "scan-to-phone" || !e.barcode) return;
+      const v = e.barcode.trim().toUpperCase();
+      const bc = StarStore.getBcDB()[v];
+      if (!bc) {
+        // Phone hasn't synced this barcode yet — show the unknown step
+        // with the relayed code preserved so user can hit Sync.
+        setEntry(null);
+        setCode(v);
+        setStep("unknown");
+        return;
+      }
+      if (bc.type !== "assignment") return;
+      successBeep();
+      setEntry(bc);
+      setCode(v);
+      // If the originating scan carried a student id, use it; else fall
+      // back to the entry's assigned student; else require a manual pick.
+      const sid = e.studentId || bc.studentId;
+      if (sid) {
+        setStudentId(sid);
+        setStep("camera");
+      } else {
+        setStudentId("");
+        setStep("pick-student");
+      }
+    });
   }, []);
 
   const onScan = (rawCode: string) => {

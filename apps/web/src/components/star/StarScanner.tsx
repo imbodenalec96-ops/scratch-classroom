@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StarStore, rehydrateBcDB, type BcEntry } from "../../lib/star/storage.ts";
 import { scanReceivedBeep, successBeep, errorBeep } from "../../lib/star/sounds.ts";
+import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
 import RefusalModal from "./RefusalModal.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import PassModal from "./PassModal.tsx";
@@ -93,6 +94,17 @@ export default function StarScanner() {
       if (entry) {
         successBeep();
         if (entry.type === "assignment") {
+          // Tell any /star/phone tab (this device or another) to jump
+          // straight to the camera step for this barcode + student.
+          // Same-tab dispatch reaches the phone page if it's open here;
+          // cross-device POST reaches it on a separate phone.
+          fireStarBoardEvent({
+            kind: "scan-to-phone",
+            studentName: entry.studentName || "—",
+            studentId: entry.studentId,
+            barcode: v,
+            detail: entry.name,
+          });
           setScan({ gradebook: { barcode: v } });
         } else if (entry.type === "work-refusal-form") {
           setScan({ refusal: { barcode: v, type: "Work Refusal" } });
