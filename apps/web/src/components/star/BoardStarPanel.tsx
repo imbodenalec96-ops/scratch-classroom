@@ -86,39 +86,57 @@ function CompletionView() {
   const data = useMemo(() => {
     const tracker = StarStore.getAsnTrack();
     const students = StarStore.getStudents();
-    const todayStr = new Date().toLocaleDateString();
 
-    // Today's assignments — anything created today OR with a submission today.
-    const todays: StarTrackerEntry[] = Object.values(tracker).filter((t) => {
-      const created = t.createdDate ? new Date(t.createdDate).toLocaleDateString() === todayStr : false;
-      const submittedToday = (t.submissions || []).some((s) => new Date(s.loggedAt).toLocaleDateString() === todayStr);
-      return created || submittedToday;
-    });
+    // Every assignment in the tracker — no date filter. The teacher sees
+    // a true running picture of how each kid is doing across all
+    // barcoded work, not just stuff created today.
+    const all: StarTrackerEntry[] = Object.values(tracker);
 
-    // For each student, find which of today's assignments they've completed.
+    // Build name lookup for matching CSV-imported entries that don't
+    // carry a real DB studentId.
+    const idByFirstName = new Map<string, string>();
+    const idByFullName  = new Map<string, string>();
+    for (const stu of students) {
+      const full = `${stu.firstName} ${stu.lastName}`.trim().toLowerCase();
+      if (full) idByFullName.set(full, stu.id);
+      const first = stu.firstName.trim().toLowerCase();
+      if (first) idByFirstName.set(first, stu.id);
+    }
+
+    const resolveStudentId = (t: StarTrackerEntry, sub?: { studentId?: string; studentName?: string }): string | null => {
+      if (sub?.studentId && students.some((s) => s.id === sub.studentId)) return sub.studentId;
+      if (t.studentId && students.some((s) => s.id === t.studentId)) return t.studentId;
+      const name = sub?.studentName || t.studentName;
+      if (!name) return null;
+      const lower = String(name).trim().toLowerCase();
+      return idByFullName.get(lower) || idByFirstName.get(lower.split(/\s+/)[0]) || null;
+    };
+
     const rows = students.map((stu) => {
       const completedFor = new Set<string>();
-      const subjectsToday = new Set<string>();
-      for (const t of todays) {
-        // Either targeted at this student via studentId, or open to anyone
-        // (no assigned student) — both count toward the matrix below.
-        if (t.studentId && t.studentId !== stu.id) continue;
-        subjectsToday.add(t.subject);
-        const sub = (t.submissions || []).find((s) => s.studentId === stu.id);
-        if (sub) completedFor.add(t.id);
+      const subjects = new Set<string>();
+      let total = 0;
+      for (const t of all) {
+        // Belongs to this student if explicitly tagged OR has a
+        // submission credited to them.
+        const explicitlyMine = resolveStudentId(t) === stu.id;
+        const submitted = (t.submissions || []).some((sub) => resolveStudentId(t, sub) === stu.id);
+        if (!explicitlyMine && !submitted) continue;
+        subjects.add(t.subject);
+        total += 1;
+        if (submitted) completedFor.add(t.id);
       }
-      const total = todays.filter((t) => !t.studentId || t.studentId === stu.id).length;
-      return { stu, completed: completedFor.size, total, subjectsToday };
+      return { stu, completed: completedFor.size, total, subjectsToday: subjects };
     });
 
-    return { todays, rows };
+    return { todays: all, rows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   if (data.todays.length === 0) {
     return (
       <div style={{ padding: 24, opacity: 0.6, textAlign: "center", fontSize: 14, borderRadius: 12, background: "rgba(255,255,255,0.04)" }}>
-        No assignments created or graded today yet.
+        No assignments yet — generate one in /star → Create.
       </div>
     );
   }

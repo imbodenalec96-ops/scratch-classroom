@@ -104,24 +104,18 @@ const ANIM = `
   }
 `;
 
-// Per-student STAR progress — counts today's STAR assignments + how many
-// have a submission. Used by the roster card progress bar to fold STAR
-// completion into the same 7/14 indicator that already shows classroom
-// assignments. Pass in the board's students so we can match tracker
-// entries by name (CSV imports + manual entries store studentName but
-// no studentId). Returns { boardStudentId: { done, total, pct } }.
+// Per-student STAR progress — counts EVERY STAR assignment credited to
+// the kid (no date filter). Used by the roster card progress bar.
+// Pass in the board's students so we can match tracker entries by name
+// (CSV imports + manual entries store studentName but no studentId).
+// Returns { boardStudentId: { done, total, pct } }.
 function computeStarProgressByStudent(
   boardStudents: Array<{ id: any; name?: string }>,
 ): Record<string, { done: number; total: number; pct: number }> {
   const out: Record<string, { done: number; total: number; pct: number }> = {};
   try {
     const tracker = StarStore.getAsnTrack();
-    const todayStr = new Date().toLocaleDateString();
-    const todays = Object.values(tracker).filter((t) => {
-      const created = t.createdDate ? new Date(t.createdDate).toLocaleDateString() === todayStr : false;
-      const submittedToday = (t.submissions || []).some((s) => new Date(s.loggedAt).toLocaleDateString() === todayStr);
-      return created || submittedToday;
-    });
+    const all = Object.values(tracker);
 
     // Build name lookup for the board's roster.
     const idByFirstName = new Map<string, string>();
@@ -136,7 +130,6 @@ function computeStarProgressByStudent(
 
     const resolveBoardId = (t: { studentId?: string; studentName?: string }): string | null => {
       if (t.studentId) {
-        // Tracker entry with explicit DB id matching a board student.
         if (boardStudents.some((b) => String(b.id) === t.studentId)) return t.studentId;
       }
       if (t.studentName) {
@@ -147,15 +140,11 @@ function computeStarProgressByStudent(
       return null;
     };
 
-    for (const t of todays) {
+    for (const t of all) {
       const sid = resolveBoardId(t);
-      if (!sid) continue; // class-wide / unknown student — skip
+      if (!sid) continue;
       const cur = out[sid] || { done: 0, total: 0, pct: 0 };
       cur.total += 1;
-      // A submission counts as "done" for THIS student if any submission
-      // record matches their board id, their tracker.studentId, OR (for
-      // CSV-imported rows) the legacy "imported" sentinel where the
-      // tracker entry was already targeted at this student by name.
       const isDone = (t.submissions || []).some((s) =>
         s.studentId === sid ||
         (t.studentId && s.studentId === t.studentId) ||
