@@ -1188,44 +1188,33 @@ export default function ClassroomBoard() {
             const cols = n <= 4 ? 2 : n <= 8 ? 4 : n <= 12 ? 4 : n <= 16 ? 4 : 5;
             const rows = Math.ceil(n / cols);
             // Pull STAR per-student data so the roster bar can include
-            // STAR assignments + each kid's grade level. Grade comes from:
-            //  1. The teacher's manual entry in /star → Settings (s.grade), OR
-            //  2. Derived from the most common grade level on the kid's
-            //     STAR assignment history (works automatically once they've
-            //     scanned/imported a few graded assignments).
+            // STAR assignments + each kid's grade level. Grade lookup:
+            //  1. Manual entry on the student record (s.grade) wins.
+            //  2. Else: take the MODE (most common grade level) across
+            //     every assignment in the tracker for this student. This
+            //     beats "most recent" because a single mis-tagged generation
+            //     would otherwise flip the displayed grade.
             const starStudents = StarStore.getStudents();
             const starGradeById: Record<string, string> = {};
-            for (const ss of starStudents) {
-              if (ss.id && ss.grade) starGradeById[ss.id] = ss.grade;
-            }
-            // Fill in missing grades from assignment history. Prefer the
-            // MOST RECENT assignment's grade level since that reflects the
-            // student's current placement (CSVs may carry old historical
-            // entries with different grades).
             const tracker = StarStore.getAsnTrack();
-            const sortedTrk = Object.values(tracker).sort(
-              (a, b) => (b.createdDate || "").localeCompare(a.createdDate || ""),
-            );
-            for (const t of sortedTrk) {
-              if (!t.gradeLevel || t.gradeLevel === "All") continue;
-              if (t.studentId && !starGradeById[t.studentId]) {
-                starGradeById[t.studentId] = t.gradeLevel;
-              }
-            }
-            // Also match by NAME for legacy CSV imports that don't carry
-            // the real DB id, falling back to first-name match.
+            const trackerVals = Object.values(tracker);
             for (const ss of starStudents) {
-              if (starGradeById[ss.id]) continue;
+              if (ss.grade) { starGradeById[ss.id] = ss.grade; continue; }
               const fullName = `${ss.firstName} ${ss.lastName}`.trim();
               const firstName = ss.firstName.trim();
-              for (const t of sortedTrk) {
-                if (!t.studentName || !t.gradeLevel || t.gradeLevel === "All") continue;
-                const tName = String(t.studentName).trim();
-                if (tName === fullName || tName === firstName || tName.split(/\s+/)[0] === firstName) {
-                  starGradeById[ss.id] = t.gradeLevel;
-                  break;
+              const votes: Record<string, number> = {};
+              for (const t of trackerVals) {
+                if (!t.gradeLevel || t.gradeLevel === "All") continue;
+                let match = false;
+                if (t.studentId && t.studentId === ss.id) match = true;
+                else if (t.studentName) {
+                  const tName = String(t.studentName).trim();
+                  if (tName === fullName || tName === firstName || tName.split(/\s+/)[0] === firstName) match = true;
                 }
+                if (match) votes[t.gradeLevel] = (votes[t.gradeLevel] || 0) + 1;
               }
+              const winner = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0];
+              if (winner) starGradeById[ss.id] = winner;
             }
             const starProgressById = computeStarProgressByStudent();
             return (
