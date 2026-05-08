@@ -10,7 +10,7 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 
-const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Science", "Social Studies"];
+const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies"];
 const GRADES = ["K", "1st", "2nd", "3rd", "4th", "5th"];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const Q_COUNTS = [5, 10, 15, 20];
@@ -308,7 +308,8 @@ function gradeMathScope(grade: string): string {
 const SUBJECT_RULES: Record<string, string> = {
   Math:             "ONLY math questions using numbers, arithmetic, or word problems. Every question must contain numbers and have a numeric answer.",
   Reading:          "ONLY reading comprehension, vocabulary, or phonics questions whose answers come from the lesson body.",
-  Writing:          "ONLY grammar, spelling, punctuation, sentence-correction, or capitalization questions.",
+  Writing:          "ONLY grammar, punctuation, sentence-correction, or capitalization questions.",
+  Spelling:         "ONLY spelling questions. Every question must be about how to spell a target word — multiple choice between correct/incorrect spellings, fill-in-the-missing-letter, or 'spell this word' prompts. NEVER ask trivia, NEVER ask history, science, or vocabulary definitions.",
   Science:          "ONLY science questions about plants, animals, weather, earth, the human body, matter, or the water cycle. No history or math.",
   "Social Studies": "ONLY social studies questions about community, citizenship, maps, geography, or U.S. history. No math or science.",
   PE:               "ONLY questions about physical activity, sportsmanship, body movement, or healthy habits.",
@@ -327,6 +328,8 @@ function buildPrompt(opts: { subject: Subject; grade: string; count: number; dif
       "Write the lesson body as a SHORT STORY OR PASSAGE (5–9 sentences) at the student's grade level.",
     "Writing":
       "Write the lesson body as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences).",
+    "Spelling":
+      "Write the lesson body as a SPELLING RULE or WORD LIST + 1 WORKED EXAMPLE (3–6 sentences). Pick 5–8 grade-appropriate target words and quiz only on those. Acceptable question patterns: 'Which spelling is correct: A. recieve B. receive C. receeve?', 'Fill in the missing letter: fri___nd', 'Spell the word that means a small dog: p_pp_'. NEVER ask trivia or content questions — only spelling.",
     "Math":
       `Write the lesson body as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: "To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5." STRICT GRADE SCOPE: ${gradeMathScope(opts.grade)} Do NOT introduce operations above the listed grade. A 2nd grader does NOT do multiplication.`,
     "PE":      "Write the lesson body as a short paragraph about exercise/teamwork (4–6 sentences) with clear facts.",
@@ -548,6 +551,7 @@ const SCIENCE_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 0, gradeMax: 2,
   },
+  // ── 2nd–3rd ──────────────────────────────────────────────
   {
     title: "How Plants Grow",
     intro: "Plants are living things — let's learn what they need to grow.",
@@ -568,6 +572,7 @@ const SCIENCE_TOPICS: LocalTopic[] = [
       { term: "photosynthesis", definition: "How plants use sunlight to make food" },
       { term: "roots", definition: "The part of a plant that goes into the soil" },
     ],
+    gradeMin: 2, gradeMax: 4,
   },
   {
     title: "The Water Cycle",
@@ -585,6 +590,7 @@ const SCIENCE_TOPICS: LocalTopic[] = [
       { text: "Does the water cycle ever stop?", answer: "No" },
       { text: "What is the whole pattern called?", answer: "The water cycle" },
     ],
+    gradeMin: 3, gradeMax: 5,
   },
   {
     title: "States of Matter",
@@ -602,10 +608,77 @@ const SCIENCE_TOPICS: LocalTopic[] = [
       { text: "Give one example of a solid.", answer: "A rock" },
       { text: "Give one example of a gas.", answer: "Air" },
     ],
+    gradeMin: 2, gradeMax: 5,
+  },
+  // ── 4th–5th ──────────────────────────────────────────────
+  {
+    title: "The Solar System",
+    intro: "Our Sun and the planets that orbit around it.",
+    body: "Our solar system has the Sun at the center and eight planets that orbit around it. The order from closest to the Sun is: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. Earth is the third planet from the Sun and the only one we know of that has life. Jupiter is the largest planet. The four inner planets (Mercury, Venus, Earth, Mars) are called rocky planets. The four outer planets are called gas giants. The Sun is actually a star — a giant ball of hot gas. Pluto used to be called a planet but is now called a dwarf planet.",
+    qa: [
+      { text: "What is at the center of our solar system?", answer: "The Sun" },
+      { text: "How many planets are in our solar system?", answer: "Eight" },
+      { text: "What is the closest planet to the Sun?", answer: "Mercury" },
+      { text: "What is the third planet from the Sun?", answer: "Earth" },
+      { text: "What is the largest planet?", answer: "Jupiter" },
+      { text: "What planet is fourth from the Sun?", answer: "Mars" },
+      { text: "Are the four outer planets called gas giants?", answer: "Yes" },
+      { text: "What is the Sun?", answer: "A star" },
+      { text: "What is Pluto called now?", answer: "A dwarf planet" },
+      { text: "Which is the only planet known to have life?", answer: "Earth" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
+  {
+    title: "Force and Motion",
+    intro: "Forces make things move, stop, or change direction.",
+    body: "A FORCE is a push or a pull. When you kick a ball, you give it a force that makes it move. When you stop a moving ball, you use a force called friction. GRAVITY is a force that pulls everything toward the ground. That's why a dropped ball falls down. INERTIA is the rule that says objects keep doing what they're doing — a moving ball keeps rolling unless something stops it. The more MASS an object has, the more force you need to move it. A bowling ball is harder to push than a soccer ball because it has more mass.",
+    qa: [
+      { text: "What is a force?", answer: "A push or a pull" },
+      { text: "What force pulls things toward the ground?", answer: "Gravity" },
+      { text: "What force stops a moving ball?", answer: "Friction" },
+      { text: "What is inertia?", answer: "Objects keep doing what they're doing" },
+      { text: "What is mass?", answer: "How much matter an object has" },
+      { text: "Why is a bowling ball harder to push than a soccer ball?", answer: "It has more mass" },
+      { text: "If you drop a ball, what makes it fall?", answer: "Gravity" },
+      { text: "Is a kick a push or a pull?", answer: "A push" },
+    ],
+    gradeMin: 4, gradeMax: 5,
   },
 ];
 
 const READING_TOPICS: LocalTopic[] = [
+  // ── K–1 ──────────────────────────────────────────────────
+  {
+    title: "The Cat and the Mat",
+    intro: "Read the short story. Every answer is in the story.",
+    body: "Sam has a cat. The cat is black. The cat sits on a red mat. The cat naps every day. Sam pets the cat. The cat purrs.",
+    qa: [
+      { text: "Who has a cat?", answer: "Sam" },
+      { text: "What color is the cat?", answer: "Black" },
+      { text: "What does the cat sit on?", answer: "A red mat" },
+      { text: "What color is the mat?", answer: "Red" },
+      { text: "What does the cat do every day?", answer: "Naps" },
+      { text: "What does Sam do?", answer: "Pets the cat" },
+      { text: "What sound does the cat make?", answer: "Purrs" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  {
+    title: "A Big Red Bus",
+    intro: "Read the short story.",
+    body: "Lily rides a big red bus to school. The bus stops at her house. Lily gets on the bus. She sits with her friend Jack. The bus drives to school. Lily and Jack laugh on the way.",
+    qa: [
+      { text: "What is the girl's name?", answer: "Lily" },
+      { text: "What color is the bus?", answer: "Red" },
+      { text: "Where does the bus go?", answer: "To school" },
+      { text: "Who does Lily sit with?", answer: "Jack" },
+      { text: "Where does the bus stop?", answer: "At her house" },
+      { text: "What do Lily and Jack do?", answer: "Laugh" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  // ── 2nd–3rd ──────────────────────────────────────────────
   {
     title: "Maya's Garden",
     intro: "Read the passage carefully — every answer is in the story.",
@@ -622,6 +695,7 @@ const READING_TOPICS: LocalTopic[] = [
       { text: "What color did the tomatoes turn?", answer: "Bright red" },
       { text: "What did Grandmother say about the carrot?", answer: "It was the best carrot she had ever tasted" },
     ],
+    gradeMin: 2, gradeMax: 3,
   },
   {
     title: "The Lost Backpack",
@@ -639,10 +713,79 @@ const READING_TOPICS: LocalTopic[] = [
       { text: "Who gave Liam a sticker?", answer: "The school secretary" },
       { text: "Why did Liam get a sticker?", answer: "For being polite" },
     ],
+    gradeMin: 2, gradeMax: 3,
+  },
+  // ── 3rd–4th ──────────────────────────────────────────────
+  {
+    title: "The Class Hamster",
+    intro: "A story about helping take care of a classroom pet.",
+    body: "Mrs. Diaz's third-grade class has a pet hamster named Pepper. Every Friday, the class picks one student to take Pepper home for the weekend. The job comes with rules: feed Pepper twice a day, give her fresh water, and clean her cage on Saturday morning. This Friday, Mrs. Diaz picked Tomas. Tomas was excited but also nervous because his little brother might scare Pepper. Mrs. Diaz told Tomas to keep the cage on a high shelf. Tomas agreed and promised to follow every rule.",
+    qa: [
+      { text: "Who is the teacher?", answer: "Mrs. Diaz" },
+      { text: "What grade is the class?", answer: "Third grade" },
+      { text: "What is the hamster's name?", answer: "Pepper" },
+      { text: "How often does a student take Pepper home?", answer: "Every Friday" },
+      { text: "How many times a day should Pepper be fed?", answer: "Twice" },
+      { text: "When should the cage be cleaned?", answer: "Saturday morning" },
+      { text: "Who got picked this Friday?", answer: "Tomas" },
+      { text: "Why was Tomas nervous?", answer: "His little brother might scare Pepper" },
+      { text: "Where should Tomas keep the cage?", answer: "On a high shelf" },
+      { text: "What did Tomas promise?", answer: "To follow every rule" },
+    ],
+    gradeMin: 3, gradeMax: 4,
+  },
+  // ── 4th–5th ──────────────────────────────────────────────
+  {
+    title: "The Time Capsule",
+    intro: "A longer passage with more detail to track.",
+    body: "Last spring, the fifth-grade class at Maple Hill School decided to make a time capsule. They wanted future students to learn about life in 2026. The class voted on what to put inside. They chose a school newspaper, a popular kid's book, a small American flag, photos of every student, and a letter from Mrs. Patel, their teacher. They sealed everything inside a metal box. The class buried the box near the playground oak tree. They marked the spot with a small stone plaque that read: \"Open in 2046.\" The students felt proud knowing they were sending a message to the future.",
+    qa: [
+      { text: "What grade decided to make the time capsule?", answer: "Fifth grade" },
+      { text: "What is the school name?", answer: "Maple Hill School" },
+      { text: "What year were they writing from?", answer: "2026" },
+      { text: "Who is the teacher?", answer: "Mrs. Patel" },
+      { text: "Name three things they put in the capsule.", answer: "A school newspaper, a popular kid's book, a small American flag" },
+      { text: "What kind of box did they use?", answer: "A metal box" },
+      { text: "Where did they bury the box?", answer: "Near the playground oak tree" },
+      { text: "What year does the plaque say to open it?", answer: "2046" },
+      { text: "What did Mrs. Patel contribute?", answer: "A letter" },
+      { text: "How did the students feel?", answer: "Proud" },
+    ],
+    gradeMin: 4, gradeMax: 5,
   },
 ];
 
 const WRITING_TOPICS: LocalTopic[] = [
+  // ── K–1 ──────────────────────────────────────────────────
+  {
+    title: "Capital Letters at the Start",
+    intro: "Every sentence starts with a capital letter.",
+    body: "When we write a sentence, the first letter must be a CAPITAL letter. Capital letters are big letters like A, B, C. Small letters are like a, b, c. We always start with a capital. We also use capitals for names. \"Maya\" is a name, so M is a capital. The word \"i\" when it talks about you is always capital — \"I\" — even in the middle of a sentence.",
+    qa: [
+      { text: "What kind of letter starts every sentence?", answer: "A capital letter" },
+      { text: "Are capital letters big or small?", answer: "Big" },
+      { text: "Should the M in 'Maya' be capital?", answer: "Yes" },
+      { text: "Is the word 'I' (about you) always capital?", answer: "Yes" },
+      { text: "Give an example of a capital letter.", answer: "A" },
+      { text: "Give an example of a small letter.", answer: "a" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  {
+    title: "Period, Question Mark, Exclamation",
+    intro: "Sentences end with a punctuation mark.",
+    body: "Every sentence ends with one of three marks. A telling sentence ends with a PERIOD (.). Example: \"The dog ran.\" An asking sentence ends with a QUESTION MARK (?). Example: \"Where is the cat?\" An excited sentence ends with an EXCLAMATION MARK (!). Example: \"Look at that!\" Every sentence needs an end mark.",
+    qa: [
+      { text: "What mark ends a telling sentence?", answer: "A period" },
+      { text: "What mark ends an asking sentence?", answer: "A question mark" },
+      { text: "What mark ends an excited sentence?", answer: "An exclamation mark" },
+      { text: "Does every sentence need an end mark?", answer: "Yes" },
+      { text: "What mark is a period?", answer: "." },
+      { text: "What mark is a question mark?", answer: "?" },
+    ],
+    gradeMin: 0, gradeMax: 2,
+  },
+  // ── 2nd–3rd ──────────────────────────────────────────────
   {
     title: "Writing Complete Sentences",
     intro: "A complete sentence has a subject and a verb.",
@@ -659,6 +802,152 @@ const WRITING_TOPICS: LocalTopic[] = [
       { text: "In 'The dog runs.' what is the verb?", answer: "runs" },
       { text: "Name another end mark besides a period.", answer: "Question mark" },
     ],
+    gradeMin: 2, gradeMax: 4,
+  },
+  {
+    title: "Nouns, Verbs, and Adjectives",
+    intro: "These three kinds of words are the building blocks of sentences.",
+    body: "A NOUN is a person, place, or thing. \"Dog,\" \"school,\" and \"apple\" are nouns. A VERB is an action or state of being. \"Run,\" \"jump,\" and \"is\" are verbs. An ADJECTIVE is a word that describes a noun. \"Big,\" \"red,\" and \"happy\" are adjectives. In the sentence \"The big dog runs,\" \"dog\" is the noun, \"runs\" is the verb, and \"big\" is the adjective.",
+    qa: [
+      { text: "What is a noun?", answer: "A person, place, or thing" },
+      { text: "What is a verb?", answer: "An action or state of being" },
+      { text: "What is an adjective?", answer: "A word that describes a noun" },
+      { text: "Is 'apple' a noun?", answer: "Yes" },
+      { text: "Is 'jump' a verb?", answer: "Yes" },
+      { text: "Is 'red' an adjective?", answer: "Yes" },
+      { text: "In 'The big dog runs,' what is the noun?", answer: "dog" },
+      { text: "In 'The big dog runs,' what is the verb?", answer: "runs" },
+      { text: "In 'The big dog runs,' what is the adjective?", answer: "big" },
+    ],
+    gradeMin: 2, gradeMax: 4,
+  },
+  // ── 4th–5th ──────────────────────────────────────────────
+  {
+    title: "Paragraph Structure",
+    intro: "A paragraph has a topic sentence, details, and a closing.",
+    body: "A PARAGRAPH is a group of sentences about ONE topic. The first sentence is the TOPIC SENTENCE — it tells the main idea. The middle sentences are DETAIL SENTENCES — they give facts and examples that support the topic. The last sentence is the CLOSING SENTENCE — it wraps up the paragraph. A good paragraph has at least three to five sentences and stays focused on one idea.",
+    qa: [
+      { text: "What is a paragraph?", answer: "A group of sentences about one topic" },
+      { text: "What is the first sentence of a paragraph called?", answer: "The topic sentence" },
+      { text: "What does the topic sentence tell?", answer: "The main idea" },
+      { text: "What are the middle sentences called?", answer: "Detail sentences" },
+      { text: "What is the last sentence called?", answer: "The closing sentence" },
+      { text: "How many sentences should a good paragraph have at least?", answer: "Three to five" },
+      { text: "How many topics should a paragraph have?", answer: "One" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
+];
+
+const SPELLING_TOPICS: LocalTopic[] = [
+  // ── K ──────────────────────────────────────────────────
+  {
+    title: "Sight Words: Set 1",
+    intro: "Sight words are short words we read every day.",
+    body: "These five sight words show up in almost every book: \"the,\" \"and,\" \"a,\" \"to,\" and \"is.\" Practice spelling each one. Notice the letters: T-H-E spells the. A-N-D spells and. The letter A by itself spells a. T-O spells to. I-S spells is. Knowing these words by sight makes reading much easier.",
+    qa: [
+      { text: "Spell the word: the", answer: "t-h-e" },
+      { text: "Spell the word: and", answer: "a-n-d" },
+      { text: "Spell the word: to", answer: "t-o" },
+      { text: "Spell the word: is", answer: "i-s" },
+      { text: "Which word is spelled A?", answer: "a" },
+      { text: "How many letters in 'the'?", answer: "Three" },
+    ],
+    gradeMin: 0, gradeMax: 1,
+  },
+  // ── 1st–2nd ──────────────────────────────────────────────
+  {
+    title: "Short A Words",
+    intro: "Short A makes the sound in cat.",
+    body: "The letter A makes a short sound — like the A in CAT. Words with short A: cat, hat, mat, bat, rat, sat, pan, can, man, ran. Notice the pattern: a consonant, then short A, then a consonant. We call this CVC: consonant-vowel-consonant.",
+    qa: [
+      { text: "What sound does short A make? Give a word.", answer: "Cat" },
+      { text: "Spell: cat", answer: "c-a-t" },
+      { text: "Spell: hat", answer: "h-a-t" },
+      { text: "Spell: pan", answer: "p-a-n" },
+      { text: "Spell: man", answer: "m-a-n" },
+      { text: "What is CVC?", answer: "Consonant-vowel-consonant" },
+      { text: "Is 'cat' a CVC word?", answer: "Yes" },
+    ],
+    gradeMin: 0, gradeMax: 2,
+  },
+  {
+    title: "Short Vowels: a, e, i, o, u",
+    intro: "Each short vowel has its own sound.",
+    body: "There are five vowels: A, E, I, O, U. Short A is the sound in CAT. Short E is the sound in BED. Short I is the sound in PIG. Short O is the sound in DOG. Short U is the sound in CUP. Practice these: cat, bed, pig, dog, cup.",
+    qa: [
+      { text: "What are the five vowels?", answer: "A, E, I, O, U" },
+      { text: "Spell a word with short A.", answer: "cat" },
+      { text: "Spell a word with short E.", answer: "bed" },
+      { text: "Spell a word with short I.", answer: "pig" },
+      { text: "Spell a word with short O.", answer: "dog" },
+      { text: "Spell a word with short U.", answer: "cup" },
+      { text: "How many vowels are there?", answer: "Five" },
+    ],
+    gradeMin: 1, gradeMax: 2,
+  },
+  // ── 2nd–3rd ──────────────────────────────────────────────
+  {
+    title: "Silent E (Magic E)",
+    intro: "When E is at the end, the vowel says its name.",
+    body: "Silent E is the magic letter at the end of a word. When you add E to a short-vowel word, the vowel says its NAME instead of its short sound. CAP becomes CAPE. KIT becomes KITE. HOP becomes HOPE. CUB becomes CUBE. The E at the end is silent — you don't say it, but it changes the word.",
+    qa: [
+      { text: "What does silent E do to the vowel?", answer: "Makes it say its name" },
+      { text: "What does CAP become with silent E?", answer: "Cape" },
+      { text: "What does KIT become with silent E?", answer: "Kite" },
+      { text: "What does HOP become with silent E?", answer: "Hope" },
+      { text: "What does CUB become with silent E?", answer: "Cube" },
+      { text: "Do you say the silent E?", answer: "No" },
+      { text: "Spell: cape", answer: "c-a-p-e" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Common Spelling: -ing endings",
+    intro: "Many action words end with -ing.",
+    body: "When we want to show action happening NOW, we add -ing to the verb. Run + ing = running. Jump + ing = jumping. Sit + ing = sitting. Notice: when a word ends in a consonant after a short vowel, we DOUBLE the consonant before adding -ing. RUN has only one N, but RUNNING has two N's. SIT becomes SITTING. JUMP keeps one P because there are two consonants already (m-p): jumping.",
+    qa: [
+      { text: "What ending shows action happening now?", answer: "-ing" },
+      { text: "Spell: running", answer: "r-u-n-n-i-n-g" },
+      { text: "Spell: jumping", answer: "j-u-m-p-i-n-g" },
+      { text: "Spell: sitting", answer: "s-i-t-t-i-n-g" },
+      { text: "How many N's in 'running'?", answer: "Two" },
+      { text: "Why do we double the N in 'running'?", answer: "Because RUN has a short vowel and one consonant" },
+    ],
+    gradeMin: 2, gradeMax: 4,
+  },
+  // ── 4th–5th ──────────────────────────────────────────────
+  {
+    title: "Tricky Spellings: ie vs ei",
+    intro: "There's a rule: I before E except after C.",
+    body: "When spelling words with the EE sound, use IE most of the time — like \"believe,\" \"piece,\" \"field.\" But after the letter C, use EI — like \"receive,\" \"ceiling,\" \"deceive.\" The rhyme says: \"I before E, except after C.\" There are exceptions: \"weird\" and \"science\" break the rule, so memorize them.",
+    qa: [
+      { text: "What is the spelling rule for IE and EI?", answer: "I before E except after C" },
+      { text: "Spell: believe", answer: "b-e-l-i-e-v-e" },
+      { text: "Spell: piece", answer: "p-i-e-c-e" },
+      { text: "Spell: receive", answer: "r-e-c-e-i-v-e" },
+      { text: "Spell: ceiling", answer: "c-e-i-l-i-n-g" },
+      { text: "Does 'receive' use IE or EI?", answer: "EI" },
+      { text: "Does 'piece' use IE or EI?", answer: "IE" },
+      { text: "Name an exception to the rule.", answer: "weird" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
+  {
+    title: "Plurals: -s, -es, -ies",
+    intro: "Three rules for making words plural.",
+    body: "To make most words plural, just add -S: cat → cats, book → books. If a word ends in S, X, Z, CH, or SH, add -ES: bus → buses, box → boxes, dish → dishes. If a word ends in a consonant + Y, change the Y to I and add -ES: baby → babies, story → stories, city → cities.",
+    qa: [
+      { text: "How do you make most words plural?", answer: "Add -s" },
+      { text: "What is the plural of cat?", answer: "cats" },
+      { text: "What is the plural of bus?", answer: "buses" },
+      { text: "What is the plural of box?", answer: "boxes" },
+      { text: "What is the plural of dish?", answer: "dishes" },
+      { text: "What is the plural of baby?", answer: "babies" },
+      { text: "What is the plural of city?", answer: "cities" },
+      { text: "What ending do you add to a word ending in CH?", answer: "-es" },
+    ],
+    gradeMin: 3, gradeMax: 5,
   },
 ];
 
@@ -851,13 +1140,27 @@ const MATH_VOCAB = [
   { term: "equation",   definition: "a math sentence with an equals sign, like 2 + 3 = 5" },
 ];
 
-function pickTopic(bank: LocalTopic[], goal: string): LocalTopic {
+function pickTopic(bank: LocalTopic[], goal: string, grade?: string): LocalTopic {
+  // Filter by grade level first — only topics whose [gradeMin, gradeMax]
+  // include this grade survive. Untagged topics fall through (legacy).
+  let pool = bank;
+  if (grade) {
+    const g = gradeNum(grade);
+    const inGrade = bank.filter((t) => {
+      const lo = t.gradeMin ?? 0;
+      const hi = t.gradeMax ?? 5;
+      return g >= lo && g <= hi;
+    });
+    if (inGrade.length > 0) pool = inGrade;
+  }
+  // Goal-string match within the grade-filtered pool — lets a teacher
+  // type "vowels" or "fractions" and steer to a matching topic.
   if (goal) {
-    const g = goal.toLowerCase();
-    const matched = bank.find((t) => t.title.toLowerCase().includes(g) || t.body.toLowerCase().includes(g));
+    const gLower = goal.toLowerCase();
+    const matched = pool.find((t) => t.title.toLowerCase().includes(gLower) || t.body.toLowerCase().includes(gLower));
     if (matched) return matched;
   }
-  return bank[Math.floor(Math.random() * bank.length)];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
@@ -877,9 +1180,10 @@ function buildLocalLesson(opts: { subject: Subject; grade: string; count: number
     subject === "Science"        ? SCIENCE_TOPICS :
     subject === "Reading"        ? READING_TOPICS :
     subject === "Writing"        ? WRITING_TOPICS :
+    subject === "Spelling"       ? SPELLING_TOPICS :
     /* Art / Music / Library / PE */ READING_TOPICS;
 
-  const topic = pickTopic(bank, goal);
+  const topic = pickTopic(bank, goal, opts.grade);
 
   // Shuffle a copy of the q/a pairs so retakes feel different, then take `count`.
   const pool = [...topic.qa].sort(() => Math.random() - 0.5);
