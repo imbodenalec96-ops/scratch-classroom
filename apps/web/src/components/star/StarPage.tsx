@@ -23,8 +23,9 @@ import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
 import StarGradebookView from "./StarGradebookView.tsx";
+import StarDataView from "./StarDataView.tsx";
 
-type Tab = "home" | "gradebook" | "create" | "reports" | "settings";
+type Tab = "home" | "gradebook" | "create" | "reports" | "data" | "settings";
 
 const SUBJECTS: Subject[] = ["Math","Reading","Writing","Science","Social Studies","PE","Art","Library","Music"];
 const GRADES = ["K","1st","2nd","3rd","4th","5th"];
@@ -136,6 +137,7 @@ export default function StarPage() {
           { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
           { id: "create"    as Tab, icon: "✨", label: "Create" },
           { id: "reports"   as Tab, icon: "📊", label: "Reports" },
+          { id: "data"      as Tab, icon: "💾", label: "Data" },
           { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
         ]).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -173,6 +175,8 @@ export default function StarPage() {
       )}
 
       {tab === "reports"  && <StarReports />}
+
+      {tab === "data"     && <StarDataView />}
 
       {tab === "settings" && <SettingsPanel />}
 
