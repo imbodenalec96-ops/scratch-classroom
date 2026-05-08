@@ -169,6 +169,9 @@ export default function StarPage() {
             <PassBarcodesPanel />
           </div>
           <div style={{ marginTop: 14 }}>
+            <StatusBarcodesPanel />
+          </div>
+          <div style={{ marginTop: 14 }}>
             <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
           </div>
         </>
@@ -268,6 +271,77 @@ function PassBarcodesPanel() {
           { id: "PASS-WATER",    label: "💧 Water" },
           { id: "PASS-BREAK",    label: "🛋 Sensory Break" },
         ].map((p) => (
+          <div key={p.id} style={{
+            padding: 10, borderRadius: 10,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>{p.label}</div>
+            <div dangerouslySetInnerHTML={{ __html: bc128svg(p.id, 0, 56, true, 1.4) }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── status barcodes (Absent / Skipped / Excused / Makeup) ────── */
+
+function StatusBarcodesPanel() {
+  const items = [
+    { id: "STATUS-ABSENT",  label: "🚫 Mark Absent",  note: "Scan when a student is absent. Pick the student + assignment in the popup." },
+    { id: "STATUS-SKIPPED", label: "⏭ Mark Skipped", note: "Scan when a student skipped this assignment. Counts as missing." },
+    { id: "STATUS-EXCUSED", label: "🩹 Mark Excused", note: "Scan when an assignment is excused (medical, IEP, etc)." },
+    { id: "STATUS-MAKEUP",  label: "🔁 Mark Makeup",  note: "Scan when a student is doing makeup work — sets status to in-progress." },
+  ];
+  const print = () => {
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) return;
+    const cells = items.map((p) => `
+      <div style="border:2px dashed #999;border-radius:14px;padding:24px;text-align:center;page-break-inside:avoid">
+        <div style="font-size:24px;font-weight:800;margin-bottom:8px">${p.label}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:14px">${p.note}</div>
+        ${bc128svg(p.id, 0, 100, true, 2.4)}
+      </div>
+    `).join("");
+    w.document.write(`<!doctype html><html><head><title>STAR status barcodes</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.5in; } }
+        body { font-family: -apple-system, sans-serif; padding: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+        h2 { font-size: 18px; margin: 0 0 12px; }
+      </style>
+    </head><body>
+      <h2>STAR — Assignment Status Barcodes (laminate near the gradebook)</h2>
+      <div class="grid">${cells}</div>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+    </body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 14, padding: 16, color: "#f5f1e8",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>📋 Assignment Status Barcodes</div>
+          <p style={{ fontSize: 12, opacity: 0.7, margin: "4px 0 0" }}>
+            Quick way to mark an assignment <b>absent</b>, <b>skipped</b>, <b>excused</b>, or <b>makeup</b> without
+            opening the full gradebook. Scan the status, pick the student + assignment in the popup.
+          </p>
+        </div>
+        <button onClick={print} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "linear-gradient(135deg,#6366f1,#b23a48)", color: "white",
+          border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
+        }}>🖨 Print status sheet</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 14 }}>
+        {items.map((p) => (
           <div key={p.id} style={{
             padding: 10, borderRadius: 10,
             background: "rgba(255,255,255,0.03)",

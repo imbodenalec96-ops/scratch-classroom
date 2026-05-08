@@ -16,11 +16,13 @@ import { scanReceivedBeep, successBeep, errorBeep } from "../../lib/star/sounds.
 import RefusalModal from "./RefusalModal.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import PassModal from "./PassModal.tsx";
+import StatusModal from "./StatusModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
   gradebook?: { barcode: string };
   pass?: { barcode: string; passKind: "Bathroom" | "Water" | "Break" };
+  status?: { barcode: string; statusKind: "Absent" | "Skipped" | "Excused" | "Makeup" };
 }
 
 export default function StarScanner() {
@@ -83,6 +85,8 @@ export default function StarScanner() {
           setScan({ refusal: { barcode: v, type: "Specials Refusal" } });
         } else if (entry.type === "pass-action") {
           setScan({ pass: { barcode: v, passKind: entry.passKind } });
+        } else if (entry.type === "status-action") {
+          setScan({ status: { barcode: v, statusKind: entry.statusKind } });
         }
       } else {
         errorBeep();
@@ -117,6 +121,12 @@ export default function StarScanner() {
       {scan.pass && (
         <PassModal
           passKind={scan.pass.passKind}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.status && (
+        <StatusModal
+          statusKind={scan.status.statusKind}
           onClose={() => setScan({})}
         />
       )}

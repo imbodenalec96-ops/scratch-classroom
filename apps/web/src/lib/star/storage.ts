@@ -64,6 +64,15 @@ export type BcEntry =
       // Which kind of pass this barcode triggers.
       passKind: "Bathroom" | "Water" | "Break";
       createdDate: string;
+    }
+  | {
+      id: string;
+      type: "status-action";
+      name: string;
+      // Which assignment status this barcode applies when paired with
+      // an assignment + student in the StatusModal.
+      statusKind: "Absent" | "Skipped" | "Excused" | "Makeup";
+      createdDate: string;
     };
 
 export interface ActivePass {
@@ -260,6 +269,13 @@ const PASS_BARCODES: Array<{ id: string; passKind: "Bathroom" | "Water" | "Break
   { id: "PASS-BREAK",    passKind: "Break",    name: "🛋 Sensory Break" },
 ];
 
+const STATUS_BARCODES: Array<{ id: string; statusKind: "Absent" | "Skipped" | "Excused" | "Makeup"; name: string }> = [
+  { id: "STATUS-ABSENT",  statusKind: "Absent",  name: "🚫 Mark Absent" },
+  { id: "STATUS-SKIPPED", statusKind: "Skipped", name: "⏭ Mark Skipped" },
+  { id: "STATUS-EXCUSED", statusKind: "Excused", name: "🩹 Mark Excused" },
+  { id: "STATUS-MAKEUP",  statusKind: "Makeup",  name: "🔁 Mark Makeup" },
+];
+
 export function rehydrateBcDB(): Record<string, BcEntry> {
   const bcDB = StarStore.getBcDB();
   const asnTrack = StarStore.getAsnTrack();
@@ -278,6 +294,11 @@ export function rehydrateBcDB(): Record<string, BcEntry> {
   for (const p of PASS_BARCODES) {
     if (!bcDB[p.id]) {
       bcDB[p.id] = { id: p.id, type: "pass-action", name: p.name, passKind: p.passKind, createdDate: new Date().toISOString() };
+    }
+  }
+  for (const s of STATUS_BARCODES) {
+    if (!bcDB[s.id]) {
+      bcDB[s.id] = { id: s.id, type: "status-action", name: s.name, statusKind: s.statusKind, createdDate: new Date().toISOString() };
     }
   }
   StarStore.setBcDB(bcDB);
