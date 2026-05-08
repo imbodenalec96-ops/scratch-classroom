@@ -73,8 +73,23 @@ export default function StarScanner() {
 
     function handleScan(v: string) {
       scanReceivedBeep();
+      // Always rehydrate so freshly-deployed seed barcodes (PASS-*, STATUS-*)
+      // are guaranteed to be in the lookup, even if the user's bcDB
+      // pre-dates the seed.
+      rehydrateBcDB();
       const bcDB = StarStore.getBcDB();
-      const entry: BcEntry | undefined = bcDB[v];
+      let entry: BcEntry | undefined = bcDB[v];
+      // Last-resort prefix fallback for the well-known fixed barcodes
+      // — covers cases where rehydrate hasn't yet written localStorage.
+      if (!entry) {
+        if (v === "STATUS-ABSENT")  entry = { id: v, type: "status-action", name: "🚫 Mark Absent",  statusKind: "Absent",  createdDate: new Date().toISOString() };
+        if (v === "STATUS-SKIPPED") entry = { id: v, type: "status-action", name: "⏭ Mark Skipped", statusKind: "Skipped", createdDate: new Date().toISOString() };
+        if (v === "STATUS-EXCUSED") entry = { id: v, type: "status-action", name: "🩹 Mark Excused", statusKind: "Excused", createdDate: new Date().toISOString() };
+        if (v === "STATUS-MAKEUP")  entry = { id: v, type: "status-action", name: "🔁 Mark Makeup",  statusKind: "Makeup",  createdDate: new Date().toISOString() };
+        if (v === "PASS-BATHROOM")  entry = { id: v, type: "pass-action",   name: "🚻 Bathroom Pass", passKind: "Bathroom", createdDate: new Date().toISOString() };
+        if (v === "PASS-WATER")     entry = { id: v, type: "pass-action",   name: "💧 Water Break",   passKind: "Water",    createdDate: new Date().toISOString() };
+        if (v === "PASS-BREAK")     entry = { id: v, type: "pass-action",   name: "🛋 Sensory Break", passKind: "Break",    createdDate: new Date().toISOString() };
+      }
       if (entry) {
         successBeep();
         if (entry.type === "assignment") {
