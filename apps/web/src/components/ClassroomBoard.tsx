@@ -9,10 +9,10 @@ import PinPad from "./PinPad.tsx";
 import BirthdayCelebration from "./BirthdayCelebration.tsx";
 import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
-import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import { StarStore } from "../lib/star/storage.ts";
+import { setActiveClassId } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -502,7 +502,12 @@ export default function ClassroomBoard() {
     api.getClasses().then((cs: any[]) => {
       if (done) return;
       if (!cs?.length) { setError("No classes available"); return; }
-      setCls(cs.find(c => c.id === classParam) || cs.find(c => String(c.name).toLowerCase() === classParam) || cs[0]);
+      const picked = cs.find(c => c.id === classParam) || cs.find(c => String(c.name).toLowerCase() === classParam) || cs[0];
+      setCls(picked);
+      // Tell the STAR cross-device relay which class this device is in,
+      // so saves on the iPad POST to the right relay AND this projector
+      // tab knows which class id to poll for incoming events.
+      if (picked?.id) setActiveClassId(picked.id);
     }).catch(() => { if (!done) setError("Couldn't load classes"); });
     return () => { done = true; };
   }, [classParam]);
@@ -2001,10 +2006,6 @@ export default function ClassroomBoard() {
 
     {/* Reaction emojis — bottom-center pill, kids tap to react silently. */}
     <ReactionRain />
-
-    {/* STAR board overlays — full-screen popups when refusal logged or
-        completed grade saved. Fires via BroadcastChannel from STAR modals. */}
-    <StarBoardOverlay />
 
     {/* STAR active passes — bottom-left strip of students currently out
         on a bathroom / water / sensory break with running timers. */}

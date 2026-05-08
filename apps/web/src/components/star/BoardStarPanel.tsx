@@ -13,6 +13,7 @@ import {
   StarStore, letterGradeColor,
   type StarStudent, type StarTrackerEntry, type Subject,
 } from "../../lib/star/storage.ts";
+import { syncFromClassroom } from "../../lib/star/sync.ts";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Science", "Social Studies"];
 
@@ -58,6 +59,7 @@ export default function BoardStarPanel() {
                 <h2 style={{ fontSize: 22, fontWeight: 900, margin: "4px 0 0" }}>
                   {view === "completion" ? "Class Completion" : "Student Grades"}
                 </h2>
+                <DataCounts />
               </div>
               <button onClick={() => setOpen(false)} style={closeBtn()}>✕</button>
             </div>
@@ -143,16 +145,7 @@ function CompletionView() {
 
   const hasAnyMatched = data.rows.some((r) => r.total > 0);
   if (!hasAnyMatched) {
-    return (
-      <div style={{ padding: 24, borderRadius: 12, background: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.40)", color: "#fde68a", fontSize: 13, lineHeight: 1.5 }}>
-        <div style={{ fontWeight: 800, marginBottom: 6 }}>
-          {data.todays.length} assignment{data.todays.length === 1 ? "" : "s"} in the system, but none are tagged to a roster student.
-        </div>
-        <div style={{ opacity: 0.85 }}>
-          Most likely you imported the legacy CSV but haven't synced the classroom roster yet. Hit <b>🔄 Sync</b> in /star, or open Settings and check your students list.
-        </div>
-      </div>
-    );
+    return <NoMatchDiagnostic count={data.todays.length} />;
   }
 
   return (
@@ -185,6 +178,73 @@ function CompletionView() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ── data counts subtitle — shows raw localStorage counts ─────── */
+
+function DataCounts() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const iv = window.setInterval(() => setTick((n) => n + 1), 2000); return () => window.clearInterval(iv); }, []);
+  const tracker = StarStore.getAsnTrack();
+  const subs = Object.values(tracker).reduce((a, t) => a + (t.submissions?.length || 0), 0);
+  void tick;
+  return (
+    <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4, fontFamily: "monospace" }}>
+      {Object.keys(tracker).length} assignments · {subs} submissions · {StarStore.getStudents().length} students
+    </div>
+  );
+}
+
+/* ── empty-state diagnostic with inline Sync button ─────────────── */
+
+function NoMatchDiagnostic({ count }: { count: number }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const studentsCount = StarStore.getStudents().length;
+
+  const sync = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await syncFromClassroom();
+      setMsg(r.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: 20, borderRadius: 12,
+      background: "rgba(251,191,36,0.10)",
+      border: "1px solid rgba(251,191,36,0.40)",
+      color: "#fde68a", fontSize: 13, lineHeight: 1.6,
+    }}>
+      <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>
+        Found {count} assignment{count === 1 ? "" : "s"} but couldn't match any to a student.
+      </div>
+      <div style={{ opacity: 0.85, marginBottom: 6 }}>
+        STAR roster has <b>{studentsCount}</b> student{studentsCount === 1 ? "" : "s"}.
+        {studentsCount === 0 && " That's why — sync your classroom roster first."}
+      </div>
+      <div style={{ opacity: 0.85, marginBottom: 14 }}>
+        Most assignments come from the legacy CSV (tagged by name only).
+        Sync pulls real student IDs so STAR can credit them.
+      </div>
+      <button onClick={sync} disabled={busy} style={{
+        padding: "10px 16px", borderRadius: 10,
+        background: busy ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#6366f1,#b23a48)",
+        color: "white", border: "1px solid rgba(251,191,36,0.55)",
+        fontWeight: 800, cursor: busy ? "wait" : "pointer", fontSize: 13,
+      }}>
+        {busy ? "Syncing…" : "🔄 Sync from Classroom"}
+      </button>
+      {msg && (
+        <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(0,0,0,0.30)", color: "#f5f1e8", fontSize: 12 }}>
+          {msg} — close + reopen this panel to refresh the view.
+        </div>
+      )}
     </div>
   );
 }

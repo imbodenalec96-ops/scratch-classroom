@@ -120,7 +120,7 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
         </div>
         {data.items.length === 0 ? (
           <div style={{ padding: 20, opacity: 0.6, textAlign: "center", fontSize: 13 }}>
-            Nothing yet today — scan a barcode to get started.
+            Nothing recent — scan a barcode to get started.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -69,6 +69,9 @@ const StudentVideoPage = lazy(() => import("./components/StudentVideoPage.tsx"))
 const PrintAssignment = lazy(() => import("./components/PrintAssignment.tsx"));
 const StarPage = lazy(() => import("./components/star/StarPage.tsx"));
 import StarScanner from "./components/star/StarScanner.tsx";
+import StarBoardOverlay from "./components/star/StarBoardOverlay.tsx";
+import { setActiveClassId } from "./lib/star/boardEvents.ts";
+import { api as starApi } from "./lib/api.ts";
 
 import { useClassConfig } from "./lib/useClassConfig.ts";
 
@@ -170,11 +173,23 @@ export default function App() {
     return () => clearInterval(iv);
   }, []);
 
+  // Bootstrap the STAR cross-device relay on app load: store the user's
+  // first class id in localStorage so save events POST + the board polls.
+  useEffect(() => {
+    starApi.getClasses().then((cs: any[]) => {
+      if (Array.isArray(cs) && cs[0]?.id) setActiveClassId(cs[0].id);
+    }).catch(() => {});
+  }, []);
+
   return (
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <StarScanner />
+        {/* Mounted globally so save → celebration overlay + sound fires on
+            ANY page, not just /board. The polling inside also drives
+            cross-device delivery once activeClassId is set. */}
+        <StarBoardOverlay />
         <Suspense fallback={<AppLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
