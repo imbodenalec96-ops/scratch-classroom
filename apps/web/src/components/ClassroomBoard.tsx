@@ -107,8 +107,12 @@ const ANIM = `
 // Per-student STAR progress — counts today's STAR assignments + how many
 // have a submission. Used by the roster card progress bar to fold STAR
 // completion into the same 7/14 indicator that already shows classroom
-// assignments. Returns { studentId: { done, total, pct } }.
-function computeStarProgressByStudent(): Record<string, { done: number; total: number; pct: number }> {
+// assignments. Pass in the board's students so we can match tracker
+// entries by name (CSV imports + manual entries store studentName but
+// no studentId). Returns { boardStudentId: { done, total, pct } }.
+function computeStarProgressByStudent(
+  boardStudents: Array<{ id: any; name?: string }>,
+): Record<string, { done: number; total: number; pct: number }> {
   const out: Record<string, { done: number; total: number; pct: number }> = {};
   try {
     const tracker = StarStore.getAsnTrack();
@@ -118,14 +122,47 @@ function computeStarProgressByStudent(): Record<string, { done: number; total: n
       const submittedToday = (t.submissions || []).some((s) => new Date(s.loggedAt).toLocaleDateString() === todayStr);
       return created || submittedToday;
     });
-    for (const t of todays) {
-      const targetIds: string[] = t.studentId ? [t.studentId] : []; // class-wide assignments are skipped here — they don't pin to one kid's bar
-      for (const sid of targetIds) {
-        const cur = out[sid] || { done: 0, total: 0, pct: 0 };
-        cur.total += 1;
-        if ((t.submissions || []).some((s) => s.studentId === sid)) cur.done += 1;
-        out[sid] = cur;
+
+    // Build name lookup for the board's roster.
+    const idByFirstName = new Map<string, string>();
+    const idByFullName  = new Map<string, string>();
+    for (const bs of boardStudents) {
+      const sid = String(bs.id);
+      const full = String(bs.name || "").trim();
+      if (full) idByFullName.set(full.toLowerCase(), sid);
+      const first = full.split(/\s+/)[0];
+      if (first) idByFirstName.set(first.toLowerCase(), sid);
+    }
+
+    const resolveBoardId = (t: { studentId?: string; studentName?: string }): string | null => {
+      if (t.studentId) {
+        // Tracker entry with explicit DB id matching a board student.
+        if (boardStudents.some((b) => String(b.id) === t.studentId)) return t.studentId;
       }
+      if (t.studentName) {
+        const tName = String(t.studentName).trim().toLowerCase();
+        const tFirst = tName.split(/\s+/)[0];
+        return idByFullName.get(tName) || idByFirstName.get(tFirst) || null;
+      }
+      return null;
+    };
+
+    for (const t of todays) {
+      const sid = resolveBoardId(t);
+      if (!sid) continue; // class-wide / unknown student — skip
+      const cur = out[sid] || { done: 0, total: 0, pct: 0 };
+      cur.total += 1;
+      // A submission counts as "done" for THIS student if any submission
+      // record matches their board id, their tracker.studentId, OR (for
+      // CSV-imported rows) the legacy "imported" sentinel where the
+      // tracker entry was already targeted at this student by name.
+      const isDone = (t.submissions || []).some((s) =>
+        s.studentId === sid ||
+        (t.studentId && s.studentId === t.studentId) ||
+        s.studentId === "imported"
+      );
+      if (isDone) cur.done += 1;
+      out[sid] = cur;
     }
     for (const sid in out) {
       const r = out[sid];
@@ -1208,7 +1245,7 @@ export default function ClassroomBoard() {
               const byName = firstName ? starByFirstName.get(firstName) : undefined;
               if (byName?.grade) starGradeById[sid] = byName.grade;
             }
-            const starProgressById = computeStarProgressByStudent();
+            const starProgressById = computeStarProgressByStudent(board.students);
             return (
           <div style={{
             flex: 1, minHeight: 0,
