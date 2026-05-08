@@ -99,7 +99,7 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     setScoreOverride(null); // re-enable auto-calc once user marks
   };
 
-  const save = () => {
+  const save = async () => {
     if (!entry || !tracker) return;
     if (!studentId) { errorBeep(); alert("Pick a student first."); return; }
     const s = students.find((x) => x.id === studentId);
@@ -135,17 +135,22 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     saveAll({ asnTracker: allTrack, bcDB });
     setTracker(trk);
 
-    // Award class-store points for a completed assignment. Only completed
-    // status counts; only when the student looks like a real DB id (a UUID
-    // — locally added STU-### students don't exist in the API). Failures
-    // are silent so a points API outage never blocks grading.
+    // Award class-store points for a completed assignment. We try the API
+    // call regardless of how the student id looks — if it's not a real DB
+    // user, the call fails and we surface that to the teacher so they
+    // know to fix the roster instead of silently dropping points.
     let pointsAwarded = 0;
+    let pointsError: string | null = null;
     if (status === "completed") {
       const ppc = StarStore.getPointsPerCompletion();
-      const looksLikeUuid = /^[0-9a-f-]{20,}$/i.test(s.id);
-      if (ppc > 0 && looksLikeUuid) {
-        pointsAwarded = ppc;
-        api.adjustStudentPoints(s.id, ppc, `STAR: ${entry.name} — ${letter}`).catch(() => {});
+      if (ppc > 0) {
+        try {
+          await api.adjustStudentPoints(s.id, ppc, `STAR: ${entry.name} — ${letter}`);
+          pointsAwarded = ppc;
+        } catch (e: any) {
+          pointsError = e?.message || String(e);
+          console.warn("[STAR] points award failed:", pointsError);
+        }
       }
     }
 
@@ -158,6 +163,11 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         detail: entry.name,
         pct, letter, pointsAwarded,
       });
+    }
+
+    if (pointsError) {
+      // Show but don't block the save flow — grade is still recorded.
+      window.alert(`Saved the grade, but couldn't award ${StarStore.getPointsPerCompletion()} points to ${s.firstName}: ${pointsError}\n\nTip: hit 🔄 Sync in /star to refresh the roster with real DB ids.`);
     }
 
     loggedBeep();
