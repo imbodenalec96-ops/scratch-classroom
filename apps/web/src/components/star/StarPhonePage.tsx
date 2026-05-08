@@ -13,8 +13,9 @@ import {
   type BcEntry, type StarStudent, type StarPhoto,
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, scanReceivedBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { syncFromClassroom } from "../../lib/star/sync.ts";
 
-type Step = "scan" | "pick-student" | "camera" | "saved";
+type Step = "scan" | "pick-student" | "camera" | "saved" | "unknown";
 
 export default function StarPhonePage() {
   const [code, setCode] = useState("");
@@ -24,10 +25,36 @@ export default function StarPhonePage() {
   const [note, setNote] = useState("");
   const [step, setStep] = useState<Step>("scan");
   const [savedPhoto, setSavedPhoto] = useState<StarPhoto | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string>("");
+  const [syncing, setSyncing] = useState(false);
+  const [bcdbSize, setBcdbSize] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => { rehydrateBcDB(); }, []);
+  const refreshCounts = () => setBcdbSize(Object.keys(StarStore.getBcDB()).length);
+
+  const runSync = async () => {
+    setSyncing(true);
+    try {
+      const r = await syncFromClassroom();
+      setSyncStatus(r.message);
+      refreshCounts();
+    } catch (e: any) {
+      setSyncStatus(`Sync failed: ${e?.message || e}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync on first mount so the phone's bcDB pulls fresh classroom
+  // assignments from the API (without this the phone's localStorage is
+  // empty and every scan returns "barcode not found").
+  useEffect(() => {
+    rehydrateBcDB();
+    refreshCounts();
+    runSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onScan = (rawCode: string) => {
     const v = rawCode.trim().toUpperCase();
@@ -36,12 +63,16 @@ export default function StarPhonePage() {
     const bc = StarStore.getBcDB()[v];
     if (!bc) {
       errorBeep();
-      alert(`Barcode ${v} isn't in the system. Sync the roster from /star first?`);
+      setEntry(null);
+      setCode(v);
+      setStep("unknown");
       return;
     }
     if (bc.type !== "assignment") {
       errorBeep();
-      alert(`${v} isn't an assignment barcode (it's a ${bc.type}). Pick a student-work barcode.`);
+      setEntry(null);
+      setCode(v);
+      setStep("unknown");
       return;
     }
     successBeep();
@@ -126,7 +157,7 @@ export default function StarPhonePage() {
       fontFamily: "'Inter', system-ui, sans-serif",
     }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <Header />
+        <Header bcdbSize={bcdbSize} syncing={syncing} onSync={runSync} syncStatus={syncStatus} />
 
         {/* Hidden file input — fires when openCamera() runs. capture="environment"
             tells iOS/Android to use the back camera. */}
@@ -141,6 +172,34 @@ export default function StarPhonePage() {
 
         {step === "scan" && (
           <ScanStep code={code} setCode={setCode} onScan={onScan} inputRef={inputRef} />
+        )}
+
+        {step === "unknown" && (
+          <div style={{
+            padding: 22, borderRadius: 18,
+            background: "rgba(239,68,68,0.10)",
+            border: "1px solid rgba(239,68,68,0.40)",
+            color: "#fca5a5",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
+              ⚠️ Barcode not found
+            </div>
+            <div style={{ fontFamily: "Menlo, monospace", fontSize: 18, fontWeight: 700, color: "#fde68a", marginBottom: 12 }}>
+              {code}
+            </div>
+            <div style={{ fontSize: 13, marginBottom: 16, color: "white", opacity: 0.85, lineHeight: 1.5 }}>
+              This phone has <b>{bcdbSize}</b> barcode{bcdbSize === 1 ? "" : "s"}.
+              If the barcode lives on your computer but isn't here, hit Sync to pull
+              the classroom roster + assignments. (STAR-locally-generated barcodes
+              don't sync — open them on the same device they were created on.)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={runSync} disabled={syncing} style={primary({ fullWidth: true, large: true })}>
+                {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
+              </button>
+              <button onClick={reset} style={ghost({ fullWidth: true })}>← Try another barcode</button>
+            </div>
+          </div>
         )}
 
         {step === "pick-student" && entry && entry.type === "assignment" && (
@@ -180,24 +239,46 @@ export default function StarPhonePage() {
 
 /* ── steps ──────────────────────────────────────────────────────── */
 
-function Header() {
+function Header({ bcdbSize, syncing, onSync, syncStatus }: {
+  bcdbSize: number; syncing: boolean; onSync: () => void; syncStatus: string;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-      <span style={{
-        width: 48, height: 48, borderRadius: 12,
-        background: "linear-gradient(135deg, #6366f1, #b23a48)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 24, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
-      }}>📷</span>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.6 }}>
-          STAR · Phone Capture
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <span style={{
+          width: 48, height: 48, borderRadius: 12,
+          background: "linear-gradient(135deg, #6366f1, #b23a48)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 24, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
+        }}>📷</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.6 }}>
+            STAR · Phone Capture
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>
+            Snap a worksheet
+          </h1>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>
-          Snap a worksheet
-        </h1>
+        <button onClick={onSync} disabled={syncing} style={{
+          padding: "8px 12px", borderRadius: 8,
+          background: "rgba(99,102,241,0.20)", color: "white",
+          border: "1px solid rgba(99,102,241,0.50)",
+          fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+        }}>{syncing ? "…" : "🔄 Sync"}</button>
       </div>
-    </div>
+      <div style={{
+        marginBottom: 16, padding: "8px 12px", borderRadius: 8,
+        background: bcdbSize === 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${bcdbSize === 0 ? "rgba(239,68,68,0.40)" : "rgba(255,255,255,0.08)"}`,
+        fontSize: 11, opacity: bcdbSize === 0 ? 1 : 0.7, color: bcdbSize === 0 ? "#fca5a5" : "white",
+        fontFamily: "Menlo, monospace",
+      }}>
+        {bcdbSize === 0
+          ? "⚠️ No barcodes on this phone yet — tap 🔄 Sync above to pull from the classroom."
+          : `${bcdbSize} barcodes loaded`}
+        {syncStatus && <div style={{ marginTop: 4 }}>{syncStatus}</div>}
+      </div>
+    </>
   );
 }
 
