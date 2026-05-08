@@ -56,7 +56,7 @@ export default function BoardStarPanel() {
                   ⭐ STAR · Class Live View
                 </div>
                 <h2 style={{ fontSize: 22, fontWeight: 900, margin: "4px 0 0" }}>
-                  {view === "completion" ? "Today's Completion" : "Student Grades"}
+                  {view === "completion" ? "Class Completion" : "Student Grades"}
                 </h2>
               </div>
               <button onClick={() => setOpen(false)} style={closeBtn()}>✕</button>
@@ -137,6 +137,20 @@ function CompletionView() {
     return (
       <div style={{ padding: 24, opacity: 0.6, textAlign: "center", fontSize: 14, borderRadius: 12, background: "rgba(255,255,255,0.04)" }}>
         No assignments yet — generate one in /star → Create.
+      </div>
+    );
+  }
+
+  const hasAnyMatched = data.rows.some((r) => r.total > 0);
+  if (!hasAnyMatched) {
+    return (
+      <div style={{ padding: 24, borderRadius: 12, background: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.40)", color: "#fde68a", fontSize: 13, lineHeight: 1.5 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>
+          {data.todays.length} assignment{data.todays.length === 1 ? "" : "s"} in the system, but none are tagged to a roster student.
+        </div>
+        <div style={{ opacity: 0.85 }}>
+          Most likely you imported the legacy CSV but haven't synced the classroom roster yet. Hit <b>🔄 Sync</b> in /star, or open Settings and check your students list.
+        </div>
       </div>
     );
   }
