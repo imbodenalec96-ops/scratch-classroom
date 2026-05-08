@@ -10,6 +10,7 @@ import {
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
 import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import CameraCapture from "./CameraCapture.tsx";
 
 interface Props {
   barcode: string;
@@ -243,8 +244,17 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         {/* Lesson — what the student was supposed to learn */}
         <LessonPanel lesson={entry.lesson} />
 
-        {/* Photos captured for this assignment via /star/phone */}
-        <PhotoStrip barcode={entry.id} />
+        {/* Live camera — opens automatically the moment a barcode is
+            scanned. Teacher can snap, retake, or just ignore it and
+            grade normally. Photos auto-save under this barcode. */}
+        <CameraCapture
+          barcode={entry.id}
+          studentId={studentId || entry.studentId}
+          studentName={(() => {
+            const s = students.find((x) => x.id === (studentId || entry.studentId));
+            return s ? `${s.firstName} ${s.lastName}`.trim() : entry.studentName;
+          })()}
+        />
 
         {/* Grade history */}
         <div style={{ marginBottom: 16 }}>
