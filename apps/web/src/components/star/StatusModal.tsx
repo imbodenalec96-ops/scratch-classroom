@@ -17,10 +17,10 @@ interface Props {
 }
 
 const STATUS_TO_SUB: Record<Props["statusKind"], StarSubmission["status"]> = {
-  Absent:  "missing",
-  Skipped: "missing",
+  Absent:  "absent",
+  Skipped: "skipped",
   Excused: "excused",
-  Makeup:  "in-progress",
+  Makeup:  "makeup",
 };
 
 const STATUS_ICON: Record<Props["statusKind"], string> = {

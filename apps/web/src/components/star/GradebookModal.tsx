@@ -25,7 +25,7 @@ export default function GradebookModal({ barcode, onClose }: Props) {
   const [studentId, setStudentId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("");
-  const [status, setStatus] = useState<"completed" | "in-progress" | "missing" | "excused">("completed");
+  const [status, setStatus] = useState<"completed" | "in-progress" | "absent" | "skipped" | "excused" | "makeup">("completed");
   const [feedback, setFeedback] = useState("");
   const [notes, setNotes] = useState("");
   const [qMarks, setQMarks] = useState<Record<number, "correct" | "wrong">>({});
@@ -341,12 +341,31 @@ export default function GradebookModal({ barcode, onClose }: Props) {
               </div>
 
               <Row label="Status">
-                <select value={status} onChange={(e) => setStatus(e.target.value as any)} style={selStyle()}>
-                  <option value="completed">Completed</option>
-                  <option value="in-progress">In progress</option>
-                  <option value="missing">Missing</option>
-                  <option value="excused">Excused</option>
-                </select>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 6 }}>
+                  {([
+                    { id: "completed",   label: "Completed",   icon: "✅", color: "#10b981" },
+                    { id: "absent",      label: "Absent",      icon: "🚫", color: "#ef4444" },
+                    { id: "skipped",     label: "Skipped",     icon: "⏭",  color: "#f59e0b" },
+                    { id: "excused",     label: "Excused",     icon: "🩹", color: "#3b82f6" },
+                    { id: "makeup",      label: "Makeup",      icon: "🔁", color: "#a855f7" },
+                    { id: "in-progress", label: "In progress", icon: "⏳", color: "#94a3b8" },
+                  ] as const).map((s) => {
+                    const active = status === s.id;
+                    return (
+                      <button key={s.id} onClick={() => setStatus(s.id as any)} style={{
+                        padding: "10px 8px", borderRadius: 8,
+                        background: active ? `linear-gradient(135deg, ${s.color}55, ${s.color}25)` : "rgba(255,255,255,0.04)",
+                        border: active ? `2px solid ${s.color}` : "1px solid rgba(255,255,255,0.10)",
+                        color: "white", cursor: "pointer",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                        fontSize: 12, fontWeight: active ? 800 : 600,
+                      }}>
+                        <span style={{ fontSize: 20 }}>{s.icon}</span>
+                        <span>{s.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </Row>
 
               <Row label="Feedback (visible to student)">

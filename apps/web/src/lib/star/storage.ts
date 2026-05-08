@@ -93,7 +93,10 @@ export interface StarSubmission {
   feedback?: string;
   timeSpent?: string;
   notes?: string;
-  status: "completed" | "in-progress" | "missing" | "excused";
+  // "absent" + "skipped" are kept as distinct values so reports can
+  // tell them apart; both count toward "not completed". Old data with
+  // status="missing" still parses fine — we just don't write that anymore.
+  status: "completed" | "in-progress" | "missing" | "absent" | "skipped" | "excused" | "makeup";
   qMarks?: Record<string, "correct" | "wrong">;
   loggedAt: string;
 }
@@ -111,7 +114,7 @@ export interface StarTrackerEntry {
   questions: StarQuestion[];
   lesson?: any;
   createdDate: string;
-  status: "assigned" | "completed" | "in-progress" | "missing" | "excused";
+  status: "assigned" | "completed" | "in-progress" | "missing" | "absent" | "skipped" | "excused" | "makeup";
   submissions: StarSubmission[];
 }
 
