@@ -474,12 +474,26 @@ function LessonPanel({ lesson }: { lesson: any }) {
             </div>
           )}
           {vocab.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {vocab.map((v, i) => (
-                <span key={i} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.25)" }}>
-                  <b>{v.term}:</b> {v.definition}
-                </span>
-              ))}
+            <div style={{
+              padding: 10, borderRadius: 8,
+              background: "rgba(16,185,129,0.10)",
+              border: "1px solid rgba(16,185,129,0.40)",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8, color: "#86efac" }}>
+                📖 Vocabulary — Words You Need to Know
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+                {vocab.map((v, i) => (
+                  <div key={i} style={{
+                    padding: "6px 8px", borderRadius: 5,
+                    background: "rgba(0,0,0,0.30)",
+                    border: "1px solid rgba(16,185,129,0.30)",
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: 12, color: "#fde68a" }}>{v.term}</div>
+                    <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 2 }}>{v.definition}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

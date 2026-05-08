@@ -75,13 +75,18 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
           const data = await res.json();
           const content = data?.choices?.[0]?.message?.content || "";
           const parsed = safeParseJSON(content);
-          if (parsed?.questions && Array.isArray(parsed.questions)) {
-            questions = parsed.questions.map((q: any, i: number) => ({
-              num: i + 1,
-              text: String(q.text || q.question || `Question ${i + 1}`),
-              answer: String(q.answer || ""),
-            }));
-            lesson = parsed.lesson || null;
+          // Some models return the full {lesson, questions} shape, others
+          // shortcut to a bare array of questions. Support both.
+          const qSource: any[] | null = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray(parsed?.questions) ? parsed.questions : null;
+          if (qSource) {
+            questions = qSource.map((q: any, i: number) => ({
+              num: Number(q?.num ?? q?.number ?? (i + 1)) || (i + 1),
+              text: String(q?.text || q?.question || q?.prompt || q?.q || `Question ${i + 1}`).trim(),
+              answer: String(q?.answer || q?.response || q?.a || q?.solution || "").trim(),
+            })).filter((q: StarQuestion) => q.text && q.text.length > 2);
+            lesson = parsed?.lesson || null;
           }
         } catch {
           // fall through to local
@@ -298,34 +303,52 @@ function gradeMathScope(grade: string): string {
   return "5th grade: all four operations with larger numbers, multi-digit multiplication, long division with whole-number quotients, fractions with same denominator.";
 }
 
-function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string }) {
-  const subjectGuidance: Record<string, string> = {
-    "Social Studies":
-      "Write the lesson as a SHORT NARRATIVE STORY (5–9 kid-friendly sentences) that names every fact a student needs. Example: \"Long ago, the United States needed a way to vote on big choices. The men who wrote the Constitution met in Philadelphia in 1787. They decided every state would send people called representatives to Washington, D.C. The President leads the country. Today the President lives in the White House…\" Then every question should be answered by a sentence in the story.",
-    "Science":
-      "Write the lesson as a SHORT EXPLANATION + EXAMPLE (5–9 sentences) that names every fact. Example: \"Plants are living things that make their own food. They use three things: sunlight, water, and soil. The leaves take in sunlight. The roots take in water. This whole process is called photosynthesis.\" Every question must be answerable from the explanation.",
-    "Reading":
-      "Write the lesson as a SHORT STORY OR PASSAGE (5–9 sentences) at the student's grade level. Then every comprehension question is answered by a sentence in the passage.",
-    "Writing":
-      "Write the lesson as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences). Each question gives a prompt and the answer field shows a model sentence/short response.",
-    "Math":
-      `Write the lesson as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: "To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5." Every question is a problem that uses the same rule; answers must be exact. STRICT GRADE SCOPE: ${gradeMathScope(opts.grade)} Do NOT introduce operations above the listed grade. A 2nd grader does NOT do multiplication.`,
-    "PE": "Write the lesson as a short story about exercise/teamwork (4–6 sentences) with clear facts. Questions test recall.",
-    "Art": "Write the lesson as a short story about an art technique or famous artist (4–6 sentences). Questions test recall.",
-    "Music": "Write the lesson as a short story about music basics (4–6 sentences). Questions test recall.",
-    "Library": "Write the lesson as a short story about a book topic (4–6 sentences). Questions test recall.",
-  };
-  const guidance = subjectGuidance[opts.subject] || subjectGuidance["Reading"];
+// Hard subject lock — keeps the AI from drifting into the wrong subject.
+// (e.g. "Math" assignments coming back as fact recall about presidents.)
+const SUBJECT_RULES: Record<string, string> = {
+  Math:             "ONLY math questions using numbers, arithmetic, or word problems. Every question must contain numbers and have a numeric answer.",
+  Reading:          "ONLY reading comprehension, vocabulary, or phonics questions whose answers come from the lesson body.",
+  Writing:          "ONLY grammar, spelling, punctuation, sentence-correction, or capitalization questions.",
+  Science:          "ONLY science questions about plants, animals, weather, earth, the human body, matter, or the water cycle. No history or math.",
+  "Social Studies": "ONLY social studies questions about community, citizenship, maps, geography, or U.S. history. No math or science.",
+  PE:               "ONLY questions about physical activity, sportsmanship, body movement, or healthy habits.",
+  Art:              "ONLY questions about colors, shapes, art techniques, or famous artists.",
+  Music:            "ONLY questions about rhythm, instruments, notes, or music basics.",
+  Library:          "ONLY questions about books, authors, library organization, or reading habits.",
+};
 
-  return `You are a special-education teacher building a SELF-CONTAINED ${opts.subject} worksheet for a ${opts.grade}-grade student${opts.studentName ? ` named ${opts.studentName}` : ""}.
+function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string }) {
+  const subjectBodyGuidance: Record<string, string> = {
+    "Social Studies":
+      "Write the lesson body as a SHORT NARRATIVE STORY (5–9 kid-friendly sentences) that names every fact a student needs.",
+    "Science":
+      "Write the lesson body as a SHORT EXPLANATION + EXAMPLE (5–9 sentences) that names every fact.",
+    "Reading":
+      "Write the lesson body as a SHORT STORY OR PASSAGE (5–9 sentences) at the student's grade level.",
+    "Writing":
+      "Write the lesson body as a CLEAR RULE + 1 WORKED EXAMPLE (3–6 sentences).",
+    "Math":
+      `Write the lesson body as the RULE STATED PLAINLY + 1 WORKED EXAMPLE end-to-end. Example: "To add fractions with the same denominator, just add the top numbers. The bottom number stays the same. Example: 2/5 + 1/5 = 3/5." STRICT GRADE SCOPE: ${gradeMathScope(opts.grade)} Do NOT introduce operations above the listed grade. A 2nd grader does NOT do multiplication.`,
+    "PE":      "Write the lesson body as a short paragraph about exercise/teamwork (4–6 sentences) with clear facts.",
+    "Art":     "Write the lesson body as a short paragraph about an art technique or famous artist (4–6 sentences).",
+    "Music":   "Write the lesson body as a short paragraph about music basics (4–6 sentences).",
+    "Library": "Write the lesson body as a short paragraph about a book topic (4–6 sentences).",
+  };
+  const bodyGuidance = subjectBodyGuidance[opts.subject] || subjectBodyGuidance["Reading"];
+  const subjectRule = SUBJECT_RULES[opts.subject] || "Stay strictly on the requested subject.";
+  const diffTxt = opts.difficulty === "Easy" ? "very simple" : opts.difficulty === "Hard" ? "challenging" : "grade-appropriate";
+
+  return `You are a special-education teacher building a SELF-CONTAINED ${opts.subject} worksheet for a ${opts.grade}-grade student${opts.studentName ? ` named ${opts.studentName}` : ""}. Difficulty: ${diffTxt}.
 ${opts.goal ? `IEP / topic focus: ${opts.goal}\n` : ""}
+
+SUBJECT LOCK — ${subjectRule}
 
 CRITICAL RULES:
 1. The "lesson" must teach EVERYTHING the student needs to answer every question — no outside knowledge.
-2. ${guidance}
-3. Use kid-friendly vocabulary appropriate for ${opts.grade} grade. Difficulty: ${opts.difficulty}.
+2. ${bodyGuidance}
+3. Use kid-friendly vocabulary appropriate for ${opts.grade} grade.
 4. Aim for the EASIER end of grade level — confidence-building, not challenging.
-5. Every "answer" field must be the exact correct answer that can be found in the lesson.body.
+5. Every "answer" field must be the exact correct answer findable in the lesson body.
 6. Generate exactly ${opts.count} questions.
 
 Return ONLY raw JSON in this exact shape (no markdown, no fences):
@@ -333,7 +356,7 @@ Return ONLY raw JSON in this exact shape (no markdown, no fences):
   "lesson": {
     "title": "Catchy student-friendly title",
     "intro": "1-sentence what we're learning today",
-    "body": "5-9 sentence STORY/PASSAGE that contains every answer (this is the most important field)",
+    "body": "5-9 sentence story/passage/explanation that contains every answer (most important field)",
     "keyPoints": ["3-5 short bullet recap points pulled from the body"],
     "workedExample": { "problem": "(optional) one example problem", "solution": "the answer" },
     "vocab": [{ "term": "key word", "definition": "kid-friendly meaning" }]
@@ -345,11 +368,19 @@ Return ONLY raw JSON in this exact shape (no markdown, no fences):
 }
 
 function safeParseJSON(s: string): any | null {
-  try { return JSON.parse(s); } catch {}
-  // strip code fences
-  const m = s.match(/\{[\s\S]*\}/);
-  if (m) {
-    try { return JSON.parse(m[0]); } catch {}
+  // Strip code fences first — some models wrap the JSON in ```json ... ```
+  const cleaned = s.replace(/```json|```/g, "").trim();
+  try { return JSON.parse(cleaned); } catch {}
+  // Try to slice out the largest JSON object …
+  const obj = cleaned.match(/\{[\s\S]*\}/);
+  if (obj) {
+    try { return JSON.parse(obj[0]); } catch {}
+  }
+  // … or a bare array (some models reply with just questions[]).
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch {}
   }
   return null;
 }
@@ -807,9 +838,18 @@ function buildMathLesson(opts: { subject: Subject; grade: string; count: number;
       body: cfg.body,
       keyPoints: cfg.keyPoints,
       workedExample: cfg.workedExample,
+      vocab: MATH_VOCAB,
     },
   };
 }
+
+const MATH_VOCAB = [
+  { term: "sum",        definition: "the answer when you add numbers together" },
+  { term: "difference", definition: "the answer when you subtract one number from another" },
+  { term: "product",    definition: "the answer when you multiply two numbers" },
+  { term: "quotient",   definition: "the answer when you divide one number by another" },
+  { term: "equation",   definition: "a math sentence with an equals sign, like 2 + 3 = 5" },
+];
 
 function pickTopic(bank: LocalTopic[], goal: string): LocalTopic {
   if (goal) {
@@ -880,14 +920,47 @@ function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQu
   `;
 
   const lessonAny: any = lesson;
+  const vocabCards = lesson?.vocab?.length ? `
+    <div style="margin-top:12px;padding:10px 12px;background:#F0FFF4;border:1px solid #16A34A;border-radius:6px">
+      <div style="font-size:10px;font-weight:800;color:#16A34A;text-transform:uppercase;margin-bottom:8px;letter-spacing:.08em">📖 Vocabulary — Words You Need to Know</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">
+        ${lesson.vocab.map((v) => `
+          <div style="background:white;border-radius:5px;padding:6px 8px;border:1px solid #BBF7D0">
+            <div style="font-weight:800;font-size:12px;color:#002855">${escapeHtml(v.term)}</div>
+            <div style="font-size:11.5px;color:#374151;margin-top:2px">${escapeHtml(v.definition)}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const keyPointsBox = lesson?.keyPoints?.length ? `
+    <div style="margin-bottom:10px;background:white;border-radius:6px;padding:8px 12px;border:1px solid #BFDBFE">
+      <div style="font-size:10px;font-weight:800;color:#002855;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">⭐ Key Points</div>
+      ${lesson.keyPoints.map((p) => `
+        <div style="display:flex;gap:6px;margin-bottom:4px;font-size:12.5px;color:#374151">
+          <span style="color:#1B5EA8;font-weight:700">•</span>${escapeHtml(p)}
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+  const exampleBox = lesson?.workedExample ? `
+    <div style="background:#FFFBEE;border:1.5px solid #F0A500;border-radius:6px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:800;color:#D97706;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">✏️ Worked Example</div>
+      <div style="font-size:13px;color:#374151;font-weight:500">${escapeHtml(lesson.workedExample.problem)} → <span style="color:#16a34a;font-weight:800">${escapeHtml(lesson.workedExample.solution)}</span></div>
+    </div>
+  ` : "";
+
   const lessonHtml = lesson ? `
-    <div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">📖 ${escapeHtml(lesson.title)}</div>
-      ${lesson.intro ? `<div style="font-size:13px;margin-bottom:8px">${escapeHtml(lesson.intro)}</div>` : ""}
-      ${lessonAny.body ? `<div style="font-size:13px;margin-bottom:8px;line-height:1.55;white-space:pre-wrap">${escapeHtml(String(lessonAny.body))}</div>` : ""}
-      ${lesson.keyPoints?.length ? `<ul style="margin:0 0 8px 18px;padding:0;font-size:13px">${lesson.keyPoints.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
-      ${lesson.workedExample ? `<div style="font-size:13px;margin-top:6px"><b>Example:</b> ${escapeHtml(lesson.workedExample.problem)} → <span style="color:#16a34a;font-weight:700">${escapeHtml(lesson.workedExample.solution)}</span></div>` : ""}
-      ${lesson.vocab?.length ? `<div style="font-size:13px;margin-top:6px"><b>Vocab:</b> ${lesson.vocab.map((v) => `<span style="margin-right:10px"><b>${escapeHtml(v.term)}</b>: ${escapeHtml(v.definition)}</span>`).join("")}</div>` : ""}
+    <div style="background:#F0F6FF;border:2px solid #1B5EA8;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+      <div style="background:#002855;color:#F0A500;font-size:11px;font-weight:800;padding:5px 10px;border-radius:4px;margin-bottom:10px;display:inline-block;letter-spacing:.08em">📚 LESSON — READ THIS FIRST</div>
+      <div style="font-size:15px;font-weight:800;color:#002855;margin-bottom:8px">${escapeHtml(lesson.title)}</div>
+      ${lesson.intro ? `<div style="font-size:13px;color:#374151;line-height:1.7;margin-bottom:10px">${escapeHtml(lesson.intro)}</div>` : ""}
+      ${lessonAny.body ? `<div style="font-size:13px;color:#374151;line-height:1.7;margin-bottom:10px;white-space:pre-wrap">${escapeHtml(String(lessonAny.body))}</div>` : ""}
+      ${keyPointsBox}
+      ${exampleBox}
+      ${vocabCards}
     </div>
   ` : "";
 
