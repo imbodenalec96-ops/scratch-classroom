@@ -1258,6 +1258,51 @@ export default function ClassroomBoard() {
               if (byName?.grade) starGradeById[sid] = byName.grade;
             }
             const starProgressById = computeStarProgressByStudent(board.students);
+            // Per-student overall letter grade — average percentage across
+            // every STAR submission credited to this kid. Same name+id
+            // matching pattern as the progress bar so CSV imports + new
+            // entries both contribute. Hidden when no submissions exist.
+            const starLetterById: Record<string, { letter: string; pct: number }> = {};
+            (() => {
+              const tracker = StarStore.getAsnTrack();
+              const idByFirstName = new Map<string, string>();
+              const idByFullName  = new Map<string, string>();
+              for (const bs of board.students) {
+                const sid = String(bs.id);
+                const full = String(bs.name || "").trim().toLowerCase();
+                if (full) idByFullName.set(full, sid);
+                const first = full.split(/\s+/)[0];
+                if (first) idByFirstName.set(first, sid);
+              }
+              const totalsBySid: Record<string, { sum: number; n: number }> = {};
+              for (const t of Object.values(tracker)) {
+                const subs = t.submissions || [];
+                if (subs.length === 0) continue;
+                for (const sub of subs) {
+                  // Resolve which board student this submission is for.
+                  let sid: string | null = null;
+                  if (board.students.some((b) => String(b.id) === sub.studentId)) sid = sub.studentId;
+                  else if (sub.studentName) {
+                    const sn = String(sub.studentName).trim().toLowerCase();
+                    sid = idByFullName.get(sn) || idByFirstName.get(sn.split(/\s+/)[0]) || null;
+                  } else if (t.studentName) {
+                    const tn = String(t.studentName).trim().toLowerCase();
+                    sid = idByFullName.get(tn) || idByFirstName.get(tn.split(/\s+/)[0]) || null;
+                  }
+                  if (!sid) continue;
+                  const cur = totalsBySid[sid] || { sum: 0, n: 0 };
+                  cur.sum += sub.pct || 0;
+                  cur.n += 1;
+                  totalsBySid[sid] = cur;
+                }
+              }
+              for (const sid in totalsBySid) {
+                const { sum, n } = totalsBySid[sid];
+                const pct = Math.round(sum / n);
+                const letter = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
+                starLetterById[sid] = { letter, pct };
+              }
+            })();
             return (
           <div style={{
             flex: 1, minHeight: 0,
@@ -1415,17 +1460,43 @@ export default function ClassroomBoard() {
                       {firstName}
                     </div>
 
-                    {/* Grade level — small pill below the name. Pulled from
-                        the STAR roster after sync (real DB id). Hidden if unknown. */}
-                    {starGradeById[String(s.id)] && (
+                    {/* Grade level + letter grade — small pills below the name.
+                        Grade level (e.g. "3rd") is set in /star → Settings.
+                        Letter grade (A/B/C/D/F) is the average across the
+                        kid's STAR submissions. Both hidden when unset. */}
+                    {(starGradeById[String(s.id)] || starLetterById[String(s.id)]) && (
                       <div style={{
-                        fontFamily: serif, fontStyle: "italic",
-                        fontSize: 11, lineHeight: 1,
-                        color: "rgba(245,241,232,0.55)",
-                        letterSpacing: "0.06em",
-                        textAlign: "center",
+                        display: "flex", justifyContent: "center", alignItems: "baseline", gap: 8,
+                        lineHeight: 1,
                       }}>
-                        {starGradeById[String(s.id)]}
+                        {starGradeById[String(s.id)] && (
+                          <span style={{
+                            fontFamily: serif, fontStyle: "italic",
+                            fontSize: 11,
+                            color: "rgba(245,241,232,0.55)",
+                            letterSpacing: "0.06em",
+                          }}>{starGradeById[String(s.id)]}</span>
+                        )}
+                        {starLetterById[String(s.id)] && (() => {
+                          const lg = starLetterById[String(s.id)];
+                          const color = lg.letter === "A" ? "#10b981"
+                            : lg.letter === "B" ? "#3b82f6"
+                            : lg.letter === "C" ? "#f59e0b"
+                            : lg.letter === "D" ? "#f97316"
+                            : "#ef4444";
+                          return (
+                            <span style={{
+                              display: "inline-flex", alignItems: "baseline", gap: 4,
+                              padding: "2px 8px", borderRadius: 999,
+                              background: `${color}1f`,
+                              border: `1px solid ${color}55`,
+                              fontFamily: serif,
+                            }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color, letterSpacing: "0.02em" }}>{lg.letter}</span>
+                              <span style={{ fontSize: 10, fontStyle: "italic", color: "rgba(245,241,232,0.55)" }}>{lg.pct}%</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -1489,21 +1560,13 @@ export default function ClassroomBoard() {
                       );
                     })()}
 
-                    {/* Per-student daily progress — `done` of `total`
-                        assignments visible to this kid today, including
-                        BOTH classroom assignments AND STAR barcoded ones
-                        graded today. The bar only appears if the student
-                        has work assigned somewhere. */}
+                    {/* Per-student STAR progress — barcoded assignments
+                        only, no classroom assignments folded in. The bar
+                        only appears if the student has STAR work today. */}
                     {(() => {
-                      const cp = classProgress?.byStudent?.[String(s.id)];
                       const sp = starProgressById[String(s.id)];
-                      const done = (cp?.done || 0) + (sp?.done || 0);
-                      const total = (cp?.total || 0) + (sp?.total || 0);
-                      if (total <= 0) return null;
-                      const pct = Math.round((done / total) * 100);
-                      const fillsClass = pct >= 100;
-                      const merged = { done, total, pct };
-                      const sp_ = merged;
+                      if (!sp || sp.total <= 0) return null;
+                      const fillsStar = sp.pct >= 100;
                       return (
                         <div style={{
                           width: "82%",
@@ -1519,13 +1582,13 @@ export default function ClassroomBoard() {
                           }}>
                             <div style={{
                               height: "100%",
-                              width: `${sp_.pct}%`,
-                              background: fillsClass
+                              width: `${sp.pct}%`,
+                              background: fillsStar
                                 ? "linear-gradient(90deg, #5b8a6e 0%, #7dd3c5 100%)"
                                 : "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
                               borderRadius: 2,
                               transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
-                              boxShadow: fillsClass
+                              boxShadow: fillsStar
                                 ? "0 0 6px rgba(125,211,197,0.55)"
                                 : "0 0 5px rgba(251,191,36,0.45)",
                             }} />
@@ -1533,59 +1596,11 @@ export default function ClassroomBoard() {
                           <div style={{
                             fontFamily: serif, fontStyle: "italic",
                             fontSize: 10, lineHeight: 1,
-                            color: fillsClass ? "#7dd3c5" : "rgba(253,230,138,0.85)",
+                            color: fillsStar ? "#7dd3c5" : "rgba(253,230,138,0.85)",
                             fontVariantNumeric: "tabular-nums",
                             textAlign: "center",
                           }}>
-                            {sp_.done}/{sp_.total}{fillsClass ? " ✓" : ""}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* STAR-only sub-bar — shows progress on barcoded
-                        STAR assignments specifically, separate from the
-                        combined classroom+STAR bar above. Hidden when
-                        the kid has zero STAR work today. */}
-                    {(() => {
-                      const sp = starProgressById[String(s.id)];
-                      if (!sp || sp.total <= 0) return null;
-                      const fillsStar = sp.pct >= 100;
-                      return (
-                        <div style={{
-                          width: "82%",
-                          display: "flex", flexDirection: "column", alignItems: "stretch", gap: 2,
-                          padding: "1px 0 0",
-                        }}>
-                          <div style={{
-                            height: 3,
-                            background: "rgba(245,241,232,0.08)",
-                            borderRadius: 2,
-                            overflow: "hidden",
-                            position: "relative",
-                          }}>
-                            <div style={{
-                              height: "100%",
-                              width: `${sp.pct}%`,
-                              background: fillsStar
-                                ? "linear-gradient(90deg, #c4b5fd 0%, #fbbf24 100%)"
-                                : "linear-gradient(90deg, #6366f1 0%, #b23a48 100%)",
-                              borderRadius: 2,
-                              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
-                              boxShadow: fillsStar
-                                ? "0 0 6px rgba(251,191,36,0.55)"
-                                : "0 0 4px rgba(99,102,241,0.45)",
-                            }} />
-                          </div>
-                          <div style={{
-                            fontFamily: serif, fontStyle: "italic",
-                            fontSize: 9, lineHeight: 1,
-                            color: fillsStar ? "#fbbf24" : "rgba(196,181,253,0.85)",
-                            fontVariantNumeric: "tabular-nums",
-                            textAlign: "center",
-                            letterSpacing: "0.04em",
-                          }}>
-                            ★ {sp.done}/{sp.total}
+                            ★ {sp.done}/{sp.total}{fillsStar ? " ✓" : ""}
                           </div>
                         </div>
                       );
