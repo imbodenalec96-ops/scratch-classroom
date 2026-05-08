@@ -1187,48 +1187,26 @@ export default function ClassroomBoard() {
             const n = board.students.length || 1;
             const cols = n <= 4 ? 2 : n <= 8 ? 4 : n <= 12 ? 4 : n <= 16 ? 4 : 5;
             const rows = Math.ceil(n / cols);
-            // Per-board-student grade lookup. Derives from BOTH the STAR
-            // roster (for manual overrides) and the assignment tracker (mode
-            // count of grade levels appearing on that kid's work). Iterating
-            // board.students directly rather than StarStore students means a
-            // student missing from the STAR roster still gets a grade if
-            // their name appears in any tracker entry.
-            const starStudentById = new Map(StarStore.getStudents().map((s) => [s.id, s]));
-            const starStudentByFirstName = new Map<string, ReturnType<typeof StarStore.getStudents>[number]>();
-            for (const ss of StarStore.getStudents()) {
-              const fn = (ss.firstName || "").trim().toLowerCase();
-              if (fn) starStudentByFirstName.set(fn, ss);
-            }
-            const tracker = StarStore.getAsnTrack();
-            const trackerVals = Object.values(tracker);
-
+            // Per-board-student grade lookup. PURELY from /star → Settings →
+            // Students.grade — no auto-derive guesses (those were unreliable
+            // because the same kid often has tracker entries at multiple
+            // grade levels). To set a kid's grade: open /star, hit Settings,
+            // type the grade level (e.g. "2nd") and Save.
             const starGradeById: Record<string, string> = {};
+            const starStudents = StarStore.getStudents();
+            const starById = new Map(starStudents.map((s) => [s.id, s]));
+            const starByFirstName = new Map<string, typeof starStudents[number]>();
+            for (const ss of starStudents) {
+              const fn = (ss.firstName || "").trim().toLowerCase();
+              if (fn && ss.grade) starByFirstName.set(fn, ss);
+            }
             for (const bs of board.students) {
               const sid = String(bs.id);
-              const fullBoardName = String(bs.name || "").trim();
-              const firstName = fullBoardName.split(/\s+/)[0] || "";
-              const firstNameLower = firstName.toLowerCase();
-
-              // 1. Manual override on the STAR student record (matched by id
-              //    OR first name).
-              const starStu = starStudentById.get(sid) || starStudentByFirstName.get(firstNameLower);
-              if (starStu?.grade) { starGradeById[sid] = starStu.grade; continue; }
-
-              // 2. Mode of grade levels across this kid's assignments.
-              const votes: Record<string, number> = {};
-              for (const t of trackerVals) {
-                if (!t.gradeLevel || t.gradeLevel === "All") continue;
-                let match = false;
-                if (t.studentId && (t.studentId === sid || (starStu && t.studentId === starStu.id))) match = true;
-                else if (t.studentName) {
-                  const tName = String(t.studentName).trim();
-                  const tFirst = tName.split(/\s+/)[0] || "";
-                  if (tName.toLowerCase() === fullBoardName.toLowerCase() || tFirst.toLowerCase() === firstNameLower) match = true;
-                }
-                if (match) votes[t.gradeLevel] = (votes[t.gradeLevel] || 0) + 1;
-              }
-              const winner = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0];
-              if (winner) starGradeById[sid] = winner;
+              const direct = starById.get(sid);
+              if (direct?.grade) { starGradeById[sid] = direct.grade; continue; }
+              const firstName = String(bs.name || "").trim().split(/\s+/)[0]?.toLowerCase();
+              const byName = firstName ? starByFirstName.get(firstName) : undefined;
+              if (byName?.grade) starGradeById[sid] = byName.grade;
             }
             const starProgressById = computeStarProgressByStudent();
             return (
