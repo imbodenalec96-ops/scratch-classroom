@@ -11,7 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
-import { StarStore, countsTowardGrade } from "../lib/star/storage.ts";
+import { StarStore, countsTowardGrade, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
@@ -1252,6 +1252,31 @@ export default function ClassroomBoard() {
               if (byName?.grade) starGradeById[sid] = byName.grade;
             }
             const starProgressById = computeStarProgressByStudent(board.students);
+            // Active passes — map each board student id to their current
+            // pass (if any) so the roster card can render a live timer
+            // ribbon and pulse red after 5 minutes.
+            const passByStudentId: Record<string, ActivePass> = {};
+            (() => {
+              const passes = StarStore.getActivePasses();
+              const idByFirstName = new Map<string, string>();
+              const idByFullName  = new Map<string, string>();
+              for (const bs of board.students) {
+                const sid = String(bs.id);
+                const full = String(bs.name || "").trim().toLowerCase();
+                if (full) idByFullName.set(full, sid);
+                const first = full.split(/\s+/)[0];
+                if (first) idByFirstName.set(first, sid);
+              }
+              for (const p of passes) {
+                let sid: string | null = null;
+                if (board.students.some((b) => String(b.id) === p.studentId)) sid = p.studentId;
+                else if (p.studentName) {
+                  const lower = String(p.studentName).trim().toLowerCase();
+                  sid = idByFullName.get(lower) || idByFirstName.get(lower.split(/\s+/)[0]) || null;
+                }
+                if (sid) passByStudentId[sid] = p;
+              }
+            })();
             // Per-student overall letter grade — average percentage across
             // every STAR submission credited to this kid. Same name+id
             // matching pattern as the progress bar so CSV imports + new
@@ -1401,6 +1426,50 @@ export default function ClassroomBoard() {
                       </div>
                     </div>
                   )}
+
+                  {/* Active pass — full-card overlay when this student is
+                      currently out on a bathroom / water / sensory break.
+                      Shows the live elapsed time and pulses red after 5
+                      minutes so the room sees who's been gone too long. */}
+                  {passByStudentId[String(s.id)] && (() => {
+                    const p = passByStudentId[String(s.id)];
+                    const startedMs = new Date(p.startedAt).getTime();
+                    const elapsedSec = Math.max(0, Math.round((timerNow - startedMs) / 1000));
+                    const over = elapsedSec > 5 * 60;
+                    const icon = p.passKind === "Bathroom" ? "🚻" : p.passKind === "Water" ? "💧" : "🛋";
+                    const fmt = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, "0")}`;
+                    return (
+                      <div style={{
+                        position: "absolute", inset: 0, zIndex: 4,
+                        pointerEvents: "none",
+                        background: over
+                          ? "linear-gradient(135deg, rgba(239,68,68,0.78), rgba(178,58,72,0.45))"
+                          : "linear-gradient(135deg, rgba(217,119,6,0.55), rgba(251,191,36,0.20))",
+                        border: over ? "3px solid #fca5a5" : "2px solid rgba(251,191,36,0.65)",
+                        borderRadius: 4,
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                        color: "white",
+                        animation: over ? "helpPulse 1s ease-in-out infinite" : undefined,
+                      }}>
+                        <div style={{ fontSize: 42, lineHeight: 1 }}>{icon}</div>
+                        <div style={{
+                          fontSize: 13, fontWeight: 900, marginTop: 4, letterSpacing: "0.18em",
+                          textTransform: "uppercase", textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                        }}>
+                          {p.passKind}{over ? " — too long" : ""}
+                        </div>
+                        <div style={{
+                          fontFamily: "Menlo, monospace", fontSize: 26, fontWeight: 800,
+                          marginTop: 4, color: over ? "#fecaca" : "#fde68a",
+                          textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                        }}>{fmt}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
+                          {firstName}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Birthday ribbon — diagonal corner banner across the
                       top-right of the card on the kid's birthday. Stays

@@ -81,11 +81,18 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
             ? parsed
             : Array.isArray(parsed?.questions) ? parsed.questions : null;
           if (qSource) {
+            const seen = new Set<string>();
             questions = qSource.map((q: any, i: number) => ({
               num: Number(q?.num ?? q?.number ?? (i + 1)) || (i + 1),
               text: String(q?.text || q?.question || q?.prompt || q?.q || `Question ${i + 1}`).trim(),
               answer: String(q?.answer || q?.response || q?.a || q?.solution || "").trim(),
-            })).filter((q: StarQuestion) => q.text && q.text.length > 2);
+            })).filter((q: StarQuestion) => {
+              if (!q.text || q.text.length <= 2) return false;
+              const key = q.text.toLowerCase();
+              if (seen.has(key)) return false; // drop duplicates the model emitted
+              seen.add(key);
+              return true;
+            }).map((q: StarQuestion, i: number) => ({ ...q, num: i + 1 }));
             lesson = parsed?.lesson || null;
           }
         } catch {
@@ -148,18 +155,11 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
     }
   };
 
-  const printAssignment = () => {
+  const printIn = (mode: PrintMode) => {
     if (!created) return;
     const bc = StarStore.getBcDB()[created.id];
     if (!bc || bc.type !== "assignment") return;
-    openPrintWindow(bc, created.questions, created.lesson, false);
-    loggedBeep();
-  };
-  const printAnswerKey = () => {
-    if (!created) return;
-    const bc = StarStore.getBcDB()[created.id];
-    if (!bc || bc.type !== "assignment") return;
-    openPrintWindow(bc, created.questions, created.lesson, true);
+    openPrintWindow(bc, created.questions, created.lesson, mode);
     loggedBeep();
   };
 
@@ -246,8 +246,12 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={printAssignment} style={ghostBtn()}>🖨 Student Copy</button>
-              <button onClick={printAnswerKey} style={ghostBtn()}>🔑 Answer Key</button>
+              <button onClick={() => printIn("student")}    style={ghostBtn()} title="Standard student worksheet">🖨 Student</button>
+              <button onClick={() => printIn("key")}        style={ghostBtn()} title="Teacher answer key with green answers">🔑 Answer Key</button>
+              <button onClick={() => printIn("large")}      style={ghostBtn()} title="Large-print version — bigger fonts + spacing">🔍 Large Print</button>
+              <button onClick={() => printIn("quiz")}       style={ghostBtn()} title="Compact quiz format with multiple-choice slots">📋 Quick Quiz</button>
+              <button onClick={() => printIn("notebook")}   style={ghostBtn()} title="Notebook format with extra-wide writing lines">📔 Notebook</button>
+              <button onClick={() => printIn("flashcards")} style={ghostBtn()} title="Cut-out flashcards (question front, answer back)">🃏 Flashcards</button>
             </div>
           </div>
           <div style={{ marginTop: 12 }}
@@ -1209,14 +1213,16 @@ function buildMathLesson(opts: { subject: Subject; grade: string; count: number;
   const scale = opts.difficulty === "Easy" ? 0.5 : opts.difficulty === "Hard" ? 1.0 : 0.75;
 
   const questions: StarQuestion[] = [];
-  for (let i = 0; i < opts.count; i++) {
-    const op = cfg.ops[i % cfg.ops.length];
+  const seen = new Set<string>(); // dedupe by exact question text
+  let attempts = 0;
+  const maxAttempts = opts.count * 30; // give it 30x slack to find unique problems
+  while (questions.length < opts.count && attempts < maxAttempts) {
+    attempts += 1;
+    const op = cfg.ops[questions.length % cfg.ops.length];
     const [maxA, maxB] = cfg.range[op]!;
     let a = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA * scale)) + 1);
     let b = Math.max(1, Math.floor(Math.random() * Math.ceil(maxB * scale)) + 1);
 
-    // Roughly half computation, half word problems — but K and 1st lean
-    // word-problem since concrete contexts help young learners.
     const wordChance = g === "K" || g === "1" ? 0.7 : 0.5;
     const isWord = Math.random() < wordChance;
 
@@ -1225,21 +1231,23 @@ function buildMathLesson(opts: { subject: Subject; grade: string; count: number;
       if (isWord) ({ text, answer } = pick(WORD_ADD)(a, b));
       else { answer = String(a + b); text = `${a} + ${b} = ?`; }
     } else if (op === "-") {
-      if (b > a) [a, b] = [b, a]; // keep positive
+      if (b > a) [a, b] = [b, a];
       if (isWord) ({ text, answer } = pick(WORD_SUB)(a, b));
       else { answer = String(a - b); text = `${a} − ${b} = ?`; }
     } else if (op === "×") {
       if (isWord) ({ text, answer } = pick(WORD_MUL)(a, b));
       else { answer = String(a * b); text = `${a} × ${b} = ?`; }
     } else {
-      // Division: build a clean problem so the answer is a whole number.
       const divisor = Math.max(2, b);
       const quotient = Math.max(1, Math.floor(Math.random() * Math.ceil(maxA / divisor)) + 1);
       const dividend = divisor * quotient;
       if (isWord) ({ text, answer } = pick(WORD_DIV)(dividend, divisor));
       else { answer = String(quotient); text = `${dividend} ÷ ${divisor} = ?`; }
     }
-    questions.push({ num: i + 1, text, answer });
+    const key = text.trim().toLowerCase();
+    if (seen.has(key)) continue; // skip duplicate problem
+    seen.add(key);
+    questions.push({ num: questions.length + 1, text, answer });
   }
 
   return {
@@ -1309,12 +1317,39 @@ function buildLocalLesson(opts: { subject: Subject; grade: string; count: number
 
   const topic = pickTopic(bank, goal, opts.grade);
 
-  // Shuffle a copy of the q/a pairs so retakes feel different, then take `count`.
-  const pool = [...topic.qa].sort(() => Math.random() - 0.5);
-  const questions: StarQuestion[] = Array.from({ length: count }, (_, i) => {
-    const q = pool[i % pool.length];
-    return { num: i + 1, text: q.text, answer: q.answer };
-  });
+  // Build a unique question pool. Start with this topic's qa, then borrow
+  // from sibling in-grade topics if we need more — never repeat a question
+  // text within a single worksheet.
+  const seen = new Set<string>();
+  const collectFrom = (t: LocalTopic) => {
+    for (const q of t.qa) {
+      const key = q.text.trim().toLowerCase();
+      if (!seen.has(key)) { seen.add(key); pool.push({ ...q, _from: t.title }); }
+    }
+  };
+  const pool: Array<{ text: string; answer: string; _from?: string }> = [];
+  collectFrom(topic);
+  if (pool.length < count) {
+    // Pull from other in-grade topics in the same bank (skip the picked one).
+    const g = gradeNum(opts.grade);
+    const inGrade = bank.filter((t) => {
+      if (t.title === topic.title) return false;
+      const lo = t.gradeMin ?? 0;
+      const hi = t.gradeMax ?? 5;
+      return g >= lo && g <= hi;
+    });
+    for (const t of inGrade) {
+      if (pool.length >= count) break;
+      collectFrom(t);
+    }
+  }
+  // Shuffle the deduplicated pool, then take exactly `count` (or all of
+  // pool if smaller — better to ship 8 unique questions than 10 with repeats).
+  pool.sort(() => Math.random() - 0.5);
+  const taken = pool.slice(0, count);
+  const questions: StarQuestion[] = taken.map((q, i) => ({
+    num: i + 1, text: q.text, answer: q.answer,
+  }));
 
   const lesson: Lesson = {
     title: topic.title,
@@ -1327,16 +1362,79 @@ function buildLocalLesson(opts: { subject: Subject; grade: string; count: number
   return { questions, lesson };
 }
 
-function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQuestion[], lesson: Lesson | null, isKey: boolean) {
+type PrintMode = "student" | "key" | "large" | "quiz" | "notebook" | "flashcards";
+
+function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQuestion[], lesson: Lesson | null, mode: PrintMode) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
-  const barcodeSvg = bc128svg(bc.id, 0, 80, true, 2.0);
+  const isKey = mode === "key";
+
+  // Flashcards mode: simple cut-out grid, no lesson, no answer lines.
+  // 6 cards per page, question on front, answer on back (printed as
+  // alternating pages so duplex front/back works).
+  if (mode === "flashcards") {
+    const barcodeSvg = bc128svg(bc.id, 0, 50, false, 1.4);
+    const cardsPerPage = 6;
+    const pages: string[] = [];
+    for (let i = 0; i < questions.length; i += cardsPerPage) {
+      const chunk = questions.slice(i, i + cardsPerPage);
+      const front = chunk.map((q) => `
+        <div style="border:2px solid #002855;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;height:2.4in;page-break-inside:avoid">
+          <div style="font-size:10px;color:#999;font-weight:700">#${q.num}</div>
+          <div style="font-size:18px;font-weight:600;color:#002855;text-align:center;line-height:1.3">${escapeHtml(q.text)}</div>
+          <div style="text-align:right;opacity:0.5">${barcodeSvg}</div>
+        </div>
+      `).join("");
+      const back = chunk.map((q) => `
+        <div style="border:2px solid #16a34a;border-radius:8px;padding:14px;display:flex;align-items:center;justify-content:center;height:2.4in;page-break-inside:avoid">
+          <div style="font-size:24px;font-weight:800;color:#16a34a;text-align:center">${escapeHtml(q.answer)}</div>
+        </div>
+      `).join("");
+      pages.push(`
+        <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:8px;page-break-after:always">${front}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:8px;page-break-after:always">${back}</div>
+      `);
+    }
+    w.document.write(`<!doctype html><html><head><title>${escapeHtml(bc.name)} — Flashcards</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.4in; } }
+        body { font-family: -apple-system, sans-serif; color: #111; padding: 12px; }
+        h1 { font-size: 16px; margin: 0 0 12px; }
+      </style></head><body>
+      <h1>${escapeHtml(bc.name)} — Cut-out Flashcards</h1>
+      ${pages.join("")}
+      <script>window.addEventListener('load', () => setTimeout(() => window.print(), 200));</script>
+    </body></html>`);
+    w.document.close();
+    return;
+  }
+
+  // Layout knobs by mode — controls font size, spacing, and answer-line
+  // height so the same template can produce a normal student copy, a
+  // large-print version, a compact quiz, or a notebook with extra-wide
+  // writing space without forking the whole template.
+  const layout = {
+    student:   { titleFs: 22, qFs: 14, lineH: 32, gap: 14, intro: 13, body: 13 },
+    key:       { titleFs: 22, qFs: 14, lineH: 0,  gap: 14, intro: 13, body: 13 },
+    large:     { titleFs: 28, qFs: 20, lineH: 56, gap: 22, intro: 17, body: 17 },
+    quiz:      { titleFs: 18, qFs: 12, lineH: 0,  gap: 8,  intro: 12, body: 12 },
+    notebook:  { titleFs: 22, qFs: 16, lineH: 96, gap: 24, intro: 14, body: 14 },
+    flashcards:{ titleFs: 22, qFs: 14, lineH: 32, gap: 14, intro: 13, body: 13 }, // unused
+  }[mode];
+
+  const barcodeSvg = bc128svg(bc.id, 0, mode === "large" ? 110 : 80, true, mode === "large" ? 2.6 : 2.0);
   const studentName = bc.studentName || "______________________";
+  const headerLabel =
+    mode === "key"      ? "📑 Teacher Answer Key" :
+    mode === "large"    ? "📝 Student Worksheet — Large Print" :
+    mode === "quiz"     ? "📋 Quick Quiz" :
+    mode === "notebook" ? "📔 Notebook Worksheet" :
+                          "📝 Student Worksheet";
   const head = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
       <div>
-        <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#555">${isKey ? "📑 Teacher Answer Key" : "📝 Student Worksheet"}</div>
-        <div style="font-size:22px;font-weight:800;margin-top:2px">${escapeHtml(bc.name)}</div>
+        <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#555">${headerLabel}</div>
+        <div style="font-size:${layout.titleFs}px;font-weight:800;margin-top:2px">${escapeHtml(bc.name)}</div>
         <div style="font-size:13px;color:#555;margin-top:4px">
           Student: <b>${escapeHtml(studentName)}</b> · Grade: ${escapeHtml(bc.gradeLevel || "")}
           · ${bc.week ? "Week " + escapeHtml(bc.week) + " · " : ""}${escapeHtml(bc.day || "")}
@@ -1392,21 +1490,60 @@ function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQu
     </div>
   ` : "";
 
-  const qHtml = questions.map((q) => `
-    <div style="margin-bottom:14px;page-break-inside:avoid">
-      <div style="font-size:14px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
-      ${isKey
-        ? `<div style="font-size:13px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
-        : `<div style="border-bottom:1px solid #999;height:32px;margin-top:6px"></div>`}
-    </div>
-  `).join("");
+  // Quiz mode: skip the lesson box entirely, render compactly with
+  // multiple-choice slots A/B/C/D for short-answer recall.
+  const showLesson = mode !== "quiz";
 
-  w.document.write(`<!doctype html><html><head><title>${escapeHtml(bc.name)} ${isKey ? "(Key)" : ""}</title>
+  const qHtml = questions.map((q) => {
+    if (mode === "quiz") {
+      // Compact two-column quiz cell — just question + four blank slots.
+      return `
+        <div style="display:flex;gap:10px;margin-bottom:${layout.gap}px;page-break-inside:avoid;font-size:${layout.qFs}px">
+          <span style="font-weight:700;color:#555;min-width:24px">#${q.num}</span>
+          <div style="flex:1">
+            <div>${escapeHtml(q.text)}</div>
+            <div style="display:flex;gap:18px;margin-top:4px;color:#666;font-size:${layout.qFs - 1}px">
+              <span>A. ___</span><span>B. ___</span><span>C. ___</span><span>D. ___</span>
+            </div>
+          </div>
+          ${isKey ? `<div style="color:#16a34a;font-weight:800">${escapeHtml(q.answer)}</div>` : ""}
+        </div>`;
+    }
+    if (mode === "notebook") {
+      // Notebook — extra-wide writing area with light blue rules.
+      return `
+        <div style="margin-bottom:${layout.gap}px;page-break-inside:avoid">
+          <div style="font-size:${layout.qFs}px;font-weight:600"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
+          ${isKey
+            ? `<div style="font-size:${layout.qFs - 2}px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
+            : `
+              <div style="margin-top:8px;border-top:1px solid #93c5fd;padding-top:${layout.lineH/3}px;border-bottom:1px solid #93c5fd;height:${layout.lineH}px;background:repeating-linear-gradient(transparent,transparent 31px,#dbeafe 31px,#dbeafe 32px)"></div>
+            `}
+        </div>`;
+    }
+    // student / key / large — same layout, knobs scale font + line height.
+    return `
+      <div style="margin-bottom:${layout.gap}px;page-break-inside:avoid">
+        <div style="font-size:${layout.qFs}px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
+        ${isKey
+          ? `<div style="font-size:${layout.qFs - 1}px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
+          : `<div style="border-bottom:1.5px solid #444;height:${layout.lineH}px;margin-top:6px"></div>`}
+      </div>`;
+  }).join("");
+
+  // Lesson body honors the layout's body font size for Large Print.
+  const adjustedLessonHtml = mode === "large"
+    ? lessonHtml
+        .replace(/font-size:13px/g, `font-size:${layout.body}px`)
+        .replace(/font-size:15px/g, `font-size:${layout.body + 4}px`)
+    : lessonHtml;
+
+  w.document.write(`<!doctype html><html><head><title>${escapeHtml(bc.name)} — ${headerLabel}</title>
     <style>
       @media print { @page { size: letter; margin: 0.5in; } }
       body { font-family: -apple-system, sans-serif; color: #111; padding: 16px; }
     </style>
-  </head><body>${head}${lessonHtml}<div>${qHtml}</div>
+  </head><body>${head}${showLesson ? adjustedLessonHtml : ""}<div>${qHtml}</div>
   <script>window.addEventListener('load', () => setTimeout(() => window.print(), 200));</script>
   </body></html>`);
   w.document.close();
