@@ -25,7 +25,7 @@ import {
   LayoutDashboard, FolderOpen, BookOpen, Monitor, BarChart3,
   Trophy, ClipboardList, HelpCircle, CheckSquare, Medal,
   Sun, Moon, LogOut, Layers, Gamepad2, Globe, Clock, Tv, Menu,
-  ShoppingBag, Star,
+  ShoppingBag, Star, Camera,
 } from "lucide-react";
 
 export default function Layout() {
@@ -570,6 +570,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked()) {
       { path: "/class-grades",    icon: Medal,           label: "Class Grades"},
       { path: "/teacher/gradebook", icon: CheckSquare,    label: "Gradebook"  },
       { path: "/star",            icon: Star,            label: "STAR"       },
+      { path: "/star/phone",      icon: Camera,          label: "STAR Phone" },
       { path: "/teacher/websites", icon: Globe,           label: "Websites"   },
       { path: "/teacher/schedule", icon: Clock,           label: "Schedule"   },
       { path: "/board",              icon: Tv,              label: "Board"      },
@@ -589,6 +590,7 @@ function getNavItems(role: string, workDone = isWorkUnlocked()) {
       { path: "/quizzes",     icon: HelpCircle,    label: "Quizzes"     },
       { path: "/teacher/gradebook", icon: CheckSquare, label: "Gradebook" },
       { path: "/star",        icon: Star,          label: "STAR"        },
+      { path: "/star/phone",  icon: Camera,        label: "STAR Phone"  },
       { path: "/teacher/store", icon: ShoppingBag, label: "Store & Points" },
       { path: "/cashout",     icon: ShoppingBag,   label: "Open Store"  },
       { path: "/teacher/websites", icon: Globe,     label: "Websites"    },

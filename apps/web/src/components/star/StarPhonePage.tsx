@@ -1,0 +1,371 @@
+// Phone-optimized capture page. Open this on a phone, type or scan
+// a barcode, and the native camera auto-opens to photograph the
+// student's completed worksheet. The photo gets compressed to ~800px
+// JPEG (so localStorage doesn't blow up) and attached to the
+// assignment under the chosen student.
+//
+// Designed for fast classroom use: huge buttons, autofocused inputs,
+// camera fires automatically as soon as a known barcode lands.
+
+import { useEffect, useRef, useState } from "react";
+import {
+  StarStore, rehydrateBcDB,
+  type BcEntry, type StarStudent, type StarPhoto,
+} from "../../lib/star/storage.ts";
+import { successBeep, errorBeep, scanReceivedBeep, loggedBeep } from "../../lib/star/sounds.ts";
+
+type Step = "scan" | "pick-student" | "camera" | "saved";
+
+export default function StarPhonePage() {
+  const [code, setCode] = useState("");
+  const [entry, setEntry] = useState<BcEntry | null>(null);
+  const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
+  const [studentId, setStudentId] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [step, setStep] = useState<Step>("scan");
+  const [savedPhoto, setSavedPhoto] = useState<StarPhoto | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => { rehydrateBcDB(); }, []);
+
+  const onScan = (rawCode: string) => {
+    const v = rawCode.trim().toUpperCase();
+    if (!v) return;
+    scanReceivedBeep();
+    const bc = StarStore.getBcDB()[v];
+    if (!bc) {
+      errorBeep();
+      alert(`Barcode ${v} isn't in the system. Sync the roster from /star first?`);
+      return;
+    }
+    if (bc.type !== "assignment") {
+      errorBeep();
+      alert(`${v} isn't an assignment barcode (it's a ${bc.type}). Pick a student-work barcode.`);
+      return;
+    }
+    successBeep();
+    setEntry(bc);
+    setCode(v);
+    // Pre-pick the assigned student if the assignment has one.
+    if (bc.studentId) setStudentId(bc.studentId);
+    setStep("pick-student");
+  };
+
+  const openCamera = () => {
+    if (!studentId) { errorBeep(); alert("Pick a student first."); return; }
+    setStep("camera");
+    // Trigger the native camera. iOS / Android Safari respect this attribute.
+    setTimeout(() => fileRef.current?.click(), 120);
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) { setStep("pick-student"); return; }
+    if (!entry) return;
+    try {
+      const dataUrl = await compressImage(file, 800, 0.78);
+      const stu = students.find((x) => x.id === studentId);
+      const photo: StarPhoto = {
+        id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        barcode: entry.id,
+        studentId,
+        studentName: stu ? `${stu.firstName} ${stu.lastName}`.trim() : undefined,
+        dataUrl,
+        ts: Date.now(),
+        note,
+      };
+      StarStore.addPhoto(photo);
+      loggedBeep();
+      setSavedPhoto(photo);
+      setStep("saved");
+    } catch (err: any) {
+      errorBeep();
+      alert(`Couldn't save photo: ${err?.message || err}`);
+      setStep("pick-student");
+    }
+  };
+
+  const reset = () => {
+    setCode("");
+    setEntry(null);
+    setStudentId("");
+    setNote("");
+    setSavedPhoto(null);
+    setStep("scan");
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
+      color: "#f5f1e8", padding: 20,
+      fontFamily: "'Inter', system-ui, sans-serif",
+    }}>
+      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <Header />
+
+        {/* Hidden file input — fires when openCamera() runs. capture="environment"
+            tells iOS/Android to use the back camera. */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={onFile}
+          style={{ display: "none" }}
+        />
+
+        {step === "scan" && (
+          <ScanStep code={code} setCode={setCode} onScan={onScan} inputRef={inputRef} />
+        )}
+
+        {step === "pick-student" && entry && entry.type === "assignment" && (
+          <PickStudentStep
+            entry={entry}
+            students={students}
+            studentId={studentId}
+            setStudentId={setStudentId}
+            note={note}
+            setNote={setNote}
+            onCamera={openCamera}
+            onCancel={reset}
+          />
+        )}
+
+        {step === "camera" && (
+          <div style={{
+            padding: 30, borderRadius: 16,
+            background: "rgba(255,255,255,0.04)",
+            textAlign: "center", fontSize: 16,
+          }}>
+            📷 Opening camera…
+            <div style={{ marginTop: 14 }}>
+              <button onClick={() => setStep("pick-student")} style={ghost()}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {step === "saved" && savedPhoto && (
+          <SavedStep
+            photo={savedPhoto}
+            onAnother={() => { setStep("camera"); setTimeout(() => fileRef.current?.click(), 120); }}
+            onDone={reset}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── steps ──────────────────────────────────────────────────────── */
+
+function Header() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <span style={{
+        width: 48, height: 48, borderRadius: 12,
+        background: "linear-gradient(135deg, #6366f1, #b23a48)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 24, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
+      }}>📷</span>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.6 }}>
+          STAR · Phone Capture
+        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>
+          Snap a worksheet
+        </h1>
+      </div>
+    </div>
+  );
+}
+
+function ScanStep({ code, setCode, onScan, inputRef }: {
+  code: string; setCode: (v: string) => void;
+  onScan: (v: string) => void;
+  inputRef: React.MutableRefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <div style={{
+      padding: 24, borderRadius: 18,
+      background: "linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(178,58,72,0.10) 100%)",
+      border: "1px solid rgba(251,191,36,0.30)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
+        Step 1 — Scan or type the assignment barcode
+      </div>
+      <input
+        ref={inputRef}
+        autoFocus
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        onKeyDown={(e) => { if (e.key === "Enter") onScan(code); }}
+        placeholder="e.g. WR-260507-503"
+        style={{
+          width: "100%", padding: "16px 18px", borderRadius: 12,
+          background: "rgba(0,0,0,0.45)", color: "white",
+          border: "2px solid rgba(255,255,255,0.18)",
+          fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 700,
+          outline: "none", letterSpacing: "0.05em",
+          boxSizing: "border-box",
+        }}
+      />
+      <button onClick={() => onScan(code)} style={primary({ fullWidth: true, large: true })}>
+        Scan →
+      </button>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 12 }}>
+        💡 Use a USB scanner or the typing keyboard. Camera-based barcode scanning
+        depends on your phone — type if it doesn't pick up the code.
+      </div>
+    </div>
+  );
+}
+
+function PickStudentStep({ entry, students, studentId, setStudentId, note, setNote, onCamera, onCancel }: {
+  entry: BcEntry & { type: "assignment" };
+  students: StarStudent[];
+  studentId: string;
+  setStudentId: (v: string) => void;
+  note: string;
+  setNote: (v: string) => void;
+  onCamera: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div style={{
+      padding: 20, borderRadius: 18,
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55 }}>
+        Step 2 — Pick the student
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, margin: "4px 0 4px" }}>{entry.name}</div>
+      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 14, fontFamily: "Menlo, monospace", color: "#fde68a" }}>
+        {entry.id}
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+        gap: 8, marginBottom: 14,
+      }}>
+        {students.map((s) => {
+          const sel = studentId === s.id;
+          return (
+            <button key={s.id} onClick={() => setStudentId(s.id)} style={{
+              padding: "12px 8px", borderRadius: 12,
+              background: sel ? "linear-gradient(135deg, #b23a48, #d97706)" : "rgba(255,255,255,0.04)",
+              border: sel ? "2px solid rgba(251,191,36,0.7)" : "1px solid rgba(255,255,255,0.10)",
+              color: "white", cursor: "pointer", fontSize: 14, fontWeight: 700,
+              minHeight: 64,
+            }}>
+              {s.firstName}
+              {s.grade && <div style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>{s.grade}</div>}
+            </button>
+          );
+        })}
+      </div>
+
+      <input
+        value={note} onChange={(e) => setNote(e.target.value)}
+        placeholder="Optional note (e.g. front side, partial work)"
+        style={{
+          width: "100%", padding: "12px 14px", borderRadius: 10,
+          background: "rgba(0,0,0,0.30)", color: "white",
+          border: "1px solid rgba(255,255,255,0.12)",
+          fontSize: 14, outline: "none",
+          boxSizing: "border-box", marginBottom: 12,
+        }}
+      />
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={onCancel} style={ghost()}>← Back</button>
+        <button onClick={onCamera} disabled={!studentId} style={primary({ fullWidth: true, large: true })}>
+          📷 Open Camera
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SavedStep({ photo, onAnother, onDone }: { photo: StarPhoto; onAnother: () => void; onDone: () => void }) {
+  return (
+    <div style={{
+      padding: 20, borderRadius: 18,
+      background: "rgba(16,185,129,0.10)",
+      border: "1px solid rgba(16,185,129,0.40)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#86efac" }}>
+        ✅ Saved
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 800, margin: "4px 0 12px" }}>
+        Photo attached to {photo.studentName || "student"}
+      </div>
+      <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)" }}>
+        <img src={photo.dataUrl} alt="" style={{ width: "100%", display: "block" }} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button onClick={onDone} style={ghost()}>Done — scan another</button>
+        <button onClick={onAnother} style={primary({ fullWidth: true })}>
+          📷 Take another photo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── helpers ────────────────────────────────────────────────────── */
+
+function primary(opts: { fullWidth?: boolean; large?: boolean } = {}): React.CSSProperties {
+  return {
+    width: opts.fullWidth ? "100%" : "auto",
+    padding: opts.large ? "16px 18px" : "12px 16px",
+    borderRadius: 12,
+    background: "linear-gradient(135deg, #6366f1, #b23a48)",
+    color: "white", border: "none",
+    fontWeight: 800, fontSize: opts.large ? 18 : 15,
+    cursor: "pointer",
+    marginTop: 14,
+    boxShadow: "0 8px 22px rgba(99,102,241,0.35)",
+  };
+}
+function ghost(): React.CSSProperties {
+  return {
+    padding: "12px 16px", borderRadius: 10,
+    background: "rgba(255,255,255,0.06)", color: "white",
+    border: "1px solid rgba(255,255,255,0.18)",
+    fontWeight: 700, cursor: "pointer", fontSize: 14,
+    flexShrink: 0,
+  };
+}
+
+// Compress an image File down to a max-side dimension and return a JPEG
+// data URL. Keeps localStorage usage manageable (~50-150 KB per photo
+// at maxSide=800 / quality=0.78 vs 5+ MB of raw camera output).
+function compressImage(file: File, maxSide: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth  * ratio);
+        const h = Math.round(img.naturalHeight * ratio);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas context unavailable")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL("image/jpeg", quality);
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image failed to load")); };
+    img.src = url;
+  });
+}

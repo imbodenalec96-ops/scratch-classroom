@@ -243,6 +243,9 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         {/* Lesson — what the student was supposed to learn */}
         <LessonPanel lesson={entry.lesson} />
 
+        {/* Photos captured for this assignment via /star/phone */}
+        <PhotoStrip barcode={entry.id} />
+
         {/* Grade history */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 8 }}>
@@ -468,6 +471,51 @@ function shellStyle(): React.CSSProperties {
     boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
   };
 }
+function PhotoStrip({ barcode }: { barcode: string }) {
+  const [photos, setPhotos] = useState(() => StarStore.getPhotos()[barcode] || []);
+  const [zoom, setZoom] = useState<string | null>(null);
+  if (photos.length === 0) return null;
+  const remove = (id: string) => {
+    if (!window.confirm("Delete this photo?")) return;
+    StarStore.deletePhoto(barcode, id);
+    setPhotos(StarStore.getPhotos()[barcode] || []);
+  };
+  return (
+    <div style={{
+      marginBottom: 16, padding: 12, borderRadius: 12,
+      background: "rgba(99,102,241,0.06)",
+      border: "1px solid rgba(99,102,241,0.30)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, color: "#a5b4fc", marginBottom: 8 }}>
+        📷 Captured Worksheets ({photos.length})
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+        {photos.map((p) => (
+          <div key={p.id} style={{ position: "relative", borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)" }}>
+            <img src={p.dataUrl} alt="" onClick={() => setZoom(p.dataUrl)} style={{ width: "100%", display: "block", cursor: "zoom-in" }} />
+            <div style={{ padding: "6px 8px", fontSize: 11, background: "rgba(0,0,0,0.50)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 700, color: "#fde68a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {p.studentName || "—"}
+              </span>
+              <button onClick={() => remove(p.id)} style={{ background: "transparent", color: "#fca5a5", border: "none", cursor: "pointer", fontSize: 13 }}>🗑</button>
+            </div>
+            {p.note && <div style={{ padding: "4px 8px", fontSize: 11, opacity: 0.8, background: "rgba(0,0,0,0.30)" }}>{p.note}</div>}
+          </div>
+        ))}
+      </div>
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{
+          position: "fixed", inset: 0, zIndex: 900,
+          background: "rgba(0,0,0,0.92)", padding: 20,
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out",
+        }}>
+          <img src={zoom} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LessonPanel({ lesson }: { lesson: any }) {
   const [open, setOpen] = useState(true);
   if (!lesson) return null;

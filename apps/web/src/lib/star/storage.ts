@@ -172,7 +172,18 @@ const KEYS = {
   pointsPerCompletion: "star_points_per_completion",
   activePasses: "star_active_passes",
   passLog: "star_pass_log",
+  photos: "star_photos",
 } as const;
+
+export interface StarPhoto {
+  id: string;             // unique id for delete + key
+  barcode: string;        // assignment / form this photo belongs to
+  studentId?: string;
+  studentName?: string;
+  dataUrl: string;        // compressed jpeg base64
+  ts: number;
+  note?: string;
+}
 
 // LocalStorage with safe parse + default fallback
 const ls = {
@@ -241,6 +252,23 @@ export const StarStore = {
   setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),
   getPassLog: () => ls.get<Array<ActivePass & { endedAt: string; elapsedSec: number }>>(KEYS.passLog, []),
   setPassLog: (v: Array<ActivePass & { endedAt: string; elapsedSec: number }>) => ls.set(KEYS.passLog, v),
+  // Photos are keyed by barcode for fast lookup in the gradebook.
+  getPhotos: () => ls.get<Record<string, StarPhoto[]>>(KEYS.photos, {}),
+  setPhotos: (v: Record<string, StarPhoto[]>) => ls.set(KEYS.photos, v),
+  addPhoto: (photo: StarPhoto) => {
+    const all = ls.get<Record<string, StarPhoto[]>>(KEYS.photos, {});
+    const list = all[photo.barcode] || [];
+    list.unshift(photo);
+    all[photo.barcode] = list;
+    ls.set(KEYS.photos, all);
+  },
+  deletePhoto: (barcode: string, photoId: string) => {
+    const all = ls.get<Record<string, StarPhoto[]>>(KEYS.photos, {});
+    if (!all[barcode]) return;
+    all[barcode] = all[barcode].filter((p) => p.id !== photoId);
+    if (all[barcode].length === 0) delete all[barcode];
+    ls.set(KEYS.photos, all);
+  },
 };
 
 // Save EVERYTHING in one shot — matches the original spec's saveAll().

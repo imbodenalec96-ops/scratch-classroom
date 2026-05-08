@@ -68,6 +68,7 @@ const TeacherStore = lazy(() => import("./components/TeacherStore.tsx"));
 const StudentVideoPage = lazy(() => import("./components/StudentVideoPage.tsx"));
 const PrintAssignment = lazy(() => import("./components/PrintAssignment.tsx"));
 const StarPage = lazy(() => import("./components/star/StarPage.tsx"));
+const StarPhonePage = lazy(() => import("./components/star/StarPhonePage.tsx"));
 import StarScanner from "./components/star/StarScanner.tsx";
 import StarBoardOverlay from "./components/star/StarBoardOverlay.tsx";
 import { setActiveClassId } from "./lib/star/boardEvents.ts";
@@ -227,6 +228,7 @@ export default function App() {
             <Route path="teacher/store" element={<TeacherStore />} />
             <Route path="teacher/assignment-schedule" element={<AssignmentSchedulePage />} />
             <Route path="star" element={<StarPage />} />
+            <Route path="star/phone" element={<StarPhonePage />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />
