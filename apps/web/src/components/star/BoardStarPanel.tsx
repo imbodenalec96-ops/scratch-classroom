@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  StarStore, letterGradeColor,
+  StarStore, letterGradeColor, countsTowardGrade,
   type StarStudent, type StarTrackerEntry, type Subject,
 } from "../../lib/star/storage.ts";
 import { syncFromClassroom } from "../../lib/star/sync.ts";
@@ -261,7 +261,9 @@ function GradesMatrixView() {
     const rows = students.map((stu) => {
       const bySubj: Record<string, { pct: number; letter: string; count: number }> = {};
       for (const t of Object.values(tracker)) {
-        const subs = (t.submissions || []).filter((s) => s.studentId === stu.id);
+        const subs = (t.submissions || [])
+          .filter((s) => s.studentId === stu.id)
+          .filter(countsTowardGrade); // skip absent / skipped / excused / makeup
         if (subs.length === 0) continue;
         const totalPct = subs.reduce((a, b) => a + b.pct, 0);
         const cur = bySubj[t.subject] || { pct: 0, letter: "F", count: 0 };

@@ -11,7 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
-import { StarStore } from "../lib/star/storage.ts";
+import { StarStore, countsTowardGrade } from "../lib/star/storage.ts";
 import { setActiveClassId } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
@@ -1273,6 +1273,9 @@ export default function ClassroomBoard() {
                 const subs = t.submissions || [];
                 if (subs.length === 0) continue;
                 for (const sub of subs) {
+                  // Skip non-counting statuses (absent / skipped / excused
+                  // / makeup) so they don't drag the average down.
+                  if (!countsTowardGrade(sub)) continue;
                   // Resolve which board student this submission is for.
                   let sid: string | null = null;
                   if (board.students.some((b) => String(b.id) === sub.studentId)) sid = sub.studentId;

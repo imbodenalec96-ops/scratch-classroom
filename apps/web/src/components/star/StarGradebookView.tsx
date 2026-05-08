@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  StarStore, letterGradeColor,
+  StarStore, letterGradeColor, countsTowardGrade,
   type StarStudent, type StarTrackerEntry, type Subject,
 } from "../../lib/star/storage.ts";
 import GradebookModal from "./GradebookModal.tsx";
@@ -26,6 +26,10 @@ interface StudentSummary {
     pct: number;
     letter: string;
     completedDate: string;
+    // True only when this submission counts toward the student's grade
+    // average (completed / in-progress). Absent / Skipped / Excused /
+    // Makeup are tracked but excluded from rollups.
+    counted: boolean;
   }>>;
 }
 
@@ -58,6 +62,7 @@ export default function StarGradebookView() {
           pct: sub.pct,
           letter: sub.letterGrade,
           completedDate: sub.completedDate,
+          counted: countsTowardGrade(sub),
         });
       }
     }
@@ -118,7 +123,10 @@ export default function StarGradebookView() {
                     {SUBJECTS.map((subj) => {
                       const subs = s.bySubject[subj] || [];
                       if (subs.length === 0) return <td key={subj} style={tdEmpty()}>—</td>;
-                      const avg = Math.round(subs.reduce((a, b) => a + b.pct, 0) / subs.length);
+                      // Only counted submissions (not absent/skipped/etc.) factor into the average.
+                      const counted = subs.filter((b) => b.counted);
+                      if (counted.length === 0) return <td key={subj} style={tdEmpty()}>—</td>;
+                      const avg = Math.round(counted.reduce((a, b) => a + b.pct, 0) / counted.length);
                       const letter = letterFromPct(avg);
                       const color = letterGradeColor(letter);
                       return (
@@ -176,8 +184,11 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
     }
   };
   const totalSubs = Object.values(summary.bySubject).reduce((a, arr) => a + arr.length, 0);
-  const overallAvg = totalSubs > 0
-    ? Math.round(Object.values(summary.bySubject).flat().reduce((a, b) => a + b.pct, 0) / totalSubs)
+  // Overall grade is averaged ONLY across counted submissions — absent /
+  // skipped / excused / makeup don't drag the kid's average down.
+  const countedSubs = Object.values(summary.bySubject).flat().filter((s) => s.counted);
+  const overallAvg = countedSubs.length > 0
+    ? Math.round(countedSubs.reduce((a, b) => a + b.pct, 0) / countedSubs.length)
     : 0;
   const overallLetter = letterFromPct(overallAvg);
 
@@ -205,9 +216,11 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
               {summary.student.firstName} {summary.student.lastName}
             </div>
             <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {summary.student.grade || "—"} · {totalSubs} graded · Overall:
+              {summary.student.grade || "—"} · {countedSubs.length} graded
+              {totalSubs > countedSubs.length && <span style={{ opacity: 0.6 }}> · {totalSubs - countedSubs.length} not counted</span>}
+              {" · Overall: "}
               <span style={{ color: letterGradeColor(overallLetter), fontWeight: 800, marginLeft: 6 }}>
-                {totalSubs > 0 ? `${overallLetter} (${overallAvg}%)` : "—"}
+                {countedSubs.length > 0 ? `${overallLetter} (${overallAvg}%)` : "—"}
               </span>
             </div>
           </div>

@@ -321,6 +321,17 @@ export function nextBarcode(prefix: "WR" | "SP", existing: Record<string, BcEntr
   return `${base}${String(n).padStart(3, "0")}`;
 }
 
+// Submissions with these statuses do NOT affect the student's grade
+// average. They're tracked for record-keeping but not factored into
+// percentage / letter grade rollups anywhere on the board, gradebook,
+// or reports. "completed" + "in-progress" are the only counting states.
+const NON_COUNTING: ReadonlySet<StarSubmission["status"]> = new Set([
+  "absent", "skipped", "excused", "makeup", "missing",
+]);
+export function countsTowardGrade(s: { status: StarSubmission["status"] }): boolean {
+  return !NON_COUNTING.has(s.status);
+}
+
 export function letterGrade(pct: number): string {
   if (pct >= 90) return "A";
   if (pct >= 80) return "B";

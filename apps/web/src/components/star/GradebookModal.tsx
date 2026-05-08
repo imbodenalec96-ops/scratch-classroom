@@ -105,14 +105,19 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     const s = students.find((x) => x.id === studentId);
     if (!s) return;
     setSaving(true);
+    // Non-counting statuses (Absent / Skipped / Excused / Makeup) get
+    // a neutral letter grade ("—") and pct=0 so they don't show up as
+    // a fake F in the gradebook history. They're already filtered out
+    // of every average via countsTowardGrade.
+    const isCounting = status === "completed" || status === "in-progress";
     const sub: StarSubmission = {
       studentId: s.id,
       studentName: `${s.firstName} ${s.lastName}`,
       completedDate: date,
-      score,
+      score:    isCounting ? score : 0,
       maxScore: max,
-      pct,
-      letterGrade: letter,
+      pct:      isCounting ? pct   : 0,
+      letterGrade: isCounting ? letter : "—",
       feedback,
       timeSpent: time,
       notes,
