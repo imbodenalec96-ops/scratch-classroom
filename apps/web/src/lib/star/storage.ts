@@ -212,6 +212,19 @@ export const StarStore = {
   setTpls:       (v: string[]) => ls.set(KEYS.tpls, v),
   getPointsPerCompletion: () => ls.get<number>(KEYS.pointsPerCompletion, 5),
   setPointsPerCompletion: (v: number) => ls.set(KEYS.pointsPerCompletion, v),
+  // Wipe one assignment everywhere it lives — bcDB, asnTracker, asns.
+  // Submissions on the tracker entry go with it. Caller is expected to
+  // confirm with the teacher first.
+  deleteAssignment: (id: string) => {
+    const bcDB = ls.get<Record<string, BcEntry>>(KEYS.bcdb, {});
+    delete bcDB[id];
+    ls.set(KEYS.bcdb, bcDB);
+    const trk = ls.get<Record<string, StarTrackerEntry>>(KEYS.asntrack, {});
+    delete trk[id];
+    ls.set(KEYS.asntrack, trk);
+    const asns = ls.get<StarAssignment[]>(KEYS.a, []).filter((a) => a.id !== id);
+    ls.set(KEYS.a, asns);
+  },
   getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
   setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),
   getPassLog: () => ls.get<Array<ActivePass & { endedAt: string; elapsedSec: number }>>(KEYS.passLog, []),

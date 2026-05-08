@@ -12,6 +12,7 @@ import ReactionRain from "./ReactionRain.tsx";
 import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel from "./star/BoardStarPanel.tsx";
+import { StarStore } from "../lib/star/storage.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -102,6 +103,37 @@ const ANIM = `
     to   { opacity: 1; transform: translateY(0); }
   }
 `;
+
+// Per-student STAR progress — counts today's STAR assignments + how many
+// have a submission. Used by the roster card progress bar to fold STAR
+// completion into the same 7/14 indicator that already shows classroom
+// assignments. Returns { studentId: { done, total, pct } }.
+function computeStarProgressByStudent(): Record<string, { done: number; total: number; pct: number }> {
+  const out: Record<string, { done: number; total: number; pct: number }> = {};
+  try {
+    const tracker = StarStore.getAsnTrack();
+    const todayStr = new Date().toLocaleDateString();
+    const todays = Object.values(tracker).filter((t) => {
+      const created = t.createdDate ? new Date(t.createdDate).toLocaleDateString() === todayStr : false;
+      const submittedToday = (t.submissions || []).some((s) => new Date(s.loggedAt).toLocaleDateString() === todayStr);
+      return created || submittedToday;
+    });
+    for (const t of todays) {
+      const targetIds: string[] = t.studentId ? [t.studentId] : []; // class-wide assignments are skipped here — they don't pin to one kid's bar
+      for (const sid of targetIds) {
+        const cur = out[sid] || { done: 0, total: 0, pct: 0 };
+        cur.total += 1;
+        if ((t.submissions || []).some((s) => s.studentId === sid)) cur.done += 1;
+        out[sid] = cur;
+      }
+    }
+    for (const sid in out) {
+      const r = out[sid];
+      r.pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0;
+    }
+  } catch {}
+  return out;
+}
 
 export default function ClassroomBoard() {
   const [params] = useSearchParams();
@@ -1155,6 +1187,15 @@ export default function ClassroomBoard() {
             const n = board.students.length || 1;
             const cols = n <= 4 ? 2 : n <= 8 ? 4 : n <= 12 ? 4 : n <= 16 ? 4 : 5;
             const rows = Math.ceil(n / cols);
+            // Pull STAR per-student data so the roster bar can include
+            // STAR assignments + each kid's grade level pulled from the
+            // STAR roster (which has been synced from /api).
+            const starStudents = StarStore.getStudents();
+            const starGradeById: Record<string, string> = {};
+            for (const ss of starStudents) {
+              if (ss.id && ss.grade) starGradeById[ss.id] = ss.grade;
+            }
+            const starProgressById = computeStarProgressByStudent();
             return (
           <div style={{
             flex: 1, minHeight: 0,
@@ -1312,6 +1353,20 @@ export default function ClassroomBoard() {
                       {firstName}
                     </div>
 
+                    {/* Grade level — small pill below the name. Pulled from
+                        the STAR roster after sync (real DB id). Hidden if unknown. */}
+                    {starGradeById[String(s.id)] && (
+                      <div style={{
+                        fontFamily: serif, fontStyle: "italic",
+                        fontSize: 11, lineHeight: 1,
+                        color: "rgba(245,241,232,0.55)",
+                        letterSpacing: "0.06em",
+                        textAlign: "center",
+                      }}>
+                        {starGradeById[String(s.id)]}
+                      </div>
+                    )}
+
                     {/* Stars — bigger, brighter, with a gentle glow on every filled star */}
                     <div style={{
                       display: "flex", alignItems: "center", gap: 5, justifyContent: "center",
@@ -1373,13 +1428,20 @@ export default function ClassroomBoard() {
                     })()}
 
                     {/* Per-student daily progress — `done` of `total`
-                        assignments visible to this kid today (matches what
-                        they actually see in their dashboard queue). The bar
-                        only appears if the student has work assigned. */}
+                        assignments visible to this kid today, including
+                        BOTH classroom assignments AND STAR barcoded ones
+                        graded today. The bar only appears if the student
+                        has work assigned somewhere. */}
                     {(() => {
-                      const sp = classProgress?.byStudent?.[String(s.id)];
-                      if (!sp || sp.total <= 0) return null;
-                      const fillsClass = sp.pct >= 100;
+                      const cp = classProgress?.byStudent?.[String(s.id)];
+                      const sp = starProgressById[String(s.id)];
+                      const done = (cp?.done || 0) + (sp?.done || 0);
+                      const total = (cp?.total || 0) + (sp?.total || 0);
+                      if (total <= 0) return null;
+                      const pct = Math.round((done / total) * 100);
+                      const fillsClass = pct >= 100;
+                      const merged = { done, total, pct };
+                      const sp_ = merged;
                       return (
                         <div style={{
                           width: "82%",
@@ -1395,7 +1457,7 @@ export default function ClassroomBoard() {
                           }}>
                             <div style={{
                               height: "100%",
-                              width: `${sp.pct}%`,
+                              width: `${sp_.pct}%`,
                               background: fillsClass
                                 ? "linear-gradient(90deg, #5b8a6e 0%, #7dd3c5 100%)"
                                 : "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
@@ -1413,7 +1475,7 @@ export default function ClassroomBoard() {
                             fontVariantNumeric: "tabular-nums",
                             textAlign: "center",
                           }}>
-                            {sp.done}/{sp.total}{fillsClass ? " ✓" : ""}
+                            {sp_.done}/{sp_.total}{fillsClass ? " ✓" : ""}
                           </div>
                         </div>
                       );

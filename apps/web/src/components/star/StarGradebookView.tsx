@@ -33,9 +33,11 @@ export default function StarGradebookView() {
   const [openBarcode, setOpenBarcode] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // Bumped on delete so the memoized tracker rebuilds.
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const students = useMemo(() => StarStore.getStudents(), []);
-  const tracker = useMemo(() => StarStore.getAsnTrack(), []);
+  const students = useMemo(() => StarStore.getStudents(), [refreshKey]);
+  const tracker = useMemo(() => StarStore.getAsnTrack(), [refreshKey]);
 
   // Build per-student summaries by walking each assignment's submissions
   // and grouping by submission's studentId.
@@ -146,6 +148,7 @@ export default function StarGradebookView() {
           tracker={tracker}
           onBack={() => setSelectedStudent(null)}
           onOpenAssignment={(bc) => setOpenBarcode(bc)}
+          onDeleted={() => setRefreshKey((n) => n + 1)}
         />
       )}
 
@@ -156,12 +159,22 @@ export default function StarGradebookView() {
   );
 }
 
-function StudentDetail({ summary, tracker, onBack, onOpenAssignment }: {
+function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }: {
   summary: StudentSummary;
   tracker: Record<string, StarTrackerEntry>;
   onBack: () => void;
   onOpenAssignment: (bc: string) => void;
+  onDeleted?: () => void;
 }) {
+  const confirmDelete = (id: string, name: string, submissionCount: number) => {
+    const msg = submissionCount > 0
+      ? `Delete "${name}" (${id}) and its ${submissionCount} graded submission(s)? This cannot be undone.`
+      : `Delete "${name}" (${id})?`;
+    if (window.confirm(msg)) {
+      StarStore.deleteAssignment(id);
+      onDeleted?.();
+    }
+  };
   const totalSubs = Object.values(summary.bySubject).reduce((a, arr) => a + arr.length, 0);
   const overallAvg = totalSubs > 0
     ? Math.round(Object.values(summary.bySubject).flat().reduce((a, b) => a + b.pct, 0) / totalSubs)
@@ -219,27 +232,41 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment }: {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {subs.map((s, i) => (
-                    <button key={i} onClick={() => onOpenAssignment(s.assignmentId)} style={{
+                    <div key={i} style={{
                       padding: "8px 10px", borderRadius: 8,
                       background: "rgba(0,0,0,0.30)", color: "white",
                       border: `1px solid ${letterGradeColor(s.letter)}55`,
-                      cursor: "pointer", textAlign: "left",
                       display: "flex", alignItems: "center", gap: 10,
                     }}>
-                      <span style={{
-                        fontSize: 18, fontWeight: 900, color: letterGradeColor(s.letter),
-                        minWidth: 22, textAlign: "center",
-                      }}>{s.letter}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {s.assignmentName}
+                      <button onClick={() => onOpenAssignment(s.assignmentId)} style={{
+                        background: "transparent", border: "none", color: "white",
+                        cursor: "pointer", textAlign: "left", padding: 0,
+                        display: "flex", flex: 1, minWidth: 0, alignItems: "center", gap: 10,
+                      }}>
+                        <span style={{
+                          fontSize: 18, fontWeight: 900, color: letterGradeColor(s.letter),
+                          minWidth: 22, textAlign: "center",
+                        }}>{s.letter}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {s.assignmentName}
+                          </div>
+                          <div style={{ fontSize: 10, opacity: 0.6 }}>{s.completedDate} · {s.pct}%</div>
                         </div>
-                        <div style={{ fontSize: 10, opacity: 0.6 }}>{s.completedDate} · {s.pct}%</div>
-                      </div>
-                      <span style={{ fontFamily: "Menlo, monospace", fontSize: 9, color: "#fde68a", opacity: 0.7 }}>
-                        {s.assignmentId.split("-").slice(-1)[0]}
-                      </span>
-                    </button>
+                        <span style={{ fontFamily: "Menlo, monospace", fontSize: 9, color: "#fde68a", opacity: 0.7 }}>
+                          {s.assignmentId.split("-").slice(-1)[0]}
+                        </span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); confirmDelete(s.assignmentId, s.assignmentName, tracker[s.assignmentId]?.submissions?.length || 0); }}
+                        title="Delete assignment"
+                        style={{
+                          padding: "4px 6px", borderRadius: 4,
+                          background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+                          border: "1px solid rgba(239,68,68,0.40)",
+                          cursor: "pointer", fontSize: 11, flexShrink: 0,
+                        }}>🗑</button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -260,14 +287,28 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment }: {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {pending.map((p) => (
-              <button key={p.id} onClick={() => onOpenAssignment(p.id)} style={{
-                padding: "8px 12px", borderRadius: 999,
-                background: "rgba(0,0,0,0.30)", color: "white",
+              <div key={p.id} style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "0", borderRadius: 999,
+                background: "rgba(0,0,0,0.30)",
                 border: "1px solid rgba(251,191,36,0.40)",
-                cursor: "pointer", fontSize: 12, fontWeight: 700,
               }}>
-                {p.subject} · {p.name} · <span style={{ fontFamily: "Menlo, monospace", fontSize: 10, color: "#fde68a" }}>{p.id}</span>
-              </button>
+                <button onClick={() => onOpenAssignment(p.id)} style={{
+                  padding: "8px 6px 8px 12px", borderRadius: 999,
+                  background: "transparent", color: "white", border: "none",
+                  cursor: "pointer", fontSize: 12, fontWeight: 700,
+                }}>
+                  {p.subject} · {p.name} · <span style={{ fontFamily: "Menlo, monospace", fontSize: 10, color: "#fde68a" }}>{p.id}</span>
+                </button>
+                <button
+                  onClick={() => confirmDelete(p.id, p.name, 0)}
+                  title="Delete"
+                  style={{
+                    padding: "4px 8px", borderRadius: 999,
+                    background: "transparent", color: "#fca5a5",
+                    border: "none", cursor: "pointer", fontSize: 11,
+                  }}>🗑</button>
+              </div>
             ))}
           </div>
         </div>

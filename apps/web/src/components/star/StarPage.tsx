@@ -444,19 +444,42 @@ function ManualAssignmentEntry({ onOpenGradebook }: { onOpenGradebook: (id: stri
           {sorted.length === 0 ? (
             <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No assignments yet.</div>
           ) : sorted.map((a) => (
-            <button key={a.id} onClick={() => onOpenGradebook(a.id)} style={{
+            <div key={a.id} style={{
               padding: "10px 12px", borderRadius: 10,
               background: "rgba(255,255,255,0.04)", color: "white",
               border: "1px solid rgba(255,255,255,0.10)",
-              cursor: "pointer", textAlign: "left",
               display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
             }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
-                <div style={{ fontSize: 11, opacity: 0.65 }}>{a.subject} · {a.gradeLevel || "—"} · {a.submissions?.length || 0} graded</div>
-              </div>
-              <span style={{ fontFamily: "Menlo, monospace", fontSize: 11, color: "#fde68a", flexShrink: 0 }}>{a.id}</span>
-            </button>
+              <button onClick={() => onOpenGradebook(a.id)} style={{
+                background: "transparent", color: "white", border: "none",
+                cursor: "pointer", textAlign: "left", padding: 0,
+                display: "flex", flex: 1, minWidth: 0, alignItems: "center", gap: 10,
+              }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.65 }}>{a.subject} · {a.gradeLevel || "—"} · {a.submissions?.length || 0} graded</div>
+                </div>
+                <span style={{ fontFamily: "Menlo, monospace", fontSize: 11, color: "#fde68a", flexShrink: 0 }}>{a.id}</span>
+              </button>
+              <button
+                onClick={() => {
+                  const submissionCount = a.submissions?.length || 0;
+                  const msg = submissionCount > 0
+                    ? `Delete "${a.name}" (${a.id}) and its ${submissionCount} graded submission(s)? This cannot be undone.`
+                    : `Delete "${a.name}" (${a.id})?`;
+                  if (window.confirm(msg)) {
+                    StarStore.deleteAssignment(a.id);
+                    setTracker(StarStore.getAsnTrack());
+                  }
+                }}
+                title="Delete assignment"
+                style={{
+                  padding: "6px 8px", borderRadius: 6,
+                  background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+                  border: "1px solid rgba(239,68,68,0.40)",
+                  cursor: "pointer", fontSize: 12, flexShrink: 0,
+                }}>🗑</button>
+            </div>
           ))}
         </div>
       </div>
