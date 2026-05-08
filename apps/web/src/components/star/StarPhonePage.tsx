@@ -171,6 +171,21 @@ export default function StarPhonePage() {
         note,
       };
       StarStore.addPhoto(photo);
+      // Relay to other devices (computer's gradebook will show it).
+      try {
+        const { fireStarBoardEvent } = await import("../../lib/star/boardEvents.ts");
+        fireStarBoardEvent({
+          kind: "photo-saved",
+          studentName: photo.studentName || "—",
+          studentId: photo.studentId,
+          barcode: entry.id,
+          photo: {
+            id: photo.id, barcode: entry.id,
+            studentId: photo.studentId, studentName: photo.studentName,
+            dataUrl: photo.dataUrl, note: photo.note, ts: photo.ts,
+          },
+        });
+      } catch {}
       loggedBeep();
       setSavedPhoto(photo);
       setStep("saved");

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { onStarBoardEvent, type StarBoardEvent, type StarBoardKind, getActiveClassId, wasSeenLocally, markSeenLocally } from "../../lib/star/boardEvents.ts";
+import { StarStore } from "../../lib/star/storage.ts";
 import { successBeep, alertBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
 
@@ -17,9 +18,34 @@ export default function StarBoardOverlay() {
   const [evt, setEvt] = useState<StarBoardEvent | null>(null);
 
   const handleEvent = (e: StarBoardEvent) => {
+    // photo-saved: ingest into local storage so the gradebook picks it
+    // up on its next render. No popup — silent sync from another device.
+    if (e.kind === "photo-saved" && e.photo && e.photo.dataUrl && e.photo.barcode) {
+      try {
+        const all = StarStore.getPhotos();
+        const list = all[e.photo.barcode] || [];
+        // Skip duplicates by id (the relay may replay events).
+        if (!list.some((p) => p.id === e.photo!.id)) {
+          all[e.photo.barcode] = [{
+            id: e.photo.id,
+            barcode: e.photo.barcode,
+            studentId: e.photo.studentId,
+            studentName: e.photo.studentName,
+            dataUrl: e.photo.dataUrl,
+            note: e.photo.note,
+            ts: e.photo.ts,
+          }, ...list];
+          StarStore.setPhotos(all);
+          loggedBeep();
+        }
+      } catch {}
+      return;
+    }
     // Skip pass events here — they belong on the ActivePassesStrip,
     // not the full takeover. Pass timing is shown in the strip.
     if (e.kind === "pass-out" || e.kind === "pass-in") return;
+    // scan-to-phone is consumed by /star/phone; not a board overlay.
+    if (e.kind === "scan-to-phone") return;
     setEvt(e);
     if (e.kind === "completion") {
       successBeep();

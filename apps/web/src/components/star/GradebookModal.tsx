@@ -9,7 +9,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
-import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import { fireStarBoardEvent, onStarBoardEvent } from "../../lib/star/boardEvents.ts";
 
 interface Props {
   barcode: string;
@@ -476,12 +476,35 @@ function shellStyle(): React.CSSProperties {
 function PhotoStrip({ barcode }: { barcode: string }) {
   const [photos, setPhotos] = useState(() => StarStore.getPhotos()[barcode] || []);
   const [zoom, setZoom] = useState<string | null>(null);
-  if (photos.length === 0) return null;
+  // Live refresh when a phone (or any device) saves a photo for this barcode.
+  // The board event listener already wrote it to localStorage; we just re-read.
+  useEffect(() => {
+    return onStarBoardEvent((e) => {
+      if (e.kind !== "photo-saved" || e.barcode !== barcode) return;
+      // Wait a tick so StarBoardOverlay's localStorage write lands first.
+      setTimeout(() => setPhotos(StarStore.getPhotos()[barcode] || []), 50);
+    });
+  }, [barcode]);
   const remove = (id: string) => {
     if (!window.confirm("Delete this photo?")) return;
     StarStore.deletePhoto(barcode, id);
     setPhotos(StarStore.getPhotos()[barcode] || []);
   };
+  if (photos.length === 0) {
+    return (
+      <div style={{
+        marginBottom: 16, padding: 14, borderRadius: 12,
+        background: "rgba(99,102,241,0.05)",
+        border: "1px dashed rgba(99,102,241,0.30)",
+        color: "rgba(245,241,232,0.70)", fontSize: 13, lineHeight: 1.5,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a5b4fc", marginBottom: 6 }}>
+          📷 Captured Worksheets
+        </div>
+        No photos yet. Open <b>/star/phone</b> on your phone — when this barcode was scanned here, your phone should have auto-jumped to the camera for it. Photos appear here within a second of saving.
+      </div>
+    );
+  }
   return (
     <div style={{
       marginBottom: 16, padding: 12, borderRadius: 12,

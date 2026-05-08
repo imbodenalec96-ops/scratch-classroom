@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StarStore, type StarPhoto } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
 
 interface Props {
   barcode: string;
@@ -121,6 +122,19 @@ export default function CameraCapture({ barcode, studentId, studentName, onSaved
       note: note.trim() || undefined,
     };
     StarStore.addPhoto(photo);
+    // Push to other devices through the cross-device relay so the
+    // computer's gradebook can show the photo within a second of the
+    // phone snapping it.
+    fireStarBoardEvent({
+      kind: "photo-saved",
+      studentName: studentName || "—",
+      studentId,
+      barcode,
+      photo: {
+        id: photo.id, barcode, studentId, studentName,
+        dataUrl: photo.dataUrl, note: photo.note, ts: photo.ts,
+      },
+    });
     loggedBeep();
     setPhotos((StarStore.getPhotos()[barcode] || []).filter((p) => !studentId || p.studentId === studentId));
     onSaved?.(photo);

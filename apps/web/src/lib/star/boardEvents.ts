@@ -9,7 +9,7 @@
 
 import { api } from "../api.ts";
 
-export type StarBoardKind = "refusal" | "completion" | "pass-out" | "pass-in" | "scan-to-phone";
+export type StarBoardKind = "refusal" | "completion" | "pass-out" | "pass-in" | "scan-to-phone" | "photo-saved";
 
 export interface StarBoardEvent {
   // Random id per event — used to dedupe the cross-device server poll
@@ -31,6 +31,16 @@ export interface StarBoardEvent {
   elapsedSec?: number;
   // For scan-to-phone: the assignment barcode the phone should open camera for.
   barcode?: string;
+  // For photo-saved: full photo record so other devices can ingest it.
+  photo?: {
+    id: string;
+    barcode: string;
+    studentId?: string;
+    studentName?: string;
+    dataUrl: string;
+    note?: string;
+    ts: number;
+  };
   ts: number;
 }
 
