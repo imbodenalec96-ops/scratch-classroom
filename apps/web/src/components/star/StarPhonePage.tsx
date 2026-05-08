@@ -47,16 +47,37 @@ export default function StarPhonePage() {
     successBeep();
     setEntry(bc);
     setCode(v);
-    // Pre-pick the assigned student if the assignment has one.
-    if (bc.studentId) setStudentId(bc.studentId);
-    setStep("pick-student");
+    // Auto-fast-path when the assignment is already tagged to a student:
+    // skip the picker and jump straight to the camera. The student grid
+    // only appears for class-wide barcodes that have no assignee.
+    if (bc.studentId) {
+      setStudentId(bc.studentId);
+      setStep("camera");
+    } else {
+      setStudentId("");
+      setStep("pick-student");
+    }
   };
 
   const openCamera = () => {
     if (!studentId) { errorBeep(); alert("Pick a student first."); return; }
     setStep("camera");
-    // Trigger the native camera. iOS / Android Safari respect this attribute.
-    setTimeout(() => fileRef.current?.click(), 120);
+  };
+
+  // When the camera step becomes active, auto-fire the file input so the
+  // phone's native camera opens without an extra tap. Works on iOS Safari
+  // + Android Chrome because we're inside the click stack from the
+  // student-grid tap (or the scan handler chain).
+  useEffect(() => {
+    if (step === "camera") {
+      const t = window.setTimeout(() => fileRef.current?.click(), 80);
+      return () => window.clearTimeout(t);
+    }
+  }, [step]);
+
+  const skipPhoto = () => {
+    // Just bail out and reset for the next scan — no photo saved.
+    reset();
   };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,25 +148,22 @@ export default function StarPhonePage() {
             entry={entry}
             students={students}
             studentId={studentId}
-            setStudentId={setStudentId}
+            // Picking a student auto-advances to the camera — one tap,
+            // not two. Note can still be added on the saved screen later.
+            setStudentId={(id) => { setStudentId(id); setStep("camera"); }}
             note={note}
             setNote={setNote}
-            onCamera={openCamera}
             onCancel={reset}
           />
         )}
 
-        {step === "camera" && (
-          <div style={{
-            padding: 30, borderRadius: 16,
-            background: "rgba(255,255,255,0.04)",
-            textAlign: "center", fontSize: 16,
-          }}>
-            📷 Opening camera…
-            <div style={{ marginTop: 14 }}>
-              <button onClick={() => setStep("pick-student")} style={ghost()}>Cancel</button>
-            </div>
-          </div>
+        {step === "camera" && entry && entry.type === "assignment" && (
+          <CameraStep
+            entry={entry}
+            studentName={(students.find((x) => x.id === studentId) || { firstName: "" } as any).firstName}
+            onRetry={() => fileRef.current?.click()}
+            onSkip={skipPhoto}
+          />
         )}
 
         {step === "saved" && savedPhoto && (
@@ -224,14 +242,13 @@ function ScanStep({ code, setCode, onScan, inputRef }: {
   );
 }
 
-function PickStudentStep({ entry, students, studentId, setStudentId, note, setNote, onCamera, onCancel }: {
+function PickStudentStep({ entry, students, studentId, setStudentId, note, setNote, onCancel }: {
   entry: BcEntry & { type: "assignment" };
   students: StarStudent[];
   studentId: string;
   setStudentId: (v: string) => void;
   note: string;
   setNote: (v: string) => void;
-  onCamera: () => void;
   onCancel: () => void;
 }) {
   return (
@@ -284,9 +301,45 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
 
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onCancel} style={ghost()}>← Back</button>
-        <button onClick={onCamera} disabled={!studentId} style={primary({ fullWidth: true, large: true })}>
-          📷 Open Camera
+      </div>
+      <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+        💡 Tap a student — camera opens automatically.
+      </div>
+    </div>
+  );
+}
+
+function CameraStep({ entry, studentName, onRetry, onSkip }: {
+  entry: BcEntry & { type: "assignment" };
+  studentName?: string;
+  onRetry: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div style={{
+      padding: 24, borderRadius: 18,
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      textAlign: "center",
+    }}>
+      <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+        Camera opening…
+      </div>
+      <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 18 }}>
+        {studentName || "Student"} · {entry.name}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button onClick={onRetry} style={primary({ fullWidth: true })}>
+          📷 Open camera again
         </button>
+        <button onClick={onSkip} style={ghost({ fullWidth: true })}>
+          Skip photo — back to scan
+        </button>
+      </div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 14 }}>
+        Phone didn't pop the camera? Tap "Open camera again". Some browsers
+        block auto-camera if you didn't tap something first.
       </div>
     </div>
   );
@@ -333,13 +386,14 @@ function primary(opts: { fullWidth?: boolean; large?: boolean } = {}): React.CSS
     boxShadow: "0 8px 22px rgba(99,102,241,0.35)",
   };
 }
-function ghost(): React.CSSProperties {
+function ghost(opts: { fullWidth?: boolean } = {}): React.CSSProperties {
   return {
     padding: "12px 16px", borderRadius: 10,
     background: "rgba(255,255,255,0.06)", color: "white",
     border: "1px solid rgba(255,255,255,0.18)",
     fontWeight: 700, cursor: "pointer", fontSize: 14,
     flexShrink: 0,
+    width: opts.fullWidth ? "100%" : "auto",
   };
 }
 
