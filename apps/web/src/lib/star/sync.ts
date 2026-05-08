@@ -81,19 +81,29 @@ export async function syncFromClassroom(): Promise<SyncResult> {
     const rows = (await api.getStudents(classId)) as Array<{ id: string; name: string; email?: string }>;
     if (Array.isArray(rows) && rows.length > 0) {
       studentsTotal = rows.length;
+      // Preserve manually-edited fields (grade, disability, phone, iep)
+      // across re-syncs by keying on the real DB id. The API only returns
+      // id/name/email — grade is set by the teacher in /star → Settings.
+      const existing = StarStore.getStudents();
+      const existingById = new Map(existing.map((s) => [s.id, s]));
+
       const next: StarStudent[] = rows.map((r) => {
         const parts = (r.name || "").trim().split(/\s+/);
         const firstName = parts[0] || r.name || "";
         const lastName  = parts.slice(1).join(" ") || "";
+        const prior = existingById.get(r.id);
         return {
           id: r.id,
           firstName, lastName,
           email: r.email,
+          // Carry forward whatever the teacher set previously.
+          grade:      prior?.grade,
+          disability: prior?.disability,
+          phone:      prior?.phone,
+          iep:        prior?.iep,
         };
       });
-      // Replace the roster entirely so legacy STU-### placeholders get
-      // cleaned out — the only source of truth is the API.
-      const existing = StarStore.getStudents();
+
       const existingIds = new Set(existing.map((s) => s.id));
       studentsAdded = next.filter((s) => !existingIds.has(s.id)).length;
       StarStore.setStudents(next);
