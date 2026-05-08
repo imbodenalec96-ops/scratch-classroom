@@ -21,14 +21,16 @@ import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
+import StarHome from "./StarHome.tsx";
+import StarGradebookView from "./StarGradebookView.tsx";
 
-type Tab = "generator" | "manual" | "reports" | "settings";
+type Tab = "home" | "gradebook" | "create" | "reports" | "settings";
 
 const SUBJECTS: Subject[] = ["Math","Reading","Writing","Science","Social Studies","PE","Art","Library","Music"];
 const GRADES = ["K","1st","2nd","3rd","4th","5th"];
 
 export default function StarPage() {
-  const [tab, setTab] = useState<Tab>("generator");
+  const [tab, setTab] = useState<Tab>("home");
   const [openGradebook, setOpenGradebook] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncResult | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -65,75 +67,110 @@ export default function StarPage() {
   }, []);
 
   return (
-    <div style={{ padding: 22, color: "#f5f1e8", maxWidth: 1280, margin: "0 auto" }}>
-      <header style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+    <div style={{ padding: "22px 22px 60px", color: "#f5f1e8", maxWidth: 1280, margin: "0 auto" }}>
+      {/* Compact title row */}
+      <header style={{ marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 52, height: 52, borderRadius: 14,
+            background: "linear-gradient(135deg, #6366f1, #b23a48)",
+            fontSize: 28, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
+          }}>⭐</span>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
-              ⭐ STAR Program
+            <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>STAR Program</h1>
+            <div style={{ fontSize: 12, opacity: 0.65 }}>
+              Special-Ed Tracker, Assessment &amp; Refusal Log
             </div>
-            <h1 style={{ fontSize: 28, fontWeight: 900, margin: "4px 0 6px" }}>
-              Special-Ed Tracker, Assessment & Refusal Log
-            </h1>
-            <p style={{ opacity: 0.7, fontSize: 13, margin: 0 }}>
-              Plug in a USB barcode scanner — scans pop the right modal anywhere in the app.
-              Use the tabs below to mint new barcodes, log paper assignments, and review reports.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <ManualBarcodeInput />
-            <button onClick={runSync} disabled={syncing} style={{
-              padding: "10px 14px", borderRadius: 10,
-              background: "rgba(99,102,241,0.15)", color: "white",
-              border: "1px solid rgba(99,102,241,0.40)",
-              fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
-            }}>
-              {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
-            </button>
           </div>
         </div>
-        {syncStatus && (
-          <div style={{
-            marginTop: 10, padding: "8px 12px", borderRadius: 8,
-            background: syncStatus.ok ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
-            border: `1px solid ${syncStatus.ok ? "rgba(16,185,129,0.30)" : "rgba(239,68,68,0.30)"}`,
-            fontSize: 12,
-          }}>
-            {syncStatus.message}
-          </div>
-        )}
+        <button onClick={runSync} disabled={syncing} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "rgba(99,102,241,0.15)", color: "white",
+          border: "1px solid rgba(99,102,241,0.40)",
+          fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
+        }}>
+          {syncing ? "Syncing…" : "🔄 Sync"}
+        </button>
       </header>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+      {/* HERO scanner — front and center */}
+      <div style={{
+        marginBottom: 16,
+        padding: "20px 24px",
+        borderRadius: 18,
+        background: "linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(178,58,72,0.10) 100%)",
+        border: "1px solid rgba(251,191,36,0.30)",
+        boxShadow: "0 12px 36px rgba(0,0,0,0.30)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 32 }}>📷</span>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 4 }}>
+              Scan or type a barcode
+            </div>
+            <HeroBarcodeInput />
+          </div>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+          USB barcode scanners type into the box automatically.
+          Scans pop the right modal — assignments, refusal forms, or pass barcodes — from any page in the app.
+        </div>
+      </div>
+
+      {syncStatus && syncStatus.message && (
+        <div style={{
+          marginBottom: 14, padding: "8px 12px", borderRadius: 8,
+          background: syncStatus.ok ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
+          border: `1px solid ${syncStatus.ok ? "rgba(16,185,129,0.30)" : "rgba(239,68,68,0.30)"}`,
+          fontSize: 12,
+        }}>
+          {syncStatus.message}
+        </div>
+      )}
+
+      {/* Tabs — pill style with icons + labels */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
         {([
-          { id: "generator" as Tab, label: "✨ Generator" },
-          { id: "manual"    as Tab, label: "📥 Add Old Work" },
-          { id: "reports"   as Tab, label: "📊 Reports" },
-          { id: "settings"  as Tab, label: "⚙️ Settings" },
+          { id: "home"      as Tab, icon: "🏠", label: "Home" },
+          { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
+          { id: "create"    as Tab, icon: "✨", label: "Create" },
+          { id: "reports"   as Tab, icon: "📊", label: "Reports" },
+          { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
         ]).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "10px 14px", borderRadius: 10,
-            background: tab === t.id ? "linear-gradient(135deg,#6366f1,#b23a48)" : "rgba(255,255,255,0.05)",
+            padding: "10px 16px", borderRadius: 999,
+            background: tab === t.id ? "linear-gradient(135deg,#6366f1,#b23a48)" : "rgba(255,255,255,0.04)",
             color: "white",
-            border: tab === t.id ? "1px solid rgba(251,191,36,0.40)" : "1px solid rgba(255,255,255,0.12)",
+            border: tab === t.id ? "1px solid rgba(251,191,36,0.55)" : "1px solid rgba(255,255,255,0.10)",
             fontWeight: 700, cursor: "pointer", fontSize: 14,
-          }}>{t.label}</button>
+            display: "flex", alignItems: "center", gap: 6,
+            boxShadow: tab === t.id ? "0 6px 18px rgba(99,102,241,0.30)" : "none",
+          }}>
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
         ))}
       </div>
 
-      {tab === "generator" && (
+      {tab === "home" && <StarHome onTab={(t) => setTab(t)} />}
+
+      {tab === "gradebook" && <StarGradebookView />}
+
+      {tab === "create" && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 14 }}>
             <AssignmentGenerator />
             <RefusalFormGenerator />
           </div>
           <div style={{ marginTop: 14 }}>
             <PassBarcodesPanel />
           </div>
+          <div style={{ marginTop: 14 }}>
+            <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
+          </div>
         </>
       )}
-
-      {tab === "manual" && <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />}
 
       {tab === "reports"  && <StarReports />}
 
@@ -143,6 +180,28 @@ export default function StarPage() {
         <GradebookModal barcode={openGradebook} onClose={() => setOpenGradebook(null)} />
       )}
     </div>
+  );
+}
+
+/* ── hero barcode input — bigger, friendlier than the small header one ─ */
+function HeroBarcodeInput() {
+  const [v, setV] = useState("");
+  return (
+    <input
+      id="star-barcode-input"
+      value={v}
+      onChange={(e) => setV(e.target.value.toUpperCase())}
+      onKeyDown={(e) => { if (e.key === "Enter") setTimeout(() => setV(""), 60); }}
+      placeholder="Type or scan barcode + Enter…"
+      autoFocus
+      style={{
+        width: "100%", padding: "14px 18px", borderRadius: 12,
+        background: "rgba(0,0,0,0.45)", color: "white",
+        border: "2px solid rgba(255,255,255,0.18)",
+        fontFamily: "Menlo, monospace", fontSize: 18, fontWeight: 700,
+        outline: "none", letterSpacing: "0.05em",
+      }}
+    />
   );
 }
 
@@ -217,32 +276,6 @@ function PassBarcodesPanel() {
         ))}
       </div>
     </div>
-  );
-}
-
-/* ── manual barcode input — works without a USB scanner ─────────── */
-// The id="star-barcode-input" matches the special-case in StarScanner —
-// keypresses while focused on this input flow into the same buffer the
-// USB scanner uses. So the global handler pops the right modal on Enter;
-// we just clear the visible value here.
-function ManualBarcodeInput() {
-  const [v, setV] = useState("");
-  return (
-    <input
-      id="star-barcode-input"
-      value={v}
-      onChange={(e) => setV(e.target.value.toUpperCase())}
-      onKeyDown={(e) => { if (e.key === "Enter") setTimeout(() => setV(""), 50); }}
-      placeholder="📷 Scan or type barcode + Enter"
-      autoFocus
-      style={{
-        padding: "10px 12px", borderRadius: 10,
-        background: "rgba(0,0,0,0.30)", color: "white",
-        border: "1px solid rgba(255,255,255,0.18)",
-        fontFamily: "Menlo, monospace", fontSize: 13, outline: "none",
-        width: 280,
-      }}
-    />
   );
 }
 

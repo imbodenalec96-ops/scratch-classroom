@@ -11,6 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import StarBoardOverlay from "./star/StarBoardOverlay.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
+import BoardStarPanel from "./star/BoardStarPanel.tsx";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -1832,6 +1833,10 @@ export default function ClassroomBoard() {
     {/* STAR active passes — bottom-left strip of students currently out
         on a bathroom / water / sensory break with running timers. */}
     <ActivePassesStrip />
+
+    {/* STAR live class view — toggle button top-right opens a slide-over
+        with today's completion tracker + grades matrix for the projector. */}
+    <BoardStarPanel />
 
     {/* Student wallet — overlay opened from the 💼 button. */}
     {showWallet && cls?.id && (
