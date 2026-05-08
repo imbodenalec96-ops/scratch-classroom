@@ -22,22 +22,50 @@ export default function BoardStarPanel() {
 
   return (
     <>
-      {/* Toggle button — top-right of the board, away from the help bell. */}
+      {/* Toggle — editorial pill matching The Roster's typography. Numbered
+          like other sections (№ 05) with small-caps serif tracking and a
+          thin amber rule. Amber pin dot stands in for the section dots
+          on every card; sits flush with the existing top-row furniture. */}
       <button onClick={() => setOpen(!open)} style={{
         position: "fixed", top: 16, right: 16, zIndex: 250,
-        padding: "10px 14px", borderRadius: 999,
-        background: open
-          ? "linear-gradient(135deg,#6366f1,#b23a48)"
-          : "rgba(0,0,0,0.55)",
-        color: "white", border: "1px solid rgba(251,191,36,0.45)",
-        fontWeight: 800, cursor: "pointer", fontSize: 14,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
-        backdropFilter: "blur(6px)",
-        display: "flex", alignItems: "center", gap: 8,
+        padding: "8px 14px 9px",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012))",
+        color: "#f5f1e8",
+        border: `1px solid ${open ? "rgba(251,191,36,0.50)" : "rgba(255,255,255,0.10)"}`,
+        borderRadius: 6,
+        cursor: "pointer",
+        boxShadow: open ? "0 8px 24px rgba(251,191,36,0.18)" : "0 2px 6px rgba(0,0,0,0.35)",
+        backdropFilter: "blur(8px)",
+        display: "flex", alignItems: "baseline", gap: 10,
+        fontFamily: "'Fraunces', 'Playfair Display', Georgia, serif",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
       }}>
-        <span>⭐</span>
-        <span>STAR</span>
-        {open && <span style={{ fontSize: 18, lineHeight: 1, marginLeft: 4 }}>✕</span>}
+        {/* Pin dot — same vocab as the cards on the roster */}
+        <span style={{
+          alignSelf: "center",
+          display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+          background: open ? "#fbbf24" : "rgba(245,241,232,0.40)",
+          boxShadow: open ? "0 0 6px rgba(251,191,36,0.55)" : "none",
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 11, fontWeight: 600, fontStyle: "italic",
+          color: open ? "#fbbf24" : "rgba(245,241,232,0.55)",
+          letterSpacing: "0.04em",
+        }}>№ 05</span>
+        <span style={{
+          fontSize: 14, fontWeight: 600,
+          letterSpacing: "0.22em", textTransform: "uppercase",
+          color: "#f5f1e8",
+        }}>Star</span>
+        {open && (
+          <span style={{
+            fontSize: 11, fontStyle: "italic", fontWeight: 500,
+            color: "rgba(245,241,232,0.55)",
+            letterSpacing: "0.04em",
+            marginLeft: 2,
+          }}>close ✕</span>
+        )}
       </button>
 
       {/* Slide-over panel */}
