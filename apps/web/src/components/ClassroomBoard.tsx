@@ -658,7 +658,10 @@ export default function ClassroomBoard() {
   const bgUrl = board.settings?.background_image_url;
   // Editorial deep-night background — ink navy with a whisper of warmth,
   // a subtle paper-grain overlay, and a single brick-red corner mark.
-  const bg = "radial-gradient(ellipse at top left, #17192b 0%, #0d1321 55%, #07080f 100%)";
+  // Background: deep near-black with subtle violet+pink radial accents
+  // in opposite corners — matches the STAR /star page identity for
+  // visual continuity across the whole product.
+  const bg = `radial-gradient(1200px 800px at 0% 0%, rgba(99,102,241,0.10) 0%, transparent 60%), radial-gradient(1000px 700px at 100% 100%, rgba(236,72,153,0.08) 0%, transparent 60%), radial-gradient(ellipse at center, #14152a 0%, #0a0a14 100%)`;
   const musicPreset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
   const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#d97706";
 
@@ -667,34 +670,45 @@ export default function ClassroomBoard() {
   const serif = "'Fraunces', 'Playfair Display', Georgia, serif";
   const mono  = "'JetBrains Mono', 'SF Mono', ui-monospace, monospace";
 
-  // Editorial section label: small-caps serif + tracking + a thin rule, numbered.
+  // Editorial section label: small-caps serif + tracking + a thin rule,
+  // numbered. Accent number now violet (matches the STAR identity)
+  // with a tiny dot bullet to reinforce the "section" feel.
   const SectionLabel: React.FC<{ n: string; title: string; kicker?: string; align?: "left" | "right" }> = ({ n, title, kicker, align = "left" }) => (
     <div style={{
       display: "flex", alignItems: "baseline", gap: 10,
-      borderBottom: `1px solid ${g(0.08)}`, paddingBottom: 4, marginBottom: 7,
+      borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 6, marginBottom: 9,
       flexDirection: align === "right" ? "row-reverse" : "row",
     }}>
       <span style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
         fontFamily: serif, fontSize: 12, fontWeight: 600, fontStyle: "italic",
-        color: "rgba(217,119,6,0.9)", letterSpacing: "0.02em",
-      }}>№ {n}</span>
+        color: "rgba(168,85,247,0.95)", letterSpacing: "0.02em",
+      }}>
+        <span style={{
+          display: "inline-block", width: 5, height: 5, borderRadius: "50%",
+          background: "rgba(168,85,247,0.95)",
+          boxShadow: "0 0 8px rgba(168,85,247,0.7)",
+        }} />
+        № {n}
+      </span>
       <span style={{
-        fontFamily: serif, fontSize: 16, fontWeight: 600, letterSpacing: "0.18em",
-        textTransform: "uppercase", color: "rgba(255,255,255,0.88)",
+        fontFamily: serif, fontSize: 17, fontWeight: 600, letterSpacing: "0.20em",
+        textTransform: "uppercase", color: "rgba(255,255,255,0.92)",
       }}>{title}</span>
       {kicker && (
         <span style={{
           fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 500,
-          color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", marginLeft: align === "right" ? 0 : "auto", marginRight: align === "right" ? "auto" : 0,
+          color: "rgba(255,255,255,0.42)", letterSpacing: "0.10em",
+          marginLeft: align === "right" ? 0 : "auto", marginRight: align === "right" ? "auto" : 0,
         }}>{kicker}</span>
       )}
     </div>
   );
 
   const card = {
-    background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008))",
-    border: `1px solid ${g(0.07)}`,
-    borderRadius: 6,
+    background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.010))",
+    border: `1px solid ${g(0.10)}`,
+    borderRadius: 8,
   } as const;
 
   return (
@@ -1045,11 +1059,12 @@ export default function ClassroomBoard() {
         }}>
           <span style={{
             fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-            color: "rgba(217,119,6,0.85)", letterSpacing: "0.28em", textTransform: "uppercase",
+            color: "rgba(168,85,247,0.95)", letterSpacing: "0.28em", textTransform: "uppercase",
           }}>Cycle Day</span>
           <span style={{
-            fontFamily: serif, fontSize: 38, fontWeight: 600, lineHeight: 1,
-            color: "#fbbf24", letterSpacing: "-0.02em",
+            fontFamily: serif, fontSize: 42, fontWeight: 600, lineHeight: 1,
+            color: "#c084fc", letterSpacing: "-0.02em",
+            textShadow: "0 0 24px rgba(168,85,247,0.45)",
           }}>{dayLetter}</span>
         </div>
 

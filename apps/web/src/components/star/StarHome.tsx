@@ -71,20 +71,20 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
 
   return (
     <div>
-      {/* Big page header */}
+      {/* Big page header — matches the other tabs' PageHeader pattern */}
       <div style={{ marginBottom: T.space["2xl"] }}>
         <div style={{
           fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
           letterSpacing: "0.22em", textTransform: "uppercase",
           color: T.color.accent, marginBottom: T.space.xs,
         }}>
-          ⭐ Today at a glance
+          🏠 Today at a glance
         </div>
         <h2 style={{
           fontSize: T.font.size["4xl"], fontWeight: T.font.weight.black,
           margin: 0, letterSpacing: "-0.025em", lineHeight: 1.05,
         }}>Welcome back.</h2>
-        <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5 }}>
+        <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5, maxWidth: 720 }}>
           Snapshot of your classroom right now — completions, refusals, who's out, and points awarded.
         </p>
       </div>

@@ -235,30 +235,71 @@ export default function StarPage() {
 
       {tab === "create" && (
         <>
-          <div style={{ marginBottom: 14 }}>
+          <PageHeader
+            kicker="✨ Create"
+            title="Build assignments + barcodes"
+            subtitle="Generate fresh content per student, mint refusal forms, print pass + status barcode sheets, or add an old paper assignment to the system."
+          />
+
+          <SectionWrapper icon="🌇" title="Afternoon pack" description="Bulk-generate one assignment per student in one click. Print all in one PDF.">
             <AfternoonPackGenerator />
+          </SectionWrapper>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: T.space.lg, marginBottom: T.space["2xl"] }}>
+            <SectionWrapper icon="✨" title="Single assignment" description="One barcoded worksheet for one kid.">
+              <AssignmentGenerator />
+            </SectionWrapper>
+            <SectionWrapper icon="🚨" title="Refusal form" description="Print a fresh refusal incident form.">
+              <RefusalFormGenerator />
+            </SectionWrapper>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 14 }}>
-            <AssignmentGenerator />
-            <RefusalFormGenerator />
-          </div>
-          <div style={{ marginTop: 14 }}>
+
+          <SectionWrapper icon="🚻" title="Pass barcodes" description="Laminate near the door — bathroom / water / sensory break.">
             <PassBarcodesPanel />
-          </div>
-          <div style={{ marginTop: 14 }}>
+          </SectionWrapper>
+
+          <SectionWrapper icon="📋" title="Status barcodes" description="Mark assignments absent / skipped / excused / makeup with one scan.">
             <StatusBarcodesPanel />
-          </div>
-          <div style={{ marginTop: 14 }}>
+          </SectionWrapper>
+
+          <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
             <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
-          </div>
+          </SectionWrapper>
         </>
       )}
 
-      {tab === "reports"  && <StarReports />}
+      {tab === "reports" && (
+        <>
+          <PageHeader
+            kicker="📊 Reports"
+            title="What's been happening"
+            subtitle="Filterable tables of refusals, assignment submissions, and the barcode database. Export any view to CSV."
+          />
+          <StarReports />
+        </>
+      )}
 
-      {tab === "data"     && <StarDataView />}
+      {tab === "data" && (
+        <>
+          <PageHeader
+            kicker="💾 Data"
+            title="Storage inspector"
+            subtitle="See exactly what's saved in this device's localStorage. Wipe a section, wipe everything, or export the whole STAR snapshot as JSON."
+          />
+          <StarDataView />
+        </>
+      )}
 
-      {tab === "settings" && <SettingsPanel />}
+      {tab === "settings" && (
+        <>
+          <PageHeader
+            kicker="⚙️ Settings"
+            title="Preferences + roster"
+            subtitle="OpenRouter AI key, points-per-completion, quick note templates, and your student roster."
+          />
+          <SettingsPanel />
+        </>
+      )}
 
       {openGradebook && (
         <GradebookModal barcode={openGradebook} onClose={() => setOpenGradebook(null)} />
@@ -270,6 +311,54 @@ export default function StarPage() {
 }
 
 /* ── hero barcode input — bigger, friendlier than the small header one ─ */
+/* ── shared layout helpers used by every tab ─────────────────────── */
+
+function PageHeader({ kicker, title, subtitle }: { kicker: string; title: string; subtitle?: string }) {
+  return (
+    <div style={{ marginBottom: T.space["2xl"] }}>
+      <div style={{
+        fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+        letterSpacing: "0.22em", textTransform: "uppercase",
+        color: T.color.accent, marginBottom: T.space.xs,
+      }}>{kicker}</div>
+      <h2 style={{
+        fontSize: T.font.size["4xl"], fontWeight: T.font.weight.black,
+        margin: 0, letterSpacing: "-0.025em", lineHeight: 1.05,
+      }}>{title}</h2>
+      {subtitle && (
+        <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5, maxWidth: 720 }}>
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SectionWrapper({ icon, title, description, children }: {
+  icon?: string; title: string; description?: string; children: React.ReactNode;
+}) {
+  return (
+    <section style={{ marginBottom: T.space["2xl"] }}>
+      <div style={{ marginBottom: T.space.md }}>
+        <h3 style={{
+          fontSize: T.font.size.xl, fontWeight: T.font.weight.bold,
+          margin: 0, letterSpacing: "-0.01em",
+          display: "flex", alignItems: "center", gap: T.space.sm,
+        }}>
+          {icon && <span style={{ fontSize: T.font.size["2xl"] }}>{icon}</span>}
+          {title}
+        </h3>
+        {description && (
+          <p style={{ margin: `${T.space.xs}px 0 0`, color: T.color.textMuted, fontSize: T.font.size.md }}>
+            {description}
+          </p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function HeroBarcodeInput() {
   const [v, setV] = useState("");
   const [focused, setFocused] = useState(false);
