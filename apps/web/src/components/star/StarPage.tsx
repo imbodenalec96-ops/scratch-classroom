@@ -23,6 +23,8 @@ import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
 import IepTracker from "./IepTracker.tsx";
 import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
+import SnapshotGenerator from "./SnapshotGenerator.tsx";
+import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
@@ -284,6 +286,18 @@ export default function StarPage() {
               </SectionWrapper>
               <SectionWrapper icon="🎯" title="Personal quiz" description="One MCQ quiz for one kid.">
                 <QuizGenerator />
+              </SectionWrapper>
+            </div>
+          </CreateGroup>
+
+          {/* GROUP — Reports & Share (parent/student snapshots + sub plans) */}
+          <CreateGroup label="Reports & Share" hint="One-tap printable PDFs — for parents, kids, and substitutes.">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="📤" title="Today's Snapshot" description="One-page PDF of a kid's day — parent edition or kid-friendly student edition.">
+                <SnapshotGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="📋" title="Sub plans packet" description="Schedule + roster + IEP cliff notes + your emergency procedures, all in one PDF.">
+                <SubPlansGenerator />
               </SectionWrapper>
             </div>
           </CreateGroup>
@@ -947,17 +961,27 @@ function SettingsPanel() {
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflow: "auto" }}>
           {students.map((s, i) => (
             <div key={s.id} style={{
-              display: "grid", gridTemplateColumns: "auto 1fr 1fr 80px auto",
-              gap: 6, alignItems: "center",
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 8, padding: 6,
             }}>
-              <span style={{ fontFamily: "Menlo, monospace", fontSize: 11, opacity: 0.7, padding: "0 4px" }}>{s.id}</span>
-              <input value={s.firstName} onChange={(e) => setStudent(i, { firstName: e.target.value })} placeholder="First" style={inp()} />
-              <input value={s.lastName}  onChange={(e) => setStudent(i, { lastName: e.target.value })}  placeholder="Last"  style={inp()} />
-              <input value={s.grade || ""} onChange={(e) => setStudent(i, { grade: e.target.value })}   placeholder="Grade" style={inp()} />
-              <button onClick={() => removeStudent(i)} style={ghostBtn()}>✕</button>
+              <div style={{
+                display: "grid", gridTemplateColumns: "auto 1fr 1fr 80px auto",
+                gap: 6, alignItems: "center",
+              }}>
+                <span style={{ fontFamily: "Menlo, monospace", fontSize: 11, opacity: 0.7, padding: "0 4px" }}>{s.id}</span>
+                <input value={s.firstName} onChange={(e) => setStudent(i, { firstName: e.target.value })} placeholder="First" style={inp()} />
+                <input value={s.lastName}  onChange={(e) => setStudent(i, { lastName: e.target.value })}  placeholder="Last"  style={inp()} />
+                <input value={s.grade || ""} onChange={(e) => setStudent(i, { grade: e.target.value })}   placeholder="Grade" style={inp()} />
+                <button onClick={() => removeStudent(i)} style={ghostBtn()}>✕</button>
+              </div>
+              <textarea
+                value={s.subNotes || ""}
+                onChange={(e) => setStudent(i, { subNotes: e.target.value })}
+                rows={2}
+                placeholder="📋 Sub notes — triggers, calming strategies, what works (printed in the Sub Plans packet)"
+                style={{ ...inp(), marginTop: 6, resize: "vertical", fontFamily: "inherit", minHeight: 50 }}
+              />
             </div>
           ))}
           <button onClick={addStudent} style={ghostBtn()}>+ Add student</button>

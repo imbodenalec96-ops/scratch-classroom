@@ -13,6 +13,13 @@ export interface StarStudent {
   phone?: string;
   email?: string;
   iep?: string;
+  // Free-text quick reference for substitute teachers — triggers,
+  // calming strategies, what works, what doesn't. Printed in the
+  // Sub Plans packet beneath the kid's IEP cliff notes.
+  subNotes?: string;
+  // Optional parent contact for the Snapshot share line.
+  parentName?: string;
+  parentEmail?: string;
 }
 
 export interface StarQuestion {
