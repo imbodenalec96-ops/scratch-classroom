@@ -41,18 +41,18 @@ const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string
 //   4th — warm amber (afternoon sun)
 //   5th — brick red (masthead / upperclass)
 const GRADE_COLORS: Record<number, { from: string; to: string; border: string; text: string; glow: string; ink: string; motif: string }> = {
-  3: { from: "rgba(42,111,106,0.28)", to: "rgba(42,111,106,0.08)", border: "rgba(94,234,212,0.55)", text: "#7dd3c5", glow: "rgba(20,184,166,0.35)", ink: "#0f2b29", motif: "3RD" },
-  4: { from: "rgba(217,119,6,0.28)",  to: "rgba(217,119,6,0.08)",  border: "rgba(251,191,36,0.55)", text: "#fbbf24", glow: "rgba(245,158,11,0.35)", ink: "#2a1805", motif: "4TH" },
-  5: { from: "rgba(178,58,72,0.28)",  to: "rgba(178,58,72,0.08)",  border: "rgba(248,113,113,0.55)", text: "#fca5a5", glow: "rgba(178,58,72,0.35)",  ink: "#2b0d11", motif: "5TH" },
+  3: { from: "rgba(99,102,241,0.30)",  to: "rgba(99,102,241,0.08)",  border: "rgba(99,102,241,0.55)",  text: "#a5b4fc", glow: "rgba(99,102,241,0.40)",  ink: "#0f0a2e", motif: "3RD" },
+  4: { from: "rgba(168,85,247,0.30)",  to: "rgba(168,85,247,0.08)",  border: "rgba(168,85,247,0.55)",  text: "#c4b5fd", glow: "rgba(168,85,247,0.40)",  ink: "#1a0f2e", motif: "4TH" },
+  5: { from: "rgba(236,72,153,0.30)",  to: "rgba(236,72,153,0.08)",  border: "rgba(236,72,153,0.55)",  text: "#f9a8d4", glow: "rgba(236,72,153,0.40)",  ink: "#2e0f24", motif: "5TH" },
 };
 
-// Behavior levels: keep semantic traffic-light logic but shift off candy tones
+// Behavior levels: traffic-light logic recolored to fit the violet/pink identity
 const BEHAVIOR_LEVELS: Record<number, { label: string; short: string; icon: string; color: string; bg: string; glow: string }> = {
-  1: { label: "Level 1",  short: "Lv 1",  icon: "1", color: "#f87171", bg: "rgba(178,58,72,0.28)",  glow: "rgba(178,58,72,0.28)" },
-  2: { label: "Level 2",  short: "Lv 2",  icon: "2", color: "#fb923c", bg: "rgba(217,119,6,0.28)",  glow: "rgba(217,119,6,0.28)" },
-  3: { label: "Level 3",  short: "Lv 3",  icon: "3", color: "#fbbf24", bg: "rgba(202,138,4,0.28)",  glow: "rgba(202,138,4,0.28)" },
-  4: { label: "Level 4",  short: "Lv 4",  icon: "4", color: "#86efac", bg: "rgba(21,128,61,0.28)",  glow: "rgba(21,128,61,0.28)" },
-  5: { label: "Level 5",  short: "Lv 5",  icon: "5", color: "#7dd3c5", bg: "rgba(42,111,106,0.32)", glow: "rgba(42,111,106,0.32)" },
+  1: { label: "Level 1",  short: "Lv 1",  icon: "1", color: "#f87171", bg: "rgba(239,68,68,0.28)",   glow: "rgba(239,68,68,0.30)"   },
+  2: { label: "Level 2",  short: "Lv 2",  icon: "2", color: "#fb7185", bg: "rgba(244,63,94,0.28)",   glow: "rgba(244,63,94,0.30)"   },
+  3: { label: "Level 3",  short: "Lv 3",  icon: "3", color: "#f472b6", bg: "rgba(236,72,153,0.28)",  glow: "rgba(236,72,153,0.30)"  },
+  4: { label: "Level 4",  short: "Lv 4",  icon: "4", color: "#c084fc", bg: "rgba(168,85,247,0.28)",  glow: "rgba(168,85,247,0.30)"  },
+  5: { label: "Level 5",  short: "Lv 5",  icon: "5", color: "#a5b4fc", bg: "rgba(99,102,241,0.32)",  glow: "rgba(99,102,241,0.32)"  },
 };
 
 const ACTIVITY_EMOJI: Array<[string, string]> = [
@@ -64,20 +64,20 @@ function actEmoji(name = "") {
   return "✨";
 }
 
-// Subject accents use the editorial palette (teal/amber/brick/ink) — not rainbow
+// Subject accents — violet/pink/indigo identity
 const SUBJECT_ACCENT: Record<string, string> = {
-  math: "#b23a48", sel: "#d97706", coding_art_gym: "#2a6f6a",
-  video_learning: "#5b7ca8", writing: "#2a6f6a", daily_news: "#8a6d3b",
-  review: "#b23a48", cashout: "#d97706", lunch: "#5b8a6e", recess: "#5b8a6e",
-  calm_down: "#5b7ca8", ted_talk: "#5b7ca8",
+  math: "#ec4899", sel: "#a855f7", coding_art_gym: "#6366f1",
+  video_learning: "#818cf8", writing: "#6366f1", daily_news: "#c084fc",
+  review: "#ec4899", cashout: "#a855f7", lunch: "#22c55e", recess: "#22c55e",
+  calm_down: "#818cf8", ted_talk: "#818cf8",
 };
 
 // Motion policy: two focal animations (full-star celebration + urgent countdown).
 // Everything else is still — editorial pages don't breathe.
 const ANIM = `
   @keyframes starGlow {
-    0%,100% { filter: drop-shadow(0 0 3px rgba(251,191,36,.7)); }
-    50%     { filter: drop-shadow(0 0 9px rgba(251,191,36,.95)) drop-shadow(0 0 18px rgba(217,119,6,.55)); }
+    0%,100% { filter: drop-shadow(0 0 4px rgba(236,72,153,.7)); }
+    50%     { filter: drop-shadow(0 0 10px rgba(236,72,153,.95)) drop-shadow(0 0 20px rgba(168,85,247,.6)); }
   }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(4px); }
@@ -88,8 +88,8 @@ const ANIM = `
     50%     { opacity: .55; }
   }
   @keyframes fullCard {
-    0%,100% { box-shadow: 0 0 0 1px rgba(251,191,36,.4), 0 6px 24px rgba(217,119,6,.18); }
-    50%     { box-shadow: 0 0 0 1px rgba(251,191,36,.75), 0 10px 36px rgba(217,119,6,.35); }
+    0%,100% { box-shadow: 0 0 0 1px rgba(236,72,153,.45), 0 8px 28px -8px rgba(168,85,247,.40); }
+    50%     { box-shadow: 0 0 0 1px rgba(236,72,153,.85), 0 14px 42px -8px rgba(168,85,247,.65); }
   }
   @keyframes helpPulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 8px 24px rgba(239,68,68,0.45); transform: scale(1); }
@@ -675,30 +675,32 @@ export default function ClassroomBoard() {
   // with a tiny dot bullet to reinforce the "section" feel.
   const SectionLabel: React.FC<{ n: string; title: string; kicker?: string; align?: "left" | "right" }> = ({ n, title, kicker, align = "left" }) => (
     <div style={{
-      display: "flex", alignItems: "baseline", gap: 10,
-      borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 6, marginBottom: 9,
+      display: "flex", alignItems: "center", gap: 10,
+      paddingBottom: 8, marginBottom: 10,
+      borderBottom: `1px solid rgba(168,85,247,0.15)`,
       flexDirection: align === "right" ? "row-reverse" : "row",
     }}>
       <span style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        fontFamily: serif, fontSize: 12, fontWeight: 600, fontStyle: "italic",
-        color: "rgba(168,85,247,0.95)", letterSpacing: "0.02em",
-      }}>
-        <span style={{
-          display: "inline-block", width: 5, height: 5, borderRadius: "50%",
-          background: "rgba(168,85,247,0.95)",
-          boxShadow: "0 0 8px rgba(168,85,247,0.7)",
-        }} />
-        № {n}
-      </span>
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 26, height: 22, borderRadius: 7,
+        fontFamily: "'Inter', sans-serif",
+        fontSize: 10, fontWeight: 900,
+        background: "linear-gradient(135deg, #ec4899, #a855f7)",
+        color: "white", letterSpacing: "0.04em",
+        boxShadow: "0 0 12px rgba(168,85,247,0.45)",
+      }}>{n}</span>
       <span style={{
-        fontFamily: serif, fontSize: 17, fontWeight: 600, letterSpacing: "0.20em",
-        textTransform: "uppercase", color: "rgba(255,255,255,0.92)",
+        fontFamily: "'Inter', sans-serif",
+        fontSize: 16, fontWeight: 800, letterSpacing: "-0.01em",
+        background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        backgroundClip: "text",
       }}>{title}</span>
       {kicker && (
         <span style={{
-          fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 500,
-          color: "rgba(255,255,255,0.42)", letterSpacing: "0.10em",
+          fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 700,
+          color: "rgba(196,181,253,0.65)", letterSpacing: "0.16em",
+          textTransform: "uppercase",
           marginLeft: align === "right" ? 0 : "auto", marginRight: align === "right" ? "auto" : 0,
         }}>{kicker}</span>
       )}
@@ -803,55 +805,54 @@ export default function ClassroomBoard() {
           }}
         >
           <div style={{
-            fontFamily: serif, fontStyle: "italic",
-            fontSize: 11, fontWeight: 600,
-            letterSpacing: "0.16em", textTransform: "uppercase",
-            color: g(0.45),
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 10, fontWeight: 800,
+            letterSpacing: "0.22em", textTransform: "uppercase",
+            color: "rgba(196,181,253,0.65)",
             whiteSpace: "nowrap",
           }}>
-            Class progress
+            Class Progress
           </div>
 
-          {/* Hairline rail with subtle accent fill */}
+          {/* Violet/pink rail with bright fill */}
           <div style={{
             flex: 1,
-            height: 2,
-            background: g(0.08),
-            borderRadius: 1,
+            height: 4,
+            background: "rgba(168,85,247,0.10)",
+            borderRadius: 999,
             overflow: "hidden",
             position: "relative",
+            border: "1px solid rgba(168,85,247,0.18)",
           }}>
             <div style={{
               position: "absolute",
-              top: -1, left: 0, height: 4,
+              top: 0, left: 0, height: "100%",
               width: `${classProgress.pct}%`,
               background: classProgress.pct >= 100
-                ? "linear-gradient(90deg, transparent, #5b8a6e 40%, #7dd3c5 80%)"
-                : "linear-gradient(90deg, transparent, #d97706 40%, #fbbf24 80%)",
-              borderRadius: 2,
+                ? "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)"
+                : "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+              borderRadius: 999,
               transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
               boxShadow: classProgress.pct >= 100
-                ? "0 0 8px rgba(125,211,197,0.5)"
-                : "0 0 8px rgba(251,191,36,0.4)",
+                ? "0 0 14px rgba(236,72,153,0.55)"
+                : "0 0 12px rgba(168,85,247,0.45)",
             }} />
           </div>
 
           <div style={{
-            fontFamily: serif, fontStyle: "italic",
-            fontSize: 13, fontWeight: 500,
-            color: classProgress.pct >= 100 ? "#7dd3c5" : "#fde68a",
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 13, fontWeight: 800,
+            color: classProgress.pct >= 100 ? "#f9a8d4" : "#c4b5fd",
             whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
           }}>
-            {/* Show actual work done across the class — done/total
-                assignments, not just "students who finished". This
-                makes the bar move continuously as kids submit. */}
             {(classProgress.totalDone ?? 0)}/{(classProgress.totalAssigned ?? 0)} · {classProgress.pct}%
           </div>
 
           {classProgress.recent[0] && (
             <div style={{
-              fontFamily: serif, fontStyle: "italic",
-              fontSize: 11, color: g(0.45),
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 11, fontWeight: 600, color: "rgba(196,181,253,0.55)",
               whiteSpace: "nowrap",
               overflow: "hidden", textOverflow: "ellipsis",
               maxWidth: 280,
@@ -859,20 +860,20 @@ export default function ClassroomBoard() {
               · just turned in: {(classProgress.recent[0].name || "?").split(" ")[0]} — {classProgress.recent[0].title}
             </div>
           )}
-          {/* Helper of the day — kid with most submissions today.
-              Renders inline with the bottom strip; vanishes if nobody
-              has submitted yet. ── */}
           {helperOfDay && helperOfDay.count > 0 && (
             <div style={{
-              fontFamily: serif, fontStyle: "italic",
-              fontSize: 11, color: "#fcd34d",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 10, fontWeight: 800,
+              color: "#fce7f3",
               whiteSpace: "nowrap",
-              padding: "2px 8px",
-              borderRadius: 2,
-              background: "rgba(217,119,6,0.18)",
-              border: "1px solid rgba(217,119,6,0.45)",
+              padding: "3px 10px",
+              borderRadius: 999,
+              background: "linear-gradient(135deg, rgba(236,72,153,0.25), rgba(168,85,247,0.12))",
+              border: "1px solid rgba(236,72,153,0.40)",
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              boxShadow: "0 0 10px rgba(236,72,153,0.20)",
             }}>
-              ⭐ helper of the day: {helperOfDay.name.split(" ")[0]} ({helperOfDay.count})
+              ★ helper of day: {helperOfDay.name.split(" ")[0]} ({helperOfDay.count})
             </div>
           )}
         </div>
@@ -889,41 +890,50 @@ export default function ClassroomBoard() {
             top: 78, left: "50%", transform: "translateX(-50%)",
             zIndex: 35,
             display: "flex", flexDirection: "column", alignItems: "center",
-            background: "linear-gradient(180deg, rgba(13,19,33,0.92) 0%, rgba(7,8,15,0.92) 100%)",
-            borderTop: `2px solid ${timerHitZero ? "#22c55e" : timerExpiringSoon ? "#b23a48" : "#7dd3c5"}`,
-            border: `1px solid ${g(0.14)}`,
-            borderRadius: 4,
-            padding: "8px 22px 10px",
+            background: "linear-gradient(180deg, rgba(26,15,46,0.94) 0%, rgba(10,4,20,0.94) 100%)",
+            border: timerHitZero
+              ? "1px solid rgba(34,197,94,0.55)"
+              : timerExpiringSoon
+                ? "1px solid rgba(239,68,68,0.65)"
+                : "1px solid rgba(168,85,247,0.45)",
+            borderRadius: 16,
+            padding: "10px 26px 12px",
             pointerEvents: "none",
-            boxShadow: timerExpiringSoon ? "0 0 24px rgba(178,58,72,0.45)" : "0 6px 20px rgba(0,0,0,0.4)",
+            boxShadow: timerExpiringSoon
+              ? "0 0 32px rgba(239,68,68,0.55), inset 0 1px 0 rgba(255,255,255,0.08)"
+              : "0 0 28px rgba(168,85,247,0.40), inset 0 1px 0 rgba(255,255,255,0.08)",
             animation: timerExpiringSoon ? "helpPulse 1s ease-in-out infinite" : undefined,
           }}
         >
           {timer?.label && (
             <div style={{
-              fontFamily: serif, fontStyle: "italic",
-              fontSize: 11, fontWeight: 600,
-              letterSpacing: "0.16em", textTransform: "uppercase",
-              color: g(0.55), marginBottom: 2,
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 10, fontWeight: 800,
+              letterSpacing: "0.22em", textTransform: "uppercase",
+              color: "rgba(196,181,253,0.75)", marginBottom: 3,
             }}>
               {timer.label}
             </div>
           )}
           <div style={{
-            fontFamily: serif, fontSize: 56, fontWeight: 500, fontStyle: "italic",
-            letterSpacing: "-0.02em", lineHeight: 1,
-            color: timerHitZero ? "#86efac" : timerExpiringSoon ? "#fca5a5" : "#fde68a",
+            fontFamily: mono, fontSize: 60, fontWeight: 800,
+            letterSpacing: "-0.025em", lineHeight: 1,
+            color: timerHitZero ? "#86efac" : timerExpiringSoon ? "#fecaca" : "#fce7f3",
             fontVariantNumeric: "tabular-nums",
+            textShadow: timerExpiringSoon
+              ? "0 0 18px rgba(252,165,165,0.55)"
+              : "0 0 18px rgba(252,231,243,0.40)",
           }}>
             {timerHitZero ? "Time!" : fmtTime(timerRemainingMs)}
           </div>
           {timer?.state === "paused" && (
             <div style={{
-              fontFamily: serif, fontStyle: "italic",
-              fontSize: 11, color: g(0.5),
-              marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 10, fontWeight: 800,
+              color: "rgba(196,181,253,0.6)",
+              marginTop: 3, letterSpacing: "0.18em", textTransform: "uppercase",
             }}>
-              ⏸ paused
+              ⏸ Paused
             </div>
           )}
         </div>
@@ -939,13 +949,14 @@ export default function ClassroomBoard() {
             top: 12, left: 14,
             zIndex: 36,
             width: 36, height: 36, borderRadius: "50%",
-            background: "rgba(13,19,33,0.85)",
-            border: `1px solid ${g(0.18)}`,
-            color: "#fde68a",
+            background: "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(99,102,241,0.10))",
+            border: `1px solid rgba(168,85,247,0.35)`,
+            color: "#fce7f3",
             fontSize: 18,
             cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
             touchAction: "manipulation",
+            boxShadow: "0 0 12px rgba(168,85,247,0.25)",
           }}
         >
           ⏱
@@ -1038,7 +1049,7 @@ export default function ClassroomBoard() {
       <header style={{
         position: "relative", zIndex: 1,
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12,
-        borderBottom: `1px solid ${g(0.12)}`, paddingBottom: 6,
+        borderBottom: `1px solid rgba(168,85,247,0.20)`, paddingBottom: 8,
       }}>
         {/* Left: class identity */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
@@ -1111,22 +1122,30 @@ export default function ClassroomBoard() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
           {musicPreset && (
             <button onClick={toggleMusic} style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "5px 11px",
-              borderRadius: 3, border: `1px solid ${g(0.16)}`,
-              background: musicPlaying ? "rgba(42,111,106,0.2)" : "transparent",
-              color: "rgba(255,255,255,0.85)", cursor: "pointer",
-              fontSize: 12, fontWeight: 500, letterSpacing: "0.02em",
-              fontFamily: serif, fontStyle: "italic",
+              display: "flex", alignItems: "center", gap: 7, padding: "6px 12px",
+              borderRadius: 999,
+              border: musicPlaying
+                ? "1px solid rgba(168,85,247,0.45)"
+                : "1px solid rgba(168,85,247,0.20)",
+              background: musicPlaying
+                ? "linear-gradient(135deg, rgba(168,85,247,0.20), rgba(99,102,241,0.10))"
+                : "rgba(168,85,247,0.04)",
+              color: "#f5f1e8", cursor: "pointer",
+              fontSize: 12, fontWeight: 700, letterSpacing: "0.02em",
+              fontFamily: "'Inter', sans-serif",
+              boxShadow: musicPlaying ? "0 0 12px rgba(168,85,247,0.25)" : undefined,
             }}>
-              <span style={{ fontStyle: "normal" }}>{musicPreset.emoji}</span>
+              <span>{musicPreset.emoji}</span>
               <span>{musicPreset.label}</span>
-              <span style={{ fontSize: 11, opacity: 0.7, fontStyle: "normal" }}>{musicPlaying ? "❙❙" : "▸"}</span>
+              <span style={{ fontSize: 11, opacity: 0.85 }}>{musicPlaying ? "❙❙" : "▸"}</span>
             </button>
           )}
           <div style={{
-            fontFamily: mono, fontSize: 36, fontWeight: 500,
-            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
-            color: "#f5f1e8",
+            fontFamily: mono, fontSize: 38, fontWeight: 700,
+            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.025em",
+            background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
           }}>{timeStr}</div>
           {isTeacher && (
             <>
@@ -1144,9 +1163,9 @@ export default function ClassroomBoard() {
             </>
           )}
           <button onClick={toggleFullscreen} style={{
-            padding: "5px 9px", borderRadius: 3, border: `1px solid ${g(0.16)}`,
-            background: "transparent", color: g(0.55), cursor: "pointer",
-            fontSize: 11, fontWeight: 600,
+            padding: "6px 10px", borderRadius: 8, border: `1px solid rgba(168,85,247,0.20)`,
+            background: "rgba(168,85,247,0.04)", color: "#c4b5fd", cursor: "pointer",
+            fontSize: 12, fontWeight: 700,
           }}>{isFullscreen ? "✕" : "⛶"}</button>
         </div>
       </header>
@@ -1731,11 +1750,11 @@ export default function ClassroomBoard() {
                           opacity: i < stars ? 1 : 0.18,
                           filter: i < stars
                             ? (isFull
-                                ? "drop-shadow(0 0 6px rgba(251,191,36,1)) drop-shadow(0 0 12px rgba(245,158,11,.6))"
-                                : "drop-shadow(0 0 3px rgba(251,191,36,.45))")
+                                ? "drop-shadow(0 0 6px rgba(236,72,153,1)) drop-shadow(0 0 12px rgba(168,85,247,.6))"
+                                : "drop-shadow(0 0 3px rgba(236,72,153,.55))")
                             : "none",
                           animation: i < stars && isFull ? `starGlow 2.2s ease-in-out ${i * 0.15}s infinite` : undefined,
-                          color: i < stars ? (isFull ? "#fbbf24" : "#fcd34d") : "rgba(245,241,232,0.28)",
+                          color: i < stars ? (isFull ? "#f9a8d4" : "#fbcfe8") : "rgba(196,181,253,0.22)",
                           transition: "all .3s ease",
                         }}>★</span>
                       ))}
@@ -1794,31 +1813,33 @@ export default function ClassroomBoard() {
                           padding: "2px 0 0",
                         }}>
                           <div style={{
-                            height: 4,
-                            background: "rgba(245,241,232,0.10)",
-                            borderRadius: 2,
+                            height: 5,
+                            background: "rgba(168,85,247,0.10)",
+                            borderRadius: 999,
                             overflow: "hidden",
                             position: "relative",
+                            border: "1px solid rgba(168,85,247,0.18)",
                           }}>
                             <div style={{
                               height: "100%",
                               width: `${sp.pct}%`,
                               background: fillsStar
-                                ? "linear-gradient(90deg, #5b8a6e 0%, #7dd3c5 100%)"
-                                : "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
-                              borderRadius: 2,
+                                ? "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)"
+                                : "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+                              borderRadius: 999,
                               transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
                               boxShadow: fillsStar
-                                ? "0 0 6px rgba(125,211,197,0.55)"
-                                : "0 0 5px rgba(251,191,36,0.45)",
+                                ? "0 0 8px rgba(236,72,153,0.55)"
+                                : "0 0 6px rgba(168,85,247,0.45)",
                             }} />
                           </div>
                           <div style={{
-                            fontFamily: serif, fontStyle: "italic",
-                            fontSize: 10, lineHeight: 1,
-                            color: fillsStar ? "#7dd3c5" : "rgba(253,230,138,0.85)",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: 10, lineHeight: 1, fontWeight: 800,
+                            color: fillsStar ? "#f9a8d4" : "#c4b5fd",
                             fontVariantNumeric: "tabular-nums",
                             textAlign: "center",
+                            letterSpacing: "0.04em",
                           }}>
                             ★ {sp.done}/{sp.total}{fillsStar ? " ✓" : ""}
                           </div>
@@ -2015,53 +2036,52 @@ export default function ClassroomBoard() {
                 const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 4, overflow: "hidden",
+                    flex: 1, borderRadius: 12, overflow: "hidden",
                     display: "flex", alignItems: "stretch",
-                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(13,19,33,0.06) 85%)`,
+                    background: `linear-gradient(95deg, ${gc.from} 0%, rgba(15,15,28,0.20) 90%)`,
                     border: `1px solid ${gc.border}`,
                     animation: `fadeUp .5s ease ${gi * 0.06}s both`,
+                    boxShadow: `0 4px 16px -8px ${gc.glow}`,
                   }}>
                     {/* Emoji + grade badge */}
                     <div style={{
-                      width: 60, flexShrink: 0, display: "flex", flexDirection: "column",
+                      width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
                       alignItems: "center", justifyContent: "center", gap: 3,
                       borderRight: `1px solid ${gc.border}`,
-                      background: "rgba(7,8,15,0.30)",
+                      background: "linear-gradient(180deg, rgba(15,15,28,0.45), rgba(15,15,28,0.20))",
                     }}>
-                      <div style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</div>
+                      <div style={{ fontSize: 24, lineHeight: 1 }}>{emoji}</div>
                       <div style={{
-                        fontFamily: serif, fontStyle: "italic",
-                        fontSize: 13, fontWeight: 700, color: gc.text,
-                        letterSpacing: "0.05em",
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: 11, fontWeight: 800, color: gc.text,
+                        letterSpacing: "0.10em",
+                        padding: "1px 7px", borderRadius: 999,
+                        background: `${gc.text}1f`,
+                        border: `1px solid ${gc.text}55`,
                       }}>{gc.motif}</div>
                     </div>
                     {/* Activity + roster */}
                     <div style={{
-                      flex: 1, padding: "8px 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4,
+                      flex: 1, padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5,
                       minWidth: 0,
                     }}>
                       <div style={{
-                        // Sans-serif here — the serif we use elsewhere
-                        // breaks apart at the board's fractional scale
-                        // (1920px → 70-80% browser scaling chops glyph
-                        // stems on short words like "Art" / "P.E"). Sans
-                        // is much more robust at sub-pixel sizes.
                         fontFamily: "'Inter', system-ui, sans-serif",
-                        fontSize: 22, fontWeight: 800,
+                        fontSize: 22, fontWeight: 900,
                         color: gc.text,
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                         lineHeight: 1.1,
-                        letterSpacing: "0.01em",
+                        letterSpacing: "-0.015em",
                         textRendering: "optimizeLegibility" as any,
                         WebkitFontSmoothing: "antialiased",
                         MozOsxFontSmoothing: "grayscale",
-                        textShadow: "0 1px 0 rgba(0,0,0,0.25)",
+                        textShadow: `0 0 18px ${gc.glow}`,
                       }}>
-                        {act || <span style={{ opacity: 0.35, fontStyle: "italic", fontWeight: 500 }}>not yet scheduled</span>}
+                        {act || <span style={{ opacity: 0.35, fontWeight: 600 }}>not yet scheduled</span>}
                       </div>
                       <div style={{
-                        fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 400,
-                        color: "rgba(245,241,232,0.65)", letterSpacing: "0.01em",
+                        fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
+                        color: "rgba(245,241,232,0.60)", letterSpacing: "0.01em",
                       }}>
                         {students.map(s => (s.name || "?").split(" ")[0]).join("  ·  ")}
                       </div>
@@ -2071,14 +2091,14 @@ export default function ClassroomBoard() {
               })}
               {board.students.filter(s => !s.specials_grade).length > 0 && (
                 <div style={{
-                  borderRadius: 3, padding: "5px 12px", display: "flex", alignItems: "center", gap: 10,
-                  background: "rgba(255,255,255,0.02)", border: `1px dashed ${g(0.1)}`,
+                  borderRadius: 10, padding: "6px 14px", display: "flex", alignItems: "center", gap: 10,
+                  background: "rgba(168,85,247,0.04)", border: `1px dashed rgba(168,85,247,0.20)`,
                 }}>
                   <div style={{
-                    fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 500,
-                    color: "rgba(245,241,232,0.3)", letterSpacing: "0.16em", textTransform: "uppercase", flexShrink: 0,
-                  }}>unassigned</div>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "rgba(245,241,232,0.4)" }}>
+                    fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 800,
+                    color: "rgba(196,181,253,0.55)", letterSpacing: "0.22em", textTransform: "uppercase", flexShrink: 0,
+                  }}>Unassigned</div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 500, color: "rgba(245,241,232,0.40)" }}>
                     {board.students.filter(s => !s.specials_grade).map(s => (s.name || "?").split(" ")[0]).join("  ·  ")}
                   </div>
                 </div>
@@ -2104,14 +2124,16 @@ export default function ClassroomBoard() {
                   return (
                     <div key={d} style={{
                       textAlign: "center",
-                      fontFamily: serif, fontSize: 20,
-                      fontWeight: isToday ? 700 : 500,
-                      fontStyle: isToday ? "normal" : "italic",
-                      padding: "5px 2px", borderRadius: 4,
-                      background: isToday ? "rgba(217,119,6,0.75)" : "transparent",
-                      color: isToday ? "#fff" : "rgba(245,241,232,0.35)",
-                      border: isToday ? "1px solid #d97706" : "1px solid transparent",
+                      fontFamily: "'Inter', sans-serif", fontSize: 18,
+                      fontWeight: isToday ? 900 : 700,
+                      padding: "5px 2px", borderRadius: 8,
+                      background: isToday
+                        ? "linear-gradient(135deg, #ec4899, #a855f7)"
+                        : "transparent",
+                      color: isToday ? "#fff" : "rgba(196,181,253,0.40)",
+                      border: isToday ? "1px solid rgba(236,72,153,0.55)" : "1px solid transparent",
                       letterSpacing: "0.04em",
+                      boxShadow: isToday ? "0 0 14px rgba(236,72,153,0.40)" : "none",
                     }}>
                       {d}
                     </div>
@@ -2126,10 +2148,10 @@ export default function ClassroomBoard() {
                     {/* Grade label cell */}
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontFamily: serif, fontStyle: "italic",
-                      fontSize: 18, fontWeight: 700, borderRadius: 4,
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: 16, fontWeight: 900, borderRadius: 8,
                       color: gc.text,
-                      background: `linear-gradient(180deg, ${gc.from}, rgba(13,19,33,0.2))`,
+                      background: `linear-gradient(180deg, ${gc.from}, rgba(15,15,28,0.20))`,
                       border: `1px solid ${gc.border}`,
                     }}>{grade}</div>
                     {DAY_LETTERS.map(day => {
@@ -2138,24 +2160,28 @@ export default function ClassroomBoard() {
                       return (
                         <div key={day} style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          textAlign: "center", borderRadius: 4, padding: "4px 2px",
-                          background: isToday ? `linear-gradient(160deg, rgba(217,119,6,0.55) 0%, rgba(217,119,6,0.25) 100%)` : "rgba(255,255,255,0.018)",
-                          border: isToday ? `1px solid rgba(217,119,6,0.7)` : `1px solid ${g(0.06)}`,
+                          textAlign: "center", borderRadius: 8, padding: "4px 2px",
+                          background: isToday
+                            ? "linear-gradient(160deg, rgba(236,72,153,0.40) 0%, rgba(168,85,247,0.18) 100%)"
+                            : "rgba(168,85,247,0.025)",
+                          border: isToday
+                            ? "1px solid rgba(236,72,153,0.55)"
+                            : "1px solid rgba(168,85,247,0.06)",
                           gap: 2, overflow: "hidden", minHeight: 0,
-                          boxShadow: isToday ? "inset 0 0 12px rgba(217,119,6,0.18)" : "none",
+                          boxShadow: isToday ? "inset 0 0 14px rgba(236,72,153,0.22)" : "none",
                         }}>
                           {c?.activity ? (
                             <>
-                              <span style={{ fontSize: 18, lineHeight: 1, opacity: isToday ? 1 : 0.6 }}>{actEmoji(c.activity)}</span>
+                              <span style={{ fontSize: 18, lineHeight: 1, opacity: isToday ? 1 : 0.55 }}>{actEmoji(c.activity)}</span>
                               <span style={{
-                                fontFamily: serif,
+                                fontFamily: "'Inter', sans-serif",
                                 fontSize: 11,
-                                fontWeight: isToday ? 600 : 400,
-                                fontStyle: "italic",
+                                fontWeight: isToday ? 800 : 600,
                                 lineHeight: 1.15,
                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 maxWidth: "100%", padding: "0 2px",
-                                color: isToday ? "#fde68a" : "rgba(245,241,232,0.45)",
+                                color: isToday ? "#fce7f3" : "rgba(196,181,253,0.45)",
+                                letterSpacing: "-0.005em",
                               }}>{c.activity}</span>
                             </>
                           ) : (
@@ -2175,39 +2201,56 @@ export default function ClassroomBoard() {
       {/* ── ROW 4: "The Ledger" — Behavior Levels strip ── */}
       <section style={{
         position: "relative", zIndex: 1,
-        ...card, borderRadius: 3,
-        display: "flex", alignItems: "center", gap: 14, padding: "0 16px",
+        ...card, borderRadius: 14,
+        display: "flex", alignItems: "center", gap: 14, padding: "0 18px",
         overflow: "hidden", flexShrink: 0,
-        borderTop: `1px solid ${g(0.12)}`,
       }}>
         <div style={{
-          fontFamily: serif, fontStyle: "italic", fontSize: 13, fontWeight: 600,
-          color: "rgba(217,119,6,0.85)", letterSpacing: "0.16em", textTransform: "uppercase",
-          flexShrink: 0, borderRight: `1px solid ${g(0.12)}`, paddingRight: 14,
-        }}>№ 04 · The Ledger</div>
-        <div style={{ flex: 1, display: "flex", gap: 16, alignItems: "center", overflow: "hidden" }}>
+          display: "inline-flex", alignItems: "center", gap: 8,
+          flexShrink: 0, paddingRight: 14,
+          borderRight: `1px solid rgba(168,85,247,0.18)`,
+        }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 26, height: 22, borderRadius: 7,
+            fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 900,
+            background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "white",
+            letterSpacing: "0.04em",
+            boxShadow: "0 0 12px rgba(168,85,247,0.45)",
+          }}>04</span>
+          <span style={{
+            fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 800,
+            letterSpacing: "-0.01em",
+            background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>The Ledger</span>
+        </div>
+        <div style={{ flex: 1, display: "flex", gap: 18, alignItems: "center", overflow: "hidden" }}>
           {[5, 4, 3, 2, 1].map(lv => {
             const at = board.students.filter(s => (s.level || 1) === lv);
             if (at.length === 0) return null;
             const lc = BEHAVIOR_LEVELS[lv];
             return (
-              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <div key={lv} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 <div style={{
-                  fontFamily: serif, fontStyle: "italic",
-                  fontSize: 13, fontWeight: 600,
-                  padding: "2px 10px 2px", borderRadius: 2,
-                  background: lc.bg, color: lc.color,
-                  borderLeft: `2px solid ${lc.color}`,
-                  letterSpacing: "0.02em",
-                }}>Lv {lv}</div>
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 11, fontWeight: 800,
+                  padding: "3px 10px", borderRadius: 999,
+                  background: `linear-gradient(135deg, ${lc.color}33, ${lc.color}11)`,
+                  color: lc.color,
+                  border: `1px solid ${lc.color}66`,
+                  letterSpacing: "0.10em", textTransform: "uppercase",
+                  boxShadow: `0 0 8px ${lc.color}33`,
+                }}>L{lv}</div>
                 {at.map((s, si) => (
                   <span key={s.id} style={{
                     fontFamily: "'Inter', sans-serif",
-                    fontSize: 13, fontWeight: 500,
-                    color: "rgba(245,241,232,0.82)",
-                    letterSpacing: "0.01em",
-                    paddingRight: si < at.length - 1 ? 6 : 0,
-                    borderRight: si < at.length - 1 ? `1px solid ${g(0.1)}` : "none",
+                    fontSize: 13, fontWeight: 700,
+                    color: "rgba(245,241,232,0.85)",
+                    letterSpacing: "-0.005em",
+                    paddingRight: si < at.length - 1 ? 8 : 0,
+                    borderRight: si < at.length - 1 ? `1px solid rgba(168,85,247,0.15)` : "none",
                   }}>{s.name}</span>
                 ))}
               </div>
