@@ -54,6 +54,14 @@ export type BcEntry =
       // Optional assigned student id (real DB id) so the gradebook can
       // pre-select that student when this barcode is scanned.
       studentId?: string;
+      // Optional IEP goal targeting — when set, GradebookModal
+      // auto-logs an IepLogEntry on save (Met if pct >= 80, Partial
+      // 50–79, Not yet < 50). The text is snapshotted so the print
+      // template + scan modal show the goal even if the goal is later
+      // edited or deleted.
+      iepGoalId?: string;
+      iepGoalArea?: string;
+      iepGoalText?: string;
     }
   | {
       id: string;
@@ -116,6 +124,10 @@ export interface StarTrackerEntry {
   week?: string;
   day?: string;
   goal?: string;
+  // IEP-aligned assignment fields (mirrored from BcEntry on creation).
+  iepGoalId?: string;
+  iepGoalArea?: string;
+  iepGoalText?: string;
   questions: StarQuestion[];
   lesson?: any;
   createdDate: string;

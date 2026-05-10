@@ -22,6 +22,7 @@ import AfternoonPackGenerator from "./AfternoonPackGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
 import IepTracker from "./IepTracker.tsx";
+import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
@@ -268,7 +269,14 @@ export default function StarPage() {
             </div>
           </CreateGroup>
 
-          {/* GROUP 2 — Quizzes (MCQ format) */}
+          {/* GROUP 2 — IEP-aligned (auto-logs progress on grade) */}
+          <CreateGroup label="IEP-Aligned" hint="Pick a kid's IEP goal — generated work auto-logs Met/Partial/Not yet on score.">
+            <SectionWrapper icon="🎯" title="From an IEP goal" description="Worksheet, quiz, or reflection — tied to a specific goal so the SEIF report fills in by itself.">
+              <IepAssignmentGenerator />
+            </SectionWrapper>
+          </CreateGroup>
+
+          {/* GROUP 3 — Quizzes (MCQ format) */}
           <CreateGroup label="Quizzes" hint="Multiple-choice. Bubble-sheet print + auto-grades on scan.">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
               <SectionWrapper icon="📝" title="Quiz pack" description="One MCQ quiz per kid in one PDF.">

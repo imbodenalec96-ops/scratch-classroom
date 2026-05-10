@@ -177,6 +177,28 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       window.alert(`Saved the grade, but couldn't award ${StarStore.getPointsPerCompletion()} points to ${s.firstName}: ${pointsError}\n\nTip: hit 🔄 Sync in /star to refresh the roster with real DB ids.`);
     }
 
+    // ── IEP auto-log ──
+    // If the assignment is tagged with an iepGoalId, write a daily IEP
+    // log entry so the SEIF report picks up the progress automatically.
+    // Map: pct >= 80 → met; 50–79 → partial; < 50 → not. Skipped/absent/
+    // excused/makeup don't count (they're already filtered out elsewhere).
+    if (
+      isCounting &&
+      (entry as any).iepGoalId &&
+      s.id
+    ) {
+      const goalArea = (entry as any).iepGoalArea || "IEP";
+      const iepStatus = pct >= 80 ? "met" : pct >= 50 ? "partial" : "not";
+      const iepNote = `Auto: ${entry.name} → ${score}/${max} (${pct}%, ${letter})`;
+      try {
+        StarStore.logIep(s.id, date, iepStatus, iepNote);
+        // Mention it inline so teacher knows this happened.
+        console.info(`[STAR] IEP auto-logged: ${s.firstName} · ${goalArea} · ${iepStatus}`);
+      } catch (e) {
+        console.warn("[STAR] IEP auto-log failed:", e);
+      }
+    }
+
     loggedBeep();
     setSaving(false);
     setSavedFlash(true);
@@ -221,11 +243,44 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       trailing={<Pill tone="accent" size="md"><span style={{ fontFamily: T.font.mono }}>{barcode}</span></Pill>}
       width={1000}
     >
+        {/* IEP focus banner — only shown for IEP-tagged assignments */}
+        {(entry as any).iepGoalText && (
+          <div style={{
+            marginBottom: 14, padding: "12px 14px", borderRadius: 12,
+            background: "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.10))",
+            border: "1px solid rgba(168,85,247,0.45)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 7,
+              padding: "3px 10px", borderRadius: 999,
+              background: "rgba(236,72,153,0.20)",
+              border: "1px solid rgba(236,72,153,0.40)",
+              fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+              color: "#fbcfe8", marginBottom: 8,
+            }}>🎯 IEP Focus · Auto-Logs Progress</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#fce7f3", lineHeight: 1.5 }}>
+              {(entry as any).iepGoalArea && (
+                <span style={{ color: "#f9a8d4", fontWeight: 800, marginRight: 6 }}>
+                  {(entry as any).iepGoalArea}:
+                </span>
+              )}
+              {(entry as any).iepGoalText}
+            </div>
+            <div style={{
+              marginTop: 6, fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 600,
+            }}>
+              Saving with score ≥80% logs as <b style={{ color: "#86efac" }}>Met</b> ·
+              50–79% as <b style={{ color: "#fcd34d" }}>Partial</b> · &lt;50% as <b style={{ color: "#fca5a5" }}>Not yet</b>.
+            </div>
+          </div>
+        )}
+
         {/* Info strip */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, marginBottom: 16 }}>
           <InfoCard label="Subject" value={`${entry.subject} · ${entry.gradeLevel || "—"}`} />
           <InfoCard label="Week / Day" value={`${entry.week ? `Week ${entry.week}` : "—"} · ${entry.day || "—"}`} />
-          <InfoCard label="IEP Goal" value={entry.goal || "—"} />
+          <InfoCard label="IEP Goal" value={(entry as any).iepGoalText || entry.goal || "—"} />
           <InfoCard label="Created" value={entry.createdDate ? new Date(entry.createdDate).toLocaleDateString() : "—"} />
         </div>
 
