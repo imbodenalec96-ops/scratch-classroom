@@ -70,128 +70,164 @@ export default function StarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const tabs = [
+    { id: "home"      as Tab, icon: "🏠", label: "Home" },
+    { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
+    { id: "create"    as Tab, icon: "✨", label: "Create" },
+    { id: "reports"   as Tab, icon: "📊", label: "Reports" },
+    { id: "data"      as Tab, icon: "💾", label: "Data" },
+    { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
+  ];
+
   return (
     <div style={{
-      padding: `${T.space["2xl"]}px ${T.space["2xl"]}px 60px`,
-      color: T.color.text, maxWidth: 1280, margin: "0 auto",
+      minHeight: "100dvh",
+      color: T.color.text,
       fontFamily: T.font.family,
+      background: T.color.bg,
+      backgroundAttachment: "fixed",
     }}>
-      {/* Compact title row */}
-      <header style={{
-        marginBottom: T.space.lg,
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        flexWrap: "wrap", gap: T.space.md,
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(220px, 260px) 1fr",
+        maxWidth: 1440, margin: "0 auto",
+        minHeight: "100dvh",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: T.space.md }}>
-          <span style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 52, height: 52, borderRadius: T.radius.xl,
-            background: T.color.primaryGradient,
-            fontSize: 28, boxShadow: T.shadow.glow,
-          }}>⭐</span>
-          <div>
-            <h1 style={{
-              fontSize: T.font.size["3xl"], fontWeight: T.font.weight.black,
-              margin: 0, letterSpacing: "-0.02em", lineHeight: 1.1,
-            }}>STAR Program</h1>
-            <div style={{ fontSize: T.font.size.sm, color: T.color.textMuted, marginTop: 2 }}>
-              Special-Ed Tracker, Assessment &amp; Refusal Log
+        {/* ── SIDEBAR ─────────────────────────────────────────── */}
+        <aside style={{
+          padding: `${T.space["2xl"]}px ${T.space.lg}px`,
+          borderRight: `1px solid ${T.color.border}`,
+          display: "flex", flexDirection: "column", gap: T.space.lg,
+          position: "sticky", top: 0, alignSelf: "start",
+          height: "100dvh", overflowY: "auto",
+        }}>
+          {/* Brand */}
+          <div style={{ display: "flex", alignItems: "center", gap: T.space.md }}>
+            <span style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 44, height: 44, borderRadius: T.radius.lg,
+              background: T.color.primaryGradient,
+              fontSize: 24, boxShadow: T.shadow.glow,
+            }}>⭐</span>
+            <div>
+              <h1 style={{
+                fontSize: T.font.size.xl, fontWeight: T.font.weight.black,
+                margin: 0, letterSpacing: "-0.01em", lineHeight: 1.1,
+              }}>STAR</h1>
+              <div style={{ fontSize: T.font.size.xs, color: T.color.textMuted }}>
+                Tracker & Refusal Log
+              </div>
             </div>
           </div>
-        </div>
-        <Button
-          variant="secondary"
-          onClick={runSync}
-          loading={syncing}
-          icon={!syncing ? <span>🔄</span> : undefined}
-        >
-          {syncing ? "Syncing…" : "Sync"}
-        </Button>
-      </header>
 
-      {/* HERO scanner — front and center */}
-      <div style={{
-        marginBottom: T.space.lg,
-        padding: `${T.space.xl}px ${T.space["2xl"]}px`,
-        borderRadius: T.radius["2xl"],
-        background: "linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(178,58,72,0.08) 100%)",
-        border: `1px solid ${T.color.accentBorder}`,
-        boxShadow: T.shadow.lg,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: T.space.md, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 32 }}>📷</span>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <label style={{
-              display: "block", marginBottom: 4,
-              fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
-              letterSpacing: "0.18em", textTransform: "uppercase",
-              color: T.color.textMuted,
-            }} htmlFor="star-barcode-input">
-              Scan or type a barcode
-            </label>
-            <HeroBarcodeInput />
+          {/* Sidebar tabs */}
+          <nav role="tablist" aria-label="STAR sections" style={{
+            display: "flex", flexDirection: "column", gap: 2,
+          }}>
+            {tabs.map((t) => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: T.radius.md,
+                    background: active ? T.color.surfaceRaised : "transparent",
+                    color: active ? T.color.text : T.color.textMuted,
+                    border: "none", outline: "none",
+                    fontFamily: T.font.family,
+                    fontWeight: active ? T.font.weight.bold : T.font.weight.normal,
+                    fontSize: T.font.size.md, textAlign: "left",
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: T.space.md,
+                    position: "relative",
+                    transition: `background ${T.motion.standard}, color ${T.motion.standard}`,
+                  }}
+                  onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = T.color.surface; }}
+                  onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                  onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = T.focusRing; }}
+                  onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
+                >
+                  {active && (
+                    <span aria-hidden style={{
+                      position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+                      width: 3, height: "60%", borderRadius: 2,
+                      background: T.color.accent, boxShadow: `0 0 12px ${T.color.accent}99`,
+                    }} />
+                  )}
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Sync at bottom of sidebar */}
+          <div style={{ marginTop: "auto", paddingTop: T.space.lg, borderTop: `1px solid ${T.color.border}` }}>
+            <Button variant="secondary" fullWidth onClick={runSync} loading={syncing}
+              icon={!syncing ? <span>🔄</span> : undefined}>
+              {syncing ? "Syncing…" : "Sync from Classroom"}
+            </Button>
+            {syncStatus && syncStatus.message && (
+              <div role="status" aria-live="polite" style={{
+                marginTop: T.space.sm, padding: `${T.space.sm}px ${T.space.md}px`,
+                borderRadius: T.radius.md,
+                background: syncStatus.ok ? T.color.successSoft : T.color.dangerSoft,
+                border: `1px solid ${syncStatus.ok ? T.color.successBorder : T.color.dangerBorder}`,
+                fontSize: T.font.size.xs, color: T.color.text, lineHeight: 1.4,
+              }}>
+                {syncStatus.message}
+              </div>
+            )}
           </div>
-        </div>
-        <div style={{ marginTop: T.space.sm, fontSize: T.font.size.xs, color: T.color.textSubtle }}>
-          USB barcode scanners type into the box automatically.
-          Scans pop the right modal — assignments, refusal forms, or pass barcodes — from any page in the app.
-        </div>
-      </div>
+        </aside>
 
-      {syncStatus && syncStatus.message && (
-        <div role="status" aria-live="polite" style={{
-          marginBottom: T.space.md, padding: `${T.space.sm}px ${T.space.md}px`,
-          borderRadius: T.radius.md,
-          background: syncStatus.ok ? T.color.successSoft : T.color.dangerSoft,
-          border: `1px solid ${syncStatus.ok ? T.color.successBorder : T.color.dangerBorder}`,
-          fontSize: T.font.size.sm, color: T.color.text,
+        {/* ── MAIN ────────────────────────────────────────────── */}
+        <main style={{
+          padding: `${T.space["2xl"]}px ${T.space["3xl"]}px ${T.space["4xl"]}px`,
+          minWidth: 0,
         }}>
-          {syncStatus.message}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div role="tablist" aria-label="STAR sections" style={{
-        display: "flex", gap: T.space.xs, marginBottom: T.space.lg, flexWrap: "wrap",
-      }}>
-        {([
-          { id: "home"      as Tab, icon: "🏠", label: "Home" },
-          { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
-          { id: "create"    as Tab, icon: "✨", label: "Create" },
-          { id: "reports"   as Tab, icon: "📊", label: "Reports" },
-          { id: "data"      as Tab, icon: "💾", label: "Data" },
-          { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
-        ]).map((t) => {
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: "10px 16px", borderRadius: T.radius.pill,
-                background: active ? T.color.primaryGradient : T.color.surface,
-                color: T.color.text,
-                border: `1px solid ${active ? T.color.accentBorder : T.color.border}`,
-                fontWeight: T.font.weight.bold, fontSize: T.font.size.md,
-                cursor: "pointer", outline: "none",
-                display: "flex", alignItems: "center", gap: 6,
-                boxShadow: active ? T.shadow.glow : "none",
-                transition: `transform ${T.motion.fast}, background ${T.motion.standard}, box-shadow ${T.motion.standard}`,
-                fontFamily: T.font.family,
-              }}
-              onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = T.color.surfaceRaised; }}
-              onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = T.color.surface; }}
-              onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = T.focusRing; }}
-              onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = active ? T.shadow.glow : "none"; }}
-            >
-              <span>{t.icon}</span>
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
+          {/* HERO scanner — bigger, brighter, the focal point */}
+          <div style={{
+            marginBottom: T.space["2xl"],
+            padding: `${T.space["2xl"]}px ${T.space["3xl"]}px`,
+            borderRadius: T.radius["2xl"],
+            background: `linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 50%, rgba(99,102,241,0.16) 100%)`,
+            border: `1px solid ${T.color.accentBorder}`,
+            boxShadow: `${T.shadow.xl}, ${T.shadow.inset}`,
+            position: "relative", overflow: "hidden",
+          }}>
+            {/* Decorative shimmer */}
+            <div aria-hidden style={{
+              position: "absolute", top: -100, right: -100,
+              width: 360, height: 360, borderRadius: "50%",
+              background: `radial-gradient(circle, ${T.color.accent}22 0%, transparent 70%)`,
+              pointerEvents: "none",
+            }} />
+            <div style={{ display: "flex", alignItems: "center", gap: T.space.xl, flexWrap: "wrap", position: "relative" }}>
+              <span style={{
+                fontSize: 48,
+                filter: `drop-shadow(0 4px 12px ${T.color.accent}66)`,
+              }}>📷</span>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <label style={{
+                  display: "block", marginBottom: 6,
+                  fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+                  letterSpacing: "0.22em", textTransform: "uppercase",
+                  color: T.color.accent,
+                }} htmlFor="star-barcode-input">
+                  Barcode Scanner
+                </label>
+                <HeroBarcodeInput />
+              </div>
+            </div>
+            <div style={{ marginTop: T.space.md, fontSize: T.font.size.sm, color: T.color.textMuted, position: "relative" }}>
+              USB scanner types automatically. Or type a barcode + Enter. Scans pop the right modal — assignments, refusals, passes — from any page.
+            </div>
+          </div>
 
       {tab === "home" && <StarHome onTab={(t) => setTab(t)} />}
 
@@ -227,6 +263,8 @@ export default function StarPage() {
       {openGradebook && (
         <GradebookModal barcode={openGradebook} onClose={() => setOpenGradebook(null)} />
       )}
+        </main>
+      </div>
     </div>
   );
 }

@@ -11,23 +11,24 @@ export const tokens = {
   // Surfaces are layered: bg < surface < surfaceRaised. Borders are
   // subtle so they read as paper edges, not boxes.
   color: {
-    // Page + surface
-    bg:               "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-    surface:          "rgba(255,255,255,0.04)",
-    surfaceRaised:    "rgba(255,255,255,0.06)",
-    surfaceSunken:    "rgba(0,0,0,0.30)",
+    // Page + surface — deeper, richer black with a subtle violet wash
+    // for distinct identity. Surfaces have stronger separation.
+    bg:               "radial-gradient(1200px 800px at 0% 0%, rgba(99,102,241,0.10) 0%, transparent 60%), radial-gradient(1000px 700px at 100% 100%, rgba(236,72,153,0.08) 0%, transparent 60%), #0a0a14",
+    surface:          "rgba(255,255,255,0.05)",
+    surfaceRaised:    "rgba(255,255,255,0.08)",
+    surfaceSunken:    "rgba(0,0,0,0.40)",
     border:           "rgba(255,255,255,0.10)",
-    borderStrong:     "rgba(255,255,255,0.16)",
-    // Text
-    text:             "#f5f1e8",   // editorial cream
-    textMuted:        "rgba(245,241,232,0.65)",
-    textSubtle:       "rgba(245,241,232,0.45)",
-    // Brand
-    accent:           "#fbbf24",   // amber, the warm highlight
-    accentSoft:       "rgba(251,191,36,0.18)",
-    accentBorder:     "rgba(251,191,36,0.45)",
+    borderStrong:     "rgba(255,255,255,0.18)",
+    // Text — slightly cooler off-white for that modern dashboard feel
+    text:             "#f8fafc",
+    textMuted:        "rgba(248,250,252,0.65)",
+    textSubtle:       "rgba(248,250,252,0.42)",
+    // Brand — bright electric accent with magenta gradient
+    accent:           "#a855f7",   // violet, the bold highlight
+    accentSoft:       "rgba(168,85,247,0.16)",
+    accentBorder:     "rgba(168,85,247,0.50)",
     primary:          "#6366f1",   // indigo
-    primaryGradient:  "linear-gradient(135deg, #6366f1, #b23a48)",
+    primaryGradient:  "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
     // Semantic
     success:          "#10b981",
     successSoft:      "rgba(16,185,129,0.10)",
@@ -59,12 +60,13 @@ export const tokens = {
   },
   // ── shadows ─────────────────────────────────────────────────────
   shadow: {
-    sm: "0 1px 3px rgba(0,0,0,0.20)",
-    md: "0 6px 18px rgba(0,0,0,0.28)",
-    lg: "0 12px 32px rgba(0,0,0,0.40)",
-    xl: "0 24px 64px rgba(0,0,0,0.50)",
-    glow: "0 8px 22px rgba(99,102,241,0.35)",
+    sm: "0 1px 3px rgba(0,0,0,0.30)",
+    md: "0 8px 24px rgba(0,0,0,0.35)",
+    lg: "0 16px 40px rgba(0,0,0,0.50)",
+    xl: "0 28px 72px rgba(0,0,0,0.60)",
+    glow: "0 10px 28px rgba(168,85,247,0.40)",
     glowAmber: "0 8px 22px rgba(251,191,36,0.22)",
+    inset: "inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   // ── typography scale ────────────────────────────────────────────
   font: {
@@ -86,7 +88,7 @@ export const tokens = {
     slow:     "320ms cubic-bezier(0.22, 1, 0.36, 1)",
   },
   // ── focus ring — visible without overpowering ──────────────────
-  focusRing: "0 0 0 3px rgba(99,102,241,0.45)",
+  focusRing: "0 0 0 3px rgba(168,85,247,0.55)",
 } as const;
 
 // Semantic color helpers for letter grades — keeps the existing

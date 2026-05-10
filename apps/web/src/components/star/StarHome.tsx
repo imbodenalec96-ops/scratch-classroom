@@ -71,11 +71,29 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
 
   return (
     <div>
-      {/* Stats */}
+      {/* Big page header */}
+      <div style={{ marginBottom: T.space["2xl"] }}>
+        <div style={{
+          fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+          letterSpacing: "0.22em", textTransform: "uppercase",
+          color: T.color.accent, marginBottom: T.space.xs,
+        }}>
+          ⭐ Today at a glance
+        </div>
+        <h2 style={{
+          fontSize: T.font.size["4xl"], fontWeight: T.font.weight.black,
+          margin: 0, letterSpacing: "-0.025em", lineHeight: 1.05,
+        }}>Welcome back.</h2>
+        <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5 }}>
+          Snapshot of your classroom right now — completions, refusals, who's out, and points awarded.
+        </p>
+      </div>
+
+      {/* Stats — bigger, with breathing room */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-        gap: T.space.md, marginBottom: T.space.lg,
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: T.space.lg, marginBottom: T.space["2xl"],
       }}>
         <Stat icon="✅" label="Completed Today" value={data.completedTodayCount} accent="success" onClick={() => onTab("gradebook")} />
         <Stat icon="🚨" label="Refusals Today" value={data.refusalsTodayCount} accent="danger" onClick={() => onTab("reports")} />
@@ -83,11 +101,14 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
         <Stat icon="⭐" label="Points Awarded" value={data.pointsToday} accent="primary" subtle="today" />
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions — section header */}
+      <div style={{ marginBottom: T.space.md }}>
+        <SectionLabel icon={<span>⚡</span>}>Quick actions</SectionLabel>
+      </div>
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-        gap: T.space.sm, marginBottom: T.space.lg,
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+        gap: T.space.md, marginBottom: T.space["2xl"],
       }}>
         <ActionTile icon="✨" title="New Assignment" subtitle="Generate + barcode" onClick={() => onTab("create")} />
         <ActionTile icon="🚨" title="Refusal Form" subtitle="Print a fresh form" onClick={() => onTab("create")} />
