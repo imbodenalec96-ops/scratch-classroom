@@ -22,6 +22,7 @@
   "build": {
     "appId": "com.imboden.scratch-classroom",
     "productName": "Scratch Classroom",
+    "electronVersion": "31.7.7",
     "directories": {
       "output": "dist",
       "buildResources": "build"

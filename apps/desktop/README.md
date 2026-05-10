@@ -1,30 +1,46 @@
 # Scratch Classroom — Desktop
 
-Electron wrapper that opens [scratch-classroom.vercel.app](https://scratch-classroom.vercel.app/) in a native window. Builds **.dmg** for Mac and **.exe** for Windows.
+Electron wrapper that opens [scratch-classroom.vercel.app](https://scratch-classroom.vercel.app/) in a native window. Distributable as **.dmg** for Mac and **.exe** for Windows.
 
 ## Why a wrapper?
 
 So you can install it like a real app (Dock / Start Menu / Launchpad) without typing the URL each time. The window points at the live deploy, so updates land automatically — no separate version management.
 
-## First-time build (one-time setup)
+## How to get the installers
+
+### Easy path: download from GitHub Actions (recommended)
+
+GitHub Actions builds both `.dmg` and `.exe` on every manual run.
+
+1. Go to **[Actions tab on GitHub](https://github.com/imbodenalec96-ops/scratch-classroom/actions/workflows/desktop-build.yml)**
+2. Click **Run workflow** → **Run workflow** (the green button)
+3. Wait ~5 minutes for both jobs to finish
+4. Click into the run → scroll to the **Artifacts** section at the bottom
+5. Download:
+   - **`scratch-classroom-mac`** zip (contains the `.dmg`)
+   - **`scratch-classroom-win`** zip (contains the `.exe`)
+6. Unzip, install. Done.
+
+### Permanent download links via Releases
+
+Push a tag like `desktop-v1.0.0`:
+```bash
+git tag desktop-v1.0.0
+git push origin desktop-v1.0.0
+```
+The workflow attaches both installers to a real GitHub Release at https://github.com/imbodenalec96-ops/scratch-classroom/releases — share that URL with anyone who needs to install.
+
+### Local build (only works for your own platform)
 
 ```bash
 # from repo root
-npm install                      # picks up the new @scratch/desktop workspace
+npm install
 cd apps/desktop
-node build/make-icons.js         # generates icon.icns + icon.ico from web/public/icons/icon-512.png
+node build/make-icons.js
+npm run build:mac          # → dist/*.dmg  (Mac only — Windows build needs Wine or a Windows machine)
 ```
 
-## Build the installers
-
-```bash
-# from apps/desktop
-npm run build:mac     # → dist/Scratch Classroom-1.0.0.dmg  (universal x64+arm64)
-npm run build:win     # → dist/Scratch Classroom Setup 1.0.0.exe  (Windows x64)
-npm run build:all     # both
-```
-
-> **Building Windows from a Mac** requires [Wine](https://www.winehq.org/) installed (`brew install --cask wine-stable`), or use a Windows machine, or a CI runner. Same the other way around for `.dmg` from Windows (use a Mac).
+> Local Mac builds may hit a Gatekeeper "ENOENT" on the unsigned `app-builder` helper binary. Fix by running `xattr -d com.apple.quarantine node_modules/app-builder-bin/mac/*` once. (We don't auto-do this because it bypasses macOS code signing — only do it for trusted local builds.)
 
 ## Test before building
 
