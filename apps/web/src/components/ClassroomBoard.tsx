@@ -162,6 +162,30 @@ function computeStarProgressByStudent(
   return out;
 }
 
+// Compact teacher-action icon used in the board header. Square, single
+// emoji, hover-tooltip via the native title attr. Tint is the accent
+// color for the per-action border + faint background fill.
+function ToolIcon({ emoji, title, tint, onClick }: {
+  emoji: string; title: string; tint: string; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 30, height: 30, borderRadius: 6,
+        border: `1px solid ${tint}`,
+        background: `${tint.replace(/0\.65\)/, "0.14)").replace(/aa$/, "22")}`,
+        color: "white",
+        cursor: "pointer", fontSize: 16, lineHeight: 1,
+        padding: 0,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >{emoji}</button>
+  );
+}
+
 export default function ClassroomBoard() {
   const [params] = useSearchParams();
   const { user } = useAuth();
@@ -1036,79 +1060,14 @@ export default function ClassroomBoard() {
               {/* Morning slide — opens the full-screen instructions
                   overlay. Teacher toggles whenever class needs the
                   routine on the board. */}
-              <button
-                onClick={() => setShowMorningSlide(true)}
-                title="Morning slide — class instructions"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid rgba(217,119,6,0.55)`,
-                  background: "rgba(217,119,6,0.18)", color: "#fde68a",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >🌅 Morning</button>
-              {/* Wallet — kids walk up, tap their face, type PIN, see
-                  their points, badges, AND can spend at the store. */}
-              <button
-                onClick={() => setShowWallet(true)}
-                title="My wallet — students unlock with their PIN"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid rgba(124,58,237,0.55)`,
-                  background: "rgba(124,58,237,0.18)", color: "#c4b5fd",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >💼 Wallet</button>
-              {/* Tools — teacher-only utilities (manual progress entry).
-                  Locked behind the teacher PIN so kids can't tamper. */}
-              <button
-                onClick={() => { setConsolePin(""); setConsolePinError(""); setConsolePinModal(true); }}
-                title="Open teacher console — requires PIN"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid ${blockAccent}88`,
-                  background: `${blockAccent}22`, color: blockAccent,
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >🔒 Tools</button>
-              {/* STAR — opens the slide-over panel (gradebook + completion). */}
-              <button
-                onClick={() => { toggleStarPanel(); }}
-                title="STAR — gradebook + completion"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid rgba(251,191,36,0.55)`,
-                  background: "rgba(251,191,36,0.18)", color: "#fde68a",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >⭐ STAR</button>
-              {/* Random student picker — fair calling spinner. */}
-              <button
-                onClick={() => fireRandomPicker()}
-                title="Random pick — pull a student fairly"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid rgba(99,102,241,0.55)`,
-                  background: "rgba(99,102,241,0.18)", color: "#c4b5fd",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >🎲 Pick</button>
-              {/* EYES ON ME — full-screen attention-getter. */}
-              <button
-                onClick={() => fireEyesOnMe()}
-                title="EYES ON ME — projector takeover for attention"
-                style={{
-                  padding: "5px 11px", borderRadius: 3,
-                  border: `1px solid rgba(239,68,68,0.55)`,
-                  background: "rgba(239,68,68,0.18)", color: "#fca5a5",
-                  cursor: "pointer", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}
-              >👀 Eyes</button>
+              {/* Teacher icon row — compact 28×28 squares with hover
+                  tooltips. Keeps the header lean even with 6 actions. */}
+              <ToolIcon emoji="🌅" title="Morning slide — class instructions" tint="rgba(217,119,6,0.65)" onClick={() => setShowMorningSlide(true)} />
+              <ToolIcon emoji="💼" title="Wallet — students unlock with PIN"   tint="rgba(124,58,237,0.65)" onClick={() => setShowWallet(true)} />
+              <ToolIcon emoji="🔒" title="Tools — teacher console (PIN)"        tint={`${blockAccent}aa`} onClick={() => { setConsolePin(""); setConsolePinError(""); setConsolePinModal(true); }} />
+              <ToolIcon emoji="⭐" title="STAR — gradebook + completion"        tint="rgba(251,191,36,0.65)" onClick={() => { toggleStarPanel(); }} />
+              <ToolIcon emoji="🎲" title="Random pick — fair caller spinner"    tint="rgba(99,102,241,0.65)" onClick={() => fireRandomPicker()} />
+              <ToolIcon emoji="👀" title="EYES ON ME — projector takeover"      tint="rgba(239,68,68,0.65)"  onClick={() => fireEyesOnMe()} />
             </>
           )}
           <button onClick={toggleFullscreen} style={{
