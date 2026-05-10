@@ -1158,17 +1158,7 @@ async function seedStarStudents() {
       }
     }
 
-    // Drop Rayden from the Star class (kid left). Idempotent: removes the
-    // class membership only — leaves the user row + history intact in case
-    // anything else still references them.
-    try {
-      await db.prepare(
-        `DELETE FROM class_members WHERE class_id = ? AND user_id IN (
-            SELECT id FROM users WHERE LOWER(name) = 'rayden' AND role = 'student'
-            UNION SELECT 's0000000-0000-0000-0000-000000000003' AS id
-         )`
-      ).run(starClassId);
-    } catch (e) { /* table may not exist on first boot */ }
+    // (Rayden cleanup happens after the seed block — see ensureRaydenRemoved)
 
     // Only create placeholder @star.local users on fresh SQLite (local dev).
     // In production (DATABASE_URL set), the real students already exist and
@@ -1192,6 +1182,27 @@ async function seedStarStudents() {
   }
 }
 seedStarStudents();
+
+// Drop Rayden from every class roster on every cold start.
+// Two simple statements (Postgres + SQLite both happy):
+//   1. by canonical seed id
+//   2. by name (covers manually-created Rayden rows)
+// User row stays so existing foreign-key history isn't orphaned; only
+// class_members is cleared so the kid disappears from the roster.
+async function ensureRaydenRemoved() {
+  try {
+    const r1: any = await db.prepare(
+      `DELETE FROM class_members WHERE user_id = 's0000000-0000-0000-0000-000000000003'`
+    ).run();
+    const r2: any = await db.prepare(
+      `DELETE FROM class_members WHERE user_id IN (SELECT id FROM users WHERE LOWER(name) = 'rayden' AND role = 'student')`
+    ).run();
+    console.log("[star-seed] Rayden cleanup ran. byId=", r1?.changes ?? r1?.rowCount ?? "?", " byName=", r2?.changes ?? r2?.rowCount ?? "?");
+  } catch (e) {
+    console.error("[star-seed] Rayden cleanup error:", e);
+  }
+}
+ensureRaydenRemoved();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Class daily schedule — Feature: block-based day table.

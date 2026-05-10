@@ -72,6 +72,9 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
     try { await db.exec(`ALTER TABLE board_user_data ADD COLUMN mcdonalds_for TEXT`); } catch {}
 
     const students = await db.prepare(
+      // Rayden left the class — defensive filter so he never appears on the
+      // board even before the seed-time DELETE in classes.ts has landed on
+      // a given lambda cold start.
       `SELECT u.id, u.name, u.avatar_url, u.avatar_emoji, u.specials_grade,
               COALESCE(u.dojo_points, 0)      AS dojo_points,
               COALESCE(bd.behavior_stars, 0) AS behavior_stars,
@@ -81,7 +84,9 @@ router.get("/classes/:classId/data", async (req: AuthRequest, res: Response) => 
        FROM users u
        JOIN class_members cm ON u.id = cm.user_id
        LEFT JOIN board_user_data bd ON bd.user_id = u.id::text
-       WHERE cm.class_id = ?::uuid AND u.role = 'student'
+       WHERE cm.class_id = ?::uuid
+         AND u.role = 'student'
+         AND LOWER(u.name) <> 'rayden'
        ORDER BY u.name ASC`
     ).all(classId);
 
