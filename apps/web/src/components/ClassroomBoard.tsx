@@ -965,64 +965,106 @@ export default function ClassroomBoard() {
 
       {isTeacher && timerControlsOpen && (
         <div
+          role="dialog"
+          aria-label="Class timer controls"
           style={{
             position: "absolute",
             top: 56, left: 14,
             zIndex: 50,
-            background: "linear-gradient(180deg, rgba(13,19,33,0.96) 0%, rgba(7,8,15,0.96) 100%)",
-            borderTop: "2px solid #b23a48",
-            border: `1px solid ${g(0.14)}`,
-            borderRadius: 4,
-            padding: "14px 18px",
-            color: "#f5f1e8",
-            minWidth: 280,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+            background: "radial-gradient(400px 300px at 0% 0%, rgba(168,85,247,0.18) 0%, transparent 60%), linear-gradient(180deg, #1a0f2e 0%, #0a0414 100%)",
+            border: "1px solid rgba(168,85,247,0.40)",
+            borderRadius: 16,
+            padding: "16px 18px",
+            color: "#fce7f3",
+            minWidth: 300,
+            boxShadow: "0 24px 48px -12px rgba(168,85,247,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         >
           <div style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 600,
-            letterSpacing: "0.16em", textTransform: "uppercase",
-            color: "#7dd3c5", marginBottom: 10,
-            borderBottom: `1px solid ${g(0.10)}`, paddingBottom: 6,
+            display: "inline-flex", alignItems: "center", gap: 7,
+            padding: "4px 12px", borderRadius: 999,
+            background: "linear-gradient(135deg, rgba(168,85,247,0.20), rgba(236,72,153,0.10))",
+            border: "1px solid rgba(168,85,247,0.30)",
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase",
+            color: "#f9a8d4",
+            marginBottom: 10,
           }}>
-            ⏱ Class timer
+            ⏱ Class Timer
           </div>
           {/* Minutes setter */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <button
               onClick={() => setTimerMinutes((m) => Math.max(1, m - 5))}
-              style={{ width: 32, height: 32, borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
+              aria-label="Decrease 5 minutes"
+              style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.05))",
+                border: "1px solid rgba(168,85,247,0.30)",
+                color: "#fce7f3", fontSize: 20, fontWeight: 800, cursor: "pointer",
+                touchAction: "manipulation",
+              }}
             >−</button>
-            <div style={{ flex: 1, textAlign: "center", fontFamily: serif, fontSize: 22, fontStyle: "italic", color: "#fde68a", fontVariantNumeric: "tabular-nums" }}>
-              {timerMinutes} min
+            <div style={{
+              flex: 1, textAlign: "center",
+              fontFamily: mono, fontSize: 26, fontWeight: 800,
+              color: "#fce7f3", fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em",
+            }}>
+              {timerMinutes} <span style={{ fontSize: 13, color: "rgba(196,181,253,0.65)", fontWeight: 700 }}>min</span>
             </div>
             <button
               onClick={() => setTimerMinutes((m) => Math.min(120, m + 5))}
-              style={{ width: 32, height: 32, borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
+              aria-label="Increase 5 minutes"
+              style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.05))",
+                border: "1px solid rgba(168,85,247,0.30)",
+                color: "#fce7f3", fontSize: 20, fontWeight: 800, cursor: "pointer",
+                touchAction: "manipulation",
+              }}
             >+</button>
           </div>
           {/* Quick presets */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
-            {[5, 10, 15, 20, 30, 45, 60].map((m) => (
-              <button
-                key={m}
-                onClick={() => setTimerMinutes(m)}
-                style={{
-                  padding: "4px 10px", borderRadius: 99,
-                  background: timerMinutes === m ? "#7dd3c5" : g(0.06),
-                  border: `1px solid ${timerMinutes === m ? "#7dd3c5" : g(0.14)}`,
-                  color: timerMinutes === m ? "#0d1321" : g(0.7),
-                  fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: serif,
-                }}
-              >{m}</button>
-            ))}
+          <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap" }}>
+            {[5, 10, 15, 20, 30, 45, 60].map((m) => {
+              const active = timerMinutes === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setTimerMinutes(m)}
+                  style={{
+                    padding: "5px 12px", borderRadius: 999,
+                    background: active
+                      ? "linear-gradient(135deg, #ec4899, #a855f7)"
+                      : "rgba(168,85,247,0.06)",
+                    border: active
+                      ? "1px solid rgba(236,72,153,0.55)"
+                      : "1px solid rgba(168,85,247,0.20)",
+                    color: active ? "white" : "rgba(196,181,253,0.75)",
+                    fontSize: 12, fontWeight: 800, cursor: "pointer",
+                    fontFamily: "'Inter', sans-serif",
+                    letterSpacing: "0.02em",
+                    boxShadow: active ? "0 0 12px rgba(236,72,153,0.40)" : "none",
+                    touchAction: "manipulation",
+                  }}
+                >{m}</button>
+              );
+            })}
           </div>
           {/* Action buttons */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {timer?.state !== "running" && (
               <button
                 onClick={() => sendTimer(timer?.state === "paused" ? "resume" : "start")}
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: "linear-gradient(135deg, #5b8a6e, #2a6f6a)", color: "#f5f1e8", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+                style={{
+                  flex: 1, padding: "11px 14px", borderRadius: 10,
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+                  color: "white", border: "none",
+                  fontWeight: 900, fontSize: 14, cursor: "pointer",
+                  letterSpacing: "-0.005em",
+                  boxShadow: "0 8px 22px -6px rgba(168,85,247,0.55)",
+                  touchAction: "manipulation",
+                }}
               >
                 ▶ {timer?.state === "paused" ? "Resume" : "Start"}
               </button>
@@ -1030,14 +1072,28 @@ export default function ClassroomBoard() {
             {timer?.state === "running" && (
               <button
                 onClick={() => sendTimer("pause")}
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: "linear-gradient(135deg, #d97706, #b45309)", color: "#f5f1e8", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+                style={{
+                  flex: 1, padding: "11px 14px", borderRadius: 10,
+                  background: "linear-gradient(135deg, #ec4899, #f97316)",
+                  color: "white", border: "none",
+                  fontWeight: 900, fontSize: 14, cursor: "pointer",
+                  boxShadow: "0 8px 22px -6px rgba(236,72,153,0.55)",
+                  touchAction: "manipulation",
+                }}
               >
                 ⏸ Pause
               </button>
             )}
             <button
               onClick={() => sendTimer("reset")}
-              style={{ flex: 1, padding: "8px 12px", borderRadius: 4, background: g(0.08), border: `1px solid ${g(0.18)}`, color: "#f5f1e8", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: serif, fontStyle: "italic" }}
+              style={{
+                flex: 1, padding: "11px 14px", borderRadius: 10,
+                background: "rgba(168,85,247,0.06)",
+                border: "1px solid rgba(168,85,247,0.30)",
+                color: "#fce7f3",
+                fontWeight: 800, fontSize: 14, cursor: "pointer",
+                touchAction: "manipulation",
+              }}
             >
               ↻ Reset
             </button>

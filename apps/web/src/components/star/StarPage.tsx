@@ -20,6 +20,7 @@ import { importStarCsv, type ImportResult } from "../../lib/star/importCsv.ts";
 import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import AfternoonPackGenerator from "./AfternoonPackGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
+import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
@@ -265,7 +266,19 @@ export default function StarPage() {
             </div>
           </CreateGroup>
 
-          {/* GROUP 2 — Single-shot generators */}
+          {/* GROUP 2 — Quizzes (MCQ format) */}
+          <CreateGroup label="Quizzes" hint="Multiple-choice. Bubble-sheet print + auto-grades on scan.">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="📝" title="Quiz pack" description="One MCQ quiz per kid in one PDF.">
+                <QuizPackGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="🎯" title="Personal quiz" description="One MCQ quiz for one kid.">
+                <QuizGenerator />
+              </SectionWrapper>
+            </div>
+          </CreateGroup>
+
+          {/* GROUP 3 — Single-shot generators */}
           <CreateGroup label="Single Item" hint="When you only need one barcode at a time.">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: T.space.lg }}>
               <SectionWrapper icon="✨" title="Single assignment" description="One barcoded worksheet for one kid.">

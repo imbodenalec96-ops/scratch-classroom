@@ -19,6 +19,11 @@ export interface StarQuestion {
   num: number;
   text: string;
   answer: string;
+  // Multiple-choice quiz support — when present, the question is rendered
+  // as an MCQ (A/B/C/D bubbles) in print + grading. `answer` then holds
+  // the correct CHOICE TEXT (not the letter), so existing reveal logic
+  // ("✓ {q.answer}") still surfaces the right thing.
+  choices?: string[];
 }
 
 export interface StarAssignment {
@@ -370,7 +375,7 @@ export function rehydrateBcDB(): Record<string, BcEntry> {
 }
 
 // Barcode ID generators
-export function nextBarcode(prefix: "WR" | "SP", existing: Record<string, BcEntry>): string {
+export function nextBarcode(prefix: "WR" | "SP" | "QZ" | "AS", existing: Record<string, BcEntry>): string {
   const now = new Date();
   const yy = String(now.getFullYear() % 100).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");

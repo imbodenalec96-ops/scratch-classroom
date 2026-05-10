@@ -399,6 +399,7 @@ export default function GradebookModal({ barcode, onClose }: Props) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflow: "auto", paddingRight: 4 }}>
                   {questions.map((q) => {
                     const mark = qMarks[q.num];
+                    const isMCQ = Array.isArray(q.choices) && q.choices.length > 0;
                     return (
                       <div key={q.num} style={{
                         padding: 10, borderRadius: 10,
@@ -419,9 +420,33 @@ export default function GradebookModal({ barcode, onClose }: Props) {
                           }}>#{q.num}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, marginBottom: 4, color: "#fce7f3", fontWeight: 600, lineHeight: 1.4 }}>{q.text}</div>
-                            <div style={{ fontSize: 12, color: "#86efac", fontWeight: 800, fontFamily: "Menlo, monospace" }}>
-                              ✓ {q.answer}
-                            </div>
+                            {isMCQ ? (
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 10px", marginTop: 4 }}>
+                                {q.choices!.map((c, i) => {
+                                  const correct = c === q.answer;
+                                  return (
+                                    <div key={i} style={{
+                                      fontSize: 11.5, fontWeight: 700,
+                                      color: correct ? "#86efac" : "rgba(196,181,253,0.85)",
+                                      display: "flex", alignItems: "center", gap: 5,
+                                    }}>
+                                      <span style={{
+                                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                        width: 18, height: 18, borderRadius: "50%",
+                                        background: correct ? "rgba(16,185,129,0.20)" : "rgba(168,85,247,0.10)",
+                                        border: correct ? "1.5px solid #10b981" : "1px solid rgba(168,85,247,0.30)",
+                                        fontSize: 10, fontWeight: 900,
+                                      }}>{String.fromCharCode(65 + i)}</span>
+                                      {c}{correct ? " ✓" : ""}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: "#86efac", fontWeight: 800, fontFamily: "Menlo, monospace" }}>
+                                ✓ {q.answer}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                             <button onClick={() => setMark(q.num, "correct")} aria-label="Mark correct" style={markBtn(mark === "correct", "#10b981")}>✓</button>
