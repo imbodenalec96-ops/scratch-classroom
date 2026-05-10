@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { StarStore, type ActivePass } from "../../lib/star/storage.ts";
 import { onStarBoardEvent } from "../../lib/star/boardEvents.ts";
 import { alertBeep } from "../../lib/star/sounds.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
 
 const ICON: Record<ActivePass["passKind"], string> = {
   Bathroom: "🚻", Water: "💧", Break: "🛋",
@@ -75,38 +76,45 @@ export default function ActivePassesStrip() {
   const anyOver = passes.some((p) => (now - new Date(p.startedAt).getTime()) / 1000 > 5 * 60);
 
   return (
-    <div style={{
-      position: "fixed", bottom: 16, left: 16, zIndex: 200,
+    <div role="status" aria-live="polite" style={{
+      position: "fixed", bottom: T.space.lg, left: T.space.lg, zIndex: 200,
       maxWidth: "min(560px, 92vw)",
-      padding: "10px 14px", borderRadius: 14,
+      padding: `${T.space.md}px ${T.space.lg}px`, borderRadius: T.radius.xl,
       background: anyOver
         ? "linear-gradient(135deg, rgba(239,68,68,0.85), rgba(178,58,72,0.85))"
         : "linear-gradient(135deg, rgba(15,23,42,0.92), rgba(30,27,46,0.92))",
-      border: anyOver ? "2px solid #fca5a5" : "1px solid rgba(251,191,36,0.40)",
-      color: "white", boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
+      border: anyOver ? `2px solid #fca5a5` : `1px solid ${T.color.accentBorder}`,
+      color: T.color.text,
+      boxShadow: anyOver ? `0 12px 36px rgba(239,68,68,0.45)` : T.shadow.lg,
       backdropFilter: "blur(8px)",
+      fontFamily: T.font.family,
       animation: anyOver ? "passStripPulse 1.2s ease-in-out infinite" : "none",
     }}>
       <div style={{
-        fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase",
-        opacity: 0.85, marginBottom: 6,
+        fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+        letterSpacing: "0.18em", textTransform: "uppercase",
+        opacity: 0.85, marginBottom: T.space.xs,
       }}>
         ⏱ Out Of Room ({passes.length}){anyOver ? " — over 5 min!" : ""}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: T.space.sm }}>
         {passes.map((p) => {
           const elapsedSec = Math.max(0, Math.round((now - new Date(p.startedAt).getTime()) / 1000));
           const over = elapsedSec > 5 * 60;
           return (
             <div key={p.studentId} style={{
-              padding: "6px 12px", borderRadius: 999,
-              background: over ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0.30)",
-              display: "flex", alignItems: "center", gap: 8,
-              border: over ? "1px solid #fecaca" : "1px solid rgba(255,255,255,0.15)",
+              padding: `6px ${T.space.md}px`, borderRadius: T.radius.pill,
+              background: over ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.30)",
+              display: "flex", alignItems: "center", gap: T.space.sm,
+              border: over ? "1px solid #fecaca" : `1px solid ${T.color.borderStrong}`,
             }}>
-              <span style={{ fontSize: 18 }}>{ICON[p.passKind]}</span>
-              <span style={{ fontWeight: 800, fontSize: 14 }}>{p.studentName}</span>
-              <span style={{ fontFamily: "Menlo, monospace", fontWeight: 800, color: over ? "#fecaca" : "#fde68a", fontSize: 14 }}>
+              <span style={{ fontSize: 18 }} aria-hidden>{ICON[p.passKind]}</span>
+              <span style={{ fontWeight: T.font.weight.bold, fontSize: T.font.size.md }}>{p.studentName}</span>
+              <span style={{
+                fontFamily: T.font.mono, fontWeight: T.font.weight.bold,
+                color: over ? "#fecaca" : T.color.accent,
+                fontSize: T.font.size.md, fontVariantNumeric: "tabular-nums",
+              }}>
                 {fmt(elapsedSec)}
               </span>
             </div>

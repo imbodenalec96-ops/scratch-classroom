@@ -164,24 +164,43 @@ function computeStarProgressByStudent(
 
 // Compact teacher-action icon used in the board header. Square, single
 // emoji, hover-tooltip via the native title attr. Tint is the accent
-// color for the per-action border + faint background fill.
+// color for the per-action border + faint background fill. Adds gentle
+// hover scale + visible focus ring for accessibility.
 function ToolIcon({ emoji, title, tint, onClick }: {
   emoji: string; title: string; tint: string; onClick: () => void;
 }) {
+  const fill = tint.replace(/0\.65\)/, "0.14)").replace(/aa$/, "22");
+  const fillHover = tint.replace(/0\.65\)/, "0.28)").replace(/aa$/, "44");
   return (
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
       style={{
-        width: 30, height: 30, borderRadius: 6,
+        width: 32, height: 32, borderRadius: 6,
         border: `1px solid ${tint}`,
-        background: `${tint.replace(/0\.65\)/, "0.14)").replace(/aa$/, "22")}`,
+        background: fill,
         color: "white",
         cursor: "pointer", fontSize: 16, lineHeight: 1,
         padding: 0,
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
+        flexShrink: 0, outline: "none",
+        transition: "transform 120ms cubic-bezier(0.22,1,0.36,1), background 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 180ms cubic-bezier(0.22,1,0.36,1)",
       }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = fillHover;
+        el.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = fill;
+        el.style.transform = "translateY(0)";
+      }}
+      onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+      onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
+      onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${tint.replace(/0\.65\)/, "0.45)").replace(/aa$/, "66")}`; }}
+      onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
     >{emoji}</button>
   );
 }

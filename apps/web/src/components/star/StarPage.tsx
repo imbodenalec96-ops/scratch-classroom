@@ -25,6 +25,8 @@ import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
 import StarGradebookView from "./StarGradebookView.tsx";
 import StarDataView from "./StarDataView.tsx";
+import { tokens as T } from "../../lib/star/theme.ts";
+import { Button } from "./ui.tsx";
 
 type Tab = "home" | "gradebook" | "create" | "reports" | "data" | "settings";
 
@@ -69,70 +71,89 @@ export default function StarPage() {
   }, []);
 
   return (
-    <div style={{ padding: "22px 22px 60px", color: "#f5f1e8", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{
+      padding: `${T.space["2xl"]}px ${T.space["2xl"]}px 60px`,
+      color: T.color.text, maxWidth: 1280, margin: "0 auto",
+      fontFamily: T.font.family,
+    }}>
       {/* Compact title row */}
-      <header style={{ marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <header style={{
+        marginBottom: T.space.lg,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: T.space.md,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: T.space.md }}>
           <span style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 52, height: 52, borderRadius: 14,
-            background: "linear-gradient(135deg, #6366f1, #b23a48)",
-            fontSize: 28, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
+            width: 52, height: 52, borderRadius: T.radius.xl,
+            background: T.color.primaryGradient,
+            fontSize: 28, boxShadow: T.shadow.glow,
           }}>⭐</span>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>STAR Program</h1>
-            <div style={{ fontSize: 12, opacity: 0.65 }}>
+            <h1 style={{
+              fontSize: T.font.size["3xl"], fontWeight: T.font.weight.black,
+              margin: 0, letterSpacing: "-0.02em", lineHeight: 1.1,
+            }}>STAR Program</h1>
+            <div style={{ fontSize: T.font.size.sm, color: T.color.textMuted, marginTop: 2 }}>
               Special-Ed Tracker, Assessment &amp; Refusal Log
             </div>
           </div>
         </div>
-        <button onClick={runSync} disabled={syncing} style={{
-          padding: "10px 14px", borderRadius: 10,
-          background: "rgba(99,102,241,0.15)", color: "white",
-          border: "1px solid rgba(99,102,241,0.40)",
-          fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
-        }}>
-          {syncing ? "Syncing…" : "🔄 Sync"}
-        </button>
+        <Button
+          variant="secondary"
+          onClick={runSync}
+          loading={syncing}
+          icon={!syncing ? <span>🔄</span> : undefined}
+        >
+          {syncing ? "Syncing…" : "Sync"}
+        </Button>
       </header>
 
       {/* HERO scanner — front and center */}
       <div style={{
-        marginBottom: 16,
-        padding: "20px 24px",
-        borderRadius: 18,
-        background: "linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(178,58,72,0.10) 100%)",
-        border: "1px solid rgba(251,191,36,0.30)",
-        boxShadow: "0 12px 36px rgba(0,0,0,0.30)",
+        marginBottom: T.space.lg,
+        padding: `${T.space.xl}px ${T.space["2xl"]}px`,
+        borderRadius: T.radius["2xl"],
+        background: "linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(178,58,72,0.08) 100%)",
+        border: `1px solid ${T.color.accentBorder}`,
+        boxShadow: T.shadow.lg,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: T.space.md, flexWrap: "wrap" }}>
           <span style={{ fontSize: 32 }}>📷</span>
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 4 }}>
+            <label style={{
+              display: "block", marginBottom: 4,
+              fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+              letterSpacing: "0.18em", textTransform: "uppercase",
+              color: T.color.textMuted,
+            }} htmlFor="star-barcode-input">
               Scan or type a barcode
-            </div>
+            </label>
             <HeroBarcodeInput />
           </div>
         </div>
-        <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+        <div style={{ marginTop: T.space.sm, fontSize: T.font.size.xs, color: T.color.textSubtle }}>
           USB barcode scanners type into the box automatically.
           Scans pop the right modal — assignments, refusal forms, or pass barcodes — from any page in the app.
         </div>
       </div>
 
       {syncStatus && syncStatus.message && (
-        <div style={{
-          marginBottom: 14, padding: "8px 12px", borderRadius: 8,
-          background: syncStatus.ok ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
-          border: `1px solid ${syncStatus.ok ? "rgba(16,185,129,0.30)" : "rgba(239,68,68,0.30)"}`,
-          fontSize: 12,
+        <div role="status" aria-live="polite" style={{
+          marginBottom: T.space.md, padding: `${T.space.sm}px ${T.space.md}px`,
+          borderRadius: T.radius.md,
+          background: syncStatus.ok ? T.color.successSoft : T.color.dangerSoft,
+          border: `1px solid ${syncStatus.ok ? T.color.successBorder : T.color.dangerBorder}`,
+          fontSize: T.font.size.sm, color: T.color.text,
         }}>
           {syncStatus.message}
         </div>
       )}
 
-      {/* Tabs — pill style with icons + labels */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
+      {/* Tabs */}
+      <div role="tablist" aria-label="STAR sections" style={{
+        display: "flex", gap: T.space.xs, marginBottom: T.space.lg, flexWrap: "wrap",
+      }}>
         {([
           { id: "home"      as Tab, icon: "🏠", label: "Home" },
           { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
@@ -140,20 +161,36 @@ export default function StarPage() {
           { id: "reports"   as Tab, icon: "📊", label: "Reports" },
           { id: "data"      as Tab, icon: "💾", label: "Data" },
           { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
-        ]).map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "10px 16px", borderRadius: 999,
-            background: tab === t.id ? "linear-gradient(135deg,#6366f1,#b23a48)" : "rgba(255,255,255,0.04)",
-            color: "white",
-            border: tab === t.id ? "1px solid rgba(251,191,36,0.55)" : "1px solid rgba(255,255,255,0.10)",
-            fontWeight: 700, cursor: "pointer", fontSize: 14,
-            display: "flex", alignItems: "center", gap: 6,
-            boxShadow: tab === t.id ? "0 6px 18px rgba(99,102,241,0.30)" : "none",
-          }}>
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
+        ]).map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              style={{
+                padding: "10px 16px", borderRadius: T.radius.pill,
+                background: active ? T.color.primaryGradient : T.color.surface,
+                color: T.color.text,
+                border: `1px solid ${active ? T.color.accentBorder : T.color.border}`,
+                fontWeight: T.font.weight.bold, fontSize: T.font.size.md,
+                cursor: "pointer", outline: "none",
+                display: "flex", alignItems: "center", gap: 6,
+                boxShadow: active ? T.shadow.glow : "none",
+                transition: `transform ${T.motion.fast}, background ${T.motion.standard}, box-shadow ${T.motion.standard}`,
+                fontFamily: T.font.family,
+              }}
+              onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = T.color.surfaceRaised; }}
+              onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = T.color.surface; }}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = T.focusRing; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = active ? T.shadow.glow : "none"; }}
+            >
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {tab === "home" && <StarHome onTab={(t) => setTab(t)} />}
@@ -197,20 +234,31 @@ export default function StarPage() {
 /* ── hero barcode input — bigger, friendlier than the small header one ─ */
 function HeroBarcodeInput() {
   const [v, setV] = useState("");
+  const [focused, setFocused] = useState(false);
   return (
     <input
       id="star-barcode-input"
       value={v}
       onChange={(e) => setV(e.target.value.toUpperCase())}
       onKeyDown={(e) => { if (e.key === "Enter") setTimeout(() => setV(""), 60); }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       placeholder="Type or scan barcode + Enter…"
       autoFocus
+      autoComplete="off"
+      spellCheck={false}
+      aria-label="Barcode scanner"
       style={{
-        width: "100%", padding: "14px 18px", borderRadius: 12,
-        background: "rgba(0,0,0,0.45)", color: "white",
-        border: "2px solid rgba(255,255,255,0.18)",
-        fontFamily: "Menlo, monospace", fontSize: 18, fontWeight: 700,
-        outline: "none", letterSpacing: "0.05em",
+        width: "100%", padding: "14px 18px",
+        borderRadius: T.radius.lg,
+        background: T.color.surfaceSunken, color: T.color.text,
+        border: `2px solid ${focused ? T.color.accent : T.color.borderStrong}`,
+        boxShadow: focused ? T.focusRing : "none",
+        fontFamily: T.font.mono,
+        fontSize: T.font.size.xl, fontWeight: T.font.weight.bold,
+        outline: "none", letterSpacing: "0.06em",
+        boxSizing: "border-box",
+        transition: `border-color ${T.motion.fast}, box-shadow ${T.motion.fast}`,
       }}
     />
   );

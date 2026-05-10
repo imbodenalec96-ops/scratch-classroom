@@ -3,6 +3,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { StarStore, letterGradeColor, type StarTrackerEntry, type StarRefusalLog, type ActivePass } from "../../lib/star/storage.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
+import { Stat, Card, SectionLabel } from "./ui.tsx";
 
 export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook" | "reports" | "settings") => void }) {
   const [now, setNow] = useState(Date.now());
@@ -72,36 +74,20 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
       {/* Stats */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        gap: 12, marginBottom: 18,
+        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+        gap: T.space.md, marginBottom: T.space.lg,
       }}>
-        <StatCard
-          icon="✅" label="Completed Today"
-          value={data.completedTodayCount} accent="#10b981"
-          onClick={() => onTab("gradebook")}
-        />
-        <StatCard
-          icon="🚨" label="Refusals Today"
-          value={data.refusalsTodayCount} accent="#ef4444"
-          onClick={() => onTab("reports")}
-        />
-        <StatCard
-          icon="⏱" label="Out Of Room"
-          value={data.activePassesCount} accent="#fbbf24"
-          subtle="active passes"
-        />
-        <StatCard
-          icon="⭐" label="Points Awarded"
-          value={data.pointsToday} accent="#a855f7"
-          subtle="today"
-        />
+        <Stat icon="✅" label="Completed Today" value={data.completedTodayCount} accent="success" onClick={() => onTab("gradebook")} />
+        <Stat icon="🚨" label="Refusals Today" value={data.refusalsTodayCount} accent="danger" onClick={() => onTab("reports")} />
+        <Stat icon="⏱" label="Out Of Room" value={data.activePassesCount} accent="warning" subtle="active passes" />
+        <Stat icon="⭐" label="Points Awarded" value={data.pointsToday} accent="primary" subtle="today" />
       </div>
 
       {/* Quick actions */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-        gap: 10, marginBottom: 18,
+        gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+        gap: T.space.sm, marginBottom: T.space.lg,
       }}>
         <ActionTile icon="✨" title="New Assignment" subtitle="Generate + barcode" onClick={() => onTab("create")} />
         <ActionTile icon="🚨" title="Refusal Form" subtitle="Print a fresh form" onClick={() => onTab("create")} />
@@ -110,84 +96,78 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
       </div>
 
       {/* Recent activity */}
-      <div style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: 14, padding: 16,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 10 }}>
-          🕐 Recent Activity
-        </div>
+      <Card padding="lg">
+        <SectionLabel icon={<span>🕐</span>}>Recent Activity</SectionLabel>
         {data.items.length === 0 ? (
-          <div style={{ padding: 20, opacity: 0.6, textAlign: "center", fontSize: 13 }}>
+          <div style={{ padding: T.space.xl, color: T.color.textSubtle, textAlign: "center", fontSize: T.font.size.md }}>
             Nothing recent — scan a barcode to get started.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: T.space.xs }}>
             {data.items.map((it, i) => (
               <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "10px 12px", borderRadius: 10,
-                background: "rgba(255,255,255,0.03)",
+                display: "flex", alignItems: "center", gap: T.space.md,
+                padding: `${T.space.sm}px ${T.space.md}px`,
+                borderRadius: T.radius.md,
+                background: T.color.surfaceSunken,
                 borderLeft: `3px solid ${it.color}`,
+                transition: `background ${T.motion.fast}`,
               }}>
                 <span style={{ fontSize: 18 }}>
                   {it.kind === "completion" ? "✅" : it.kind === "refusal" ? "🚨" : "⏱"}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: T.font.size.md, fontWeight: T.font.weight.semibold, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {it.title}
                   </div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>{it.meta}</div>
+                  <div style={{ fontSize: T.font.size.sm, color: T.color.textMuted }}>{it.meta}</div>
                 </div>
-                <span style={{ fontSize: 11, opacity: 0.55, whiteSpace: "nowrap", color: it.color, fontWeight: 700 }}>
+                <span style={{
+                  fontSize: T.font.size.xs, whiteSpace: "nowrap", color: it.color,
+                  fontWeight: T.font.weight.semibold, fontVariantNumeric: "tabular-nums",
+                }}>
                   {fmtRelative(it.ts, now)}
                 </span>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </div>
-  );
-}
-
-function StatCard({ icon, label, value, accent, subtle, onClick }: { icon: string; label: string; value: number | string; accent: string; subtle?: string; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} disabled={!onClick} style={{
-      padding: 16, borderRadius: 14,
-      background: `linear-gradient(135deg, ${accent}22, ${accent}05)`,
-      border: `1px solid ${accent}55`,
-      color: "white", textAlign: "left", cursor: onClick ? "pointer" : "default",
-      display: "flex", flexDirection: "column", gap: 4,
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.7 }}>{label}</span>
-        <span style={{ fontSize: 22 }}>{icon}</span>
-      </div>
-      <div style={{ fontSize: 38, fontWeight: 900, color: accent, lineHeight: 1, marginTop: 4 }}>{value}</div>
-      {subtle && <div style={{ fontSize: 11, opacity: 0.6 }}>{subtle}</div>}
-    </button>
   );
 }
 
 function ActionTile({ icon, title, subtitle, onClick }: { icon: string; title: string; subtitle: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      padding: 14, borderRadius: 12,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      color: "white", textAlign: "left", cursor: "pointer",
-      display: "flex", alignItems: "center", gap: 12,
-      transition: "transform 0.15s ease, background 0.15s ease",
+      padding: T.space.md, borderRadius: T.radius.lg,
+      background: T.color.surface,
+      border: `1px solid ${T.color.border}`,
+      color: T.color.text, textAlign: "left", cursor: "pointer",
+      display: "flex", alignItems: "center", gap: T.space.md,
+      transition: `transform ${T.motion.fast}, background ${T.motion.standard}, border-color ${T.motion.standard}, box-shadow ${T.motion.standard}`,
+      outline: "none",
+      fontFamily: T.font.family,
     }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(99,102,241,0.10)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = "rgba(99,102,241,0.10)";
+        el.style.borderColor = T.color.accentBorder;
+        el.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = T.color.surface;
+        el.style.borderColor = T.color.border;
+        el.style.transform = "translateY(0)";
+      }}
+      onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = T.focusRing; }}
+      onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
     >
-      <span style={{ fontSize: 28 }}>{icon}</span>
+      <span style={{ fontSize: 28 }} aria-hidden>{icon}</span>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 800 }}>{title}</div>
-        <div style={{ fontSize: 11, opacity: 0.7 }}>{subtitle}</div>
+        <div style={{ fontSize: T.font.size.md, fontWeight: T.font.weight.bold }}>{title}</div>
+        <div style={{ fontSize: T.font.size.xs, color: T.color.textMuted }}>{subtitle}</div>
       </div>
     </button>
   );

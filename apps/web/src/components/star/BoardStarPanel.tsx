@@ -14,6 +14,7 @@ import {
   type StarStudent, type StarTrackerEntry, type Subject,
 } from "../../lib/star/storage.ts";
 import { syncFromClassroom } from "../../lib/star/sync.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Science", "Social Studies"];
 
@@ -39,29 +40,41 @@ export default function BoardStarPanel() {
 
       {/* Slide-over panel */}
       {open && (
-        <div onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }} style={{
+        <div role="dialog" aria-label="STAR class live view"
+          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }} style={{
           position: "fixed", inset: 0, zIndex: 240,
           background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)",
+          animation: `starOverlayIn ${T.motion.standard}`,
         }}>
+          <style>{`@keyframes starOverlayIn { from { opacity: 0; } to { opacity: 1; } } @keyframes starSheetIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
           <div style={{
             position: "absolute", top: 0, right: 0, bottom: 0,
             width: "min(900px, 96vw)",
-            background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-            borderLeft: "1px solid rgba(255,255,255,0.10)",
-            color: "#f5f1e8", padding: 24, overflow: "auto",
-            boxShadow: "-24px 0 64px rgba(0,0,0,0.5)",
+            background: T.color.bg,
+            borderLeft: `1px solid ${T.color.border}`,
+            color: T.color.text, padding: T.space["2xl"], overflow: "auto",
+            boxShadow: `-24px 0 64px rgba(0,0,0,0.55)`,
+            fontFamily: T.font.family,
+            animation: `starSheetIn ${T.motion.slow}`,
           }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: T.space.lg, gap: T.space.md }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.6 }}>
+                <div style={{
+                  fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+                  letterSpacing: "0.18em", textTransform: "uppercase",
+                  color: T.color.textMuted,
+                }}>
                   ⭐ STAR · Class Live View
                 </div>
-                <h2 style={{ fontSize: 22, fontWeight: 900, margin: "4px 0 0" }}>
+                <h2 style={{
+                  fontSize: T.font.size["2xl"], fontWeight: T.font.weight.black,
+                  margin: "4px 0 0", letterSpacing: "-0.01em",
+                }}>
                   {view === "completion" ? "Class Completion" : "Student Grades"}
                 </h2>
                 <DataCounts />
               </div>
-              <button onClick={() => setOpen(false)} style={closeBtn()}>✕</button>
+              <button onClick={() => setOpen(false)} aria-label="Close panel" style={closeBtn()}>✕</button>
             </div>
 
             {/* View toggle */}
