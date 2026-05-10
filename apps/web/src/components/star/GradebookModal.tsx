@@ -10,6 +10,8 @@ import {
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
 import { fireStarBoardEvent, onStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
+import { Modal, Button, Pill } from "./ui.tsx";
 
 interface Props {
   barcode: string;
@@ -192,17 +194,16 @@ export default function GradebookModal({ barcode, onClose }: Props) {
 
   if (!entry) {
     return (
-      <Backdrop onClose={onClose}>
-        <div style={shellStyle()}>
-          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>Unknown barcode</div>
-            <button onClick={onClose} style={closeBtn()}>✕</button>
-          </header>
-          <p style={{ marginTop: 12, opacity: 0.7 }}>
-            <span style={{ fontFamily: "Menlo, monospace", color: "#fde68a" }}>{barcode}</span> isn't a known assignment.
-          </p>
-        </div>
-      </Backdrop>
+      <Modal
+        onClose={onClose}
+        kicker="⚠️ Barcode Not Found"
+        title="Unknown barcode"
+        width={520}
+      >
+        <p style={{ margin: 0, color: T.color.textMuted, fontSize: T.font.size.md, lineHeight: 1.55 }}>
+          <span style={{ fontFamily: T.font.mono, color: T.color.accent }}>{barcode}</span> isn't a known assignment in this device's database. Hit 🔄 Sync in /star to refresh.
+        </p>
+      </Modal>
     );
   }
 
@@ -213,25 +214,13 @@ export default function GradebookModal({ barcode, onClose }: Props) {
   const submissions = tracker?.submissions || [];
 
   return (
-    <Backdrop onClose={onClose}>
-      <div style={shellStyle()}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55 }}>
-              📝 Assignment Gradebook
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>{entry.subject}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{
-              padding: "6px 12px", borderRadius: 999,
-              background: "#fde68a", color: "#78350f",
-              fontFamily: "Menlo, monospace", fontWeight: 800, fontSize: 13,
-            }}>{barcode}</span>
-            <button onClick={onClose} style={closeBtn()}>✕</button>
-          </div>
-        </header>
-
+    <Modal
+      onClose={onClose}
+      kicker="📝 Assignment Gradebook"
+      title={entry.subject}
+      trailing={<Pill tone="accent" size="md"><span style={{ fontFamily: T.font.mono }}>{barcode}</span></Pill>}
+      width={1000}
+    >
         {/* Info strip */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, marginBottom: 16 }}>
           <InfoCard label="Subject" value={`${entry.subject} · ${entry.gradeLevel || "—"}`} />
@@ -428,22 +417,30 @@ export default function GradebookModal({ barcode, onClose }: Props) {
             )}
           </div>
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
+          <div style={{
+            display: "flex", gap: T.space.md, justifyContent: "space-between", alignItems: "center",
+            marginTop: T.space.lg, paddingTop: T.space.lg,
+            borderTop: `1px solid ${T.color.border}`,
+          }}>
+            <div style={{ fontSize: T.font.size.sm, color: T.color.textMuted }}>
               {status === "completed" && StarStore.getPointsPerCompletion() > 0
                 ? `🎁 +${StarStore.getPointsPerCompletion()} points to ${students.find((x) => x.id === studentId)?.firstName || "student"} on save`
                 : ""}
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={onClose} style={btnGhost()}>Close</button>
-              <button onClick={save} disabled={saving} style={btnPrimary(savedFlash)}>
+            <div style={{ display: "flex", gap: T.space.sm }}>
+              <Button variant="ghost" onClick={onClose}>Close</Button>
+              <Button
+                variant={savedFlash ? "success" : "primary"}
+                onClick={save}
+                loading={saving}
+                size="lg"
+              >
                 {saving ? "Saving…" : savedFlash ? "✓ Saved" : "✅ Save Grade"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-      </div>
-    </Backdrop>
+    </Modal>
   );
 }
 

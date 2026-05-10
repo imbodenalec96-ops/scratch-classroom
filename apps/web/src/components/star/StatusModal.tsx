@@ -10,6 +10,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import { Modal } from "./ui.tsx";
 
 interface Props {
   statusKind: "Absent" | "Skipped" | "Excused" | "Makeup";
@@ -98,33 +99,12 @@ export default function StatusModal({ statusKind, onClose }: Props) {
   };
 
   return (
-    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{
-      position: "fixed", inset: 0, zIndex: 800,
-      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-    }}>
-      <div style={{
-        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-        border: `1px solid ${accent}55`,
-        borderRadius: 18, width: "min(720px, 96vw)", maxHeight: "92vh",
-        overflow: "auto", padding: 22, color: "#f5f1e8",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-      }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55, color: accent }}>
-              {STATUS_ICON[statusKind]} Mark Assignment {statusKind}
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>
-              Pick the student + assignment
-            </div>
-          </div>
-          <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: 8,
-            background: "rgba(255,255,255,0.05)", color: "white",
-            border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", fontWeight: 800,
-          }}>✕</button>
-        </header>
+    <Modal
+      onClose={onClose}
+      kicker={<span style={{ color: accent }}>{STATUS_ICON[statusKind]} Mark Assignment {statusKind}</span>}
+      title="Pick the student + assignment"
+      width={720}
+    >
 
         {/* Student grid */}
         <Row label="Student">
@@ -180,8 +160,7 @@ export default function StatusModal({ statusKind, onClose }: Props) {
             {saving ? "Saving…" : savedFlash ? "✓ Saved" : `${STATUS_ICON[statusKind]} Mark ${statusKind}`}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

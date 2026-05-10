@@ -16,6 +16,7 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { buildLocalLesson, type Lesson } from "./AssignmentGenerator.tsx";
+import { Modal } from "./ui.tsx";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies", "SEL"];
 const Q_COUNTS = [5, 10, 15, 20];
@@ -375,31 +376,12 @@ function EditEntryModal({ entry, onClose, onSave }: {
   };
 
   return (
-    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{
-      position: "fixed", inset: 0, zIndex: 850,
-      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-    }}>
-      <div style={{
-        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: 18, width: "min(800px, 96vw)", maxHeight: "92vh",
-        overflow: "auto", padding: 22, color: "#f5f1e8",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55 }}>
-              ✏️ Edit · {entry.studentName}
-            </div>
-            <div style={{ fontFamily: "Menlo, monospace", color: "#fde68a", fontSize: 13 }}>{entry.barcode}</div>
-          </div>
-          <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: 8,
-            background: "rgba(255,255,255,0.05)", color: "white",
-            border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", fontWeight: 800,
-          }}>✕</button>
-        </div>
+    <Modal
+      onClose={onClose}
+      kicker={`✏️ Edit · ${entry.studentName}`}
+      title={<span style={{ fontFamily: "Menlo, monospace", color: "#fde68a", fontSize: 18 }}>{entry.barcode}</span>}
+      width={800}
+    >
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px", gap: 8, marginBottom: 12 }}>
           <Field label="Assignment name">
@@ -458,8 +440,7 @@ function EditEntryModal({ entry, onClose, onSave }: {
           <button onClick={onClose} style={ghost()}>Cancel</button>
           <button onClick={save} style={primary()}>💾 Save changes</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

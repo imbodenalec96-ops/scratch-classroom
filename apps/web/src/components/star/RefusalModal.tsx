@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { StarStore, saveAll, type StarRefusalLog, type StarRfgTrackerEntry, type StarStudent } from "../../lib/star/storage.ts";
 import { loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
+import { Modal, Button, Pill } from "./ui.tsx";
 
 interface Props {
   barcode: string;
@@ -125,34 +127,13 @@ export default function RefusalModal({ barcode, type, onClose }: Props) {
   };
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position: "fixed", inset: 0, zIndex: 800,
-        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
-      }}
+    <Modal
+      onClose={onClose}
+      kicker={refusalType}
+      title="Log refusal incident"
+      trailing={<Pill tone="accent" size="md"><span style={{ fontFamily: T.font.mono }}>{barcode}</span></Pill>}
+      width={880}
     >
-      <div style={{
-        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: 18, width: "min(880px, 96vw)", maxHeight: "92vh",
-        overflow: "auto", padding: 22, color: "#f5f1e8",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-      }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55 }}>
-              {refusalType}
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>
-              Log refusal — <span style={{ fontFamily: "Menlo, monospace", color: "#fde68a" }}>{barcode}</span>
-            </div>
-          </div>
-          <button onClick={onClose} style={closeBtn()}>✕</button>
-        </header>
-
         {/* Refusal type toggle */}
         <Row label="Type">
           <div style={{ display: "flex", gap: 8 }}>
@@ -238,14 +219,22 @@ export default function RefusalModal({ barcode, type, onClose }: Props) {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Anything else?" style={{ ...inpStyle(), resize: "vertical", fontFamily: "inherit" }} />
         </Row>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
-          <button onClick={onClose} style={btnGhost()}>Cancel</button>
-          <button onClick={save} disabled={saving} style={btnPrimary(savedFlash)}>
-            {saving ? "Saving…" : savedFlash ? "✓ Saved" : "Save log"}
-          </button>
+        <div style={{
+          display: "flex", gap: T.space.sm, justifyContent: "flex-end",
+          marginTop: T.space.lg, paddingTop: T.space.lg,
+          borderTop: `1px solid ${T.color.border}`,
+        }}>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            variant={savedFlash ? "success" : "primary"}
+            onClick={save}
+            loading={saving}
+            size="lg"
+          >
+            {saving ? "Saving…" : savedFlash ? "✓ Saved" : "🚨 Save Log"}
+          </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

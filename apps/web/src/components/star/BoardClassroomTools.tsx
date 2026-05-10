@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onStarBoardEvent, type StarBoardEvent } from "../../lib/star/boardEvents.ts";
 import { successBeep, alertBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
 
 type BoardStudent = { id: string; name?: string; behavior_stars?: number };
 const TICK_MS = 70;        // spinner step delay (ms)
@@ -168,31 +169,31 @@ function ActivityFeed() {
   if (fresh.length === 0) return null;
 
   return (
-    <div style={{
-      position: "fixed", bottom: 92, right: 16, zIndex: 200,
+    <div role="log" aria-label="Recent STAR activity" style={{
+      position: "fixed", bottom: 92, right: T.space.lg, zIndex: 200,
       width: "min(360px, 92vw)",
-      display: "flex", flexDirection: "column", gap: 6,
-      pointerEvents: "none",
+      display: "flex", flexDirection: "column", gap: T.space.xs,
+      pointerEvents: "none", fontFamily: T.font.family,
     }}>
       {fresh.map((it, i) => (
         <div key={it.id} style={{
-          padding: "8px 12px", borderRadius: 10,
+          padding: `${T.space.sm}px ${T.space.md}px`, borderRadius: T.radius.md,
           background: "rgba(15,23,42,0.92)",
           border: `1px solid ${it.color}55`,
           borderLeft: `3px solid ${it.color}`,
-          color: "white",
+          color: T.color.text,
           backdropFilter: "blur(8px)",
-          fontSize: 12,
+          fontSize: T.font.size.sm,
           opacity: Math.max(0.35, 1 - i * 0.18),
-          display: "flex", alignItems: "center", gap: 8,
-          animation: i === 0 ? "feedSlide .35s ease-out" : "none",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+          display: "flex", alignItems: "center", gap: T.space.sm,
+          animation: i === 0 ? `feedSlide ${T.motion.standard}` : "none",
+          boxShadow: T.shadow.md,
         }}>
-          <span style={{ fontSize: 18 }}>{it.icon}</span>
+          <span style={{ fontSize: 18 }} aria-hidden>{it.icon}</span>
           <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {it.label}
           </span>
-          <span style={{ fontSize: 10, opacity: 0.6, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: T.font.size.xs, color: T.color.textSubtle, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
             {fmtAgo(now - it.ts)}
           </span>
         </div>

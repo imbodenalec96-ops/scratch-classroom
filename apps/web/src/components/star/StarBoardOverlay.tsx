@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { onStarBoardEvent, type StarBoardEvent, type StarBoardKind, getActiveClassId, wasSeenLocally, markSeenLocally } from "../../lib/star/boardEvents.ts";
 import { StarStore } from "../../lib/star/storage.ts";
+import { tokens as T } from "../../lib/star/theme.ts";
 import { successBeep, alertBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { api } from "../../lib/api.ts";
 
@@ -130,42 +131,51 @@ export default function StarBoardOverlay() {
 
 function CompletionOverlay({ e, onClose }: { e: StarBoardEvent; onClose: () => void }) {
   return (
-    <div onClick={onClose} style={{
+    <div onClick={onClose} role="alertdialog" aria-label={`Great job ${e.studentName}`} style={{
       position: "fixed", inset: 0, zIndex: 9999,
-      background: "radial-gradient(ellipse at center, rgba(16,185,129,0.40) 0%, rgba(0,0,0,0.85) 80%)",
+      background: `radial-gradient(ellipse at center, ${T.color.success}66 0%, rgba(0,0,0,0.88) 80%)`,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      animation: "starBoardFade 0.4s ease-out", color: "white", textAlign: "center", padding: 40,
+      animation: `starBoardFade ${T.motion.standard}`, color: T.color.text,
+      textAlign: "center", padding: T.space["3xl"],
+      cursor: "pointer", fontFamily: T.font.family,
     }}>
       <ConfettiRain />
-      <div style={{ fontSize: "min(24vw, 240px)", lineHeight: 1, marginBottom: 20, animation: "starBounce 0.6s ease-out" }}>🎉</div>
+      <div style={{ fontSize: "min(24vw, 240px)", lineHeight: 1, marginBottom: T.space.xl, animation: "starBounce 0.6s ease-out" }} aria-hidden>🎉</div>
       <div style={{
-        fontSize: "min(11vw, 140px)", fontWeight: 900, letterSpacing: "-0.02em",
-        textShadow: "0 6px 30px rgba(16,185,129,0.6)",
+        fontSize: "min(11vw, 150px)", fontWeight: T.font.weight.black, letterSpacing: "-0.02em",
+        textShadow: `0 6px 30px ${T.color.success}99`,
         animation: "starBounce 0.7s ease-out 0.05s both",
+        lineHeight: 1,
       }}>
         GREAT JOB!
       </div>
       <div style={{
-        fontSize: "min(7vw, 90px)", fontWeight: 800, marginTop: 10,
-        color: "#fde68a", textShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        fontFamily: T.font.serif, fontStyle: "italic",
+        fontSize: "min(7vw, 96px)", fontWeight: 600, marginTop: T.space.md,
+        color: T.color.accent, textShadow: "0 4px 16px rgba(0,0,0,0.45)",
         animation: "starBounce 0.7s ease-out 0.1s both",
       }}>
         {e.studentName}
       </div>
       {e.detail && (
-        <div style={{ fontSize: "min(3.5vw, 36px)", opacity: 0.85, marginTop: 18, fontWeight: 600 }}>
+        <div style={{
+          fontSize: "min(3.5vw, 36px)", color: T.color.textMuted,
+          marginTop: T.space.lg, fontWeight: T.font.weight.semibold,
+        }}>
           ✓ {e.detail}{e.letter && e.pct != null ? ` — ${e.letter} (${e.pct}%)` : ""}
         </div>
       )}
       {(e.pointsAwarded || 0) > 0 && (
         <div style={{
-          marginTop: 30, padding: "14px 32px", borderRadius: 999,
+          marginTop: T.space["2xl"], padding: `${T.space.md}px ${T.space["3xl"]}px`,
+          borderRadius: T.radius.pill,
           background: "linear-gradient(135deg, #fbbf24, #f97316)",
-          fontSize: "min(5vw, 56px)", fontWeight: 900, letterSpacing: "0.02em",
-          boxShadow: "0 12px 32px rgba(251,191,36,0.45)",
+          fontSize: "min(5vw, 56px)", fontWeight: T.font.weight.black,
+          letterSpacing: "0.02em",
+          boxShadow: `0 12px 36px rgba(251,191,36,0.55)`,
           animation: "starBounce 0.6s ease-out 0.2s both",
         }}>
-          +{e.pointsAwarded} ⭐ points!
+          +{e.pointsAwarded} ⭐ points
         </div>
       )}
     </div>
@@ -176,35 +186,45 @@ function CompletionOverlay({ e, onClose }: { e: StarBoardEvent; onClose: () => v
 
 function RefusalOverlay({ e, onClose }: { e: StarBoardEvent; onClose: () => void }) {
   return (
-    <div onClick={onClose} style={{
+    <div onClick={onClose} role="alertdialog" aria-label={`Refusal logged for ${e.studentName}`} style={{
       position: "fixed", inset: 0, zIndex: 9999,
-      background: "radial-gradient(ellipse at center, rgba(239,68,68,0.55) 0%, rgba(0,0,0,0.92) 80%)",
+      background: `radial-gradient(ellipse at center, ${T.color.danger}88 0%, rgba(0,0,0,0.94) 80%)`,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      animation: "starBoardFade 0.4s ease-out, starShake 0.5s ease-out",
-      color: "white", textAlign: "center", padding: 40,
+      animation: `starBoardFade ${T.motion.standard}, starShake 0.5s ease-out`,
+      color: T.color.text, textAlign: "center", padding: T.space["3xl"],
+      cursor: "pointer", fontFamily: T.font.family,
     }}>
-      <div style={{ fontSize: "min(24vw, 240px)", lineHeight: 1, marginBottom: 20, animation: "starShake 0.5s ease-out" }}>🚨</div>
+      <div style={{ fontSize: "min(24vw, 240px)", lineHeight: 1, marginBottom: T.space.xl, animation: "starShake 0.5s ease-out" }} aria-hidden>🚨</div>
       <div style={{
-        fontSize: "min(10vw, 120px)", fontWeight: 900, letterSpacing: "-0.02em",
-        textShadow: "0 6px 30px rgba(239,68,68,0.6)",
+        fontSize: "min(10vw, 130px)", fontWeight: T.font.weight.black,
+        letterSpacing: "-0.02em",
+        textShadow: `0 6px 30px ${T.color.danger}aa`,
+        lineHeight: 1,
       }}>
         REFUSAL LOGGED
       </div>
       <div style={{
-        fontSize: "min(8vw, 100px)", fontWeight: 800, marginTop: 10,
-        color: "#fde68a", textShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        fontFamily: T.font.serif, fontStyle: "italic",
+        fontSize: "min(8vw, 100px)", fontWeight: 600, marginTop: T.space.md,
+        color: T.color.accent, textShadow: "0 4px 16px rgba(0,0,0,0.45)",
       }}>
         {e.studentName}
       </div>
       <div style={{
-        marginTop: 24, padding: "10px 26px", borderRadius: 999,
-        background: "rgba(0,0,0,0.45)", border: "2px solid rgba(255,255,255,0.25)",
-        fontSize: "min(4vw, 42px)", fontWeight: 800,
+        marginTop: T.space.xl,
+        padding: `${T.space.sm}px ${T.space["2xl"]}px`,
+        borderRadius: T.radius.pill,
+        background: "rgba(0,0,0,0.50)", border: "2px solid rgba(255,255,255,0.30)",
+        fontSize: "min(4vw, 42px)", fontWeight: T.font.weight.bold,
+        letterSpacing: "0.02em",
       }}>
         {e.refusalType || "Work Refusal"}
       </div>
       {e.detail && (
-        <div style={{ fontSize: "min(3vw, 30px)", opacity: 0.8, marginTop: 18, fontWeight: 600 }}>
+        <div style={{
+          fontSize: "min(3vw, 30px)", color: T.color.textMuted,
+          marginTop: T.space.lg, fontWeight: T.font.weight.semibold,
+        }}>
           {e.detail}
         </div>
       )}

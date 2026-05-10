@@ -265,6 +265,110 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
+/* ── Modal — backdrop + shell + header used by every STAR modal ── */
+
+interface ModalProps {
+  open?: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  kicker?: ReactNode;        // small uppercase eyebrow above the title
+  trailing?: ReactNode;      // top-right slot (besides close button)
+  width?: number | string;   // override max-width
+  children: ReactNode;
+  footer?: ReactNode;
+  ariaLabel?: string;
+}
+
+export function Modal({ open = true, onClose, title, kicker, trailing, width = 880, children, footer, ariaLabel }: ModalProps) {
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={typeof title === "string" ? title : ariaLabel}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 800,
+        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: T.space.xl,
+        animation: `starModalFade ${T.motion.standard}`,
+      }}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+    >
+      <style>{`
+        @keyframes starModalFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes starModalIn { from { transform: translateY(8px) scale(0.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+      `}</style>
+      <div style={{
+        background: T.color.bg,
+        border: `1px solid ${T.color.border}`,
+        borderRadius: T.radius["2xl"],
+        width: typeof width === "number" ? `min(${width}px, 96vw)` : width,
+        maxHeight: "92vh", overflow: "auto",
+        padding: T.space["2xl"],
+        color: T.color.text,
+        boxShadow: T.shadow.xl,
+        fontFamily: T.font.family,
+        animation: `starModalIn ${T.motion.slow}`,
+      }}>
+        {(title || kicker || trailing) && (
+          <header style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            gap: T.space.md, marginBottom: T.space.lg,
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              {kicker && (
+                <div style={{
+                  fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
+                  letterSpacing: "0.20em", textTransform: "uppercase",
+                  color: T.color.textMuted, marginBottom: 2,
+                }}>{kicker}</div>
+              )}
+              {title && (
+                <h2 style={{
+                  fontSize: T.font.size["2xl"], fontWeight: T.font.weight.black,
+                  margin: 0, letterSpacing: "-0.01em", lineHeight: 1.15,
+                }}>{title}</h2>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: T.space.sm, flexShrink: 0 }}>
+              {trailing}
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                style={{
+                  width: 36, height: 36, borderRadius: T.radius.md,
+                  background: T.color.surface, color: T.color.text,
+                  border: `1px solid ${T.color.border}`,
+                  cursor: "pointer", fontSize: 16, fontWeight: T.font.weight.bold,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  outline: "none",
+                  transition: `background ${T.motion.fast}, box-shadow ${T.motion.fast}`,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = T.color.surfaceRaised; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = T.color.surface; }}
+                onFocus={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = T.focusRing; }}
+                onBlur={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
+              >✕</button>
+            </div>
+          </header>
+        )}
+        <div>{children}</div>
+        {footer && (
+          <footer style={{
+            display: "flex", justifyContent: "flex-end", alignItems: "center",
+            gap: T.space.sm, marginTop: T.space.lg,
+            paddingTop: T.space.lg, borderTop: `1px solid ${T.color.border}`,
+          }}>
+            {footer}
+          </footer>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Stat tile — for dashboards ─────────────────────────────────── */
 
 interface StatProps {
