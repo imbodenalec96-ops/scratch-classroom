@@ -179,6 +179,8 @@ const KEYS = {
   passLog: "star_pass_log",
   photos: "star_photos",
   templates: "star_templates",
+  iepGoals: "star_iep_goals",
+  iepLog: "star_iep_log",
 } as const;
 
 export interface StarTemplate {
@@ -205,6 +207,30 @@ export interface StarPhoto {
   dataUrl: string;        // compressed jpeg base64
   ts: number;
   note?: string;
+}
+
+// IEP goals + daily log. Multiple goals per student (real IEPs have
+// 5–9 each). `iepGoals` is a flat list — query by studentId.
+// `iepLog` records daily overall progress per kid (one row per kid per
+// day); the SEIF report shows every goal + the daily log table.
+export interface IepGoal {
+  id: string;             // unique id (so multi-goal edit / delete works)
+  studentId: string;
+  goalText: string;       // the IEP goal as written in the doc
+  area?: string;          // optional category — Reading / Behavior / etc.
+  createdDate: string;    // ISO
+  updatedDate: string;    // ISO
+}
+
+export type IepStatus = "met" | "partial" | "not";
+
+export interface IepLogEntry {
+  id: string;             // ulid-ish unique key
+  studentId: string;
+  date: string;           // YYYY-MM-DD (Pacific) — one canonical entry per kid per day
+  status: IepStatus;
+  note?: string;
+  loggedAt: string;       // ISO timestamp
 }
 
 // LocalStorage with safe parse + default fallback
@@ -306,6 +332,110 @@ export const StarStore = {
     all[barcode] = all[barcode].filter((p) => p.id !== photoId);
     if (all[barcode].length === 0) delete all[barcode];
     ls.set(KEYS.photos, all);
+  },
+
+  // ── IEP goals (multi-goal per student) + daily log ───────────────
+  // `iepGoals` is a flat array. Migrates legacy single-goal storage
+  // (Record<studentId, IepGoal>) on first read so older installs keep
+  // their data.
+  getIepGoals: (): IepGoal[] => {
+    const raw: any = ls.get<any>(KEYS.iepGoals, []);
+    if (Array.isArray(raw)) return raw as IepGoal[];
+    // Legacy: Record<studentId, IepGoal> — migrate.
+    if (raw && typeof raw === "object") {
+      const out: IepGoal[] = [];
+      for (const sid in raw) {
+        const g = raw[sid];
+        if (g?.goalText) {
+          out.push({
+            id: `iep-g-${sid}-1`, studentId: sid,
+            goalText: String(g.goalText), area: g.area,
+            createdDate: g.createdDate || new Date().toISOString(),
+            updatedDate: g.updatedDate || new Date().toISOString(),
+          });
+        }
+      }
+      ls.set(KEYS.iepGoals, out);
+      return out;
+    }
+    return [];
+  },
+  setIepGoals: (v: IepGoal[]) => ls.set(KEYS.iepGoals, v),
+  goalsForStudent: (sid: string): IepGoal[] => {
+    const all = ls.get<IepGoal[]>(KEYS.iepGoals, []);
+    return Array.isArray(all) ? all.filter((g) => g.studentId === sid) : [];
+  },
+  addIepGoal: (studentId: string, goalText: string, area?: string): IepGoal => {
+    const allRaw: any = ls.get<any>(KEYS.iepGoals, []);
+    const all: IepGoal[] = Array.isArray(allRaw) ? allRaw : [];
+    const now = new Date().toISOString();
+    const goal: IepGoal = {
+      id: `iep-g-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      studentId,
+      goalText: goalText.trim(),
+      area: (area || "").trim() || undefined,
+      createdDate: now, updatedDate: now,
+    };
+    all.push(goal);
+    ls.set(KEYS.iepGoals, all);
+    return goal;
+  },
+  updateIepGoal: (id: string, patch: { goalText?: string; area?: string }) => {
+    const all = ls.get<IepGoal[]>(KEYS.iepGoals, []);
+    const idx = all.findIndex((g) => g.id === id);
+    if (idx < 0) return;
+    all[idx] = {
+      ...all[idx],
+      goalText: patch.goalText !== undefined ? patch.goalText.trim() : all[idx].goalText,
+      area: patch.area !== undefined ? (patch.area.trim() || undefined) : all[idx].area,
+      updatedDate: new Date().toISOString(),
+    };
+    ls.set(KEYS.iepGoals, all);
+  },
+  deleteIepGoal: (id: string) => {
+    const all = ls.get<IepGoal[]>(KEYS.iepGoals, []).filter((g) => g.id !== id);
+    ls.set(KEYS.iepGoals, all);
+  },
+  // Bulk replace for a single student — used by the "Load my class
+  // goals" import. Removes existing goals for that kid then adds the
+  // provided ones in order.
+  setStudentGoals: (studentId: string, goals: Array<{ area?: string; goalText: string }>) => {
+    const allRaw: any = ls.get<any>(KEYS.iepGoals, []);
+    const all: IepGoal[] = Array.isArray(allRaw) ? allRaw : [];
+    const kept = all.filter((g) => g.studentId !== studentId);
+    const now = new Date().toISOString();
+    for (const g of goals) {
+      kept.push({
+        id: `iep-g-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        studentId,
+        goalText: g.goalText.trim(),
+        area: (g.area || "").trim() || undefined,
+        createdDate: now, updatedDate: now,
+      });
+    }
+    ls.set(KEYS.iepGoals, kept);
+  },
+
+  getIepLog: () => ls.get<IepLogEntry[]>(KEYS.iepLog, []),
+  setIepLog: (v: IepLogEntry[]) => ls.set(KEYS.iepLog, v),
+  // Upsert by (studentId + date) — typing a status replaces the prior
+  // entry for the same day. Returns the saved entry.
+  logIep: (studentId: string, date: string, status: IepStatus, note?: string): IepLogEntry => {
+    const all = ls.get<IepLogEntry[]>(KEYS.iepLog, []);
+    const idx = all.findIndex((e) => e.studentId === studentId && e.date === date);
+    const entry: IepLogEntry = {
+      id: idx >= 0 ? all[idx].id : `iep-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      studentId, date, status, note,
+      loggedAt: new Date().toISOString(),
+    };
+    if (idx >= 0) all[idx] = entry; else all.push(entry);
+    ls.set(KEYS.iepLog, all);
+    return entry;
+  },
+  clearIepLogEntry: (studentId: string, date: string) => {
+    const all = ls.get<IepLogEntry[]>(KEYS.iepLog, [])
+      .filter((e) => !(e.studentId === studentId && e.date === date));
+    ls.set(KEYS.iepLog, all);
   },
 };
 

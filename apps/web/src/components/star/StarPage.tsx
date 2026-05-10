@@ -21,6 +21,7 @@ import AssignmentGenerator from "./AssignmentGenerator.tsx";
 import AfternoonPackGenerator from "./AfternoonPackGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
+import IepTracker from "./IepTracker.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import StarHome from "./StarHome.tsx";
@@ -29,7 +30,7 @@ import StarDataView from "./StarDataView.tsx";
 import { tokens as T } from "../../lib/star/theme.ts";
 import { Button } from "./ui.tsx";
 
-type Tab = "home" | "gradebook" | "create" | "reports" | "data" | "settings";
+type Tab = "home" | "gradebook" | "create" | "iep" | "reports" | "data" | "settings";
 
 const SUBJECTS: Subject[] = ["Math","Reading","Writing","Science","Social Studies","PE","Art","Library","Music"];
 const GRADES = ["K","1st","2nd","3rd","4th","5th"];
@@ -75,6 +76,7 @@ export default function StarPage() {
     { id: "home"      as Tab, icon: "🏠", label: "Home" },
     { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
     { id: "create"    as Tab, icon: "✨", label: "Create" },
+    { id: "iep"       as Tab, icon: "🎯", label: "IEP" },
     { id: "reports"   as Tab, icon: "📊", label: "Reports" },
     { id: "data"      as Tab, icon: "💾", label: "Data" },
     { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
@@ -304,6 +306,17 @@ export default function StarPage() {
               <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
             </SectionWrapper>
           </CreateGroup>
+        </>
+      )}
+
+      {tab === "iep" && (
+        <>
+          <PageHeader
+            kicker="🎯 IEP Goals"
+            title="Daily progress · IEP team-ready"
+            subtitle="Tap Met / Partial / Not yet per kid each day. Set goals in Settings → IEP Goals. Print a SEIF report for your IEP meetings — per kid or whole class."
+          />
+          <IepTracker />
         </>
       )}
 
@@ -950,7 +963,297 @@ function SettingsPanel() {
       </div>
 
       <div style={{ gridColumn: "1 / -1" }}>
+        <IepGoalsPanel students={students} />
+      </div>
+
+      <div style={{ gridColumn: "1 / -1" }}>
         <CsvImportPanel />
+      </div>
+    </div>
+  );
+}
+
+/* ── IEP Goals editor — multi-goal per kid, used by IEP tab + SEIF report ── */
+
+// Pre-baked roster IEP goals — one-tap loader for Alec's actual class.
+// Names matched case-insensitively against the student roster. Rayden
+// excluded (left class). Kids not on roster are skipped silently.
+const ROSTER_IEP_GOALS: Record<string, Array<{ area: string; goalText: string }>> = {
+  anna: [
+    { area: "Reading — Phonics", goalText: "Will apply instructional-level phonics and word analysis skills to decode and recognize high-frequency words with 80% accuracy" },
+    { area: "Reading — CVC Blending", goalText: "Will accurately blend CVC words with 80% accuracy during structured activities" },
+    { area: "Reading — Sight Words", goalText: "Will recognize and read the first 50 Fry sight words with 60% accuracy" },
+    { area: "Writing — Conventions", goalText: "Will demonstrate command of standard English conventions including capitalization and punctuation when writing a complete sentence, achieving 80% accuracy" },
+    { area: "Writing — Dictation", goalText: "Will trace a sentence in response to a verbal prompt that she has dictated" },
+    { area: "Math", goalText: "Will independently solve addition and subtraction problems within 20 using a number line or manipulatives with 80% accuracy" },
+    { area: "Social/Emotional — Transitions", goalText: "Will transition between classroom activities independently and appropriately in 3/5 opportunities using visual schedules or timers" },
+    { area: "Social/Emotional — Emotion Expression", goalText: "Will accept direction within 2 prompts and communicate emotions and needs using words or visuals when frustrated" },
+  ],
+  ameer: [
+    { area: "Behavior — On-Task", goalText: "When assigned an academic task during whole group instruction, will independently remain on-task for 20 minutes or until task is completed, in 4/5 academic tasks" },
+    { area: "Behavior — Transitions", goalText: "Given a visual schedule and a verbal prompt, will transition from an in-process activity to a new activity using 1 strategy from the anchor chart, for 4/5 transition opportunities" },
+    { area: "Social/Emotional — Conflict Resolution", goalText: "Given a written assignment to brainstorm positive strategies for handling conflict, will write a list of at least 3 positive strategies, for 4/5 conflict opportunities" },
+    { area: "Behavior — Classroom Expectations", goalText: "Given a visual of a new classroom expectation and a verbal prompt, will follow the new classroom expectation by acting in accordance with the visual, for 4/5 opportunities" },
+  ],
+  jaida: [
+    { area: "Reading — Context Clues", goalText: "After reading a paragraph containing 1 bold unknown word and at least 1 underlined context clue, will use the context clue to write the meaning of the unknown word, for 4/5 unknown words on 3/4 progress monitoring assessments" },
+    { area: "Reading — Root Words", goalText: "Will write a definition for 1 bolded word containing a common root (e.g., aquatics, geothermal, cardiac) using context clues, for 4/5 unknown words" },
+    { area: "Reading — Prefixes", goalText: "Will write a definition for 1 bolded word containing a prefix (e.g., undone, antiviral, retell) using context clues and prefixes, for 4/5 unknown words" },
+    { area: "Writing — Conventions", goalText: "Given an instructional-level sentence with a highlighted writing convention error related to capitalization, punctuation, or spelling, will correct the error by rewriting the sentence, for 4/5 sentences on 3/4 progress monitoring assessments" },
+    { area: "Math — Add/Subtract", goalText: "Given a visually represented equation with two multi-digit whole numbers within 1,000 and a place value chart, will add or subtract by bundling or decomposing the pieces with guiding questions, for 4/5 equations on 3/4 progress monitoring assessments" },
+    { area: "Math — Multiplication", goalText: "Given a multiplication problem with 2 multi-digit whole numbers up to 3 digits each (e.g., 468 × 44), will use the standard algorithm to solve in 2 minutes or less, for 4/5 multiplication exercises" },
+    { area: "Social/Emotional — If-Then", goalText: "When asked to predict how a given behavior might affect the feelings of others, will write an If-Then sentence including the given behavior and 1 predicted emotion, scoring 2/2 rubric points on 4/5 progress monitoring assessments" },
+    { area: "Behavior — Bullying/Teasing", goalText: "Given written definitions of teasing and bullying behaviors, will write 2 examples of unwelcome teasing or bullying behaviors experienced or witnessed, scoring 2/2 rubric points on 4/5 progress monitoring assessments" },
+  ],
+  kaleb: [
+    { area: "Reading — Decoding", goalText: "Given a word list of 20 regularly spelled one-syllable words with closed, open, vowel digraph, vowel-consonant-e, and r-controlled syllable types, will decode and blend to read 18/20 words aloud using a decoding strategy on 3/4 progress monitoring assessments" },
+    { area: "Reading — Comprehension", goalText: "After a read-aloud of a 3-4 sentence independent-level literary story, when verbally prompted to describe a character, will verbally state 2 details from the story that describe the character on 3/4 progress monitoring assessments" },
+    { area: "Writing — Sentence Frames", goalText: "Given a worksheet read aloud with 5 sentence frames, will complete each sentence frame verbally and in writing using a word bank, applying correct prepositional phrase placement, verb tense, and adjective order, for 5/5 sentences" },
+    { area: "Writing — Conventions", goalText: "Given a read-aloud of a written sentence with 1 writing convention error related to capitalization of names and end punctuation, will correct the error by crossing out and replacing, for 3/4 sentences on 3/4 progress monitoring assessments" },
+    { area: "Math — Add/Subtract", goalText: "Given an addition or subtraction problem within 1,000 and a place value chart, will write the sum or difference using a place value strategy with guiding questions, for 4/5 problems on 3/4 progress monitoring assessments" },
+    { area: "Math — Multiplication", goalText: "Given a visually represented multiplication expression with multiples of ten within three digits and a one-digit number, will find the product by counting equal groups using illustrations, arrays, or area models, for 4/5 problems on 3/4 progress monitoring assessments" },
+    { area: "Social/Emotional — Emotions", goalText: "Given a written If-Then sentence starter describing how a familiar behavior makes one feel, will complete the sentence by selecting 1 emotion from a word bank, scoring 1/1 rubric points on 4/5 progress monitoring assessments" },
+    { area: "Behavior — On-Task", goalText: "When assigned an academic task during whole group instruction, will independently remain on-task for 15 minutes or until the task is completed, in 4/5 academic tasks" },
+    { area: "Behavior — Ethical Choices", goalText: "Given a written assignment with 2 choices of how a person in an ethical scenario can be responsible, will circle 1 way in which that person could accept responsibility, on 4/5 progress monitoring assessments" },
+  ],
+  zoey: [
+    { area: "Reading — Vowel Digraphs", goalText: "Given a written word list of 10 one-syllable words containing long-a, long-e, and long-o vowel digraphs (e.g., road, rain, speech), will verbally decode the words to read aloud 8/10 on 3/4 progress monitoring assessments" },
+    { area: "Reading — Two-Syllable Decoding", goalText: "Given a word list of 20 regularly spelled two-syllable words including six different syllable types, will verbally decode each syllable and blend to read 16/20 words aloud using a decoding strategy on 3/4 progress monitoring assessments" },
+    { area: "Reading — Main Idea", goalText: "Given an instructional-level informational text with an explicitly stated main idea, will determine the main idea with 90% accuracy for 3/4 texts" },
+    { area: "Articulation", goalText: "Will improve articulation by correctly producing /s/, /z/, \"CH\", and \"J\" in conversation, maintaining 90% criteria as implemented by the Speech Language Pathologist" },
+    { area: "Math — Place Value/Add/Subtract", goalText: "Given an addition or subtraction problem within 500 visually represented with base ten blocks, will write the sum or difference using a place value strategy with guiding questions, for 4/5 problems on 3/4 progress monitoring assessments" },
+    { area: "Writing — Opinion Paragraph", goalText: "Given an opinion writing prompt, will write a 4-sentence opinion paragraph with 1 topic sentence, 3 supporting reasons, and 2 transition words, on 2/3 writing prompts" },
+    { area: "Social/Emotional — On-Task", goalText: "When assigned an academic task during whole group instruction, will independently remain on-task for 15 minutes or until the task is completed, in 4/5 academic tasks" },
+    { area: "Social/Emotional — Calming Strategies", goalText: "Given the end of a 20-minute unstructured activity and a choice board, will implement a calming strategy from their toolbox for 5 minutes, for 4/5 opportunities on 3/4 progress monitoring assessments" },
+  ],
+};
+
+function IepGoalsPanel({ students }: { students: StarStudent[] }) {
+  const [goals, setGoals] = useState(() => StarStore.getIepGoals());
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { area: string; goalText: string }>>({});
+  const [importFlash, setImportFlash] = useState<string | null>(null);
+
+  const refresh = () => setGoals(StarStore.getIepGoals());
+
+  const goalsForKid = (sid: string) => goals.filter((g) => g.studentId === sid);
+
+  const setDraft = (id: string, patch: { area?: string; goalText?: string }) => {
+    setDrafts((cur) => ({
+      ...cur,
+      [id]: {
+        area: patch.area !== undefined ? patch.area : (cur[id]?.area ?? ""),
+        goalText: patch.goalText !== undefined ? patch.goalText : (cur[id]?.goalText ?? ""),
+      },
+    }));
+  };
+
+  const persistGoal = (id: string) => {
+    const d = drafts[id];
+    if (!d) return;
+    StarStore.updateIepGoal(id, { goalText: d.goalText, area: d.area });
+    refresh();
+    setSavedFlash(id);
+    setTimeout(() => setSavedFlash((x) => x === id ? null : x), 800);
+  };
+
+  const addGoal = (sid: string) => {
+    const g = StarStore.addIepGoal(sid, "", "");
+    refresh();
+    setDraft(g.id, { area: "", goalText: "" });
+    setOpenId(sid);
+  };
+
+  const remove = (id: string) => {
+    if (!window.confirm("Delete this goal?")) return;
+    StarStore.deleteIepGoal(id);
+    refresh();
+  };
+
+  const loadRoster = () => {
+    let loaded = 0;
+    let skipped: string[] = [];
+    for (const s of students) {
+      const key = (s.firstName || "").trim().toLowerCase();
+      const list = ROSTER_IEP_GOALS[key];
+      if (!list) { skipped.push(s.firstName); continue; }
+      StarStore.setStudentGoals(s.id, list);
+      loaded += list.length;
+    }
+    refresh();
+    setImportFlash(`Loaded ${loaded} goals across ${students.length - skipped.length} students.${skipped.length ? ` Not in preset: ${skipped.join(", ")}.` : ""}`);
+    setTimeout(() => setImportFlash(null), 6000);
+  };
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 14, padding: 16, color: "#f5f1e8",
+    }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>🎯 IEP Goals</div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.65)", fontWeight: 600 }}>
+          Add as many goals per kid as the IEP doc lists. All show in the IEP tab + SEIF report.
+        </div>
+      </div>
+
+      {Object.keys(ROSTER_IEP_GOALS).length > 0 && (
+        <div style={{
+          marginTop: 10, marginBottom: 4,
+          padding: "10px 12px", borderRadius: 10,
+          background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.06))",
+          border: "1px solid rgba(168,85,247,0.30)",
+          display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+        }}>
+          <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: "#fce7f3", fontWeight: 600 }}>
+            One-tap import: Anna, Ameer, Jaida, Kaleb, Zoey (real IEP goals you sent over).
+          </div>
+          <button
+            onClick={loadRoster}
+            style={{
+              padding: "8px 14px", borderRadius: 999,
+              background: "linear-gradient(135deg, #ec4899, #a855f7)",
+              border: "none", color: "white", fontWeight: 800, fontSize: 12,
+              cursor: "pointer", touchAction: "manipulation",
+              boxShadow: "0 6px 16px -6px rgba(236,72,153,0.55)",
+            }}
+          >📥 Load my class goals</button>
+        </div>
+      )}
+      {importFlash && (
+        <div style={{
+          marginTop: 8, padding: "8px 12px", borderRadius: 8,
+          background: "rgba(34,197,94,0.10)",
+          border: "1px solid rgba(34,197,94,0.40)",
+          color: "#bbf7d0", fontSize: 12, fontWeight: 700,
+        }}>{importFlash}</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+        {students.length === 0 && (
+          <div style={{
+            padding: 14, borderRadius: 10,
+            background: "rgba(168,85,247,0.04)",
+            border: "1px dashed rgba(168,85,247,0.25)",
+            color: "rgba(196,181,253,0.65)", fontSize: 13, fontWeight: 600,
+          }}>
+            Add students above first.
+          </div>
+        )}
+        {students.map((s) => {
+          const list = goalsForKid(s.id);
+          const expanded = openId === s.id || list.length > 0;
+          return (
+            <div key={s.id} style={{
+              padding: 10, borderRadius: 10,
+              background: "rgba(168,85,247,0.06)",
+              border: "1px solid rgba(168,85,247,0.20)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 900, fontSize: 13, color: "white", flexShrink: 0,
+                  boxShadow: "0 2px 8px -2px rgba(168,85,247,0.55)",
+                }}>{(s.firstName || "?").charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: "#fce7f3" }}>
+                  {s.firstName} {s.lastName}
+                  <span style={{ marginLeft: 8, color: "rgba(196,181,253,0.55)", fontWeight: 700, fontSize: 11 }}>
+                    {list.length} goal{list.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => addGoal(s.id)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 999,
+                    background: "rgba(168,85,247,0.10)",
+                    border: "1px solid rgba(168,85,247,0.30)",
+                    color: "#fce7f3", fontWeight: 800, fontSize: 12,
+                    cursor: "pointer", touchAction: "manipulation",
+                  }}
+                >+ Add goal</button>
+                <button
+                  onClick={() => setOpenId((cur) => cur === s.id ? null : s.id)}
+                  style={{
+                    padding: "6px 10px", borderRadius: 999,
+                    background: "rgba(168,85,247,0.06)",
+                    border: "1px solid rgba(168,85,247,0.20)",
+                    color: "rgba(196,181,253,0.75)", fontWeight: 800, fontSize: 12,
+                    cursor: "pointer", touchAction: "manipulation",
+                  }}
+                >{openId === s.id ? "Hide" : "Show"}</button>
+              </div>
+
+              {expanded && list.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {list.map((g) => {
+                    const draft = drafts[g.id] ?? { area: g.area || "", goalText: g.goalText };
+                    const flash = savedFlash === g.id;
+                    return (
+                      <div key={g.id} style={{
+                        display: "grid",
+                        gridTemplateColumns: "180px 1fr auto auto",
+                        gap: 6, alignItems: "center",
+                        padding: 6, borderRadius: 8,
+                        background: flash ? "rgba(34,197,94,0.10)" : "rgba(10,4,20,0.30)",
+                        border: flash ? "1px solid rgba(34,197,94,0.45)" : "1px solid rgba(168,85,247,0.15)",
+                      }}>
+                        <input
+                          value={draft.area}
+                          onChange={(e) => setDraft(g.id, { area: e.target.value })}
+                          onBlur={() => persistGoal(g.id)}
+                          placeholder="Area (e.g. Reading)"
+                          style={inp()}
+                        />
+                        <input
+                          value={draft.goalText}
+                          onChange={(e) => setDraft(g.id, { goalText: e.target.value })}
+                          onBlur={() => persistGoal(g.id)}
+                          placeholder="IEP goal text"
+                          style={inp()}
+                        />
+                        <button
+                          onClick={() => persistGoal(g.id)}
+                          style={{
+                            padding: "8px 12px", borderRadius: 8,
+                            background: draft.goalText ? "linear-gradient(135deg, #ec4899, #a855f7)" : "rgba(168,85,247,0.06)",
+                            border: draft.goalText ? "1px solid rgba(236,72,153,0.55)" : "1px solid rgba(168,85,247,0.20)",
+                            color: "white", fontWeight: 800, fontSize: 12,
+                            cursor: "pointer", touchAction: "manipulation",
+                          }}
+                        >{flash ? "✓" : "Save"}</button>
+                        <button
+                          onClick={() => remove(g.id)}
+                          title="Delete"
+                          style={{
+                            padding: "8px 10px", borderRadius: 8,
+                            background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+                            border: "1px solid rgba(239,68,68,0.40)",
+                            cursor: "pointer", fontSize: 13,
+                          }}
+                        >🗑</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {expanded && list.length === 0 && (
+                <div style={{
+                  marginTop: 10, padding: "10px 12px", borderRadius: 8,
+                  background: "rgba(168,85,247,0.04)",
+                  border: "1px dashed rgba(168,85,247,0.25)",
+                  color: "rgba(196,181,253,0.65)", fontSize: 12, fontWeight: 600,
+                }}>
+                  No goals yet — tap <b style={{ color: "#fce7f3" }}>+ Add goal</b> above.
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

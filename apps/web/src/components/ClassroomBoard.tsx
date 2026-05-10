@@ -588,6 +588,20 @@ export default function ClassroomBoard() {
   const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   const dayLetter = (board.settings?.current_specials_day || "A").toUpperCase();
 
+  // ── Whole-class reward goal — sum of behavior_stars across the
+  // class. Renders as a slim banner above the Ledger when target > 0,
+  // and fires a one-time celebration when total ≥ target.
+  const rewardTarget = Number(board.settings?.class_reward_target || 0);
+  const rewardLabel = (board.settings?.class_reward_label || "").trim();
+  const rewardEmoji = (board.settings?.class_reward_emoji || "🎉").trim();
+  const rewardTotal = useMemo(
+    () => board.students.reduce((sum, s) => sum + (Number((s as any).behavior_stars) || 0), 0),
+    [board.students]
+  );
+  const rewardActive = rewardTarget > 0;
+  const rewardPct = rewardActive ? Math.min(100, Math.round((rewardTotal / rewardTarget) * 100)) : 0;
+  const rewardEarned = rewardActive && rewardTotal >= rewardTarget;
+
   const countdown = useMemo(() => {
     if (!currentBlock) return null;
     const [h, m] = (currentBlock.end_time || "").split(":").map(Number);
@@ -727,7 +741,7 @@ export default function ClassroomBoard() {
       transform: `translate(-50%, -50%) scale(${scale})`,
       transformOrigin: "center center",
       overflow: "hidden", display: "grid",
-      gridTemplateRows: "72px 156px 1fr 56px",
+      gridTemplateRows: rewardActive ? "72px 156px 1fr 52px 56px" : "72px 156px 1fr 56px",
       gap: 8, padding: "12px 16px 12px 16px",
       color: "white", fontFamily: "'Inter', system-ui, sans-serif",
       background: bgUrl ? `url(${bgUrl}) center/cover no-repeat` : bg,
@@ -2250,6 +2264,93 @@ export default function ClassroomBoard() {
           </section>
         </div>
       </div>
+
+      {/* ── REWARD GOAL banner — slim row above the Ledger when set ── */}
+      {rewardActive && (
+        <section style={{
+          position: "relative", zIndex: 1,
+          borderRadius: 14,
+          background: rewardEarned
+            ? "radial-gradient(600px 200px at 0% 50%, rgba(16,185,129,0.30) 0%, transparent 65%), linear-gradient(95deg, rgba(16,185,129,0.22) 0%, rgba(168,85,247,0.18) 50%, rgba(236,72,153,0.18) 100%)"
+            : "linear-gradient(95deg, rgba(168,85,247,0.18) 0%, rgba(99,102,241,0.10) 50%, rgba(236,72,153,0.18) 100%)",
+          border: rewardEarned ? "1px solid rgba(16,185,129,0.55)" : "1px solid rgba(168,85,247,0.30)",
+          boxShadow: rewardEarned
+            ? "0 0 36px rgba(16,185,129,0.45), inset 0 1px 0 rgba(255,255,255,0.06)"
+            : "0 0 24px -8px rgba(168,85,247,0.30), inset 0 1px 0 rgba(255,255,255,0.04)",
+          padding: "0 18px",
+          display: "flex", alignItems: "center", gap: 14,
+          overflow: "hidden",
+          animation: rewardEarned ? "fullCard 2.6s ease-in-out infinite" : undefined,
+        }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            flexShrink: 0,
+          }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 32, height: 32, borderRadius: 10,
+              background: rewardEarned
+                ? "linear-gradient(135deg, #22c55e, #10b981)"
+                : "linear-gradient(135deg, #ec4899, #a855f7)",
+              fontSize: 18,
+              boxShadow: rewardEarned
+                ? "0 0 14px rgba(16,185,129,0.55)"
+                : "0 0 14px rgba(168,85,247,0.45)",
+            }}>{rewardEmoji}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              <span style={{
+                fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 800,
+                letterSpacing: "0.22em", textTransform: "uppercase",
+                color: rewardEarned ? "#86efac" : "#f9a8d4",
+              }}>{rewardEarned ? "Class Goal Earned!" : "Class Goal"}</span>
+              <span style={{
+                fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 900,
+                letterSpacing: "-0.02em",
+                background: rewardEarned
+                  ? "linear-gradient(135deg, #d1fae5 0%, #f9a8d4 100%)"
+                  : "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                maxWidth: 320,
+              }}>{rewardLabel || "Whole-Class Reward"}</span>
+            </div>
+          </div>
+
+          {/* Progress rail */}
+          <div style={{
+            flex: 1, minWidth: 0,
+            height: 10, borderRadius: 999,
+            background: "rgba(168,85,247,0.10)",
+            border: "1px solid rgba(168,85,247,0.20)",
+            overflow: "hidden", position: "relative",
+          }}>
+            <div style={{
+              position: "absolute", top: 0, left: 0, height: "100%",
+              width: `${rewardPct}%`,
+              background: rewardEarned
+                ? "linear-gradient(90deg, #22c55e 0%, #10b981 50%, #ec4899 100%)"
+                : "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+              borderRadius: 999,
+              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+              boxShadow: rewardEarned
+                ? "0 0 16px rgba(16,185,129,0.55)"
+                : "0 0 14px rgba(236,72,153,0.45)",
+            }} />
+          </div>
+
+          <div style={{
+            flexShrink: 0,
+            fontFamily: mono, fontSize: 22, fontWeight: 900,
+            color: rewardEarned ? "#bbf7d0" : "#fce7f3",
+            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+            textShadow: rewardEarned ? "0 0 14px rgba(187,247,208,0.55)" : "0 0 12px rgba(252,231,243,0.30)",
+          }}>
+            {rewardTotal}<span style={{ fontSize: 14, color: "rgba(196,181,253,0.55)", fontWeight: 700 }}> / {rewardTarget}</span>
+            <span style={{ marginLeft: 8, fontSize: 12, color: rewardEarned ? "#86efac" : "#c4b5fd" }}>· {rewardPct}%</span>
+          </div>
+        </section>
+      )}
 
       {/* ── ROW 4: "The Ledger" — Behavior Levels strip ── */}
       <section style={{

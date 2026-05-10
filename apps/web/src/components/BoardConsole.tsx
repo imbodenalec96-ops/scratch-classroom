@@ -8,7 +8,7 @@
 //      picks an item, redeems. PIN check goes to the server; teacher
 //      stays in control of when the store is open.
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.ts";
 import PinPad from "./PinPad.tsx";
 
@@ -99,7 +99,7 @@ interface Props {
   onClose: () => void;
 }
 
-type ConsoleTab = "progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings" | "morning";
+type ConsoleTab = "progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings" | "morning" | "reward";
 
 interface NavItem {
   id: ConsoleTab;
@@ -120,6 +120,7 @@ const NAV: NavGroup[] = [
       { id: "progress", icon: "📋", label: "Progress", desc: "Tap +/− to log assignments" },
       { id: "points",   icon: "🪙", label: "Points",   desc: "Award or remove dojo points" },
       { id: "stars",    icon: "⭐", label: "Stars",    desc: "Behavior stars + McDonald's" },
+      { id: "reward",   icon: "🎯", label: "Reward",   desc: "Whole-class goal banner" },
     ],
   },
   {
@@ -299,6 +300,7 @@ export default function BoardConsole({ classId, students, storeOnly = false, onC
             {tab === "spinner"  && <SpinnerTab students={students} />}
             {tab === "groups"   && <GroupsTab students={students} />}
             {tab === "store"    && <StoreTab classId={classId} students={students} />}
+            {tab === "reward"   && <RewardTab classId={classId} students={students} />}
             {tab === "pins"     && <PinsTab classId={classId} />}
             {tab === "settings" && (
               <Suspense fallback={<div style={{ textAlign: "center", padding: 40, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>Loading…</div>}>
@@ -1952,6 +1954,214 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Whole-class reward goal — set target / label / emoji + reset ─── */
+
+function RewardTab({ classId, students }: { classId: string; students: Student[] }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [target, setTarget] = useState<number>(0);
+  const [label, setLabel] = useState<string>("");
+  const [emoji, setEmoji] = useState<string>("🎉");
+
+  const totalStars = useMemo(
+    () => students.reduce((sum, s: any) => sum + (Number(s.behavior_stars) || 0), 0),
+    [students]
+  );
+  const pct = target > 0 ? Math.min(100, Math.round((totalStars / target) * 100)) : 0;
+  const earned = target > 0 && totalStars >= target;
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getBoardData(classId)
+      .then((d: any) => {
+        if (cancelled) return;
+        const s = d?.settings || {};
+        setTarget(Number(s.class_reward_target) || 0);
+        setLabel(String(s.class_reward_label || ""));
+        setEmoji(String(s.class_reward_emoji || "🎉"));
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoading(false));
+    return () => { cancelled = true; };
+  }, [classId]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveBoardSetting("class_reward_target", String(Math.max(0, Math.floor(target) || 0)));
+      await api.saveBoardSetting("class_reward_label", label.trim());
+      await api.saveBoardSetting("class_reward_emoji", emoji.trim() || "🎉");
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1600);
+    } catch {}
+    setSaving(false);
+  };
+
+  const clear = async () => {
+    if (!window.confirm("Clear the class reward goal? The banner on the board will disappear.")) return;
+    setSaving(true);
+    try {
+      await api.saveBoardSetting("class_reward_target", "0");
+      await api.saveBoardSetting("class_reward_label", "");
+      setTarget(0);
+      setLabel("");
+    } catch {}
+    setSaving(false);
+  };
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{
+        marginBottom: 18, padding: "12px 14px", borderRadius: 12,
+        background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.06))",
+        border: "1px solid rgba(168,85,247,0.30)",
+        color: "#fce7f3", fontSize: 13, fontWeight: 600, lineHeight: 1.5,
+      }}>
+        Set a target like <strong style={{ color: "#f9a8d4" }}>200 stars → Pizza Party</strong>. The board shows a giant
+        progress bar that fills as the class earns stars together. When the goal is hit, the banner celebrates.
+      </div>
+
+      <div style={{
+        marginBottom: 22, padding: "14px 18px", borderRadius: 14,
+        background: earned
+          ? "radial-gradient(400px 200px at 0% 50%, rgba(16,185,129,0.30) 0%, transparent 65%), linear-gradient(95deg, rgba(16,185,129,0.22), rgba(168,85,247,0.18) 50%, rgba(236,72,153,0.18))"
+          : "linear-gradient(95deg, rgba(168,85,247,0.18), rgba(99,102,241,0.10) 50%, rgba(236,72,153,0.18))",
+        border: earned ? "1px solid rgba(16,185,129,0.55)" : "1px solid rgba(168,85,247,0.30)",
+        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+      }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 40, height: 40, borderRadius: 12,
+          background: earned ? "linear-gradient(135deg, #22c55e, #10b981)" : "linear-gradient(135deg, #ec4899, #a855f7)",
+          fontSize: 22,
+          boxShadow: earned ? "0 0 14px rgba(16,185,129,0.55)" : "0 0 14px rgba(168,85,247,0.45)",
+          flexShrink: 0,
+        }}>{emoji || "🎉"}</span>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+            color: earned ? "#86efac" : "#f9a8d4",
+          }}>{earned ? "Earned!" : "Class Goal Preview"}</div>
+          <div style={{
+            fontSize: 18, fontWeight: 900, letterSpacing: "-0.02em",
+            background: earned
+              ? "linear-gradient(135deg, #d1fae5 0%, #f9a8d4 100%)"
+              : "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+          }}>{label || "(set a goal name like 'Pizza Party')"}</div>
+          <div style={{
+            marginTop: 8, height: 10, borderRadius: 999,
+            background: "rgba(168,85,247,0.10)",
+            border: "1px solid rgba(168,85,247,0.20)",
+            overflow: "hidden", position: "relative",
+          }}>
+            <div style={{
+              position: "absolute", top: 0, left: 0, height: "100%",
+              width: `${pct}%`,
+              background: earned
+                ? "linear-gradient(90deg, #22c55e 0%, #10b981 50%, #ec4899 100%)"
+                : "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+              borderRadius: 999,
+              transition: "width .8s cubic-bezier(0.22,1,0.36,1)",
+              boxShadow: earned ? "0 0 16px rgba(16,185,129,0.55)" : "0 0 14px rgba(236,72,153,0.45)",
+            }} />
+          </div>
+        </div>
+        <div style={{
+          textAlign: "right", flexShrink: 0,
+          fontSize: 22, fontWeight: 900, color: earned ? "#bbf7d0" : "#fce7f3",
+          fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+          textShadow: earned ? "0 0 12px rgba(187,247,208,0.5)" : "0 0 12px rgba(252,231,243,0.30)",
+        }}>
+          {totalStars}<span style={{ fontSize: 14, color: "rgba(196,181,253,0.55)", fontWeight: 700 }}> / {target || "—"}</span>
+          <div style={{ fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 700 }}>{target ? `${pct}%` : "no target set"}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px", gap: 10 }}>
+        <Field label="Reward name">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Pizza party · Movie day · Bonus recess"
+            style={inputStyle()}
+          />
+        </Field>
+        <Field label="Target stars (whole class)">
+          <input
+            type="number" min={0}
+            value={target}
+            onChange={(e) => setTarget(Number(e.target.value) || 0)}
+            placeholder="200"
+            style={inputStyle()}
+          />
+        </Field>
+        <Field label="Emoji">
+          <input
+            value={emoji}
+            onChange={(e) => setEmoji(e.target.value)}
+            placeholder="🍕"
+            style={{ ...inputStyle(), textAlign: "center", fontSize: 18 }}
+          />
+        </Field>
+      </div>
+
+      <div style={{
+        marginTop: 6, fontSize: 12, color: "rgba(196,181,253,0.55)", fontWeight: 600,
+      }}>
+        💡 The total fills automatically as you award behavior stars (the ⭐ Stars tab). You can use any
+        whole number — e.g. 50 stars for a small reward, 200 for a bigger one.
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
+        {[
+          { label: "Pizza Party", target: 200, emoji: "🍕" },
+          { label: "Movie Day", target: 150, emoji: "🎬" },
+          { label: "Bonus Recess", target: 80, emoji: "🏃" },
+          { label: "Ice Cream", target: 120, emoji: "🍦" },
+          { label: "Game Day", target: 100, emoji: "🎮" },
+        ].map((p) => (
+          <button
+            key={p.label}
+            onClick={() => { setLabel(p.label); setTarget(p.target); setEmoji(p.emoji); }}
+            style={{
+              padding: "6px 12px", borderRadius: 999,
+              background: "rgba(168,85,247,0.06)",
+              border: "1px solid rgba(168,85,247,0.30)",
+              color: "#fce7f3", fontWeight: 800, fontSize: 12,
+              cursor: "pointer", touchAction: "manipulation",
+            }}
+          >{p.emoji} {p.label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+        {target > 0 && (
+          <button onClick={clear} disabled={saving} style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+            border: "1px solid rgba(239,68,68,0.40)",
+            fontWeight: 800, fontSize: 13, cursor: "pointer",
+          }}>Clear goal</button>
+        )}
+        <button onClick={save} disabled={saving} style={{
+          padding: "11px 18px", borderRadius: 10,
+          background: savedFlash
+            ? "linear-gradient(135deg, #22c55e, #10b981)"
+            : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+          color: "white", border: "none",
+          fontWeight: 900, fontSize: 14, cursor: "pointer",
+          opacity: saving ? 0.6 : 1,
+          boxShadow: "0 8px 22px -6px rgba(168,85,247,0.55)",
+        }}>{saving ? "Saving…" : savedFlash ? "✓ Saved" : "Save reward"}</button>
       </div>
     </div>
   );
