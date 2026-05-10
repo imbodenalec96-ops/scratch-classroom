@@ -71,6 +71,7 @@ const StarPage = lazy(() => import("./components/star/StarPage.tsx"));
 const StarPhonePage = lazy(() => import("./components/star/StarPhonePage.tsx"));
 import StarScanner from "./components/star/StarScanner.tsx";
 import StarBoardOverlay from "./components/star/StarBoardOverlay.tsx";
+import UpdateChecker from "./components/UpdateChecker.tsx";
 import { setActiveClassId } from "./lib/star/boardEvents.ts";
 import { api as starApi } from "./lib/api.ts";
 
@@ -194,6 +195,10 @@ export default function App() {
             ANY page, not just /board. The polling inside also drives
             cross-device delivery once activeClassId is set. */}
         <StarBoardOverlay />
+        {/* Polls /version.json — nudges the user to refresh when a new
+            deploy lands. Fixes "iPad still on the old build" without
+            needing a service worker. */}
+        <UpdateChecker />
         <Suspense fallback={<AppLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
