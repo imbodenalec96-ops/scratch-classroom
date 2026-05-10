@@ -323,6 +323,9 @@ export default function StarPage() {
               <SectionWrapper icon="📋" title="Status barcodes" description="Absent / skipped / excused / makeup with one scan.">
                 <StatusBarcodesPanel />
               </SectionWrapper>
+              <SectionWrapper icon="🎮" title="Free time barcodes" description="Earned reward or sensory regulation timer — 5 / 10 / 15 / 20 min.">
+                <FreetimeBarcodesPanel />
+              </SectionWrapper>
             </div>
             <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
               <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
@@ -633,6 +636,65 @@ function StatusBarcodesPanel() {
         }}>🖨 Print status sheet</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+        {items.map((p) => (
+          <div key={p.id} style={{
+            padding: 10, borderRadius: 10,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>{p.label}</div>
+            <div dangerouslySetInnerHTML={{ __html: bc128svg(p.id, 0, 56, true, 1.4) }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Free Time barcodes — earned reward / sensory regulation timer ── */
+function FreetimeBarcodesPanel() {
+  const items = [
+    { id: "FREETIME-5",  label: "🎮 Free Time · 5 min",  note: "Scan + tap a kid. 5-minute timed session, ends automatically or by re-scan." },
+    { id: "FREETIME-10", label: "🎮 Free Time · 10 min", note: "10-minute reward / regulation block." },
+    { id: "FREETIME-15", label: "🎮 Free Time · 15 min", note: "15-minute reward — earned for behavior plan or finished work." },
+    { id: "FREETIME-20", label: "🎮 Free Time · 20 min", note: "20-minute longer reward window." },
+  ];
+  const print = () => {
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) return;
+    const cells = items.map((p) => `
+      <div style="border:2px dashed #999;border-radius:14px;padding:24px;text-align:center;page-break-inside:avoid">
+        <div style="font-size:24px;font-weight:800;margin-bottom:8px">${p.label}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:14px">${p.note}</div>
+        ${bc128svg(p.id, 0, 100, true, 2.4)}
+      </div>
+    `).join("");
+    w.document.write(`<!doctype html><html><head><title>STAR free time barcodes</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.5in; } }
+        body { font-family: -apple-system, sans-serif; padding: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+        h2 { font-size: 18px; margin: 0 0 12px; }
+      </style>
+    </head><body>
+      <h2>STAR — Free Time Barcodes (laminate at your desk)</h2>
+      <div class="grid">${cells}</div>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+    </body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div style={{ color: "#f5f1e8" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <button onClick={print} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)", color: "white",
+          border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
+        }}>🖨 Print free time sheet</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
         {items.map((p) => (
           <div key={p.id} style={{
             padding: 10, borderRadius: 10,

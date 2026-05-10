@@ -93,6 +93,17 @@ export type BcEntry =
       // an assignment + student in the StatusModal.
       statusKind: "Absent" | "Skipped" | "Excused" | "Makeup";
       createdDate: string;
+    }
+  | {
+      id: string;
+      type: "freetime-action";
+      name: string;
+      // Minutes of free time this barcode grants (5 / 10 / 15 / 20 …).
+      // Pair with a student in the FreetimeModal to start a timed
+      // session. Active sessions render on the board strip; on end,
+      // they're written to a freetime log.
+      freetimeMinutes: number;
+      createdDate: string;
     };
 
 export interface ActivePass {
@@ -100,6 +111,19 @@ export interface ActivePass {
   studentName: string;
   passKind: "Bathroom" | "Water" | "Break";
   startedAt: string; // ISO
+}
+
+export interface ActiveFreetime {
+  studentId: string;
+  studentName: string;
+  durationMin: number;   // planned minutes
+  startedAt: string;     // ISO
+  reason?: string;       // optional teacher note (e.g. "Earned for finishing math")
+}
+
+export interface FreetimeLogEntry extends ActiveFreetime {
+  endedAt: string;       // ISO
+  elapsedSec: number;
 }
 
 export interface StarSubmission {
@@ -202,6 +226,8 @@ const KEYS = {
   iepLog: "star_iep_log",
   iepDefaultMet: "star_iep_default_met",
   iepDefaultPartial: "star_iep_default_partial",
+  activeFreetime: "star_active_freetime",
+  freetimeLog: "star_freetime_log",
 } as const;
 
 /**
@@ -369,6 +395,32 @@ export const StarStore = {
     const asns = ls.get<StarAssignment[]>(KEYS.a, []).filter((a) => a.id !== id);
     ls.set(KEYS.a, asns);
   },
+  // ── Free time sessions ───────────────────────────────────────────
+  getActiveFreetime: () => ls.get<ActiveFreetime[]>(KEYS.activeFreetime, []),
+  setActiveFreetime: (v: ActiveFreetime[]) => ls.set(KEYS.activeFreetime, v),
+  startFreetime: (s: ActiveFreetime) => {
+    const all = ls.get<ActiveFreetime[]>(KEYS.activeFreetime, []);
+    // One active freetime per student — replace any existing entry.
+    const next = all.filter((x) => x.studentId !== s.studentId);
+    next.push(s);
+    ls.set(KEYS.activeFreetime, next);
+  },
+  endFreetime: (studentId: string): FreetimeLogEntry | null => {
+    const all = ls.get<ActiveFreetime[]>(KEYS.activeFreetime, []);
+    const idx = all.findIndex((x) => x.studentId === studentId);
+    if (idx < 0) return null;
+    const entry = all[idx];
+    const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(entry.startedAt).getTime()) / 1000));
+    const log: FreetimeLogEntry = { ...entry, endedAt: new Date().toISOString(), elapsedSec };
+    const remaining = all.filter((_, i) => i !== idx);
+    ls.set(KEYS.activeFreetime, remaining);
+    const logArr = ls.get<FreetimeLogEntry[]>(KEYS.freetimeLog, []);
+    logArr.unshift(log);
+    ls.set(KEYS.freetimeLog, logArr.slice(0, 500));
+    return log;
+  },
+  getFreetimeLog: () => ls.get<FreetimeLogEntry[]>(KEYS.freetimeLog, []),
+
   getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
   setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),
   getPassLog: () => ls.get<Array<ActivePass & { endedAt: string; elapsedSec: number }>>(KEYS.passLog, []),
@@ -553,6 +605,15 @@ const STATUS_BARCODES: Array<{ id: string; statusKind: "Absent" | "Skipped" | "E
   { id: "STATUS-MAKEUP",  statusKind: "Makeup",  name: "🔁 Mark Makeup" },
 ];
 
+// Free time barcodes — scan + pick a student to start a timed free
+// time session. Common preset durations.
+export const FREETIME_BARCODES: Array<{ id: string; freetimeMinutes: number; name: string }> = [
+  { id: "FREETIME-5",  freetimeMinutes: 5,  name: "🎮 Free Time · 5 min"  },
+  { id: "FREETIME-10", freetimeMinutes: 10, name: "🎮 Free Time · 10 min" },
+  { id: "FREETIME-15", freetimeMinutes: 15, name: "🎮 Free Time · 15 min" },
+  { id: "FREETIME-20", freetimeMinutes: 20, name: "🎮 Free Time · 20 min" },
+];
+
 export function rehydrateBcDB(): Record<string, BcEntry> {
   const bcDB = StarStore.getBcDB();
   const asnTrack = StarStore.getAsnTrack();
@@ -576,6 +637,11 @@ export function rehydrateBcDB(): Record<string, BcEntry> {
   for (const s of STATUS_BARCODES) {
     if (!bcDB[s.id]) {
       bcDB[s.id] = { id: s.id, type: "status-action", name: s.name, statusKind: s.statusKind, createdDate: new Date().toISOString() };
+    }
+  }
+  for (const f of FREETIME_BARCODES) {
+    if (!bcDB[f.id]) {
+      bcDB[f.id] = { id: f.id, type: "freetime-action", name: f.name, freetimeMinutes: f.freetimeMinutes, createdDate: new Date().toISOString() };
     }
   }
   StarStore.setBcDB(bcDB);

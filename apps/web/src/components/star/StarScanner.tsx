@@ -19,12 +19,14 @@ import RefusalModal from "./RefusalModal.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import PassModal from "./PassModal.tsx";
 import StatusModal from "./StatusModal.tsx";
+import FreetimeModal from "./FreetimeModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
   gradebook?: { barcode: string };
   pass?: { barcode: string; passKind: "Bathroom" | "Water" | "Break" };
   status?: { barcode: string; statusKind: "Absent" | "Skipped" | "Excused" | "Makeup" };
+  freetime?: { barcode: string; minutes: number };
   unknown?: { barcode: string };
 }
 
@@ -92,6 +94,13 @@ export default function StarScanner() {
         if (v === "PASS-BATHROOM")  entry = { id: v, type: "pass-action",   name: "🚻 Bathroom Pass", passKind: "Bathroom", createdDate: new Date().toISOString() };
         if (v === "PASS-WATER")     entry = { id: v, type: "pass-action",   name: "💧 Water Break",   passKind: "Water",    createdDate: new Date().toISOString() };
         if (v === "PASS-BREAK")     entry = { id: v, type: "pass-action",   name: "🛋 Sensory Break", passKind: "Break",    createdDate: new Date().toISOString() };
+        // FREETIME-{minutes} — synthesize from the prefix so a never-synced
+        // device still routes correctly when scanning a printed sheet.
+        const ftMatch = /^FREETIME-(\d+)$/i.exec(v);
+        if (ftMatch) {
+          const mins = Math.max(1, Math.min(120, Number(ftMatch[1]) || 10));
+          entry = { id: v, type: "freetime-action", name: `🎮 Free Time · ${mins} min`, freetimeMinutes: mins, createdDate: new Date().toISOString() };
+        }
       }
       if (entry) {
         successBeep();
@@ -116,6 +125,8 @@ export default function StarScanner() {
           setScan({ pass: { barcode: v, passKind: entry.passKind } });
         } else if (entry.type === "status-action") {
           setScan({ status: { barcode: v, statusKind: entry.statusKind } });
+        } else if (entry.type === "freetime-action") {
+          setScan({ freetime: { barcode: v, minutes: entry.freetimeMinutes } });
         }
       } else {
         // Local miss → try the server lookup.
@@ -155,6 +166,8 @@ export default function StarScanner() {
             setScan({ pass: { barcode: v, passKind: (final as any).passKind } });
           } else if (final.type === "status-action") {
             setScan({ status: { barcode: v, statusKind: (final as any).statusKind } });
+          } else if (final.type === "freetime-action") {
+            setScan({ freetime: { barcode: v, minutes: (final as any).freetimeMinutes } });
           }
           return;
         }
@@ -197,6 +210,12 @@ export default function StarScanner() {
           onClose={() => setScan({})}
         />
       )}
+      {scan.freetime && (
+        <FreetimeModal
+          minutes={scan.freetime.minutes}
+          onClose={() => setScan({})}
+        />
+      )}
       {scan.unknown && (
         <UnknownBarcodeOverlay
           barcode={scan.unknown.barcode}
@@ -226,6 +245,8 @@ export default function StarScanner() {
                 setScan({ pass: { barcode: code, passKind: (found as any).passKind } });
               } else if (found.type === "status-action") {
                 setScan({ status: { barcode: code, statusKind: (found as any).statusKind } });
+              } else if (found.type === "freetime-action") {
+                setScan({ freetime: { barcode: code, minutes: (found as any).freetimeMinutes } });
               }
             } else {
               errorBeep();
