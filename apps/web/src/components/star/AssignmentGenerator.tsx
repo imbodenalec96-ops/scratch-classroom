@@ -5,7 +5,7 @@
 import { useState } from "react";
 import {
   StarStore, saveAll,
-  type Subject, type StarQuestion, type StarTrackerEntry, type BcEntry, type StarStudent,
+  type Subject, type StarQuestion, type StarTrackerEntry, type BcEntry, type StarStudent, type StarTemplate,
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
@@ -224,10 +224,43 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
         <div style={{ fontSize: 12, opacity: 0.6 }}>
           {StarStore.getApiKey() ? "🤖 OpenRouter AI key set" : "💡 No AI key — will use local generator"}
         </div>
-        <button onClick={generate} disabled={busy} style={primaryBtn()}>
-          {busy ? "Generating…" : "✨ Generate Assignment"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => {
+            const name = window.prompt("Name this template (e.g. 'Daily Math · 3rd'):", `${subject} · ${grade}`);
+            if (!name) return;
+            const stuName = studentName || (students.find((x) => x.id === studentId) ? `${students.find((x) => x.id === studentId)!.firstName}` : undefined);
+            StarStore.addTemplate({
+              id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              name, subject, grade, count, difficulty, goal,
+              studentId: studentId || undefined,
+              studentName: stuName,
+              createdAt: new Date().toISOString(),
+              uses: 0,
+            });
+            successBeep();
+          }} title="Save current settings as a template" style={ghostBtn()}>
+            💾 Save Template
+          </button>
+          <button onClick={generate} disabled={busy} style={primaryBtn()}>
+            {busy ? "Generating…" : "✨ Generate Assignment"}
+          </button>
+        </div>
       </div>
+
+      <TemplatesPanel
+        onUse={(t) => {
+          // Apply template + immediately regenerate. Bumps the use count.
+          setSubject(t.subject);
+          setGrade(t.grade);
+          setCount(t.count);
+          setDifficulty(t.difficulty);
+          setGoal(t.goal || "");
+          if (t.studentId) setStudentId(t.studentId);
+          StarStore.bumpTemplate(t.id);
+          // Tiny delay so React commits the form-state update before generate reads it.
+          setTimeout(() => generate(), 80);
+        }}
+      />
 
       {created && (
         <div style={{
@@ -259,6 +292,61 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── templates panel ─────────────────────────────────────────────── */
+
+function TemplatesPanel({ onUse }: { onUse: (t: StarTemplate) => void }) {
+  const [tpls, setTpls] = useState(() => StarStore.getTemplates());
+  if (tpls.length === 0) return null;
+  const remove = (id: string) => {
+    if (!window.confirm("Delete this template?")) return;
+    StarStore.deleteTemplate(id);
+    setTpls(StarStore.getTemplates());
+  };
+  return (
+    <div style={{
+      marginTop: 14, paddingTop: 12,
+      borderTop: "1px solid rgba(255,255,255,0.08)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 8 }}>
+        💾 Saved Templates ({tpls.length}) — tap to regenerate fresh content
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {tpls.map((t) => (
+          <div key={t.id} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 10px", borderRadius: 8,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}>
+            <button onClick={() => onUse(t)} style={{
+              flex: 1, minWidth: 0, padding: 0,
+              background: "transparent", color: "white", border: "none",
+              cursor: "pointer", textAlign: "left",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>{t.name}</div>
+              <div style={{ fontSize: 11, opacity: 0.65 }}>
+                {t.subject} · {t.grade} · {t.count}q · {t.difficulty}
+                {t.studentName ? ` · for ${t.studentName}` : ""} · used {t.uses}×
+              </div>
+            </button>
+            <button onClick={() => onUse(t)} title="Regenerate fresh content from this template" style={{
+              padding: "6px 10px", borderRadius: 6,
+              background: "linear-gradient(135deg,#6366f1,#b23a48)", color: "white",
+              border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            }}>🔁 Run</button>
+            <button onClick={() => remove(t.id)} title="Delete template" style={{
+              padding: "6px 8px", borderRadius: 6,
+              background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+              border: "1px solid rgba(239,68,68,0.40)",
+              cursor: "pointer", fontSize: 11,
+            }}>🗑</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

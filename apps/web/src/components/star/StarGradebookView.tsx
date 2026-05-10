@@ -326,6 +326,95 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
           </div>
         </div>
       )}
+
+      {/* Timeline — chronological strip of every event for this kid:
+          submissions, refusals, passes. Pulled from local storage. */}
+      <StudentTimeline studentId={summary.student.id} firstName={summary.student.firstName} />
+    </div>
+  );
+}
+
+function StudentTimeline({ studentId, firstName }: { studentId: string; firstName: string }) {
+  const items = useMemo(() => {
+    const out: Array<{ id: string; ts: number; icon: string; color: string; title: string; meta: string }> = [];
+    const tracker = StarStore.getAsnTrack();
+    for (const t of Object.values(tracker)) {
+      for (const sub of (t.submissions || [])) {
+        if (sub.studentId !== studentId) continue;
+        const isCounted = countsTowardGrade(sub);
+        out.push({
+          id: `sub-${t.id}-${sub.loggedAt}`,
+          ts: new Date(sub.loggedAt).getTime() || 0,
+          icon: sub.status === "completed" ? "✅"
+              : sub.status === "absent"    ? "🚫"
+              : sub.status === "skipped"   ? "⏭"
+              : sub.status === "excused"   ? "🩹"
+              : sub.status === "makeup"    ? "🔁" : "⏳",
+          color: !isCounted ? "#94a3b8" : letterGradeColor(sub.letterGrade),
+          title: t.name,
+          meta: `${t.subject} · ${isCounted ? `${sub.letterGrade} (${sub.pct}%)` : sub.status} · ${sub.completedDate}`,
+        });
+      }
+    }
+    for (const r of StarStore.getLog()) {
+      if (r.studentId !== studentId) continue;
+      out.push({
+        id: `ref-${r.id}`,
+        ts: new Date(`${r.date} ${r.time}`).getTime() || Date.now(),
+        icon: "🚨", color: "#ef4444",
+        title: r.type, meta: `${r.subject || ""}${r.task ? ` — ${r.task}` : ""}`.trim(),
+      });
+    }
+    for (const p of StarStore.getPassLog()) {
+      if (p.studentId !== studentId) continue;
+      out.push({
+        id: `pass-${p.studentId}-${p.startedAt}`,
+        ts: new Date(p.endedAt).getTime() || 0,
+        icon: "🚻", color: "#fbbf24",
+        title: `${p.passKind} pass`,
+        meta: `Out for ${Math.floor(p.elapsedSec / 60)}:${String(p.elapsedSec % 60).padStart(2, "0")}`,
+      });
+    }
+    out.sort((a, b) => b.ts - a.ts);
+    return out;
+  }, [studentId]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.6, marginBottom: 8 }}>
+        🕐 {firstName}'s Timeline ({items.length})
+      </div>
+      <div style={{
+        position: "relative", paddingLeft: 24,
+        borderLeft: "2px solid rgba(255,255,255,0.08)",
+        display: "flex", flexDirection: "column", gap: 8,
+      }}>
+        {items.map((it) => (
+          <div key={it.id} style={{ position: "relative" }}>
+            <span style={{
+              position: "absolute", left: -34, top: 8,
+              width: 22, height: 22, borderRadius: "50%",
+              background: `${it.color}25`,
+              border: `2px solid ${it.color}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11,
+            }}>{it.icon}</span>
+            <div style={{
+              padding: "8px 12px", borderRadius: 8,
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${it.color}33`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{it.title}</div>
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{it.meta}</div>
+              <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>
+                {it.ts ? new Date(it.ts).toLocaleString() : ""}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

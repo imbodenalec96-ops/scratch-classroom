@@ -11,6 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
+import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
 import { StarStore, countsTowardGrade, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
@@ -1084,6 +1085,30 @@ export default function ClassroomBoard() {
                   letterSpacing: "0.08em", textTransform: "uppercase",
                 }}
               >⭐ STAR</button>
+              {/* Random student picker — fair calling spinner. */}
+              <button
+                onClick={() => fireRandomPicker()}
+                title="Random pick — pull a student fairly"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid rgba(99,102,241,0.55)`,
+                  background: "rgba(99,102,241,0.18)", color: "#c4b5fd",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >🎲 Pick</button>
+              {/* EYES ON ME — full-screen attention-getter. */}
+              <button
+                onClick={() => fireEyesOnMe()}
+                title="EYES ON ME — projector takeover for attention"
+                style={{
+                  padding: "5px 11px", borderRadius: 3,
+                  border: `1px solid rgba(239,68,68,0.55)`,
+                  background: "rgba(239,68,68,0.18)", color: "#fca5a5",
+                  cursor: "pointer", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >👀 Eyes</button>
             </>
           )}
           <button onClick={toggleFullscreen} style={{
@@ -2086,6 +2111,9 @@ export default function ClassroomBoard() {
     {/* STAR live class view — toggle button top-right opens a slide-over
         with today's completion tracker + grades matrix for the projector. */}
     <BoardStarPanel />
+
+    {/* Random picker overlay + EYES ON ME overlay + activity feed. */}
+    <BoardClassroomTools students={(board?.students || []) as any} />
 
     {/* Student wallet — overlay opened from the 💼 button. */}
     {showWallet && cls?.id && (

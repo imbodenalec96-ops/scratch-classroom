@@ -173,7 +173,24 @@ const KEYS = {
   activePasses: "star_active_passes",
   passLog: "star_pass_log",
   photos: "star_photos",
+  templates: "star_templates",
 } as const;
+
+export interface StarTemplate {
+  id: string;
+  name: string;            // teacher-facing label, e.g. "Daily Math · 3rd"
+  subject: Subject;
+  grade: string;
+  count: number;
+  difficulty: "Easy" | "Medium" | "Hard";
+  goal?: string;
+  studentId?: string;       // optional default student
+  studentName?: string;
+  createdAt: string;
+  // Bumped each time the template is used to "regenerate fresh content"
+  // — handy for the teacher to see how many worksheets came from it.
+  uses: number;
+}
 
 export interface StarPhoto {
   id: string;             // unique id for delete + key
@@ -235,6 +252,22 @@ export const StarStore = {
   setTpls:       (v: string[]) => ls.set(KEYS.tpls, v),
   getPointsPerCompletion: () => ls.get<number>(KEYS.pointsPerCompletion, 5),
   setPointsPerCompletion: (v: number) => ls.set(KEYS.pointsPerCompletion, v),
+  getTemplates: () => ls.get<StarTemplate[]>(KEYS.templates, []),
+  setTemplates: (v: StarTemplate[]) => ls.set(KEYS.templates, v),
+  addTemplate: (t: StarTemplate) => {
+    const all = ls.get<StarTemplate[]>(KEYS.templates, []);
+    all.unshift(t);
+    ls.set(KEYS.templates, all.slice(0, 100));
+  },
+  bumpTemplate: (id: string) => {
+    const all = ls.get<StarTemplate[]>(KEYS.templates, []);
+    const i = all.findIndex((t) => t.id === id);
+    if (i >= 0) { all[i].uses = (all[i].uses || 0) + 1; ls.set(KEYS.templates, all); }
+  },
+  deleteTemplate: (id: string) => {
+    const all = ls.get<StarTemplate[]>(KEYS.templates, []).filter((t) => t.id !== id);
+    ls.set(KEYS.templates, all);
+  },
   // Wipe one assignment everywhere it lives — bcDB, asnTracker, asns.
   // Submissions on the tracker entry go with it. Caller is expected to
   // confirm with the teacher first.

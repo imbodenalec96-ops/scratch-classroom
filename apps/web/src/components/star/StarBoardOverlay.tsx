@@ -50,12 +50,28 @@ export default function StarBoardOverlay() {
     if (e.kind === "completion") {
       successBeep();
       setTimeout(() => loggedBeep(), 200);
+      // Browser-native TTS — speaks "Great job, Kaleb!" so the room
+      // hears who got the win without staring at the board. No setup
+      // required, works in every modern browser.
+      speakName(`Great job, ${(e.studentName || "").split(/\s+/)[0]}!`);
     } else {
       alertBeep();
       setTimeout(() => errorBeep(), 350);
     }
     if (e.studentId) highlightRosterCard(e.studentId, e.kind);
   };
+
+  function speakName(text: string) {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth || !text) return;
+      // Cancel any in-flight speech so back-to-back saves don't queue up.
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0; u.pitch = 1.1; u.volume = 0.9;
+      synth.speak(u);
+    } catch {}
+  }
 
   useEffect(() => onStarBoardEvent(handleEvent), []);
 
