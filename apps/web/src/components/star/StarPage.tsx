@@ -253,30 +253,44 @@ export default function StarPage() {
             subtitle="Generate fresh content per student, mint refusal forms, print pass + status barcode sheets, or add an old paper assignment to the system."
           />
 
-          <SectionWrapper icon="🌇" title="Afternoon pack" description="Bulk-generate one assignment per student in one click. Print all in one PDF.">
-            <AfternoonPackGenerator />
-          </SectionWrapper>
+          {/* GROUP 1 — Bulk packs (the heroes of the page) */}
+          <CreateGroup label="Bulk Packs" hint="One click, one PDF, one assignment per kid.">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="🌅" title="Morning pack" description="Warm-up packets for the start of class.">
+                <AfternoonPackGenerator defaultLabel="Morning" defaultSubject="Reading" />
+              </SectionWrapper>
+              <SectionWrapper icon="🌇" title="Afternoon pack" description="Independent work for the second block.">
+                <AfternoonPackGenerator defaultLabel="Afternoon" defaultSubject="Math" />
+              </SectionWrapper>
+            </div>
+          </CreateGroup>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: T.space.lg, marginBottom: T.space["2xl"] }}>
-            <SectionWrapper icon="✨" title="Single assignment" description="One barcoded worksheet for one kid.">
-              <AssignmentGenerator />
+          {/* GROUP 2 — Single-shot generators */}
+          <CreateGroup label="Single Item" hint="When you only need one barcode at a time.">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="✨" title="Single assignment" description="One barcoded worksheet for one kid.">
+                <AssignmentGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="🚨" title="Refusal form" description="Print a fresh refusal incident form.">
+                <RefusalFormGenerator />
+              </SectionWrapper>
+            </div>
+          </CreateGroup>
+
+          {/* GROUP 3 — Utilities (laminate-once / paper-import) */}
+          <CreateGroup label="Utilities" hint="Print once, scan often.">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="🚻" title="Pass barcodes" description="Laminate near the door — bathroom / water / sensory.">
+                <PassBarcodesPanel />
+              </SectionWrapper>
+              <SectionWrapper icon="📋" title="Status barcodes" description="Absent / skipped / excused / makeup with one scan.">
+                <StatusBarcodesPanel />
+              </SectionWrapper>
+            </div>
+            <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
+              <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
             </SectionWrapper>
-            <SectionWrapper icon="🚨" title="Refusal form" description="Print a fresh refusal incident form.">
-              <RefusalFormGenerator />
-            </SectionWrapper>
-          </div>
-
-          <SectionWrapper icon="🚻" title="Pass barcodes" description="Laminate near the door — bathroom / water / sensory break.">
-            <PassBarcodesPanel />
-          </SectionWrapper>
-
-          <SectionWrapper icon="📋" title="Status barcodes" description="Mark assignments absent / skipped / excused / makeup with one scan.">
-            <StatusBarcodesPanel />
-          </SectionWrapper>
-
-          <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
-            <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
-          </SectionWrapper>
+          </CreateGroup>
         </>
       )}
 
@@ -359,6 +373,32 @@ function PageHeader({ kicker, title, subtitle }: { kicker: string; title: string
   );
 }
 
+function CreateGroup({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: T.space["3xl"] }}>
+      <div style={{
+        display: "flex", alignItems: "baseline", gap: 12,
+        marginBottom: T.space.md,
+        paddingBottom: T.space.sm,
+        borderBottom: "1px solid rgba(168,85,247,0.18)",
+      }}>
+        <h3 style={{
+          margin: 0,
+          fontSize: 20, fontWeight: 900, letterSpacing: "-0.02em",
+          background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
+        }}>{label}</h3>
+        <span style={{
+          fontSize: 11, fontWeight: 700,
+          color: "rgba(196,181,253,0.55)", letterSpacing: "0.04em",
+        }}>{hint}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function SectionWrapper({ icon, title, description, children }: {
   icon?: string; title: string; description?: string; children: React.ReactNode;
 }) {
@@ -366,28 +406,39 @@ function SectionWrapper({ icon, title, description, children }: {
   // outer card or duplicate heading anymore — they render directly
   // into this card's body.
   return (
-    <section style={{ marginBottom: T.space["2xl"] }}>
+    <section style={{ marginBottom: T.space.lg }}>
       <div style={{
         background: T.color.surface,
         border: `1px solid ${T.color.border}`,
-        borderRadius: T.radius["2xl"],
-        padding: T.space["2xl"],
+        borderRadius: T.radius.xl,
+        padding: T.space.xl,
         boxShadow: T.shadow.md,
       }}>
-        <div style={{ marginBottom: T.space.lg }}>
-          <h3 style={{
-            fontSize: T.font.size.xl, fontWeight: T.font.weight.bold,
-            margin: 0, letterSpacing: "-0.01em", color: T.color.text,
-            display: "flex", alignItems: "center", gap: T.space.sm,
-          }}>
-            {icon && <span style={{ fontSize: T.font.size["2xl"] }}>{icon}</span>}
-            {title}
-          </h3>
-          {description && (
-            <p style={{ margin: `${T.space.xs}px 0 0`, color: T.color.textMuted, fontSize: T.font.size.md, lineHeight: 1.5 }}>
-              {description}
-            </p>
+        <div style={{ marginBottom: T.space.md, display: "flex", alignItems: "flex-start", gap: T.space.md }}>
+          {icon && (
+            <span style={{
+              flexShrink: 0,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: 12,
+              background: "linear-gradient(135deg, rgba(168,85,247,0.20), rgba(236,72,153,0.10))",
+              border: "1px solid rgba(168,85,247,0.30)",
+              fontSize: 22,
+            }}>{icon}</span>
           )}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 style={{
+              fontSize: T.font.size.lg, fontWeight: T.font.weight.bold,
+              margin: 0, letterSpacing: "-0.015em", color: T.color.text,
+              lineHeight: 1.2,
+            }}>
+              {title}
+            </h3>
+            {description && (
+              <p style={{ margin: `${T.space.xs}px 0 0`, color: T.color.textMuted, fontSize: T.font.size.sm, lineHeight: 1.45 }}>
+                {description}
+              </p>
+            )}
+          </div>
         </div>
         {children}
       </div>

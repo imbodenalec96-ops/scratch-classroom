@@ -82,27 +82,29 @@ export default function StarGradebookView() {
       {!detail ? (
         <>
           {/* Search */}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 14 }}>
             <input
               value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="🔍 Search students…"
               style={{
-                width: "100%", padding: "10px 14px", borderRadius: 10,
-                background: "rgba(0,0,0,0.30)", color: "white",
-                border: "1px solid rgba(255,255,255,0.12)",
-                fontSize: 14, outline: "none",
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                background: "rgba(10,4,20,0.45)", color: "#fce7f3",
+                border: "1px solid rgba(168,85,247,0.25)",
+                fontSize: 14, outline: "none", fontWeight: 600,
+                boxSizing: "border-box",
               }}
             />
           </div>
 
           {/* Matrix */}
           <div style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            borderRadius: 14, overflow: "auto",
+            background: "linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(99,102,241,0.03) 100%)",
+            border: "1px solid rgba(168,85,247,0.20)",
+            borderRadius: 16, overflow: "auto",
+            boxShadow: "0 12px 32px -12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead style={{ background: "rgba(0,0,0,0.40)" }}>
+              <thead>
                 <tr>
                   <th style={th()}>Student</th>
                   {SUBJECTS.map((s) => <th key={s} style={th()}>{s}</th>)}
@@ -110,20 +112,19 @@ export default function StarGradebookView() {
               </thead>
               <tbody>
                 {filtered.map((s) => (
-                  <tr key={s.student.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <tr key={s.student.id} style={{ borderTop: "1px solid rgba(168,85,247,0.10)" }}>
                     <td style={tdName()}>
                       <button onClick={() => setSelectedStudent(s.student.id)} style={nameBtn()}>
                         <span style={avatarStyle()}>{(s.student.firstName || "?")[0].toUpperCase()}</span>
                         <span>
-                          <div style={{ fontWeight: 800 }}>{s.student.firstName} {s.student.lastName}</div>
-                          {s.student.grade && <div style={{ fontSize: 11, opacity: 0.6 }}>{s.student.grade}</div>}
+                          <div style={{ fontWeight: 800, color: "#f5f1e8", letterSpacing: "-0.01em" }}>{s.student.firstName} {s.student.lastName}</div>
+                          {s.student.grade && <div style={{ fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 700, letterSpacing: "0.04em" }}>{s.student.grade}</div>}
                         </span>
                       </button>
                     </td>
                     {SUBJECTS.map((subj) => {
                       const subs = s.bySubject[subj] || [];
                       if (subs.length === 0) return <td key={subj} style={tdEmpty()}>—</td>;
-                      // Only counted submissions (not absent/skipped/etc.) factor into the average.
                       const counted = subs.filter((b) => b.counted);
                       if (counted.length === 0) return <td key={subj} style={tdEmpty()}>—</td>;
                       const avg = Math.round(counted.reduce((a, b) => a + b.pct, 0) / counted.length);
@@ -132,9 +133,9 @@ export default function StarGradebookView() {
                       return (
                         <td key={subj} style={td()}>
                           <button onClick={() => setSelectedStudent(s.student.id)} style={cellBtn(color)}>
-                            <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1 }}>{letter}</div>
-                            <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>{avg}%</div>
-                            <div style={{ fontSize: 10, opacity: 0.55 }}>{subs.length}×</div>
+                            <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1, textShadow: `0 0 12px ${color}55` }}>{letter}</div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#fce7f3" }}>{avg}%</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(196,181,253,0.55)", letterSpacing: "0.04em" }}>{subs.length}×</div>
                           </button>
                         </td>
                       );
@@ -145,7 +146,7 @@ export default function StarGradebookView() {
             </table>
           </div>
           {filtered.length === 0 && (
-            <div style={{ padding: 20, opacity: 0.6, textAlign: "center", fontSize: 13 }}>
+            <div style={{ padding: 22, color: "rgba(196,181,253,0.55)", textAlign: "center", fontSize: 13, fontWeight: 600 }}>
               No students. Visit Settings → Students or hit 🔄 Sync from Classroom.
             </div>
           )}
@@ -200,26 +201,34 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <button onClick={onBack} style={{
-          padding: "8px 14px", borderRadius: 10,
-          background: "rgba(255,255,255,0.05)", color: "white",
-          border: "1px solid rgba(255,255,255,0.15)",
-          fontWeight: 700, cursor: "pointer", fontSize: 13,
+          padding: "9px 16px", borderRadius: 999,
+          background: "rgba(168,85,247,0.06)", color: "#fce7f3",
+          border: "1px solid rgba(168,85,247,0.30)",
+          fontWeight: 800, cursor: "pointer", fontSize: 13,
         }}>← All students</button>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ ...avatarStyle(), width: 56, height: 56, fontSize: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ ...avatarStyle(), width: 60, height: 60, fontSize: 26 }}>
             {(summary.student.firstName || "?")[0].toUpperCase()}
           </span>
           <div>
-            <div style={{ fontSize: 24, fontWeight: 900 }}>
+            <div style={{
+              fontSize: 26, fontWeight: 900, letterSpacing: "-0.025em", lineHeight: 1.1,
+              background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 50%, #f9a8d4 100%)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>
               {summary.student.firstName} {summary.student.lastName}
             </div>
-            <div style={{ fontSize: 12, opacity: 0.6 }}>
+            <div style={{ fontSize: 12, color: "rgba(196,181,253,0.65)", marginTop: 4, fontWeight: 600 }}>
               {summary.student.grade || "—"} · {countedSubs.length} graded
-              {totalSubs > countedSubs.length && <span style={{ opacity: 0.6 }}> · {totalSubs - countedSubs.length} not counted</span>}
+              {totalSubs > countedSubs.length && <span style={{ opacity: 0.7 }}> · {totalSubs - countedSubs.length} not counted</span>}
               {" · Overall: "}
-              <span style={{ color: letterGradeColor(overallLetter), fontWeight: 800, marginLeft: 6 }}>
+              <span style={{
+                color: letterGradeColor(overallLetter), fontWeight: 900, marginLeft: 6,
+                textShadow: `0 0 10px ${letterGradeColor(overallLetter)}55`,
+              }}>
                 {countedSubs.length > 0 ? `${overallLetter} (${overallAvg}%)` : "—"}
               </span>
             </div>
@@ -228,27 +237,45 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
       </div>
 
       {/* By subject */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 18 }}>
         {SUBJECTS.map((subj) => {
           const subs = summary.bySubject[subj] || [];
           return (
             <div key={subj} style={{
-              padding: 14, borderRadius: 12,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              padding: 16, borderRadius: 14,
+              background: "linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(99,102,241,0.03) 100%)",
+              border: "1px solid rgba(168,85,247,0.20)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 18px -8px rgba(0,0,0,0.45)",
             }}>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.6, marginBottom: 8 }}>
-                {subj} · {subs.length} graded
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 800, letterSpacing: "-0.005em",
+                  color: "#fce7f3",
+                }}>
+                  {subj}
+                </div>
+                <div style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase",
+                  color: "rgba(196,181,253,0.55)",
+                  padding: "2px 8px", borderRadius: 999,
+                  background: "rgba(168,85,247,0.10)",
+                  border: "1px solid rgba(168,85,247,0.20)",
+                }}>{subs.length} graded</div>
               </div>
               {subs.length === 0 ? (
-                <div style={{ fontSize: 12, opacity: 0.5 }}>No submissions yet.</div>
+                <div style={{ fontSize: 12, color: "rgba(196,181,253,0.45)", fontWeight: 600 }}>No submissions yet.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {subs.map((s, i) => (
+                  {subs.map((s, i) => {
+                    const lc = letterGradeColor(s.letter);
+                    return (
                     <div key={i} style={{
-                      padding: "8px 10px", borderRadius: 8,
-                      background: "rgba(0,0,0,0.30)", color: "white",
-                      border: `1px solid ${letterGradeColor(s.letter)}55`,
+                      padding: "9px 12px", borderRadius: 10,
+                      background: `linear-gradient(135deg, ${lc}1a 0%, rgba(10,4,20,0.30) 100%)`,
+                      color: "white",
+                      border: `1px solid ${lc}55`,
                       display: "flex", alignItems: "center", gap: 10,
                     }}>
                       <button onClick={() => onOpenAssignment(s.assignmentId)} style={{
@@ -257,16 +284,20 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
                         display: "flex", flex: 1, minWidth: 0, alignItems: "center", gap: 10,
                       }}>
                         <span style={{
-                          fontSize: 18, fontWeight: 900, color: letterGradeColor(s.letter),
-                          minWidth: 22, textAlign: "center",
+                          fontSize: 18, fontWeight: 900, color: lc,
+                          minWidth: 24, textAlign: "center",
+                          textShadow: `0 0 10px ${lc}55`,
                         }}>{s.letter}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {s.assignmentName}
                           </div>
-                          <div style={{ fontSize: 10, opacity: 0.6 }}>{s.completedDate} · {s.pct}%</div>
+                          <div style={{ fontSize: 10, color: "rgba(196,181,253,0.65)", fontWeight: 600 }}>{s.completedDate} · {s.pct}%</div>
                         </div>
-                        <span style={{ fontFamily: "Menlo, monospace", fontSize: 9, color: "#fde68a", opacity: 0.7 }}>
+                        <span style={{
+                          fontFamily: "Menlo, monospace", fontSize: 9, color: "#f9a8d4",
+                          fontWeight: 700, letterSpacing: "0.04em",
+                        }}>
                           {s.assignmentId.split("-").slice(-1)[0]}
                         </span>
                       </button>
@@ -274,13 +305,13 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
                         onClick={(e) => { e.stopPropagation(); confirmDelete(s.assignmentId, s.assignmentName, tracker[s.assignmentId]?.submissions?.length || 0); }}
                         title="Delete assignment"
                         style={{
-                          padding: "4px 6px", borderRadius: 4,
-                          background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+                          padding: "5px 7px", borderRadius: 6,
+                          background: "rgba(239,68,68,0.12)", color: "#fca5a5",
                           border: "1px solid rgba(239,68,68,0.40)",
                           cursor: "pointer", fontSize: 11, flexShrink: 0,
                         }}>🗑</button>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
@@ -291,33 +322,41 @@ function StudentDetail({ summary, tracker, onBack, onOpenAssignment, onDeleted }
       {/* Pending */}
       {pending.length > 0 && (
         <div style={{
-          padding: 14, borderRadius: 12,
-          background: "rgba(251,191,36,0.05)",
-          border: "1px solid rgba(251,191,36,0.30)",
+          padding: 16, borderRadius: 14,
+          background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.06))",
+          border: "1px solid rgba(168,85,247,0.30)",
+          boxShadow: "0 4px 18px -8px rgba(168,85,247,0.30)",
         }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fbbf24", marginBottom: 8 }}>
-            ⏳ Assigned but not yet graded ({pending.length})
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
+            padding: "3px 10px", borderRadius: 999,
+            background: "rgba(168,85,247,0.20)",
+            border: "1px solid rgba(168,85,247,0.40)",
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase",
+            color: "#c4b5fd", marginBottom: 10,
+          }}>
+            ⏳ Assigned · not yet graded · {pending.length}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {pending.map((p) => (
               <div key={p.id} style={{
                 display: "flex", alignItems: "center", gap: 4,
-                padding: "0", borderRadius: 999,
-                background: "rgba(0,0,0,0.30)",
-                border: "1px solid rgba(251,191,36,0.40)",
+                borderRadius: 999,
+                background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.05))",
+                border: "1px solid rgba(168,85,247,0.35)",
               }}>
                 <button onClick={() => onOpenAssignment(p.id)} style={{
-                  padding: "8px 6px 8px 12px", borderRadius: 999,
-                  background: "transparent", color: "white", border: "none",
+                  padding: "8px 8px 8px 14px", borderRadius: 999,
+                  background: "transparent", color: "#fce7f3", border: "none",
                   cursor: "pointer", fontSize: 12, fontWeight: 700,
                 }}>
-                  {p.subject} · {p.name} · <span style={{ fontFamily: "Menlo, monospace", fontSize: 10, color: "#fde68a" }}>{p.id}</span>
+                  {p.subject} · {p.name} · <span style={{ fontFamily: "Menlo, monospace", fontSize: 10, color: "#f9a8d4", fontWeight: 700 }}>{p.id}</span>
                 </button>
                 <button
                   onClick={() => confirmDelete(p.id, p.name, 0)}
                   title="Delete"
                   style={{
-                    padding: "4px 8px", borderRadius: 999,
+                    padding: "4px 10px", borderRadius: 999,
                     background: "transparent", color: "#fca5a5",
                     border: "none", cursor: "pointer", fontSize: 11,
                   }}>🗑</button>
@@ -382,33 +421,41 @@ function StudentTimeline({ studentId, firstName }: { studentId: string; firstNam
   if (items.length === 0) return null;
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.6, marginBottom: 8 }}>
-        🕐 {firstName}'s Timeline ({items.length})
+    <div style={{ marginTop: 18 }}>
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 7,
+        padding: "4px 12px", borderRadius: 999,
+        background: "rgba(168,85,247,0.10)",
+        border: "1px solid rgba(168,85,247,0.30)",
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.20em", textTransform: "uppercase",
+        color: "#c4b5fd", marginBottom: 12,
+      }}>
+        🕐 {firstName}'s Timeline · {items.length}
       </div>
       <div style={{
-        position: "relative", paddingLeft: 24,
-        borderLeft: "2px solid rgba(255,255,255,0.08)",
+        position: "relative", paddingLeft: 26,
+        borderLeft: "2px solid rgba(168,85,247,0.20)",
         display: "flex", flexDirection: "column", gap: 8,
       }}>
         {items.map((it) => (
           <div key={it.id} style={{ position: "relative" }}>
             <span style={{
-              position: "absolute", left: -34, top: 8,
-              width: 22, height: 22, borderRadius: "50%",
+              position: "absolute", left: -36, top: 8,
+              width: 24, height: 24, borderRadius: "50%",
               background: `${it.color}25`,
               border: `2px solid ${it.color}`,
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 11,
+              boxShadow: `0 0 10px ${it.color}55`,
             }}>{it.icon}</span>
             <div style={{
-              padding: "8px 12px", borderRadius: 8,
-              background: "rgba(255,255,255,0.04)",
-              border: `1px solid ${it.color}33`,
+              padding: "10px 14px", borderRadius: 10,
+              background: `linear-gradient(135deg, ${it.color}1a 0%, rgba(10,4,20,0.30) 100%)`,
+              border: `1px solid ${it.color}40`,
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{it.title}</div>
-              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{it.meta}</div>
-              <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#fce7f3", letterSpacing: "-0.005em" }}>{it.title}</div>
+              <div style={{ fontSize: 11, color: "rgba(196,181,253,0.75)", marginTop: 3, fontWeight: 600 }}>{it.meta}</div>
+              <div style={{ fontSize: 10, color: "rgba(196,181,253,0.45)", marginTop: 3, fontWeight: 600 }}>
                 {it.ts ? new Date(it.ts).toLocaleString() : ""}
               </div>
             </div>
@@ -431,25 +478,27 @@ function letterFromPct(pct: number): string {
 
 function th(): React.CSSProperties {
   return {
-    textAlign: "left", padding: "12px 14px",
-    fontSize: 11, fontWeight: 800, letterSpacing: "0.14em",
-    textTransform: "uppercase", opacity: 0.7, color: "white",
-    position: "sticky", top: 0, background: "rgba(0,0,0,0.80)",
+    textAlign: "left", padding: "14px 16px",
+    fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
+    textTransform: "uppercase", color: "#c4b5fd",
+    position: "sticky", top: 0,
+    background: "linear-gradient(180deg, rgba(168,85,247,0.18) 0%, rgba(99,102,241,0.10) 100%)",
+    borderBottom: "1px solid rgba(168,85,247,0.25)",
   };
 }
 function td(): React.CSSProperties {
-  return { padding: "10px 14px", verticalAlign: "middle" };
+  return { padding: "12px 16px", verticalAlign: "middle" };
 }
 function tdName(): React.CSSProperties {
-  return { padding: "8px 14px", verticalAlign: "middle", minWidth: 200 };
+  return { padding: "10px 16px", verticalAlign: "middle", minWidth: 200 };
 }
 function tdEmpty(): React.CSSProperties {
-  return { padding: "10px 14px", textAlign: "center", opacity: 0.3, fontSize: 16 };
+  return { padding: "12px 16px", textAlign: "center", color: "rgba(196,181,253,0.30)", fontSize: 16 };
 }
 function nameBtn(): React.CSSProperties {
   return {
-    display: "flex", alignItems: "center", gap: 10,
-    padding: 6, borderRadius: 8,
+    display: "flex", alignItems: "center", gap: 12,
+    padding: 6, borderRadius: 10,
     background: "transparent", color: "white",
     border: "none", cursor: "pointer", textAlign: "left",
     width: "100%",
@@ -457,17 +506,19 @@ function nameBtn(): React.CSSProperties {
 }
 function avatarStyle(): React.CSSProperties {
   return {
-    width: 36, height: 36, borderRadius: "50%",
-    background: "linear-gradient(135deg, #6366f1, #b23a48)",
+    width: 38, height: 38, borderRadius: "50%",
+    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontWeight: 800, fontSize: 16, color: "white", flexShrink: 0,
+    fontWeight: 900, fontSize: 16, color: "white", flexShrink: 0,
+    boxShadow: "0 4px 14px -4px rgba(168,85,247,0.55), inset 0 2px 0 rgba(255,255,255,0.15)",
   };
 }
 function cellBtn(color: string): React.CSSProperties {
   return {
-    padding: "6px 8px", borderRadius: 8,
-    background: `${color}15`, border: `1px solid ${color}55`,
+    padding: "8px 10px", borderRadius: 10,
+    background: `linear-gradient(135deg, ${color}22 0%, ${color}08 100%)`,
+    border: `1px solid ${color}55`,
     color: "white", cursor: "pointer", textAlign: "center",
-    minWidth: 64,
+    minWidth: 70,
   };
 }

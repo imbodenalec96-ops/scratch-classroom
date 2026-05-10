@@ -41,14 +41,21 @@ interface PackEntry {
   subject: Subject;
 }
 
-export default function AfternoonPackGenerator() {
+interface BulkPackProps {
+  /** Label prefix used in the default pack name + barcode pack name. Defaults to "Afternoon". */
+  defaultLabel?: string;
+  /** Default subject for new packs. Defaults to Math. */
+  defaultSubject?: Subject;
+}
+
+export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", defaultSubject = "Math" }: BulkPackProps = {}) {
   const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
-  const [subject, setSubject] = useState<Subject>("Math");
+  const [subject, setSubject] = useState<Subject>(defaultSubject);
   const [count, setCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<typeof DIFFICULTIES[number]>("Medium");
   const [packLabel, setPackLabel] = useState<string>(() => {
     const d = new Date();
-    return `Afternoon ${d.toLocaleDateString()}`;
+    return `${defaultLabel} ${d.toLocaleDateString()}`;
   });
   const [includeAnswerKey, setIncludeAnswerKey] = useState(true);
   const [autoMatchGrade, setAutoMatchGrade] = useState(true);

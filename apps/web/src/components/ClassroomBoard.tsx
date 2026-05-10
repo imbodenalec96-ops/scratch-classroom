@@ -2036,53 +2036,52 @@ export default function ClassroomBoard() {
                 const emoji = actEmoji(act || "");
                 return (
                   <div key={grade} style={{
-                    flex: 1, borderRadius: 12, overflow: "hidden",
+                    flex: 1, minHeight: 0, borderRadius: 10, overflow: "hidden",
                     display: "flex", alignItems: "stretch",
                     background: `linear-gradient(95deg, ${gc.from} 0%, rgba(15,15,28,0.20) 90%)`,
                     border: `1px solid ${gc.border}`,
                     animation: `fadeUp .5s ease ${gi * 0.06}s both`,
-                    boxShadow: `0 4px 16px -8px ${gc.glow}`,
                   }}>
                     {/* Emoji + grade badge */}
                     <div style={{
-                      width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: 3,
+                      width: 52, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                       borderRight: `1px solid ${gc.border}`,
-                      background: "linear-gradient(180deg, rgba(15,15,28,0.45), rgba(15,15,28,0.20))",
+                      background: "rgba(15,15,28,0.40)",
                     }}>
-                      <div style={{ fontSize: 24, lineHeight: 1 }}>{emoji}</div>
                       <div style={{
                         fontFamily: "'Inter', sans-serif",
                         fontSize: 11, fontWeight: 800, color: gc.text,
-                        letterSpacing: "0.10em",
-                        padding: "1px 7px", borderRadius: 999,
+                        letterSpacing: "0.08em",
+                        padding: "2px 7px", borderRadius: 999,
                         background: `${gc.text}1f`,
                         border: `1px solid ${gc.text}55`,
                       }}>{gc.motif}</div>
                     </div>
-                    {/* Activity + roster */}
+                    {/* Activity + roster — single-row layout, no vertical clipping */}
                     <div style={{
-                      flex: 1, padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5,
-                      minWidth: 0,
+                      flex: 1, padding: "0 14px", minWidth: 0,
+                      display: "flex", alignItems: "center", gap: 12,
                     }}>
-                      <div style={{
+                      <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
+                      <span style={{
                         fontFamily: "'Inter', system-ui, sans-serif",
-                        fontSize: 22, fontWeight: 800,
+                        fontSize: 18, fontWeight: 800,
                         color: "#fce7f3",
+                        lineHeight: 1.1,
+                        letterSpacing: "-0.005em",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        lineHeight: 1.15,
-                        letterSpacing: "0",
-                        WebkitFontSmoothing: "antialiased",
-                        MozOsxFontSmoothing: "grayscale",
+                        flexShrink: 0,
                       }}>
-                        {act || <span style={{ opacity: 0.35, fontWeight: 600, color: "rgba(245,241,232,0.50)" }}>not yet scheduled</span>}
-                      </div>
-                      <div style={{
+                        {act || <span style={{ opacity: 0.40, fontWeight: 600, color: "rgba(245,241,232,0.50)" }}>not yet scheduled</span>}
+                      </span>
+                      <span style={{
                         fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
-                        color: "rgba(245,241,232,0.60)", letterSpacing: "0.01em",
+                        color: "rgba(245,241,232,0.55)", letterSpacing: "0.01em",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        minWidth: 0, flex: 1,
                       }}>
                         {students.map(s => (s.name || "?").split(" ")[0]).join("  ·  ")}
-                      </div>
+                      </span>
                     </div>
                   </div>
                 );
