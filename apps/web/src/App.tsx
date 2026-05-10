@@ -127,7 +127,10 @@ function DashboardRedirect() {
   // Teachers + admins land on the board — that's the room's main
   // surface now that iPads are gone. They can still reach /admin or
   // /teacher from the sidebar / nav for back-office tasks.
-  if (user.role === "admin" || user.role === "teacher") return <Navigate to="/board" replace />;
+  // Teachers + admins land on the teacher dashboard now (not /board) —
+  // they can still tap into /board, /star, etc. from the sidebar nav,
+  // but logging in shouldn't auto-take over the projector.
+  if (user.role === "admin" || user.role === "teacher") return <Navigate to="/teacher" replace />;
   return <Navigate to="/student" replace />;
 }
 

@@ -145,20 +145,7 @@ export default function AfternoonPackGenerator() {
   };
 
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      borderRadius: 14, padding: 16, color: "#f5f1e8",
-    }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
-        🌇 Afternoon Pack — bulk-generate one per student
-      </div>
-      <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 14px" }}>
-        Pick a subject + difficulty, choose which kids, hit Generate. Each
-        student gets their own barcoded worksheet (lesson + questions, no
-        repeats inside one packet). Then <b>🖨 Print pack</b> opens one
-        window with everything stacked — single Cmd+P prints all of it.
-      </p>
+    <div style={{ color: "#f5f1e8" }}>
 
       {/* Form */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>

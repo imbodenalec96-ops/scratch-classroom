@@ -46,15 +46,7 @@ export default function RefusalFormGenerator() {
   };
 
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      borderRadius: 14, padding: 16, color: "#f5f1e8",
-    }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
-        🚨 Print a Refusal Form
-      </div>
-
+    <div style={{ color: "#f5f1e8" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <Field label="Form type">
           <select value={type} onChange={(e) => setType(e.target.value as FormType)} style={inp()}>

@@ -337,24 +337,35 @@ function PageHeader({ kicker, title, subtitle }: { kicker: string; title: string
 function SectionWrapper({ icon, title, description, children }: {
   icon?: string; title: string; description?: string; children: React.ReactNode;
 }) {
+  // The wrapper is the card. Subcomponents should NOT add their own
+  // outer card or duplicate heading anymore — they render directly
+  // into this card's body.
   return (
     <section style={{ marginBottom: T.space["2xl"] }}>
-      <div style={{ marginBottom: T.space.md }}>
-        <h3 style={{
-          fontSize: T.font.size.xl, fontWeight: T.font.weight.bold,
-          margin: 0, letterSpacing: "-0.01em",
-          display: "flex", alignItems: "center", gap: T.space.sm,
-        }}>
-          {icon && <span style={{ fontSize: T.font.size["2xl"] }}>{icon}</span>}
-          {title}
-        </h3>
-        {description && (
-          <p style={{ margin: `${T.space.xs}px 0 0`, color: T.color.textMuted, fontSize: T.font.size.md }}>
-            {description}
-          </p>
-        )}
+      <div style={{
+        background: T.color.surface,
+        border: `1px solid ${T.color.border}`,
+        borderRadius: T.radius["2xl"],
+        padding: T.space["2xl"],
+        boxShadow: T.shadow.md,
+      }}>
+        <div style={{ marginBottom: T.space.lg }}>
+          <h3 style={{
+            fontSize: T.font.size.xl, fontWeight: T.font.weight.bold,
+            margin: 0, letterSpacing: "-0.01em", color: T.color.text,
+            display: "flex", alignItems: "center", gap: T.space.sm,
+          }}>
+            {icon && <span style={{ fontSize: T.font.size["2xl"] }}>{icon}</span>}
+            {title}
+          </h3>
+          {description && (
+            <p style={{ margin: `${T.space.xs}px 0 0`, color: T.color.textMuted, fontSize: T.font.size.md, lineHeight: 1.5 }}>
+              {description}
+            </p>
+          )}
+        </div>
+        {children}
       </div>
-      {children}
     </section>
   );
 }
@@ -425,26 +436,15 @@ function PassBarcodesPanel() {
   };
 
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      borderRadius: 14, padding: 16, color: "#f5f1e8",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>🚻 Pass Barcodes</div>
-          <p style={{ fontSize: 12, opacity: 0.7, margin: "4px 0 0" }}>
-            Laminate these and tape them near the door. Scan a pass, tap a student in the popup
-            to send them out — scan again + tap to mark return. Active passes show on the board with running timers; alerts after 5 minutes.
-          </p>
-        </div>
+    <div style={{ color: "#f5f1e8" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
         <button onClick={print} style={{
           padding: "10px 14px", borderRadius: 10,
-          background: "linear-gradient(135deg,#6366f1,#b23a48)", color: "white",
+          background: "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)", color: "white",
           border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
         }}>🖨 Print pass sheet</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         {[
           { id: "PASS-BATHROOM", label: "🚻 Bathroom" },
           { id: "PASS-WATER",    label: "💧 Water" },
@@ -500,26 +500,15 @@ function StatusBarcodesPanel() {
   };
 
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      borderRadius: 14, padding: 16, color: "#f5f1e8",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>📋 Assignment Status Barcodes</div>
-          <p style={{ fontSize: 12, opacity: 0.7, margin: "4px 0 0" }}>
-            Quick way to mark an assignment <b>absent</b>, <b>skipped</b>, <b>excused</b>, or <b>makeup</b> without
-            opening the full gradebook. Scan the status, pick the student + assignment in the popup.
-          </p>
-        </div>
+    <div style={{ color: "#f5f1e8" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
         <button onClick={print} style={{
           padding: "10px 14px", borderRadius: 10,
-          background: "linear-gradient(135deg,#6366f1,#b23a48)", color: "white",
+          background: "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)", color: "white",
           border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
         }}>🖨 Print status sheet</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         {items.map((p) => (
           <div key={p.id} style={{
             padding: 10, borderRadius: 10,
@@ -618,16 +607,7 @@ function ManualAssignmentEntry({ onOpenGradebook }: { onOpenGradebook: (id: stri
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-      <div style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: 14, padding: 16, color: "#f5f1e8",
-      }}>
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>📥 Add an Existing Paper Assignment</div>
-        <p style={{ fontSize: 12, opacity: 0.7, marginTop: -6, marginBottom: 12 }}>
-          Use this for old worksheets that don't have a barcode yet. We'll mint one
-          you can tape to the paper, then scan to pull up the gradebook.
-        </p>
+      <div style={{ color: "#f5f1e8" }}>
 
         <Field label="Assignment name">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Multiplication WS p.12" style={inp()} />
@@ -687,7 +667,7 @@ function ManualAssignmentEntry({ onOpenGradebook }: { onOpenGradebook: (id: stri
 
       <div style={{
         background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        border: `1px solid rgba(168,85,247,0.30)`,
         borderRadius: 14, padding: 16, color: "#f5f1e8",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
