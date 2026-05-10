@@ -99,103 +99,213 @@ interface Props {
   onClose: () => void;
 }
 
+type ConsoleTab = "progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings" | "morning";
+
+interface NavItem {
+  id: ConsoleTab;
+  icon: string;
+  label: string;
+  desc: string;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV: NavGroup[] = [
+  {
+    label: "Quick",
+    items: [
+      { id: "progress", icon: "📋", label: "Progress", desc: "Tap +/− to log assignments" },
+      { id: "points",   icon: "🪙", label: "Points",   desc: "Award or remove dojo points" },
+      { id: "stars",    icon: "⭐", label: "Stars",    desc: "Behavior stars + McDonald's" },
+    ],
+  },
+  {
+    label: "Teach",
+    items: [
+      { id: "morning",  icon: "🌅", label: "Morning",  desc: "Today's slide + warnings" },
+      { id: "spinner",  icon: "🎲", label: "Spinner",  desc: "Random pick wheel" },
+      { id: "groups",   icon: "👥", label: "Groups",   desc: "Auto-group the class" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { id: "store",    icon: "🛒", label: "Store",    desc: "Catalog + cashout" },
+      { id: "pins",     icon: "🔑", label: "PINs",     desc: "Roster PIN cards" },
+      { id: "settings", icon: "⚙️", label: "Settings", desc: "Board appearance + more" },
+    ],
+  },
+];
+
+function findNavItem(id: ConsoleTab): NavItem {
+  for (const g of NAV) for (const it of g.items) if (it.id === id) return it;
+  return NAV[0].items[0];
+}
+
 export default function BoardConsole({ classId, students, storeOnly = false, onClose }: Props) {
-  const [tab, setTab] = useState<"progress" | "store" | "pins" | "points" | "spinner" | "groups" | "stars" | "settings" | "morning">(storeOnly ? "store" : "progress");
+  const [tab, setTab] = useState<ConsoleTab>(storeOnly ? "store" : "progress");
+  const current = storeOnly ? { id: "store" as ConsoleTab, icon: "🛒", label: "Store", desc: "Catalog + cashout" } : findNavItem(tab);
 
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
+        background: "rgba(10,4,20,0.78)", backdropFilter: "blur(8px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
     >
       <div style={{
-        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        background: "radial-gradient(900px 600px at 0% 0%, rgba(168,85,247,0.18) 0%, transparent 55%), radial-gradient(700px 500px at 100% 100%, rgba(236,72,153,0.16) 0%, transparent 55%), linear-gradient(180deg, #1a0f2e 0%, #0a0414 100%)",
+        border: "1px solid rgba(168,85,247,0.30)",
         borderRadius: 22,
-        width: "min(900px, 95vw)",
-        maxHeight: "90vh",
+        width: "min(1100px, 96vw)",
+        maxHeight: "92vh",
         overflow: "hidden",
         display: "flex", flexDirection: "column",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+        boxShadow: "0 28px 72px -10px rgba(168,85,247,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
         color: "#f5f1e8",
       }}>
+        {/* HEADER — gradient title + close */}
         <header style={{
           padding: "18px 24px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          borderBottom: "1px solid rgba(168,85,247,0.20)",
           display: "flex", alignItems: "center", gap: 16,
         }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.45 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 7,
+              padding: "4px 12px", borderRadius: 999,
+              background: "linear-gradient(135deg, rgba(168,85,247,0.20), rgba(236,72,153,0.10))",
+              border: "1px solid rgba(168,85,247,0.30)",
+              fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase",
+              color: "#f9a8d4", marginBottom: 6,
+            }}>
+              <span style={{
+                display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                background: "#ec4899", boxShadow: "0 0 10px rgba(236,72,153,0.85)",
+              }} />
               {storeOnly ? "Classroom Store" : "Teacher Console"}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>
-              {storeOnly
-                ? "Tap your face to start"
-                : tab === "progress" ? "Manual Progress" : "Classroom Store"}
+            <div style={{
+              fontSize: 24, fontWeight: 900, letterSpacing: "-0.025em",
+              background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 50%, #f9a8d4 100%)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+            }}>
+              {storeOnly ? "Tap your face to start" : `${current.icon} ${current.label}`}
             </div>
+            {!storeOnly && (
+              <div style={{ fontSize: 12, color: "rgba(196,181,253,0.55)", fontWeight: 600, marginTop: 2 }}>
+                {current.desc}
+              </div>
+            )}
           </div>
-          {!storeOnly && (
-            <div style={{ display: "flex", gap: 6, padding: 4, background: "rgba(255,255,255,0.05)", borderRadius: 12, flexWrap: "wrap" }}>
-              {(["progress", "points", "stars", "morning", "spinner", "groups", "store", "pins", "settings"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: tab === t ? "linear-gradient(135deg, #b23a48, #d97706)" : "transparent",
-                    color: tab === t ? "white" : "rgba(245,241,232,0.65)",
-                    fontWeight: 700, fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t === "progress" ? "📋 Progress"
-                    : t === "points" ? "🪙 Points"
-                    : t === "stars" ? "⭐ Stars"
-                    : t === "morning" ? "🌅 Morning"
-                    : t === "spinner" ? "🎲 Spinner"
-                    : t === "groups" ? "👥 Groups"
-                    : t === "store" ? "🛒 Store"
-                    : t === "pins" ? "🔑 PINs"
-                    : "⚙️ Settings"}
-                </button>
-              ))}
-            </div>
-          )}
           <button
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "rgba(245,241,232,0.7)",
+              width: 44, height: 44, borderRadius: "50%",
+              background: "rgba(168,85,247,0.10)",
+              border: "1px solid rgba(168,85,247,0.30)",
+              color: "#fce7f3",
               fontSize: 18, fontWeight: 700,
-              cursor: "pointer",
+              cursor: "pointer", touchAction: "manipulation",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >✕</button>
         </header>
 
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          {tab === "progress" && <ProgressTab classId={classId} students={students} />}
-          {tab === "points"   && <PointsTab classId={classId} students={students} />}
-          {tab === "stars"    && <StarsTab students={students} />}
-          {tab === "morning"  && <MorningTab classId={classId} />}
-          {tab === "spinner"  && <SpinnerTab students={students} />}
-          {tab === "groups"   && <GroupsTab students={students} />}
-          {tab === "store"    && <StoreTab classId={classId} students={students} />}
-          {tab === "pins"     && <PinsTab classId={classId} />}
-          {tab === "settings" && (
-            <Suspense fallback={<div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>}>
-              <TeacherBoardSettings />
-            </Suspense>
+        {/* BODY — sidebar nav + content */}
+        <div style={{
+          flex: 1, minHeight: 0, display: "flex",
+          overflow: "hidden",
+        }}>
+          {!storeOnly && (
+            <nav
+              role="tablist"
+              aria-label="Teacher console sections"
+              style={{
+                flexShrink: 0,
+                width: 220,
+                padding: "16px 12px",
+                borderRight: "1px solid rgba(168,85,247,0.18)",
+                background: "linear-gradient(180deg, rgba(168,85,247,0.04) 0%, rgba(99,102,241,0.02) 100%)",
+                overflowY: "auto",
+                display: "flex", flexDirection: "column", gap: 18,
+              }}
+            >
+              {NAV.map((group) => (
+                <div key={group.label}>
+                  <div style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase",
+                    color: "rgba(196,181,253,0.55)", padding: "0 10px 6px",
+                  }}>{group.label}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {group.items.map((it) => {
+                      const active = tab === it.id;
+                      return (
+                        <button
+                          key={it.id}
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setTab(it.id)}
+                          style={{
+                            position: "relative",
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: "none",
+                            background: active
+                              ? "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.10))"
+                              : "transparent",
+                            color: active ? "#fce7f3" : "rgba(245,241,232,0.70)",
+                            fontWeight: active ? 800 : 600,
+                            fontSize: 14, textAlign: "left",
+                            cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: 10,
+                            transition: "background 180ms cubic-bezier(0.22,1,0.36,1)",
+                            touchAction: "manipulation",
+                          }}
+                          onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(168,85,247,0.06)"; }}
+                          onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                        >
+                          {active && (
+                            <span aria-hidden style={{
+                              position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+                              width: 3, height: "60%", borderRadius: 2,
+                              background: "linear-gradient(180deg, #ec4899, #a855f7)",
+                              boxShadow: "0 0 8px rgba(168,85,247,0.7)",
+                            }} />
+                          )}
+                          <span style={{ fontSize: 18 }}>{it.icon}</span>
+                          <span>{it.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
           )}
+
+          <div style={{ flex: 1, minWidth: 0, overflow: "auto", padding: 22 }}>
+            {tab === "progress" && <ProgressTab classId={classId} students={students} />}
+            {tab === "points"   && <PointsTab classId={classId} students={students} />}
+            {tab === "stars"    && <StarsTab students={students} />}
+            {tab === "morning"  && <MorningTab classId={classId} />}
+            {tab === "spinner"  && <SpinnerTab students={students} />}
+            {tab === "groups"   && <GroupsTab students={students} />}
+            {tab === "store"    && <StoreTab classId={classId} students={students} />}
+            {tab === "pins"     && <PinsTab classId={classId} />}
+            {tab === "settings" && (
+              <Suspense fallback={<div style={{ textAlign: "center", padding: 40, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>Loading…</div>}>
+                <TeacherBoardSettings />
+              </Suspense>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -260,12 +370,18 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
           100% { opacity: 0; transform: translateY(-30px) scale(0.95); }
         }
       `}</style>
-      <div style={{ fontSize: 13, color: "rgba(245,241,232,0.55)", marginBottom: 18 }}>
-        Tap + and − to tally assignments. Each one earns the kid <strong style={{ color: "#fde68a" }}>+4 🪙</strong> automatically.
+      <div style={{
+        fontSize: 13, color: "rgba(196,181,253,0.75)", marginBottom: 18,
+        padding: "10px 14px", borderRadius: 10,
+        background: "rgba(168,85,247,0.06)",
+        border: "1px solid rgba(168,85,247,0.20)",
+        fontWeight: 600,
+      }}>
+        Tap <b style={{ color: "#fce7f3" }}>+</b> and <b style={{ color: "#fce7f3" }}>−</b> to tally assignments. Each one earns the kid <strong style={{ color: "#f9a8d4" }}>+4 🪙</strong> automatically.
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 40, opacity: 0.5 }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 40, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>Loading…</div>
       ) : (
         <div style={{
           display: "grid",
@@ -280,15 +396,16 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
               <div key={s.id} style={{
                 position: "relative",
                 background: flashing
-                  ? "linear-gradient(135deg, rgba(34,197,94,0.20), rgba(16,185,129,0.10))"
-                  : "rgba(255,255,255,0.04)",
+                  ? "linear-gradient(135deg, rgba(34,197,94,0.22), rgba(168,85,247,0.08))"
+                  : "linear-gradient(180deg, rgba(168,85,247,0.08) 0%, rgba(99,102,241,0.04) 100%)",
                 border: flashing
                   ? "1px solid rgba(34,197,94,0.50)"
-                  : "1px solid rgba(255,255,255,0.08)",
+                  : "1px solid rgba(168,85,247,0.20)",
                 borderRadius: 14,
                 padding: "14px 16px",
                 display: "flex", alignItems: "center", gap: 12,
                 transition: "background .25s, border .25s",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
               }}>
                 {/* +N pts pop — floats up + fades when teacher
                     awards points via the +/− buttons */}
@@ -312,7 +429,7 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
                 )}
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 22, color: "white", fontWeight: 800, flexShrink: 0,
                 }}>{s.avatar_emoji || initial}</div>
@@ -339,14 +456,14 @@ function ProgressTab({ classId, students }: { classId: string; students: Student
                     minWidth: 36, textAlign: "center",
                     fontSize: 22, fontWeight: 900,
                     fontVariantNumeric: "tabular-nums",
-                    color: "#fde68a",
+                    color: "#f9a8d4",
                   }}>{count}</div>
                   <button
                     onClick={() => adjust(s, 1)}
                     disabled={savingId === s.id}
                     style={{
                       width: 32, height: 32, borderRadius: 8,
-                      background: "linear-gradient(135deg, #b23a48, #d97706)",
+                      background: "linear-gradient(135deg, #ec4899, #a855f7)",
                       border: "none",
                       color: "white", fontSize: 18, fontWeight: 800,
                       cursor: "pointer",
@@ -438,7 +555,7 @@ function MorningTab({ classId }: { classId: string }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
-          Edit the morning routine slide. Tap <strong style={{ color: "#fde68a" }}>🌅 Morning</strong> on the board to show it.
+          Edit the morning routine slide. Tap <strong style={{ color: "#f9a8d4" }}>🌅 Morning</strong> on the board to show it.
         </div>
         <button
           onClick={save}
@@ -447,7 +564,7 @@ function MorningTab({ classId }: { classId: string }) {
             padding: "10px 22px", borderRadius: 999,
             background: savedFlash
               ? "linear-gradient(135deg, #15803d, #22c55e)"
-              : "linear-gradient(135deg, #b23a48, #d97706)",
+              : "linear-gradient(135deg, #ec4899, #a855f7)",
             border: "none", color: "white", fontSize: 13, fontWeight: 800,
             cursor: saving ? "wait" : "pointer",
             opacity: saving ? 0.7 : 1,
@@ -474,7 +591,7 @@ function MorningTab({ classId }: { classId: string }) {
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 width: 28, height: 28, borderRadius: "50%",
-                background: "linear-gradient(135deg,#b23a48,#d97706)",
+                background: "linear-gradient(135deg, #ec4899, #a855f7)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 12, fontWeight: 800, color: "white",
                 flexShrink: 0,
@@ -604,7 +721,7 @@ function MorningTab({ classId }: { classId: string }) {
               padding: "8px 14px", borderRadius: 999,
               background: "rgba(250,204,21,0.10)",
               border: "1px dashed rgba(250,204,21,0.35)",
-              color: "#fde68a", fontSize: 12, fontWeight: 700,
+              color: "#f9a8d4", fontSize: 12, fontWeight: 700,
               cursor: "pointer",
             }}
           >+ Add notice</button>
@@ -658,7 +775,10 @@ function MorningTab({ classId }: { classId: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,241,232,0.55)", marginBottom: 6 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+        color: "rgba(196,181,253,0.65)", marginBottom: 6,
+      }}>
         {label}
       </div>
       {children}
@@ -668,23 +788,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function inputStyle(): React.CSSProperties {
   return {
     width: "100%", boxSizing: "border-box",
-    padding: "10px 14px", borderRadius: 10,
-    background: "rgba(0,0,0,0.30)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    color: "white", fontSize: 14, fontWeight: 600,
+    padding: "12px 14px", borderRadius: 10,
+    background: "rgba(10,4,20,0.45)",
+    border: "1px solid rgba(168,85,247,0.25)",
+    color: "#fce7f3", fontSize: 14, fontWeight: 600,
     outline: "none",
+    minHeight: 44,
   };
 }
 function smallBtn(disabled: boolean, danger = false): React.CSSProperties {
   return {
-    width: 30, height: 30, borderRadius: 8,
-    background: danger ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.05)",
-    border: danger ? "1px solid rgba(239,68,68,0.30)" : "1px solid rgba(255,255,255,0.10)",
-    color: danger ? "#fca5a5" : "white",
-    fontSize: 14, fontWeight: 700,
+    width: 36, height: 36, borderRadius: 10,
+    background: danger
+      ? "linear-gradient(135deg, rgba(239,68,68,0.15), rgba(236,72,153,0.05))"
+      : "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.05))",
+    border: danger
+      ? "1px solid rgba(239,68,68,0.35)"
+      : "1px solid rgba(168,85,247,0.30)",
+    color: danger ? "#fca5a5" : "#fce7f3",
+    fontSize: 16, fontWeight: 800,
     cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.3 : 1,
     flexShrink: 0,
+    touchAction: "manipulation",
   };
 }
 
@@ -752,7 +878,7 @@ function StarsTab({ students }: { students: Student[] }) {
   return (
     <div>
       <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)", marginBottom: 18 }}>
-        Tap stars to add or remove. <strong style={{ color: "#fde68a" }}>Hit 5 → asks what day they get McDonald's.</strong> The 🍔 pill on the roster card shows that day. After they get it, tap 🍔 to reset.
+        Tap stars to add or remove. <strong style={{ color: "#f9a8d4" }}>Hit 5 → asks what day they get McDonald's.</strong> The 🍔 pill on the roster card shows that day. After they get it, tap 🍔 to reset.
       </div>
 
       {/* McDonald's date prompt — when a kid crosses into 5 stars,
@@ -778,7 +904,7 @@ function StarsTab({ students }: { students: Student[] }) {
             textAlign: "center",
           }}>
             <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 4 }}>🍔</div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "#fde68a", marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: "#f9a8d4", marginBottom: 4 }}>
               McDonald's Earned
             </div>
             <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 18 }}>
@@ -839,7 +965,7 @@ function StarsTab({ students }: { students: Student[] }) {
           padding: "10px 14px", borderRadius: 10, marginBottom: 14,
           background: "linear-gradient(135deg, rgba(217,119,6,0.30), rgba(178,58,72,0.18))",
           border: "1px solid rgba(217,119,6,0.50)",
-          color: "#fde68a", fontWeight: 800, fontSize: 14, textAlign: "center",
+          color: "#f9a8d4", fontWeight: 800, fontSize: 14, textAlign: "center",
           animation: "pointsPop 1.4s ease-out both",
         }}>{flash}</div>
       )}
@@ -867,8 +993,8 @@ function StarsTab({ students }: { students: Student[] }) {
               <div style={{
                 width: 40, height: 40, borderRadius: "50%",
                 background: isFull
-                  ? "linear-gradient(135deg, #fbbf24, #d97706)"
-                  : "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  ? "linear-gradient(135deg, #f9a8d4, #ec4899)"
+                  : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 20, color: "white", fontWeight: 800, flexShrink: 0,
               }}>{s.avatar_emoji || initial}</div>
@@ -893,7 +1019,7 @@ function StarsTab({ students }: { students: Student[] }) {
                         fontSize: 22, lineHeight: 1,
                         background: "transparent", border: "none",
                         cursor: "pointer",
-                        color: i < count ? (isFull ? "#fbbf24" : "#fcd34d") : "rgba(245,241,232,0.20)",
+                        color: i < count ? (isFull ? "#f9a8d4" : "#fbcfe8") : "rgba(245,241,232,0.20)",
                         filter: i < count ? `drop-shadow(0 0 ${isFull ? 8 : 3}px rgba(251,191,36,${isFull ? 0.7 : 0.4}))` : "none",
                         padding: 2,
                         transition: "color .15s, filter .15s",
@@ -998,7 +1124,7 @@ function SpinnerTab({ students }: { students: Student[] }) {
             disabled={spinning || eligible.length === 0}
             style={{
               padding: "10px 22px", borderRadius: 999,
-              background: spinning ? "rgba(255,255,255,0.10)" : "linear-gradient(135deg,#b23a48,#d97706)",
+              background: spinning ? "rgba(255,255,255,0.10)" : "linear-gradient(135deg, #ec4899, #a855f7)",
               border: "none", color: "white", fontSize: 14, fontWeight: 800,
               cursor: spinning || eligible.length === 0 ? "default" : "pointer",
               opacity: spinning || eligible.length === 0 ? 0.6 : 1,
@@ -1018,7 +1144,7 @@ function SpinnerTab({ students }: { students: Student[] }) {
         }}>
           <div style={{
             width: 84, height: 84, borderRadius: "50%",
-            background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+            background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 42, color: "white", fontWeight: 900,
             boxShadow: "0 0 24px rgba(178,58,72,0.55)",
@@ -1027,7 +1153,7 @@ function SpinnerTab({ students }: { students: Student[] }) {
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.55 }}>
               You're up!
             </div>
-            <div style={{ fontSize: 36, fontWeight: 900, color: "#fde68a", lineHeight: 1.05, marginTop: 4 }}>
+            <div style={{ fontSize: 36, fontWeight: 900, color: "#f9a8d4", lineHeight: 1.05, marginTop: 4 }}>
               {winner.name}
             </div>
           </div>
@@ -1061,12 +1187,12 @@ function SpinnerTab({ students }: { students: Student[] }) {
               onClick={() => !spinning && exclude(s.id)}
               style={{
                 background: isHighlighted
-                  ? "linear-gradient(135deg, #b23a48, #d97706)"
+                  ? "linear-gradient(135deg, #ec4899, #a855f7)"
                   : isExcluded
                     ? "rgba(255,255,255,0.02)"
                     : "rgba(255,255,255,0.04)",
                 border: isHighlighted
-                  ? "2px solid #fbbf24"
+                  ? "2px solid #ec4899"
                   : "1px solid rgba(255,255,255,0.08)",
                 borderRadius: 14,
                 padding: "14px 10px",
@@ -1080,7 +1206,7 @@ function SpinnerTab({ students }: { students: Student[] }) {
             >
               <div style={{
                 width: 48, height: 48, borderRadius: "50%",
-                background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 24, fontWeight: 800, color: "white",
               }}>{s.avatar_emoji || initial}</div>
@@ -1111,7 +1237,7 @@ function GroupsTab({ students }: { students: Student[] }) {
   };
 
   const colors = [
-    { from: "#b23a48", to: "#d97706" },
+    { from: "#ec4899", to: "#a855f7" },
     { from: "#0f766e", to: "#10b981" },
     { from: "#7c3aed", to: "#4f46e5" },
     { from: "#dc2626", to: "#f97316" },
@@ -1135,7 +1261,7 @@ function GroupsTab({ students }: { students: Student[] }) {
               onClick={() => setGroupSize(n)}
               style={{
                 width: 36, height: 36, borderRadius: 8,
-                background: groupSize === n ? "linear-gradient(135deg,#b23a48,#d97706)" : "rgba(255,255,255,0.05)",
+                background: groupSize === n ? "linear-gradient(135deg, #ec4899, #a855f7)" : "rgba(255,255,255,0.05)",
                 border: groupSize === n ? "none" : "1px solid rgba(255,255,255,0.10)",
                 color: "white", fontWeight: 800, fontSize: 14,
                 cursor: "pointer",
@@ -1146,7 +1272,7 @@ function GroupsTab({ students }: { students: Student[] }) {
             onClick={make}
             style={{
               padding: "10px 18px", borderRadius: 999,
-              background: "linear-gradient(135deg,#b23a48,#d97706)",
+              background: "linear-gradient(135deg, #ec4899, #a855f7)",
               border: "none", color: "white", fontSize: 13, fontWeight: 800,
               cursor: "pointer",
               marginLeft: 8,
@@ -1321,14 +1447,14 @@ function PointsTab({ classId, students }: { classId: string; students: Student[]
               }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 20, color: "white", fontWeight: 800, flexShrink: 0,
                 }}>{s.avatar_emoji || initial}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name.split(" ")[0]}</div>
                   <div style={{
-                    fontSize: 16, fontWeight: 900, color: "#fde68a",
+                    fontSize: 16, fontWeight: 900, color: "#f9a8d4",
                     fontVariantNumeric: "tabular-nums",
                   }}>🪙 {bal}</div>
                 </div>
@@ -1423,7 +1549,7 @@ export function PinsTab({ classId }: { classId: string }) {
       }}>
         <div style={{ fontSize: 13, color: "rgba(245,241,232,0.65)" }}>
           Each student needs a 4-digit PIN to redeem from the board store.
-          {missing > 0 && <> <span style={{ color: "#fcd34d", fontWeight: 700 }}>{missing} student{missing===1?"":"s"} still need one.</span></>}
+          {missing > 0 && <> <span style={{ color: "#fbcfe8", fontWeight: 700 }}>{missing} student{missing===1?"":"s"} still need one.</span></>}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -1455,7 +1581,7 @@ export function PinsTab({ classId }: { classId: string }) {
               disabled={busyId === "__all__"}
               style={{
                 padding: "8px 14px", borderRadius: 999,
-                background: "linear-gradient(135deg,#b23a48,#d97706)",
+                background: "linear-gradient(135deg, #ec4899, #a855f7)",
                 border: "none", color: "white", fontSize: 12, fontWeight: 800,
                 cursor: "pointer",
               }}
@@ -1487,7 +1613,7 @@ export function PinsTab({ classId }: { classId: string }) {
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 22, color: "white", fontWeight: 800, flexShrink: 0,
                 }}>{s.avatar_emoji || initial}</div>
@@ -1528,7 +1654,7 @@ export function PinsTab({ classId }: { classId: string }) {
                   title={has ? "Generate a new PIN" : "Assign a PIN"}
                   style={{
                     padding: "8px 12px", borderRadius: 8,
-                    background: has ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#b23a48,#d97706)",
+                    background: has ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg, #ec4899, #a855f7)",
                     border: has ? "1px solid rgba(255,255,255,0.15)" : "none",
                     color: "white", fontSize: 12, fontWeight: 800,
                     cursor: "pointer", flexShrink: 0,
@@ -1675,7 +1801,7 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
               >
                 <div style={{
                   width: 64, height: 64, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 32, fontWeight: 800,
                 }}>{s.avatar_emoji || initial}</div>
@@ -1694,7 +1820,7 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
       <div style={{ maxWidth: 360, margin: "20px auto", textAlign: "center" }}>
         <div style={{
           width: 96, height: 96, borderRadius: "50%",
-          background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+          background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 48, fontWeight: 800,
           margin: "0 auto 14px",
@@ -1728,7 +1854,7 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
             disabled={pin.length < 3}
             style={{
               flex: 2, padding: "12px 0", borderRadius: 12,
-              background: pin.length < 3 ? "rgba(255,255,255,0.10)" : "linear-gradient(135deg,#b23a48,#d97706)",
+              background: pin.length < 3 ? "rgba(255,255,255,0.10)" : "linear-gradient(135deg, #ec4899, #a855f7)",
               border: "none", color: "white", fontWeight: 800,
               cursor: pin.length < 3 ? "default" : "pointer",
               opacity: pin.length < 3 ? 0.5 : 1,
@@ -1759,7 +1885,7 @@ function StoreTab({ classId: _classId, students }: { classId: string; students: 
       }}>
         <div style={{
           width: 40, height: 40, borderRadius: "50%",
-          background: "linear-gradient(135deg, #b23a48, #7c3aed)",
+          background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 22, fontWeight: 800,
         }}>{picked.avatar_emoji || picked.name[0].toUpperCase()}</div>
