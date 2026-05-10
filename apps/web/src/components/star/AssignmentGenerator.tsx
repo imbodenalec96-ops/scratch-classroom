@@ -16,7 +16,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const Q_COUNTS = [5, 10, 15, 20];
 const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 
-interface Lesson {
+export interface Lesson {
   title: string;
   intro: string;
   body?: string;
@@ -1382,7 +1382,7 @@ function pickTopic(bank: LocalTopic[], goal: string, grade?: string): LocalTopic
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
+export function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
   const { subject, count, difficulty, goal } = opts;
 
   // Math is procedural — generate fresh problems, but the operations and

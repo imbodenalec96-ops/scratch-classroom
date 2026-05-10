@@ -18,6 +18,7 @@ import { setActiveClassId } from "../../lib/star/boardEvents.ts";
 import { api } from "../../lib/api.ts";
 import { importStarCsv, type ImportResult } from "../../lib/star/importCsv.ts";
 import AssignmentGenerator from "./AssignmentGenerator.tsx";
+import AfternoonPackGenerator from "./AfternoonPackGenerator.tsx";
 import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import StarReports from "./StarReports.tsx";
 import GradebookModal from "./GradebookModal.tsx";
@@ -161,6 +162,9 @@ export default function StarPage() {
 
       {tab === "create" && (
         <>
+          <div style={{ marginBottom: 14 }}>
+            <AfternoonPackGenerator />
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 14 }}>
             <AssignmentGenerator />
             <RefusalFormGenerator />
