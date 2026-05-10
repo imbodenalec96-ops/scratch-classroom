@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { StarStore, rehydrateBcDB, type BcEntry } from "../../lib/star/storage.ts";
 import { scanReceivedBeep, successBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { fireStarBoardEvent } from "../../lib/star/boardEvents.ts";
+import { lookupBarcodeOnServer } from "../../lib/star/barcodeRelay.ts";
 import RefusalModal from "./RefusalModal.tsx";
 import GradebookModal from "./GradebookModal.tsx";
 import PassModal from "./PassModal.tsx";
@@ -73,7 +74,7 @@ export default function StarScanner() {
       }, 80);
     };
 
-    function handleScan(v: string) {
+    async function handleScan(v: string) {
       scanReceivedBeep();
       // Always rehydrate so freshly-deployed seed barcodes (PASS-*, STATUS-*)
       // are guaranteed to be in the lookup, even if the user's bcDB
@@ -117,10 +118,33 @@ export default function StarScanner() {
           setScan({ status: { barcode: v, statusKind: entry.statusKind } });
         }
       } else {
+        // Last-resort: ask the server in case the barcode was minted on
+        // another device. If found, persists locally + retries the scan
+        // routing. Otherwise show the "unknown" overlay.
+        const server = await lookupBarcodeOnServer(v);
+        if (server) {
+          successBeep();
+          if (server.type === "assignment") {
+            fireStarBoardEvent({
+              kind: "scan-to-phone",
+              studentName: server.studentName || "—",
+              studentId: server.studentId,
+              barcode: v,
+              detail: server.name,
+            });
+            setScan({ gradebook: { barcode: v } });
+          } else if (server.type === "work-refusal-form") {
+            setScan({ refusal: { barcode: v, type: "Work Refusal" } });
+          } else if (server.type === "specials-refusal-form") {
+            setScan({ refusal: { barcode: v, type: "Specials Refusal" } });
+          } else if (server.type === "pass-action") {
+            setScan({ pass: { barcode: v, passKind: (server as any).passKind } });
+          } else if (server.type === "status-action") {
+            setScan({ status: { barcode: v, statusKind: (server as any).statusKind } });
+          }
+          return;
+        }
         errorBeep();
-        // Used to fall through and open a Refusal modal, which surprised
-        // teachers ("why did it log a refusal?"). Now shows a clear
-        // "barcode not found" overlay with a Sync hint instead.
         setScan({ unknown: { barcode: v } });
       }
     }

@@ -9,6 +9,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
 
 type FormType = "Work Refusal" | "Specials Refusal";
 
@@ -35,6 +36,7 @@ export default function RefusalFormGenerator() {
     };
     bcDB[id] = entry;
     saveAll({ bcDB });
+    pushBarcodeToServer(entry);
     successBeep();
     setCreated({ id, type, studentName });
   };

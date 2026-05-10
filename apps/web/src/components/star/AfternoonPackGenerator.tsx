@@ -15,6 +15,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
 import { buildLocalLesson, type Lesson } from "./AssignmentGenerator.tsx";
 import { Modal } from "./ui.tsx";
 
@@ -135,6 +136,8 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         });
       }
       saveAll({ bcDB, asnTracker: tracker, asns });
+      // Push every minted barcode to the server so other devices can scan it.
+      for (const o of out) pushBarcodeToServer(bcDB[o.barcode]);
       successBeep();
       setGenerated(out);
     } catch (e: any) {
@@ -282,6 +285,7 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
               };
             }
             saveAll({ bcDB, asnTracker: tr });
+            pushBarcodeToServer(bcDB[updated.barcode]);
             setGenerated((cur) => cur.map((p) => (p.barcode === updated.barcode ? updated : p)));
             setEditing(null);
           }}

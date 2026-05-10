@@ -14,6 +14,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Spelling", "Science", "Social Studies"];
 const COUNTS = [5, 10, 15, 20];
@@ -48,13 +49,17 @@ export default function QuizGenerator() {
     if (!s) { errorBeep(); return; }
     const useGrade = s.grade || grade;
     const studentName = `${s.firstName} ${s.lastName}`.trim();
+    // BUG FIX (was passing fresh copies to saveAll → mutation lost):
+    // grab bcDB + tracker ONCE, mutate them, then persist the same refs.
+    const bcDB = StarStore.getBcDB();
+    const tracker = StarStore.getAsnTrack();
     const slice = mintQuizSlice({
-      bcDB: StarStore.getBcDB(),
-      tracker: StarStore.getAsnTrack(),
+      bcDB, tracker,
       subject, count, difficulty, grade: useGrade,
       studentId, studentName,
     });
-    saveAll({ bcDB: StarStore.getBcDB(), asnTracker: StarStore.getAsnTrack() });
+    saveAll({ bcDB, asnTracker: tracker });
+    pushBarcodeToServer(bcDB[slice.barcode]);
     successBeep();
     setCreated(slice);
   };
@@ -163,6 +168,8 @@ export function QuizPackGenerator() {
         slices.push(slice);
       }
       saveAll({ bcDB, asnTracker: tracker });
+      // Push each new barcode to the server so other devices can scan it.
+      for (const sl of slices) pushBarcodeToServer(bcDB[sl.barcode]);
       successBeep();
       setGenerated(slices);
     } finally {

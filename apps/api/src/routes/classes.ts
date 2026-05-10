@@ -1584,6 +1584,84 @@ router.get("/:classId/star-events", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * Locally-minted STAR barcodes (QZ-, AS-, WR-, SP-) live in the
+ * teacher's localStorage, which means a barcode created on the iPad
+ * can't be scanned on the projector — different device, different
+ * bcDB. This relay persists the BcEntry payload server-side so any
+ * device in the class can fetch it via syncFromClassroom + scanner
+ * fallback. Long-lived (no TTL).
+ */
+let starBarcodesReady = false;
+async function ensureStarBarcodes() {
+  if (starBarcodesReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS star_barcodes (
+      class_id TEXT NOT NULL,
+      barcode TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (class_id, barcode)
+    )`);
+    starBarcodesReady = true;
+  } catch { starBarcodesReady = true; }
+}
+
+router.post("/:classId/star-barcodes", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureStarBarcodes();
+  const barcode = String(req.body?.barcode || "").trim().toUpperCase();
+  const payload = req.body?.payload;
+  if (!barcode || !payload) return res.status(400).json({ error: "missing barcode or payload" });
+  const now = new Date().toISOString();
+  try {
+    // UPSERT — re-mint of the same barcode replaces. Postgres + SQLite differ on
+    // ON CONFLICT syntax; both support the form below.
+    await db.prepare(
+      `INSERT INTO star_barcodes (class_id, barcode, payload, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (class_id, barcode) DO UPDATE SET payload = EXCLUDED.payload, created_at = EXCLUDED.created_at`
+    ).run(req.params.classId, barcode, JSON.stringify(payload), now);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "insert failed" });
+  }
+});
+
+// List all barcodes for the class (for syncFromClassroom).
+router.get("/:classId/star-barcodes", async (req: AuthRequest, res: Response) => {
+  await ensureStarBarcodes();
+  try {
+    const rows = await db.prepare(
+      `SELECT barcode, payload, created_at FROM star_barcodes WHERE class_id = ? ORDER BY created_at DESC LIMIT 2000`
+    ).all(req.params.classId) as any[];
+    const out = rows.map((r) => {
+      let p: any = {};
+      try { p = JSON.parse(r.payload || "{}"); } catch {}
+      return { barcode: r.barcode, payload: p, created_at: r.created_at };
+    });
+    res.json({ barcodes: out });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "fetch failed" });
+  }
+});
+
+// Single-barcode lookup — used by the scanner's "not found locally"
+// fallback so a single missed scan doesn't require a full sync.
+router.get("/:classId/star-barcodes/:barcode", async (req: AuthRequest, res: Response) => {
+  await ensureStarBarcodes();
+  const bc = String(req.params.barcode || "").trim().toUpperCase();
+  try {
+    const row: any = await db.prepare(
+      `SELECT barcode, payload, created_at FROM star_barcodes WHERE class_id = ? AND barcode = ? LIMIT 1`
+    ).get(req.params.classId, bc);
+    if (!row) return res.status(404).json({ error: "not found" });
+    let p: any = {};
+    try { p = JSON.parse(row.payload || "{}"); } catch {}
+    res.json({ barcode: row.barcode, payload: p, created_at: row.created_at });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "fetch failed" });
+  }
+});
+
 router.post("/:classId/help", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   const classId = req.params.classId;

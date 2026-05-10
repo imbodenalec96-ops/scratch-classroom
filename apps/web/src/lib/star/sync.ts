@@ -215,11 +215,22 @@ export async function syncFromClassroom(): Promise<SyncResult> {
     console.warn("[star sync] assignments:", e);
   }
 
+  // ── Cross-device locally-minted barcodes (QZ-, AS-, WR-, SP-) ──
+  // Pull anything stored on the server-side relay so this device can
+  // scan barcodes generated on another device.
+  let relayAdded = 0;
+  try {
+    const { pullBarcodesFromServer } = await import("./barcodeRelay.ts");
+    relayAdded = await pullBarcodesFromServer();
+  } catch (e) {
+    console.warn("[star sync] barcode relay:", e);
+  }
+
   return {
     ok: true,
     studentsAdded, studentsTotal,
     assignmentsAdded, assignmentsTotal,
-    message: `Synced ${studentsTotal} students · ${assignmentsAdded} new barcodes from ${assignmentsTotal} assignments.`,
+    message: `Synced ${studentsTotal} students · ${assignmentsAdded} new assignments${relayAdded ? ` · +${relayAdded} cross-device barcodes` : ""}.`,
   };
 }
 

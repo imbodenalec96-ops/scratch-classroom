@@ -9,6 +9,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies", "SEL"];
 const GRADES = ["K", "1st", "2nd", "3rd", "4th", "5th"];
@@ -143,6 +144,7 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
       asns.unshift({ id, name, subject, type: "Assignment", grade });
 
       saveAll({ bcDB, asnTracker: tracker, asns });
+      pushBarcodeToServer(bcDB[id]);
       successBeep();
       setCreated({ id, questions: questions!, lesson: lesson! });
       onCreated?.(id);

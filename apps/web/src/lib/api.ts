@@ -50,6 +50,20 @@ export const api = {
       `/classes/${classId}/star-events`,
       { method: "POST", body: JSON.stringify({ kind, payload }) },
     ),
+  // STAR barcode persistence — long-lived per-class store of locally-
+  // minted barcodes (QZ-, AS-, WR-, SP-) so any device can scan them.
+  starBarcodePost: (classId: string, barcode: string, payload: any) =>
+    request<{ ok: boolean }>(`/classes/${classId}/star-barcodes`, {
+      method: "POST", body: JSON.stringify({ barcode, payload }),
+    }),
+  starBarcodesList: (classId: string) =>
+    request<{ barcodes: Array<{ barcode: string; payload: any; created_at: string }> }>(
+      `/classes/${classId}/star-barcodes`,
+    ),
+  starBarcodeGet: (classId: string, barcode: string) =>
+    request<{ barcode: string; payload: any; created_at: string }>(
+      `/classes/${classId}/star-barcodes/${encodeURIComponent(barcode)}`,
+    ),
   getClasses: () => request<any[]>("/classes"),
   createClass: (name: string) => request<any>("/classes", { method: "POST", body: JSON.stringify({ name }) }),
   getClass: (id: string) => request<any>(`/classes/${id}`),

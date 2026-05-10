@@ -18,6 +18,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
 import { buildLocalLesson } from "./AssignmentGenerator.tsx";
 
 const COUNTS = [5, 8, 10, 15];
@@ -130,6 +131,7 @@ export default function IepAssignmentGenerator() {
         iepGoalId: goal.id, iepGoalArea: goal.area, iepGoalText: goal.goalText,
       };
       saveAll({ bcDB, asnTracker: tracker });
+      pushBarcodeToServer(entry);
       successBeep();
       setCreated({ barcode, studentName, goal, questions, lesson, subject, format, grade });
     } finally {
