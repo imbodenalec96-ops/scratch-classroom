@@ -12,7 +12,12 @@
     "dev:web": "npm -w apps/web run dev",
     "build": "npm -w packages/shared run build && npm -w apps/api run build && npm -w apps/web run build",
     "seed": "npm -w apps/api run seed",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "desktop": "npm -w apps/desktop run start",
+    "desktop:icons": "cd apps/desktop && node build/make-icons.js",
+    "desktop:build:mac": "npm -w apps/desktop run build:mac",
+    "desktop:build:win": "npm -w apps/desktop run build:win",
+    "desktop:build:all": "npm -w apps/desktop run build:all"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -14,3 +14,9 @@ dist/
 scripts/
 fix_passages_and_spelling.cjs
 fix_wednesday_passages.cjs
+
+# Desktop wrapper output (electron-builder dist + generated icons)
+apps/desktop/dist/
+apps/desktop/build/icon.icns
+apps/desktop/build/icon.ico
+apps/desktop/build/icon.png

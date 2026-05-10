@@ -1,0 +1,70 @@
+{
+  "name": "@scratch/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop wrapper for Scratch Classroom — produces .dmg (Mac) and .exe (Windows) installers from the live web app.",
+  "main": "main.js",
+  "author": {
+    "name": "Alec Imboden"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac --x64 --arm64",
+    "build:win": "electron-builder --win --x64",
+    "build:all": "electron-builder --mac --x64 --arm64 --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^25.1.8",
+    "png2icons": "^2.0.1"
+  },
+  "build": {
+    "appId": "com.imboden.scratch-classroom",
+    "productName": "Scratch Classroom",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Scratch Classroom",
+      "icon": "build/icon.icns",
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 140, "y": 200, "type": "file" },
+        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Scratch Classroom"
+    },
+    "publish": null
+  }
+}
