@@ -238,52 +238,66 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         <PhotoStrip barcode={entry.id} />
 
         {/* Grade history */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 8 }}>
-            📊 Grade History {submissions.length ? `(${submissions.length})` : ""}
-          </div>
+        <div style={{ marginBottom: 18 }}>
+          <SectionPill icon="📊">
+            Grade History{submissions.length ? ` · ${submissions.length}` : ""}
+          </SectionPill>
           {submissions.length === 0 ? (
-            <div style={{ padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.10)", opacity: 0.6, fontSize: 13 }}>
+            <div style={{
+              marginTop: 10,
+              padding: "14px 16px", borderRadius: 12,
+              background: "rgba(168,85,247,0.04)",
+              border: "1px dashed rgba(168,85,247,0.25)",
+              color: "rgba(196,181,253,0.65)", fontSize: 13, fontWeight: 600,
+            }}>
               No grades logged yet.
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
-              {submissions.map((s, i) => (
+            <div style={{
+              marginTop: 10,
+              display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10,
+            }}>
+              {submissions.map((s, i) => {
+                const lc = letterGradeColor(s.letterGrade);
+                return (
                 <div key={i} style={{
-                  padding: 10, borderRadius: 12,
-                  background: "rgba(255,255,255,0.04)",
-                  border: `1px solid ${letterGradeColor(s.letterGrade)}55`,
-                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 12px", borderRadius: 12,
+                  background: `linear-gradient(135deg, ${lc}1a 0%, rgba(10,4,20,0.30) 100%)`,
+                  border: `1px solid ${lc}55`,
+                  display: "flex", alignItems: "center", gap: 12,
                 }}>
                   <div style={{
                     width: 52, height: 52, borderRadius: 12,
-                    background: `${letterGradeColor(s.letterGrade)}33`,
-                    border: `2px solid ${letterGradeColor(s.letterGrade)}`,
+                    background: `${lc}25`,
+                    border: `2px solid ${lc}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 900, fontSize: 26, color: letterGradeColor(s.letterGrade),
+                    fontWeight: 900, fontSize: 24, color: lc,
                     flexShrink: 0,
+                    textShadow: `0 0 12px ${lc}55`,
                   }}>{s.letterGrade}</div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: "#fce7f3", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.005em" }}>
                       {s.studentName}
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.75 }}>{s.score}/{s.maxScore} · {s.pct}%</div>
-                    <div style={{ fontSize: 11, opacity: 0.55 }}>{s.completedDate}</div>
+                    <div style={{ fontSize: 12, color: "rgba(196,181,253,0.75)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{s.score}/{s.maxScore} · {s.pct}%</div>
+                    <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>{s.completedDate}</div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Add new grade */}
         <div style={{
-          padding: 12, borderRadius: 12,
-          background: "rgba(99,102,241,0.06)",
-          border: "1px solid rgba(99,102,241,0.30)",
+          padding: 16, borderRadius: 16,
+          background: "linear-gradient(180deg, rgba(168,85,247,0.10) 0%, rgba(99,102,241,0.05) 100%)",
+          border: "1px solid rgba(168,85,247,0.30)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 18px -8px rgba(168,85,247,0.30)",
         }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 10, color: "#a5b4fc" }}>
-            ✏️ Add New Grade Entry
+          <div style={{ marginBottom: 12 }}>
+            <SectionPill icon="✏️">Add New Grade Entry</SectionPill>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: totalQ > 0 ? "1fr 1fr" : "1fr", gap: 14 }}>
@@ -379,38 +393,46 @@ export default function GradebookModal({ barcode, onClose }: Props) {
             {/* Right col — mark questions */}
             {totalQ > 0 && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8, color: "#86efac" }}>
-                  ✓ Mark Questions — Auto-calculates Score
+                <div style={{ marginBottom: 10 }}>
+                  <SectionPill icon="✓">Mark Questions · auto-scores</SectionPill>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflow: "auto", paddingRight: 4 }}>
                   {questions.map((q) => {
                     const mark = qMarks[q.num];
                     return (
                       <div key={q.num} style={{
-                        padding: 8, borderRadius: 10,
-                        background: mark === "correct" ? "rgba(16,185,129,0.10)" :
-                                    mark === "wrong"   ? "rgba(239,68,68,0.10)" :
-                                                          "rgba(255,255,255,0.04)",
-                        border: `1px solid ${mark === "correct" ? "#10b98166" : mark === "wrong" ? "#ef444466" : "rgba(255,255,255,0.10)"}`,
+                        padding: 10, borderRadius: 10,
+                        background: mark === "correct" ? "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(168,85,247,0.05))" :
+                                    mark === "wrong"   ? "linear-gradient(135deg, rgba(239,68,68,0.18), rgba(236,72,153,0.05))" :
+                                                          "rgba(168,85,247,0.04)",
+                        border: `1px solid ${mark === "correct" ? "rgba(16,185,129,0.45)" : mark === "wrong" ? "rgba(239,68,68,0.45)" : "rgba(168,85,247,0.18)"}`,
                       }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                          <div style={{ fontWeight: 800, fontSize: 12, opacity: 0.7, minWidth: 22 }}>#{q.num}</div>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{
+                            fontWeight: 900, fontSize: 11,
+                            color: "#c4b5fd",
+                            padding: "2px 7px", borderRadius: 999,
+                            background: "rgba(168,85,247,0.12)",
+                            border: "1px solid rgba(168,85,247,0.30)",
+                            minWidth: 30, textAlign: "center",
+                            flexShrink: 0,
+                          }}>#{q.num}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, marginBottom: 4, opacity: 0.85 }}>{q.text}</div>
-                            <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700, fontFamily: "Menlo, monospace" }}>
+                            <div style={{ fontSize: 12.5, marginBottom: 4, color: "#fce7f3", fontWeight: 600, lineHeight: 1.4 }}>{q.text}</div>
+                            <div style={{ fontSize: 12, color: "#86efac", fontWeight: 800, fontFamily: "Menlo, monospace" }}>
                               ✓ {q.answer}
                             </div>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <button onClick={() => setMark(q.num, "correct")} style={markBtn(mark === "correct", "#10b981")}>✓</button>
-                            <button onClick={() => setMark(q.num, "wrong")} style={markBtn(mark === "wrong", "#ef4444")}>✗</button>
+                            <button onClick={() => setMark(q.num, "correct")} aria-label="Mark correct" style={markBtn(mark === "correct", "#10b981")}>✓</button>
+                            <button onClick={() => setMark(q.num, "wrong")} aria-label="Mark wrong" style={markBtn(mark === "wrong", "#ef4444")}>✗</button>
                           </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+                <div style={{ marginTop: 8, fontSize: 12, color: "rgba(196,181,253,0.65)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                   Marked {Object.keys(qMarks).length} / {totalQ} · {correctCount} correct
                 </div>
               </div>
@@ -473,12 +495,9 @@ function shellStyle(): React.CSSProperties {
 function PhotoStrip({ barcode }: { barcode: string }) {
   const [photos, setPhotos] = useState(() => StarStore.getPhotos()[barcode] || []);
   const [zoom, setZoom] = useState<string | null>(null);
-  // Live refresh when a phone (or any device) saves a photo for this barcode.
-  // The board event listener already wrote it to localStorage; we just re-read.
   useEffect(() => {
     return onStarBoardEvent((e) => {
       if (e.kind !== "photo-saved" || e.barcode !== barcode) return;
-      // Wait a tick so StarBoardOverlay's localStorage write lands first.
       setTimeout(() => setPhotos(StarStore.getPhotos()[barcode] || []), 50);
     });
   }, [barcode]);
@@ -490,26 +509,26 @@ function PhotoStrip({ barcode }: { barcode: string }) {
   if (photos.length === 0) {
     return (
       <div style={{
-        marginBottom: 16, padding: 14, borderRadius: 12,
-        background: "rgba(99,102,241,0.05)",
-        border: "1px dashed rgba(99,102,241,0.30)",
-        color: "rgba(245,241,232,0.70)", fontSize: 13, lineHeight: 1.5,
+        marginBottom: 16, padding: "14px 16px", borderRadius: 14,
+        background: "linear-gradient(135deg, rgba(168,85,247,0.06), rgba(99,102,241,0.03))",
+        border: "1px dashed rgba(168,85,247,0.28)",
+        color: "rgba(196,181,253,0.65)", fontSize: 13, lineHeight: 1.55, fontWeight: 600,
       }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a5b4fc", marginBottom: 6 }}>
-          📷 Captured Worksheets
+        <div style={{ marginBottom: 6 }}>
+          <SectionPill icon="📷">Captured Worksheets</SectionPill>
         </div>
-        No photos yet. Open <b>/star/phone</b> on your phone — when this barcode was scanned here, your phone should have auto-jumped to the camera for it. Photos appear here within a second of saving.
+        No photos yet. Open <b style={{ color: "#fce7f3" }}>/star/phone</b> on your phone — when this barcode was scanned here, your phone auto-jumps to the camera. Photos appear here within a second of saving.
       </div>
     );
   }
   return (
     <div style={{
-      marginBottom: 16, padding: 12, borderRadius: 12,
-      background: "rgba(99,102,241,0.06)",
-      border: "1px solid rgba(99,102,241,0.30)",
+      marginBottom: 16, padding: 14, borderRadius: 14,
+      background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.05))",
+      border: "1px solid rgba(168,85,247,0.30)",
     }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, color: "#a5b4fc", marginBottom: 8 }}>
-        📷 Captured Worksheets ({photos.length})
+      <div style={{ marginBottom: 10 }}>
+        <SectionPill icon="📷">Captured Worksheets · {photos.length}</SectionPill>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
         {photos.map((p) => (
@@ -550,51 +569,65 @@ function LessonPanel({ lesson }: { lesson: any }) {
 
   return (
     <div style={{
-      marginBottom: 16, padding: 14, borderRadius: 12,
-      background: "rgba(99,102,241,0.07)",
-      border: "1px solid rgba(99,102,241,0.30)",
+      marginBottom: 16, padding: 14, borderRadius: 14,
+      background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.05))",
+      border: "1px solid rgba(168,85,247,0.30)",
     }}>
-      <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+          gap: 10, padding: 0, background: "transparent", border: "none",
+          color: "inherit", textAlign: "left", cursor: "pointer",
+        }}
+      >
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, color: "#a5b4fc" }}>
-            📖 Lesson — what the student should know
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>{title}</div>
+          <SectionPill icon="📖">Lesson · what the student should know</SectionPill>
+          <div style={{
+            fontSize: 17, fontWeight: 900, marginTop: 6, letterSpacing: "-0.015em",
+            background: "linear-gradient(135deg, #f5f1e8 0%, #f9a8d4 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+          }}>{title}</div>
         </div>
-        <span style={{ fontSize: 18, opacity: 0.7 }}>{open ? "▾" : "▸"}</span>
-      </div>
+        <span style={{ fontSize: 18, color: "#c4b5fd", fontWeight: 800 }}>{open ? "▾" : "▸"}</span>
+      </button>
       {open && (
-        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
-          {intro && <p style={{ margin: "0 0 8px", opacity: 0.95 }}>{intro}</p>}
-          {body && <p style={{ margin: "0 0 8px", opacity: 0.85, whiteSpace: "pre-wrap" }}>{body}</p>}
+        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55, color: "rgba(245,241,232,0.92)" }}>
+          {intro && <p style={{ margin: "0 0 8px" }}>{intro}</p>}
+          {body && <p style={{ margin: "0 0 8px", color: "rgba(245,241,232,0.80)", whiteSpace: "pre-wrap" }}>{body}</p>}
           {keyPoints.length > 0 && (
             <ul style={{ margin: "0 0 8px 18px", padding: 0 }}>
               {keyPoints.map((p, i) => <li key={i} style={{ marginBottom: 2 }}>{p}</li>)}
             </ul>
           )}
           {example && (
-            <div style={{ padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.25)", marginBottom: 8 }}>
-              <b>Example:</b> {example.problem} → <span style={{ color: "#86efac", fontWeight: 700 }}>{example.solution}</span>
+            <div style={{
+              padding: "8px 12px", borderRadius: 10, marginBottom: 8,
+              background: "rgba(10,4,20,0.40)",
+              border: "1px solid rgba(168,85,247,0.20)",
+            }}>
+              <b style={{ color: "#fce7f3" }}>Example:</b> {example.problem} → <span style={{ color: "#86efac", fontWeight: 800 }}>{example.solution}</span>
             </div>
           )}
           {vocab.length > 0 && (
             <div style={{
-              padding: 10, borderRadius: 8,
-              background: "rgba(16,185,129,0.10)",
+              padding: 10, borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(168,85,247,0.05))",
               border: "1px solid rgba(16,185,129,0.40)",
             }}>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8, color: "#86efac" }}>
-                📖 Vocabulary — Words You Need to Know
+              <div style={{ marginBottom: 8 }}>
+                <SectionPill icon="📖">Vocabulary · words you need</SectionPill>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
                 {vocab.map((v, i) => (
                   <div key={i} style={{
-                    padding: "6px 8px", borderRadius: 5,
-                    background: "rgba(0,0,0,0.30)",
+                    padding: "8px 10px", borderRadius: 8,
+                    background: "rgba(10,4,20,0.40)",
                     border: "1px solid rgba(16,185,129,0.30)",
                   }}>
-                    <div style={{ fontWeight: 800, fontSize: 12, color: "#fde68a" }}>{v.term}</div>
-                    <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 2 }}>{v.definition}</div>
+                    <div style={{ fontWeight: 900, fontSize: 12, color: "#fce7f3", letterSpacing: "-0.005em" }}>{v.term}</div>
+                    <div style={{ fontSize: 11.5, color: "rgba(196,181,253,0.80)", marginTop: 2, fontWeight: 600 }}>{v.definition}</div>
                   </div>
                 ))}
               </div>
@@ -609,29 +642,50 @@ function LessonPanel({ lesson }: { lesson: any }) {
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={{
-      padding: 10, borderRadius: 10,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      padding: "10px 12px", borderRadius: 12,
+      background: "linear-gradient(180deg, rgba(168,85,247,0.08) 0%, rgba(99,102,241,0.04) 100%)",
+      border: "1px solid rgba(168,85,247,0.20)",
     }}>
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{value}</div>
+      <div style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+        color: "rgba(196,181,253,0.65)", marginBottom: 4,
+      }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#fce7f3", letterSpacing: "-0.005em" }}>{value}</div>
     </div>
   );
 }
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55, marginBottom: 4 }}>{label}</div>
+      <div style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+        color: "rgba(196,181,253,0.65)", marginBottom: 5,
+      }}>{label}</div>
       {children}
     </div>
   );
 }
+function SectionPill({ icon, children }: { icon: string; children: React.ReactNode }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 7,
+      padding: "4px 12px", borderRadius: 999,
+      background: "rgba(168,85,247,0.10)",
+      border: "1px solid rgba(168,85,247,0.30)",
+      fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+      color: "#c4b5fd",
+    }}>
+      <span aria-hidden>{icon}</span>{children}
+    </span>
+  );
+}
 function inpStyle(): React.CSSProperties {
   return {
-    width: "100%", padding: "9px 10px", borderRadius: 8,
-    background: "rgba(0,0,0,0.30)", color: "white",
-    border: "1px solid rgba(255,255,255,0.12)",
-    fontSize: 13, outline: "none",
+    width: "100%", padding: "10px 12px", borderRadius: 10,
+    background: "rgba(10,4,20,0.45)", color: "#fce7f3",
+    border: "1px solid rgba(168,85,247,0.25)",
+    fontSize: 14, outline: "none", fontWeight: 600,
+    boxSizing: "border-box",
   };
 }
 function selStyle(): React.CSSProperties {
@@ -639,11 +693,13 @@ function selStyle(): React.CSSProperties {
 }
 function markBtn(active: boolean, color: string): React.CSSProperties {
   return {
-    width: 32, height: 26, borderRadius: 6,
-    background: active ? color : "rgba(255,255,255,0.06)",
-    border: `1px solid ${active ? color : "rgba(255,255,255,0.15)"}`,
+    width: 36, height: 32, borderRadius: 8,
+    background: active ? `linear-gradient(135deg, ${color}, ${color}cc)` : "rgba(168,85,247,0.06)",
+    border: `1px solid ${active ? color : "rgba(168,85,247,0.20)"}`,
     color: active ? "white" : color,
-    fontWeight: 800, fontSize: 14, cursor: "pointer",
+    fontWeight: 900, fontSize: 16, cursor: "pointer",
+    boxShadow: active ? `0 0 12px ${color}55` : undefined,
+    touchAction: "manipulation",
   };
 }
 function btnGhost(): React.CSSProperties {

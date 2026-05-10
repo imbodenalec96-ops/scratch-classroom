@@ -330,12 +330,12 @@ export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenToo
               fontWeight: 900,
               letterSpacing: "-0.02em",
               margin: 0,
-              background: "linear-gradient(90deg, #fde68a 0%, #f97316 25%, #b23a48 50%, #f97316 75%, #fde68a 100%)",
+              background: "linear-gradient(90deg, #f5f1e8 0%, #c4b5fd 25%, #f9a8d4 50%, #c4b5fd 75%, #f5f1e8 100%)",
               backgroundSize: "200% 200%",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-              textShadow: "0 0 30px rgba(251,191,36,0.20)",
+              textShadow: "0 0 30px rgba(168,85,247,0.30)",
               textAlign: "center",
               flexShrink: 0,
               animation: "titleShimmer 6s linear infinite",
@@ -366,11 +366,11 @@ export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenToo
                   <div style={{
                     width: tier.badge * 0.8, height: tier.badge * 0.8, borderRadius: "50%",
                     flexShrink: 0,
-                    background: "linear-gradient(135deg, #b23a48, #d97706)",
+                    background: "linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)",
                     color: "white",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: tier.badge * 0.36, fontWeight: 900,
-                    // Continuous gentle pulse to give the badge life
+                    boxShadow: "0 8px 22px -6px rgba(168,85,247,0.55)",
                     animation: `badgeBeat 2.4s ease-in-out ${i * 0.3}s infinite`,
                   }}>{i + 1}</div>
                   <div style={{
@@ -390,8 +390,8 @@ export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenToo
                 maxWidth: 980, alignSelf: "center", width: "100%",
                 padding: `${tier.padVH * 0.7}vh ${tier.padVH * 1.2}vh`,
                 borderRadius: 14,
-                background: "linear-gradient(135deg, rgba(15,118,110,0.22), rgba(56,189,248,0.10))",
-                border: "1.5px solid rgba(15,118,110,0.45)",
+                background: "linear-gradient(135deg, rgba(168,85,247,0.22), rgba(99,102,241,0.10))",
+                border: "1.5px solid rgba(168,85,247,0.45)",
                 display: "flex", alignItems: "center", gap: 12,
                 flexWrap: "wrap",
                 animation: "morningSlideIn .5s ease .55s both",
@@ -400,7 +400,7 @@ export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenToo
                 <div style={{
                   fontSize: 11, fontWeight: 900, letterSpacing: "0.22em",
                   textTransform: "uppercase",
-                  color: "#7dd3c5",
+                  color: "#c4b5fd",
                   display: "flex", alignItems: "center", gap: 6,
                 }}>
                   <span style={{ fontSize: 16 }}>🪙</span> Cashout
@@ -409,10 +409,10 @@ export default function MorningSlide({ classId, onClose, onOpenWallet, onOpenToo
                   {slide.cashout_times.map((t, i) => (
                     <span key={i} style={{
                       padding: "6px 14px", borderRadius: 999,
-                      background: "rgba(125,211,197,0.18)",
-                      border: "1px solid rgba(125,211,197,0.45)",
+                      background: "rgba(236,72,153,0.18)",
+                      border: "1px solid rgba(236,72,153,0.45)",
                       fontSize: `clamp(13px, ${tier.warnVH * 0.9}vw, 20px)`,
-                      fontWeight: 800, color: "#a7f3d0",
+                      fontWeight: 800, color: "#fce7f3",
                       fontVariantNumeric: "tabular-nums",
                       letterSpacing: "0.04em",
                     }}>{t}</span>

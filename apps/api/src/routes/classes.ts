@@ -1107,7 +1107,7 @@ const STAR_TEACHER_ID = "a0000000-0000-0000-0000-000000000002"; // Jane Teacher 
 const STAR_STUDENTS_SEED = [
   { id: "s0000000-0000-0000-0000-000000000001", name: "Ryan",   email: "ryan.star@star.local",   specials_grade: 5 },
   { id: "s0000000-0000-0000-0000-000000000002", name: "Jaida",  email: "jaida.star@star.local",  specials_grade: 5 },
-  { id: "s0000000-0000-0000-0000-000000000003", name: "Rayden", email: "rayden.star@star.local", specials_grade: 4 },
+  // s0000000-...-000000000003 (Rayden) intentionally omitted — left class.
   { id: "s0000000-0000-0000-0000-000000000004", name: "Zoey",   email: "zoey.star@star.local",   specials_grade: 3 },
   { id: "s0000000-0000-0000-0000-000000000005", name: "Aiden",  email: "aiden.star@star.local",  specials_grade: 3 },
   { id: "s0000000-0000-0000-0000-000000000006", name: "Kaleb",  email: "kaleb.star@star.local",  specials_grade: 5 },
@@ -1157,6 +1157,18 @@ async function seedStarStudents() {
         ).run(s.specials_grade, s.id);
       }
     }
+
+    // Drop Rayden from the Star class (kid left). Idempotent: removes the
+    // class membership only — leaves the user row + history intact in case
+    // anything else still references them.
+    try {
+      await db.prepare(
+        `DELETE FROM class_members WHERE class_id = ? AND user_id IN (
+            SELECT id FROM users WHERE LOWER(name) = 'rayden' AND role = 'student'
+            UNION SELECT 's0000000-0000-0000-0000-000000000003' AS id
+         )`
+      ).run(starClassId);
+    } catch (e) { /* table may not exist on first boot */ }
 
     // Only create placeholder @star.local users on fresh SQLite (local dev).
     // In production (DATABASE_URL set), the real students already exist and

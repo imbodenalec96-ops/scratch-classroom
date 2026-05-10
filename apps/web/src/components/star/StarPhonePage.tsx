@@ -208,10 +208,12 @@ export default function StarPhonePage() {
 
   return (
     <div style={{
-      minHeight: "100vh",
+      minHeight: "100dvh",
       background: "radial-gradient(1200px 900px at 0% 0%, rgba(168,85,247,0.22) 0%, transparent 55%), radial-gradient(1000px 800px at 100% 100%, rgba(236,72,153,0.20) 0%, transparent 55%), radial-gradient(800px 600px at 50% 0%, rgba(99,102,241,0.16) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)",
-      color: "#f5f1e8", padding: 20,
+      color: "#f5f1e8",
+      padding: "max(env(safe-area-inset-top), 16px) max(env(safe-area-inset-right), 16px) max(env(safe-area-inset-bottom), 24px) max(env(safe-area-inset-left), 16px)",
       fontFamily: "'Inter', system-ui, sans-serif",
+      WebkitTextSizeAdjust: "100%",
     }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <Header bcdbSize={bcdbSize} syncing={syncing} onSync={runSync} syncStatus={syncStatus} />
@@ -359,36 +361,62 @@ function ScanStep({ code, setCode, onScan, inputRef }: {
 }) {
   return (
     <div style={{
-      padding: 24, borderRadius: 18,
+      padding: 22, borderRadius: 20,
       background: "linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 50%, rgba(99,102,241,0.14) 100%)",
       border: "1px solid rgba(168,85,247,0.35)",
       boxShadow: "0 12px 32px -10px rgba(168,85,247,0.40), inset 0 1px 0 rgba(255,255,255,0.05)",
     }}>
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase", color: "#f9a8d4", marginBottom: 10 }}>
-        Step 1 · Scan or type the barcode
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 28, height: 24, borderRadius: 8,
+          background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "white",
+          fontSize: 11, fontWeight: 900, letterSpacing: "0.04em",
+          boxShadow: "0 0 12px rgba(168,85,247,0.45)",
+        }}>1</span>
+        <span style={{
+          fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+          color: "#f9a8d4",
+        }}>Scan or type the barcode</span>
       </div>
+      <label htmlFor="phone-barcode" style={{ position: "absolute", left: -9999, top: "auto", width: 1, height: 1, overflow: "hidden" }}>
+        Assignment barcode
+      </label>
       <input
+        id="phone-barcode"
         ref={inputRef}
         autoFocus
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         onKeyDown={(e) => { if (e.key === "Enter") onScan(code); }}
-        placeholder="e.g. WR-260507-503"
+        placeholder="WR-260507-503"
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        inputMode="text"
         style={{
-          width: "100%", padding: "16px 18px", borderRadius: 12,
+          width: "100%", padding: "16px 18px",
+          minHeight: 56,
+          borderRadius: 14,
           background: "rgba(10,4,20,0.60)", color: "#fce7f3",
           border: "2px solid rgba(168,85,247,0.35)",
-          fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 800,
+          fontFamily: "Menlo, monospace",
+          fontSize: 18, fontWeight: 800,
           outline: "none", letterSpacing: "0.05em",
           boxSizing: "border-box",
+          touchAction: "manipulation",
         }}
       />
-      <button onClick={() => onScan(code)} style={primary({ fullWidth: true, large: true })}>
+      <button
+        onClick={() => onScan(code)}
+        disabled={!code.trim()}
+        style={primary({ fullWidth: true, large: true, disabled: !code.trim() })}
+      >
         Scan →
       </button>
-      <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", marginTop: 12, fontWeight: 600 }}>
-        💡 Use a USB scanner or the typing keyboard. Camera-based barcode scanning
-        depends on your phone — type if it doesn't pick up the code.
+      <div style={{ fontSize: 12, color: "rgba(196,181,253,0.60)", marginTop: 14, fontWeight: 600, lineHeight: 1.5 }}>
+        💡 Tip: a USB scanner types the barcode + presses Enter on its own.
+        Or just type it — fully OK.
       </div>
     </div>
   );
@@ -428,41 +456,57 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
 
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-        gap: 8, marginBottom: 14,
+        gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
+        gap: 10, marginBottom: 14,
       }}>
         {students.map((s) => {
           const sel = studentId === s.id;
           return (
-            <button key={s.id} onClick={() => setStudentId(s.id)} style={{
-              padding: "12px 8px", borderRadius: 12,
-              background: sel
-                ? "linear-gradient(135deg, #ec4899, #a855f7)"
-                : "linear-gradient(135deg, rgba(168,85,247,0.08), rgba(99,102,241,0.04))",
-              border: sel
-                ? "2px solid rgba(236,72,153,0.65)"
-                : "1px solid rgba(168,85,247,0.20)",
-              color: "white", cursor: "pointer", fontSize: 14, fontWeight: 800,
-              minHeight: 64,
-              boxShadow: sel ? "0 0 16px rgba(236,72,153,0.45)" : undefined,
-              letterSpacing: "-0.005em",
-            }}>
+            <button
+              key={s.id}
+              onClick={() => setStudentId(s.id)}
+              aria-pressed={sel}
+              style={{
+                padding: "14px 10px", borderRadius: 14,
+                background: sel
+                  ? "linear-gradient(135deg, #ec4899 0%, #a855f7 100%)"
+                  : "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.04))",
+                border: sel
+                  ? "2px solid rgba(236,72,153,0.70)"
+                  : "1px solid rgba(168,85,247,0.20)",
+                color: "white", cursor: "pointer",
+                fontSize: 16, fontWeight: 800,
+                minHeight: 72,
+                boxShadow: sel ? "0 8px 22px -6px rgba(236,72,153,0.55)" : undefined,
+                letterSpacing: "-0.005em",
+                touchAction: "manipulation",
+                transition: "transform 150ms cubic-bezier(0.22,1,0.36,1)",
+              }}
+            >
               {s.firstName}
-              {s.grade && <div style={{ fontSize: 10, opacity: 0.75, marginTop: 3, fontWeight: 600 }}>{s.grade}</div>}
+              {s.grade && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4, fontWeight: 700 }}>{s.grade}</div>}
             </button>
           );
         })}
       </div>
 
+      <label htmlFor="phone-note" style={{
+        display: "block", fontSize: 11, fontWeight: 800,
+        letterSpacing: "0.18em", textTransform: "uppercase",
+        color: "rgba(196,181,253,0.65)", marginBottom: 6,
+      }}>Note (optional)</label>
       <input
+        id="phone-note"
         value={note} onChange={(e) => setNote(e.target.value)}
-        placeholder="Optional note (e.g. front side, partial work)"
+        placeholder="e.g. front side, partial work"
         style={{
-          width: "100%", padding: "12px 14px", borderRadius: 12,
+          width: "100%", padding: "14px 16px",
+          minHeight: 52, borderRadius: 12,
           background: "rgba(10,4,20,0.45)", color: "#fce7f3",
           border: "1px solid rgba(168,85,247,0.25)",
-          fontSize: 14, outline: "none", fontWeight: 600,
+          fontSize: 16, outline: "none", fontWeight: 600,
           boxSizing: "border-box", marginBottom: 12,
+          touchAction: "manipulation",
         }}
       />
 
@@ -557,28 +601,35 @@ function SavedStep({ photo, onAnother, onDone }: { photo: StarPhoto; onAnother: 
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
-function primary(opts: { fullWidth?: boolean; large?: boolean } = {}): React.CSSProperties {
+function primary(opts: { fullWidth?: boolean; large?: boolean; disabled?: boolean } = {}): React.CSSProperties {
   return {
     width: opts.fullWidth ? "100%" : "auto",
-    padding: opts.large ? "16px 20px" : "12px 16px",
+    padding: opts.large ? "18px 22px" : "14px 18px",
+    minHeight: opts.large ? 56 : 48,
     borderRadius: 14,
-    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+    background: opts.disabled
+      ? "rgba(168,85,247,0.18)"
+      : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
     color: "white", border: "none",
-    fontWeight: 900, fontSize: opts.large ? 18 : 15,
-    cursor: "pointer",
+    fontWeight: 900, fontSize: opts.large ? 18 : 16,
+    cursor: opts.disabled ? "not-allowed" : "pointer",
+    opacity: opts.disabled ? 0.55 : 1,
     marginTop: 14,
     letterSpacing: "-0.005em",
-    boxShadow: "0 12px 28px -8px rgba(168,85,247,0.55)",
+    boxShadow: opts.disabled ? "none" : "0 12px 28px -8px rgba(168,85,247,0.55)",
+    touchAction: "manipulation",
   };
 }
 function ghost(opts: { fullWidth?: boolean } = {}): React.CSSProperties {
   return {
-    padding: "12px 16px", borderRadius: 12,
+    padding: "14px 18px", borderRadius: 12,
+    minHeight: 48,
     background: "rgba(168,85,247,0.06)", color: "#fce7f3",
     border: "1px solid rgba(168,85,247,0.30)",
-    fontWeight: 800, cursor: "pointer", fontSize: 14,
+    fontWeight: 800, cursor: "pointer", fontSize: 16,
     flexShrink: 0,
     width: opts.fullWidth ? "100%" : "auto",
+    touchAction: "manipulation",
   };
 }
 
