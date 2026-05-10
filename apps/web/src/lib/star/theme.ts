@@ -11,23 +11,24 @@ export const tokens = {
   // Surfaces are layered: bg < surface < surfaceRaised. Borders are
   // subtle so they read as paper edges, not boxes.
   color: {
-    // Page + surface — deeper, richer black with a subtle violet wash
-    // for distinct identity. Surfaces have stronger separation.
-    bg:               "radial-gradient(1200px 800px at 0% 0%, rgba(99,102,241,0.10) 0%, transparent 60%), radial-gradient(1000px 700px at 100% 100%, rgba(236,72,153,0.08) 0%, transparent 60%), #0a0a14",
-    surface:          "rgba(255,255,255,0.05)",
-    surfaceRaised:    "rgba(255,255,255,0.08)",
-    surfaceSunken:    "rgba(0,0,0,0.40)",
-    border:           "rgba(255,255,255,0.10)",
-    borderStrong:     "rgba(255,255,255,0.18)",
+    // Page + surface — deep purple core with strong violet/pink radial glows
+    bg:               "radial-gradient(1400px 900px at 0% 0%, rgba(168,85,247,0.20) 0%, transparent 55%), radial-gradient(1200px 800px at 100% 100%, rgba(236,72,153,0.18) 0%, transparent 55%), radial-gradient(900px 600px at 50% 0%, rgba(99,102,241,0.14) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)",
+    surface:          "linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(99,102,241,0.03) 50%, rgba(15,15,28,0.20) 100%)",
+    surfaceRaised:    "linear-gradient(180deg, rgba(168,85,247,0.12) 0%, rgba(99,102,241,0.06) 100%)",
+    surfaceSunken:    "rgba(10,4,20,0.55)",
+    border:           "rgba(168,85,247,0.18)",
+    borderStrong:     "rgba(168,85,247,0.40)",
     // Text — slightly cooler off-white for that modern dashboard feel
     text:             "#f8fafc",
     textMuted:        "rgba(248,250,252,0.65)",
-    textSubtle:       "rgba(248,250,252,0.42)",
-    // Brand — bright electric accent with magenta gradient
-    accent:           "#a855f7",   // violet, the bold highlight
+    textSubtle:       "rgba(196,181,253,0.55)",
+    // Brand — violet → pink anchor pair
+    accent:           "#a855f7",
     accentSoft:       "rgba(168,85,247,0.16)",
     accentBorder:     "rgba(168,85,247,0.50)",
-    primary:          "#6366f1",   // indigo
+    accentPink:       "#ec4899",
+    accentPinkSoft:   "rgba(236,72,153,0.16)",
+    primary:          "#6366f1",
     primaryGradient:  "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
     // Semantic
     success:          "#10b981",
@@ -61,11 +62,11 @@ export const tokens = {
   // ── shadows ─────────────────────────────────────────────────────
   shadow: {
     sm: "0 1px 3px rgba(0,0,0,0.30)",
-    md: "0 8px 24px rgba(0,0,0,0.35)",
-    lg: "0 16px 40px rgba(0,0,0,0.50)",
-    xl: "0 28px 72px rgba(0,0,0,0.60)",
-    glow: "0 10px 28px rgba(168,85,247,0.40)",
-    glowAmber: "0 8px 22px rgba(251,191,36,0.22)",
+    md: "0 4px 18px -8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
+    lg: "0 16px 40px rgba(0,0,0,0.50), 0 0 24px rgba(168,85,247,0.10)",
+    xl: "0 28px 72px rgba(0,0,0,0.60), 0 0 36px rgba(168,85,247,0.18)",
+    glow: "0 12px 32px -10px rgba(168,85,247,0.55)",
+    glowPink: "0 12px 32px -10px rgba(236,72,153,0.55)",
     inset: "inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   // ── typography scale ────────────────────────────────────────────

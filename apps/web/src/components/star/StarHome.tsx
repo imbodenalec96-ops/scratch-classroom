@@ -74,15 +74,26 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
       {/* Big page header — matches the other tabs' PageHeader pattern */}
       <div style={{ marginBottom: T.space["2xl"] }}>
         <div style={{
-          fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
-          letterSpacing: "0.22em", textTransform: "uppercase",
-          color: T.color.accent, marginBottom: T.space.xs,
+          display: "inline-flex", alignItems: "center", gap: 8, marginBottom: T.space.sm,
+          padding: "5px 12px", borderRadius: 999,
+          background: "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.10))",
+          border: "1px solid rgba(168,85,247,0.30)",
+          fontSize: 10, fontWeight: 800,
+          letterSpacing: "0.28em", textTransform: "uppercase",
+          color: "#f9a8d4",
         }}>
-          🏠 Today at a glance
+          <span style={{
+            display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+            background: "#ec4899", boxShadow: "0 0 10px rgba(236,72,153,0.85)",
+          }} />
+          Today at a glance
         </div>
         <h2 style={{
           fontSize: T.font.size["4xl"], fontWeight: T.font.weight.black,
-          margin: 0, letterSpacing: "-0.025em", lineHeight: 1.05,
+          margin: 0, letterSpacing: "-0.035em", lineHeight: 1.05,
+          background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 40%, #f9a8d4 100%)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
         }}>Welcome back.</h2>
         <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5, maxWidth: 720 }}>
           Snapshot of your classroom right now — completions, refusals, who's out, and points awarded.

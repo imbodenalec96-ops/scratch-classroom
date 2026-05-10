@@ -209,7 +209,7 @@ export default function StarPhonePage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
+      background: "radial-gradient(1200px 900px at 0% 0%, rgba(168,85,247,0.22) 0%, transparent 55%), radial-gradient(1000px 800px at 100% 100%, rgba(236,72,153,0.20) 0%, transparent 55%), radial-gradient(800px 600px at 50% 0%, rgba(99,102,241,0.16) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)",
       color: "#f5f1e8", padding: 20,
       fontFamily: "'Inter', system-ui, sans-serif",
     }}>
@@ -233,18 +233,22 @@ export default function StarPhonePage() {
 
         {step === "unknown" && (
           <div style={{
-            padding: 22, borderRadius: 18,
-            background: "rgba(239,68,68,0.10)",
-            border: "1px solid rgba(239,68,68,0.40)",
-            color: "#fca5a5",
+            padding: 24, borderRadius: 18,
+            background: "linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(236,72,153,0.10) 100%)",
+            border: "1px solid rgba(239,68,68,0.45)",
+            color: "#fecaca",
+            boxShadow: "0 12px 32px -10px rgba(239,68,68,0.40), inset 0 1px 0 rgba(255,255,255,0.05)",
           }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
-              ⚠️ Barcode not found
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase", marginBottom: 8, color: "#fca5a5" }}>
+              ⚠ Barcode not found
             </div>
-            <div style={{ fontFamily: "Menlo, monospace", fontSize: 18, fontWeight: 700, color: "#fde68a", marginBottom: 12 }}>
+            <div style={{
+              fontFamily: "Menlo, monospace", fontSize: 20, fontWeight: 800,
+              color: "#f9a8d4", marginBottom: 14, letterSpacing: "0.04em",
+            }}>
               {code}
             </div>
-            <div style={{ fontSize: 13, marginBottom: 16, color: "white", opacity: 0.85, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, marginBottom: 16, color: "rgba(245,241,232,0.85)", lineHeight: 1.5, fontWeight: 500 }}>
               This phone has <b>{bcdbSize}</b> barcode{bcdbSize === 1 ? "" : "s"}.
               If the barcode lives on your computer but isn't here, hit Sync to pull
               the classroom roster + assignments. (STAR-locally-generated barcodes
@@ -301,39 +305,48 @@ function Header({ bcdbSize, syncing, onSync, syncStatus }: {
 }) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <span style={{
-          width: 48, height: 48, borderRadius: 12,
-          background: "linear-gradient(135deg, #6366f1, #b23a48)",
+          width: 52, height: 52, borderRadius: 14,
+          background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 24, boxShadow: "0 8px 20px rgba(99,102,241,0.40)",
+          fontSize: 26, boxShadow: "0 12px 28px -8px rgba(168,85,247,0.55)",
         }}>📷</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
             STAR · Phone Capture
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: "-0.01em" }}>
+          <h1 style={{
+            fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: "-0.025em",
+            background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 40%, #f9a8d4 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>
             Snap a worksheet
           </h1>
         </div>
         <button onClick={onSync} disabled={syncing} style={{
-          padding: "8px 12px", borderRadius: 8,
-          background: "rgba(99,102,241,0.20)", color: "white",
-          border: "1px solid rgba(99,102,241,0.50)",
-          fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+          padding: "9px 14px", borderRadius: 999,
+          background: "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.15))",
+          color: "#fce7f3",
+          border: "1px solid rgba(168,85,247,0.45)",
+          fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+          boxShadow: "0 0 12px rgba(168,85,247,0.25)",
         }}>{syncing ? "…" : "🔄 Sync"}</button>
       </div>
       <div style={{
-        marginBottom: 16, padding: "8px 12px", borderRadius: 8,
-        background: bcdbSize === 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.04)",
-        border: `1px solid ${bcdbSize === 0 ? "rgba(239,68,68,0.40)" : "rgba(255,255,255,0.08)"}`,
-        fontSize: 11, opacity: bcdbSize === 0 ? 1 : 0.7, color: bcdbSize === 0 ? "#fca5a5" : "white",
-        fontFamily: "Menlo, monospace",
+        marginBottom: 18, padding: "9px 14px", borderRadius: 12,
+        background: bcdbSize === 0
+          ? "linear-gradient(135deg, rgba(239,68,68,0.18), rgba(236,72,153,0.10))"
+          : "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.05))",
+        border: `1px solid ${bcdbSize === 0 ? "rgba(239,68,68,0.40)" : "rgba(168,85,247,0.20)"}`,
+        fontSize: 11, color: bcdbSize === 0 ? "#fecaca" : "#c4b5fd",
+        fontFamily: "Menlo, monospace", fontWeight: 700,
       }}>
         {bcdbSize === 0
           ? "⚠️ No barcodes on this phone yet — tap 🔄 Sync above to pull from the classroom."
           : `${bcdbSize} barcodes loaded`}
-        {syncStatus && <div style={{ marginTop: 4 }}>{syncStatus}</div>}
+        {syncStatus && <div style={{ marginTop: 4, opacity: 0.85 }}>{syncStatus}</div>}
       </div>
     </>
   );
@@ -347,11 +360,12 @@ function ScanStep({ code, setCode, onScan, inputRef }: {
   return (
     <div style={{
       padding: 24, borderRadius: 18,
-      background: "linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(178,58,72,0.10) 100%)",
-      border: "1px solid rgba(251,191,36,0.30)",
+      background: "linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 50%, rgba(99,102,241,0.14) 100%)",
+      border: "1px solid rgba(168,85,247,0.35)",
+      boxShadow: "0 12px 32px -10px rgba(168,85,247,0.40), inset 0 1px 0 rgba(255,255,255,0.05)",
     }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
-        Step 1 — Scan or type the assignment barcode
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase", color: "#f9a8d4", marginBottom: 10 }}>
+        Step 1 · Scan or type the barcode
       </div>
       <input
         ref={inputRef}
@@ -362,9 +376,9 @@ function ScanStep({ code, setCode, onScan, inputRef }: {
         placeholder="e.g. WR-260507-503"
         style={{
           width: "100%", padding: "16px 18px", borderRadius: 12,
-          background: "rgba(0,0,0,0.45)", color: "white",
-          border: "2px solid rgba(255,255,255,0.18)",
-          fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 700,
+          background: "rgba(10,4,20,0.60)", color: "#fce7f3",
+          border: "2px solid rgba(168,85,247,0.35)",
+          fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 800,
           outline: "none", letterSpacing: "0.05em",
           boxSizing: "border-box",
         }}
@@ -372,7 +386,7 @@ function ScanStep({ code, setCode, onScan, inputRef }: {
       <button onClick={() => onScan(code)} style={primary({ fullWidth: true, large: true })}>
         Scan →
       </button>
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 12 }}>
+      <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", marginTop: 12, fontWeight: 600 }}>
         💡 Use a USB scanner or the typing keyboard. Camera-based barcode scanning
         depends on your phone — type if it doesn't pick up the code.
       </div>
@@ -391,15 +405,24 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
 }) {
   return (
     <div style={{
-      padding: 20, borderRadius: 18,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
+      padding: 22, borderRadius: 18,
+      background: "linear-gradient(180deg, rgba(168,85,247,0.08) 0%, rgba(99,102,241,0.04) 100%)",
+      border: "1px solid rgba(168,85,247,0.20)",
+      boxShadow: "0 12px 32px -12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
     }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.55 }}>
-        Step 2 — Pick the student
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase", color: "#c4b5fd" }}>
+        Step 2 · Pick the student
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, margin: "4px 0 4px" }}>{entry.name}</div>
-      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 14, fontFamily: "Menlo, monospace", color: "#fde68a" }}>
+      <div style={{
+        fontSize: 22, fontWeight: 900, margin: "6px 0 4px", letterSpacing: "-0.02em",
+        background: "linear-gradient(135deg, #f5f1e8 0%, #f9a8d4 100%)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+      }}>{entry.name}</div>
+      <div style={{
+        fontSize: 12, marginBottom: 16,
+        fontFamily: "Menlo, monospace", color: "#f9a8d4", fontWeight: 700,
+        letterSpacing: "0.04em",
+      }}>
         {entry.id}
       </div>
 
@@ -413,13 +436,19 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
           return (
             <button key={s.id} onClick={() => setStudentId(s.id)} style={{
               padding: "12px 8px", borderRadius: 12,
-              background: sel ? "linear-gradient(135deg, #b23a48, #d97706)" : "rgba(255,255,255,0.04)",
-              border: sel ? "2px solid rgba(251,191,36,0.7)" : "1px solid rgba(255,255,255,0.10)",
-              color: "white", cursor: "pointer", fontSize: 14, fontWeight: 700,
+              background: sel
+                ? "linear-gradient(135deg, #ec4899, #a855f7)"
+                : "linear-gradient(135deg, rgba(168,85,247,0.08), rgba(99,102,241,0.04))",
+              border: sel
+                ? "2px solid rgba(236,72,153,0.65)"
+                : "1px solid rgba(168,85,247,0.20)",
+              color: "white", cursor: "pointer", fontSize: 14, fontWeight: 800,
               minHeight: 64,
+              boxShadow: sel ? "0 0 16px rgba(236,72,153,0.45)" : undefined,
+              letterSpacing: "-0.005em",
             }}>
               {s.firstName}
-              {s.grade && <div style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>{s.grade}</div>}
+              {s.grade && <div style={{ fontSize: 10, opacity: 0.75, marginTop: 3, fontWeight: 600 }}>{s.grade}</div>}
             </button>
           );
         })}
@@ -429,10 +458,10 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
         value={note} onChange={(e) => setNote(e.target.value)}
         placeholder="Optional note (e.g. front side, partial work)"
         style={{
-          width: "100%", padding: "12px 14px", borderRadius: 10,
-          background: "rgba(0,0,0,0.30)", color: "white",
-          border: "1px solid rgba(255,255,255,0.12)",
-          fontSize: 14, outline: "none",
+          width: "100%", padding: "12px 14px", borderRadius: 12,
+          background: "rgba(10,4,20,0.45)", color: "#fce7f3",
+          border: "1px solid rgba(168,85,247,0.25)",
+          fontSize: 14, outline: "none", fontWeight: 600,
           boxSizing: "border-box", marginBottom: 12,
         }}
       />
@@ -440,7 +469,7 @@ function PickStudentStep({ entry, students, studentId, setStudentId, note, setNo
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onCancel} style={ghost()}>← Back</button>
       </div>
-      <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+      <div style={{ marginTop: 10, fontSize: 11, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>
         💡 Tap a student — camera opens automatically.
       </div>
     </div>
@@ -455,16 +484,21 @@ function CameraStep({ entry, studentName, onRetry, onSkip }: {
 }) {
   return (
     <div style={{
-      padding: 24, borderRadius: 18,
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.10)",
+      padding: 26, borderRadius: 18,
+      background: "linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.06) 50%, rgba(99,102,241,0.10) 100%)",
+      border: "1px solid rgba(168,85,247,0.30)",
       textAlign: "center",
+      boxShadow: "0 12px 32px -10px rgba(168,85,247,0.40), inset 0 1px 0 rgba(255,255,255,0.05)",
     }}>
-      <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+      <div style={{ fontSize: 42, marginBottom: 10, filter: "drop-shadow(0 0 12px rgba(236,72,153,0.45))" }}>📷</div>
+      <div style={{
+        fontSize: 20, fontWeight: 900, marginBottom: 5, letterSpacing: "-0.02em",
+        background: "linear-gradient(135deg, #f5f1e8 0%, #f9a8d4 100%)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+      }}>
         Camera opening…
       </div>
-      <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 18 }}>
+      <div style={{ fontSize: 13, color: "rgba(196,181,253,0.75)", marginBottom: 20, fontWeight: 600 }}>
         {studentName || "Student"} · {entry.name}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -475,7 +509,7 @@ function CameraStep({ entry, studentName, onRetry, onSkip }: {
           Skip photo — back to scan
         </button>
       </div>
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 14 }}>
+      <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", marginTop: 14, fontWeight: 600 }}>
         Phone didn't pop the camera? Tap "Open camera again". Some browsers
         block auto-camera if you didn't tap something first.
       </div>
@@ -486,17 +520,29 @@ function CameraStep({ entry, studentName, onRetry, onSkip }: {
 function SavedStep({ photo, onAnother, onDone }: { photo: StarPhoto; onAnother: () => void; onDone: () => void }) {
   return (
     <div style={{
-      padding: 20, borderRadius: 18,
-      background: "rgba(16,185,129,0.10)",
-      border: "1px solid rgba(16,185,129,0.40)",
+      padding: 22, borderRadius: 18,
+      background: "linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(168,85,247,0.10) 100%)",
+      border: "1px solid rgba(16,185,129,0.45)",
+      boxShadow: "0 12px 32px -12px rgba(16,185,129,0.35), inset 0 1px 0 rgba(255,255,255,0.05)",
     }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#86efac" }}>
-        ✅ Saved
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 7,
+        padding: "4px 12px", borderRadius: 999,
+        background: "rgba(16,185,129,0.20)",
+        border: "1px solid rgba(16,185,129,0.45)",
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+        color: "#86efac",
+      }}>
+        ✓ Saved
       </div>
-      <div style={{ fontSize: 18, fontWeight: 800, margin: "4px 0 12px" }}>
+      <div style={{
+        fontSize: 19, fontWeight: 900, margin: "8px 0 14px", letterSpacing: "-0.02em",
+        background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 100%)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+      }}>
         Photo attached to {photo.studentName || "student"}
       </div>
-      <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)" }}>
+      <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid rgba(168,85,247,0.30)", boxShadow: "0 8px 24px -10px rgba(168,85,247,0.30)" }}>
         <img src={photo.dataUrl} alt="" style={{ width: "100%", display: "block" }} />
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -514,22 +560,23 @@ function SavedStep({ photo, onAnother, onDone }: { photo: StarPhoto; onAnother: 
 function primary(opts: { fullWidth?: boolean; large?: boolean } = {}): React.CSSProperties {
   return {
     width: opts.fullWidth ? "100%" : "auto",
-    padding: opts.large ? "16px 18px" : "12px 16px",
-    borderRadius: 12,
-    background: "linear-gradient(135deg, #6366f1, #b23a48)",
+    padding: opts.large ? "16px 20px" : "12px 16px",
+    borderRadius: 14,
+    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
     color: "white", border: "none",
-    fontWeight: 800, fontSize: opts.large ? 18 : 15,
+    fontWeight: 900, fontSize: opts.large ? 18 : 15,
     cursor: "pointer",
     marginTop: 14,
-    boxShadow: "0 8px 22px rgba(99,102,241,0.35)",
+    letterSpacing: "-0.005em",
+    boxShadow: "0 12px 28px -8px rgba(168,85,247,0.55)",
   };
 }
 function ghost(opts: { fullWidth?: boolean } = {}): React.CSSProperties {
   return {
-    padding: "12px 16px", borderRadius: 10,
-    background: "rgba(255,255,255,0.06)", color: "white",
-    border: "1px solid rgba(255,255,255,0.18)",
-    fontWeight: 700, cursor: "pointer", fontSize: 14,
+    padding: "12px 16px", borderRadius: 12,
+    background: "rgba(168,85,247,0.06)", color: "#fce7f3",
+    border: "1px solid rgba(168,85,247,0.30)",
+    fontWeight: 800, cursor: "pointer", fontSize: 14,
     flexShrink: 0,
     width: opts.fullWidth ? "100%" : "auto",
   };

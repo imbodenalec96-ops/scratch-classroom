@@ -103,18 +103,30 @@ export default function StarPage() {
         }}>
           {/* Brand */}
           <div style={{ display: "flex", alignItems: "center", gap: T.space.md }}>
-            <span style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 44, height: 44, borderRadius: T.radius.lg,
-              background: T.color.primaryGradient,
-              fontSize: 24, boxShadow: T.shadow.glow,
-            }}>⭐</span>
+            <div style={{ position: "relative", width: 48, height: 48 }}>
+              <div style={{
+                position: "absolute", inset: -2, borderRadius: T.radius.lg,
+                background: "conic-gradient(from 0deg, #ec4899, #a855f7, #6366f1, #ec4899)",
+                filter: "blur(0.5px)",
+              }} />
+              <span style={{
+                position: "relative",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 48, height: 48, borderRadius: T.radius.lg,
+                background: "linear-gradient(135deg, #1a0f2e 0%, #0f0a1f 100%)",
+                fontSize: 24,
+                boxShadow: "inset 0 2px 0 rgba(255,255,255,0.08), 0 0 18px rgba(168,85,247,0.35)",
+              }}>⭐</span>
+            </div>
             <div>
               <h1 style={{
-                fontSize: T.font.size.xl, fontWeight: T.font.weight.black,
-                margin: 0, letterSpacing: "-0.01em", lineHeight: 1.1,
+                fontSize: 22, fontWeight: 900,
+                margin: 0, letterSpacing: "-0.025em", lineHeight: 1.1,
+                background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 50%, #f9a8d4 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}>STAR</h1>
-              <div style={{ fontSize: T.font.size.xs, color: T.color.textMuted }}>
+              <div style={{ fontSize: T.font.size.xs, color: "rgba(196,181,253,0.65)", fontWeight: 700, letterSpacing: "0.04em" }}>
                 Tracker & Refusal Log
               </div>
             </div>
@@ -317,13 +329,26 @@ function PageHeader({ kicker, title, subtitle }: { kicker: string; title: string
   return (
     <div style={{ marginBottom: T.space["2xl"] }}>
       <div style={{
-        fontSize: T.font.size.xs, fontWeight: T.font.weight.bold,
-        letterSpacing: "0.22em", textTransform: "uppercase",
-        color: T.color.accent, marginBottom: T.space.xs,
-      }}>{kicker}</div>
+        display: "inline-flex", alignItems: "center", gap: 8, marginBottom: T.space.sm,
+        padding: "5px 12px", borderRadius: 999,
+        background: "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.10))",
+        border: "1px solid rgba(168,85,247,0.30)",
+        fontSize: 10, fontWeight: 800,
+        letterSpacing: "0.28em", textTransform: "uppercase",
+        color: "#f9a8d4",
+      }}>
+        <span style={{
+          display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+          background: "#ec4899", boxShadow: "0 0 10px rgba(236,72,153,0.85)",
+        }} />
+        {kicker}
+      </div>
       <h2 style={{
         fontSize: T.font.size["4xl"], fontWeight: T.font.weight.black,
-        margin: 0, letterSpacing: "-0.025em", lineHeight: 1.05,
+        margin: 0, letterSpacing: "-0.035em", lineHeight: 1.05,
+        background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 40%, #f9a8d4 100%)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        backgroundClip: "text",
       }}>{title}</h2>
       {subtitle && (
         <p style={{ marginTop: T.space.sm, color: T.color.textMuted, fontSize: T.font.size.lg, lineHeight: 1.5, maxWidth: 720 }}>
