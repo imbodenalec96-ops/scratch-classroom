@@ -984,8 +984,9 @@ function SettingsPanel() {
 /* ── IEP Goals editor — multi-goal per kid, used by IEP tab + SEIF report ── */
 
 // Pre-baked roster IEP goals — one-tap loader for Alec's actual class.
-// Names matched case-insensitively against the student roster. Rayden
-// excluded (left class). Kids not on roster are skipped silently.
+// Names matched case-insensitively against the student roster. Kids
+// not on roster are skipped silently. Rayden's goals are kept here
+// in case he comes back; he's filtered out of the board separately.
 const ROSTER_IEP_GOALS: Record<string, Array<{ area: string; goalText: string }>> = {
   anna: [
     { area: "Reading — Phonics", goalText: "Will apply instructional-level phonics and word analysis skills to decode and recognize high-frequency words with 80% accuracy" },
@@ -1033,6 +1034,13 @@ const ROSTER_IEP_GOALS: Record<string, Array<{ area: string; goalText: string }>
     { area: "Writing — Opinion Paragraph", goalText: "Given an opinion writing prompt, will write a 4-sentence opinion paragraph with 1 topic sentence, 3 supporting reasons, and 2 transition words, on 2/3 writing prompts" },
     { area: "Social/Emotional — On-Task", goalText: "When assigned an academic task during whole group instruction, will independently remain on-task for 15 minutes or until the task is completed, in 4/5 academic tasks" },
     { area: "Social/Emotional — Calming Strategies", goalText: "Given the end of a 20-minute unstructured activity and a choice board, will implement a calming strategy from their toolbox for 5 minutes, for 4/5 opportunities on 3/4 progress monitoring assessments" },
+  ],
+  rayden: [
+    { area: "Behavior — On-Task", goalText: "When assigned an academic task during whole group instruction, will independently remain on-task for 15 minutes or until the task is completed, in 4/5 academic tasks as measured by observation and documentation" },
+    { area: "Behavior — Transitions", goalText: "Given an anchor chart of transition strategies and a verbal prompt, will transition from an in-process activity to a new activity using 1 strategy from the anchor chart, for 4/5 transition opportunities on 3/4 progress monitoring assessments" },
+    { area: "Social/Emotional — Upsetting Situations", goalText: "Given a written task evaluating how a person in a scenario deals with an upsetting situation (e.g., being left out, losing, rejection, being teased), will write a response explaining if they would approach it the same way and give one reason why/why not, scoring 2/2 on 4/5 progress monitoring assessments" },
+    { area: "Behavior — Productive School Behaviors", goalText: "Will demonstrate productive school behaviors on a daily basis, achieving 80% as measured by observations and documentation by special education staff" },
+    { area: "Behavior — Maladaptive Behaviors", goalText: "Will decrease maladaptive behaviors when upset while participating in structured and unstructured activities 90% of the time, as measured by observation and documentation" },
   ],
 };
 
@@ -1116,7 +1124,7 @@ function IepGoalsPanel({ students }: { students: StarStudent[] }) {
           display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
         }}>
           <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: "#fce7f3", fontWeight: 600 }}>
-            One-tap import: Anna, Ameer, Jaida, Kaleb, Zoey (real IEP goals you sent over).
+            One-tap import: Anna, Ameer, Jaida, Kaleb, Zoey, Rayden — real IEP goals you sent over.
           </div>
           <button
             onClick={loadRoster}
