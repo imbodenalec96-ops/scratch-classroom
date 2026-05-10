@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
+  <!-- Belt-and-suspenders cache-busting for the HTML shell. The Vercel
+       headers (vercel.json) are the primary mechanism, but Safari and a
+       few corporate proxies historically respect these meta tags too,
+       so we set them as well. Asset chunks are hashed by Vite + cached
+       hard at the CDN edge — this only affects the index.html shell. -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <!-- PWA / home-screen install -->
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#7c3aed" />
