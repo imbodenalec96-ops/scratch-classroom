@@ -118,29 +118,43 @@ export default function StarScanner() {
           setScan({ status: { barcode: v, statusKind: entry.statusKind } });
         }
       } else {
-        // Last-resort: ask the server in case the barcode was minted on
-        // another device. If found, persists locally + retries the scan
-        // routing. Otherwise show the "unknown" overlay.
-        const server = await lookupBarcodeOnServer(v);
-        if (server) {
+        // Local miss → try the server lookup.
+        let server = await lookupBarcodeOnServer(v);
+        // Still missing? Run a full sync (which also pulls the relay
+        // table) and retry once. Handles "barcode created seconds ago,
+        // hadn't propagated yet" and "this device never synced".
+        if (!server) {
+          try {
+            const { syncFromClassroom } = await import("../../lib/star/sync.ts");
+            await syncFromClassroom();
+            const refreshed = StarStore.getBcDB();
+            if (refreshed[v]) {
+              entry = refreshed[v];
+            } else {
+              server = await lookupBarcodeOnServer(v);
+            }
+          } catch {}
+        }
+        const final = entry || server || undefined;
+        if (final) {
           successBeep();
-          if (server.type === "assignment") {
+          if (final.type === "assignment") {
             fireStarBoardEvent({
               kind: "scan-to-phone",
-              studentName: server.studentName || "—",
-              studentId: server.studentId,
+              studentName: final.studentName || "—",
+              studentId: final.studentId,
               barcode: v,
-              detail: server.name,
+              detail: final.name,
             });
             setScan({ gradebook: { barcode: v } });
-          } else if (server.type === "work-refusal-form") {
+          } else if (final.type === "work-refusal-form") {
             setScan({ refusal: { barcode: v, type: "Work Refusal" } });
-          } else if (server.type === "specials-refusal-form") {
+          } else if (final.type === "specials-refusal-form") {
             setScan({ refusal: { barcode: v, type: "Specials Refusal" } });
-          } else if (server.type === "pass-action") {
-            setScan({ pass: { barcode: v, passKind: (server as any).passKind } });
-          } else if (server.type === "status-action") {
-            setScan({ status: { barcode: v, statusKind: (server as any).statusKind } });
+          } else if (final.type === "pass-action") {
+            setScan({ pass: { barcode: v, passKind: (final as any).passKind } });
+          } else if (final.type === "status-action") {
+            setScan({ status: { barcode: v, statusKind: (final as any).statusKind } });
           }
           return;
         }
@@ -192,6 +206,31 @@ export default function StarScanner() {
             const type: "Work Refusal" | "Specials Refusal" = code.startsWith("SP-") ? "Specials Refusal" : "Work Refusal";
             setScan({ refusal: { barcode: code, type } });
           }}
+          onRetry={async () => {
+            const code = scan.unknown!.barcode;
+            try {
+              const { syncFromClassroom } = await import("../../lib/star/sync.ts");
+              await syncFromClassroom();
+            } catch {}
+            const local = StarStore.getBcDB()[code];
+            const found = local || (await lookupBarcodeOnServer(code));
+            if (found) {
+              successBeep();
+              if (found.type === "assignment") {
+                setScan({ gradebook: { barcode: code } });
+              } else if (found.type === "work-refusal-form") {
+                setScan({ refusal: { barcode: code, type: "Work Refusal" } });
+              } else if (found.type === "specials-refusal-form") {
+                setScan({ refusal: { barcode: code, type: "Specials Refusal" } });
+              } else if (found.type === "pass-action") {
+                setScan({ pass: { barcode: code, passKind: (found as any).passKind } });
+              } else if (found.type === "status-action") {
+                setScan({ status: { barcode: code, statusKind: (found as any).statusKind } });
+              }
+            } else {
+              errorBeep();
+            }
+          }}
         />
       )}
     </>
@@ -200,50 +239,85 @@ export default function StarScanner() {
 
 /* ── unknown-barcode overlay ─────────────────────────────────────── */
 
-function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal }: {
+function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal, onRetry }: {
   barcode: string;
   onClose: () => void;
   onForceRefusal: () => void;
+  onRetry: () => Promise<void>;
 }) {
   const guessRefusal = barcode.startsWith("WR-") || barcode.startsWith("SP-");
+  const isLocallyMinted = /^(QZ|AS|WR|SP|MA|MO)-/i.test(barcode);
+  const [retrying, setRetrying] = useState(false);
+  const [retried, setRetried] = useState(false);
+  const handleRetry = async () => {
+    setRetrying(true);
+    try { await onRetry(); }
+    finally { setRetrying(false); setRetried(true); }
+  };
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{
       position: "fixed", inset: 0, zIndex: 800,
-      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
+      background: "rgba(10,4,20,0.78)", backdropFilter: "blur(8px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
     }}>
       <div style={{
-        background: "linear-gradient(180deg, #0f172a 0%, #1e1b2e 100%)",
-        border: "1px solid rgba(239,68,68,0.40)",
-        borderRadius: 18, width: "min(520px, 96vw)", padding: 22, color: "#f5f1e8",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+        background: "radial-gradient(700px 500px at 0% 0%, rgba(168,85,247,0.18) 0%, transparent 55%), linear-gradient(180deg, #1a0f2e 0%, #0a0414 100%)",
+        border: "1px solid rgba(239,68,68,0.45)",
+        borderRadius: 18, width: "min(540px, 96vw)", padding: 22, color: "#f5f1e8",
+        boxShadow: "0 28px 64px -10px rgba(239,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
       }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
-          ⚠️ Barcode Not Found
-        </div>
-        <div style={{ fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 800, color: "#fde68a", marginBottom: 12 }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "4px 12px", borderRadius: 999,
+          background: "rgba(239,68,68,0.18)",
+          border: "1px solid rgba(239,68,68,0.45)",
+          fontSize: 10, fontWeight: 800, letterSpacing: "0.28em", textTransform: "uppercase",
+          color: "#fca5a5", marginBottom: 8,
+        }}>⚠ Barcode Not Found</div>
+        <div style={{
+          fontFamily: "Menlo, monospace", fontSize: 22, fontWeight: 800,
+          color: "#f9a8d4", marginBottom: 14, letterSpacing: "0.04em",
+        }}>
           {barcode}
         </div>
-        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.55, marginBottom: 16 }}>
-          This barcode isn't in this device's STAR database. Most likely the
-          barcode was created on another device and hasn't synced yet, or
-          the localStorage was cleared.
-          <br /><br />
-          Open <b>/star</b> and hit <b>🔄 Sync from Classroom</b> to refresh,
-          or check the <b>💾 Data</b> tab to see what's stored.
+        <div style={{ fontSize: 13, color: "rgba(245,241,232,0.85)", lineHeight: 1.55, marginBottom: 16 }}>
+          {isLocallyMinted ? (
+            <>This barcode was created on another device. The cross-device sync
+            should have caught it — tap <b style={{ color: "#fce7f3" }}>🔄 Sync &amp; Retry</b> below
+            to pull the latest from the server and try again.</>
+          ) : (
+            <>This barcode isn't in any STAR database. Either it was wiped, or it's
+            a code from a different system.</>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {isLocallyMinted && (
+            <button onClick={handleRetry} disabled={retrying} style={{
+              padding: "13px 18px", borderRadius: 12, border: "none",
+              background: retrying
+                ? "rgba(168,85,247,0.20)"
+                : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+              color: "white", fontWeight: 900, fontSize: 14,
+              cursor: retrying ? "wait" : "pointer",
+              boxShadow: retrying ? "none" : "0 8px 22px -6px rgba(168,85,247,0.55)",
+              touchAction: "manipulation",
+            }}>
+              {retrying ? "Syncing…" : retried ? "🔄 Sync &amp; Retry again" : "🔄 Sync &amp; Retry"}
+            </button>
+          )}
           <button onClick={onClose} style={{
-            padding: "12px 16px", borderRadius: 10,
-            background: "linear-gradient(135deg, #6366f1, #b23a48)",
-            color: "white", border: "none", fontWeight: 800, cursor: "pointer", fontSize: 14,
+            padding: "11px 16px", borderRadius: 12,
+            background: "rgba(168,85,247,0.06)", color: "#fce7f3",
+            border: "1px solid rgba(168,85,247,0.30)",
+            fontWeight: 800, cursor: "pointer", fontSize: 14,
+            touchAction: "manipulation",
           }}>OK — try another barcode</button>
           {guessRefusal && (
             <button onClick={onForceRefusal} style={{
               padding: "10px 14px", borderRadius: 10,
-              background: "rgba(255,255,255,0.05)", color: "white",
-              border: "1px solid rgba(255,255,255,0.15)",
-              fontWeight: 700, cursor: "pointer", fontSize: 13,
+              background: "rgba(168,85,247,0.04)", color: "rgba(196,181,253,0.75)",
+              border: "1px dashed rgba(168,85,247,0.30)",
+              fontWeight: 700, cursor: "pointer", fontSize: 12,
             }}>
               ↳ Open as a refusal log anyway
             </button>
