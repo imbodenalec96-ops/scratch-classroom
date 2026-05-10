@@ -706,9 +706,10 @@ export default function ClassroomBoard() {
   );
 
   const card = {
-    background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.010))",
-    border: `1px solid ${g(0.10)}`,
-    borderRadius: 8,
+    background: "linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(99,102,241,0.03) 50%, rgba(15,15,28,0.20) 100%)",
+    border: `1px solid rgba(168,85,247,0.18)`,
+    borderRadius: 14,
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 18px -8px rgba(0,0,0,0.5)",
   } as const;
 
   return (
@@ -1367,35 +1368,59 @@ export default function ClassroomBoard() {
               const isBirthday = !!bday && bday.slice(-5) === todayMD;
               return (
                 <div key={s.id} data-student-id={s.id} className="star-roster-card" style={{
-                  borderRadius: 4, display: "flex", flexDirection: "column",
+                  borderRadius: 14, display: "flex", flexDirection: "column",
                   alignItems: "stretch", textAlign: "center",
                   background: isFull
-                    ? "linear-gradient(180deg, rgba(217,119,6,0.18) 0%, rgba(178,58,72,0.08) 100%)"
-                    : "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
-                  border: isFull ? "1px solid rgba(251,191,36,.55)" : `1px solid ${g(0.08)}`,
+                    ? "linear-gradient(155deg, rgba(236,72,153,0.22) 0%, rgba(168,85,247,0.16) 50%, rgba(99,102,241,0.10) 100%)"
+                    : "linear-gradient(155deg, rgba(168,85,247,0.07) 0%, rgba(99,102,241,0.04) 60%, rgba(15,15,28,0.20) 100%)",
+                  border: isFull
+                    ? "1px solid rgba(236,72,153,0.55)"
+                    : `1px solid rgba(168,85,247,0.18)`,
+                  boxShadow: isFull
+                    ? "0 0 0 1px rgba(236,72,153,0.25), 0 12px 32px -10px rgba(168,85,247,0.55)"
+                    : "0 4px 18px -8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
                   animation: isFull
                     ? `fullCard 3.5s ease-in-out infinite, fadeUp .5s ease ${idx * 0.04}s both`
                     : `fadeUp .5s ease ${idx * 0.04}s both`,
                   overflow: "hidden",
                   position: "relative",
                 }}>
-                  {/* Left spine: level color as a vertical rule (magazine pull-quote treatment) */}
+                  {/* Top accent strip: full-width gradient bar — replaces the
+                      old skinny left spine. Much more visible at a distance. */}
                   <div style={{
-                    position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
+                    position: "absolute", left: 0, right: 0, top: 0, height: 3,
                     background: isFull
-                      ? "linear-gradient(180deg, #fbbf24, #d97706)"
-                      : lc.color,
-                    opacity: isFull ? 1 : 0.85,
+                      ? "linear-gradient(90deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)"
+                      : `linear-gradient(90deg, transparent 0%, ${lc.color} 50%, transparent 100%)`,
+                    opacity: isFull ? 1 : 0.7,
                   }} />
 
-                  {/* Level marker — small-caps serif, top-right, editorial footnote vibe */}
+                  {/* Soft violet glow in the bottom-right corner — adds depth
+                      without competing with content */}
+                  {!isFull && (
+                    <div style={{
+                      position: "absolute", right: -30, bottom: -30,
+                      width: 90, height: 90, borderRadius: "50%",
+                      background: "radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)",
+                      pointerEvents: "none",
+                    }} />
+                  )}
+
+                  {/* Level chip — solid pill, top-right, easy to scan */}
                   <div style={{
-                    position: "absolute", top: 7, right: 9,
-                    fontFamily: serif, fontStyle: "italic",
-                    fontSize: 11, fontWeight: 600, color: lc.color,
-                    letterSpacing: "0.04em",
-                    zIndex: 1,
-                  }}>lv.{lv}</div>
+                    position: "absolute", top: 8, right: 8,
+                    padding: "2px 7px", borderRadius: 999,
+                    background: isFull
+                      ? "linear-gradient(135deg, #ec4899, #a855f7)"
+                      : `linear-gradient(135deg, ${lc.color}cc, ${lc.color}66)`,
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 9, fontWeight: 800, color: "white",
+                    letterSpacing: "0.10em", textTransform: "uppercase",
+                    boxShadow: isFull
+                      ? "0 0 10px rgba(236,72,153,0.55)"
+                      : `0 0 6px ${lc.color}55`,
+                    zIndex: 2,
+                  }}>L{lv}</div>
 
                   {/* Presence dot — green = online, gray = offline. Sits top-left
                       so teacher can scan the room at a glance. */}
@@ -1406,12 +1431,14 @@ export default function ClassroomBoard() {
                       <div
                         title={online ? `Working — ${pres?.activity || "active"}` : "Offline"}
                         style={{
-                          position: "absolute", top: 7, left: 7,
+                          position: "absolute", top: 9, left: 9,
                           width: 10, height: 10, borderRadius: "50%",
-                          background: online ? "#22c55e" : "rgba(255,255,255,0.18)",
-                          boxShadow: online ? "0 0 8px rgba(34,197,94,0.7)" : undefined,
+                          background: online ? "#22c55e" : "rgba(255,255,255,0.14)",
+                          boxShadow: online
+                            ? "0 0 0 2px rgba(34,197,94,0.18), 0 0 10px rgba(34,197,94,0.7)"
+                            : "0 0 0 2px rgba(255,255,255,0.04)",
                           animation: online ? "presPulse 2.4s ease-in-out infinite" : undefined,
-                          zIndex: 1,
+                          zIndex: 2,
                         }}
                       />
                     );
@@ -1511,35 +1538,52 @@ export default function ClassroomBoard() {
                   )}
 
                   {/* Card body */}
-                  <div style={{ flex: 1, padding: "12px 8px 10px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, justifyContent: "center" }}>
-                    {/* Avatar — flat disc, no inner glow soup */}
+                  <div style={{ flex: 1, padding: "16px 10px 12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, justifyContent: "center", position: "relative", zIndex: 1 }}>
+                    {/* Avatar — modern with violet halo ring + subtle gradient disc */}
                     <div style={{
-                      width: 74, height: 74, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+                      position: "relative",
+                      width: 78, height: 78, flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontFamily: serif, fontSize: s.avatar_emoji ? 38 : 32, fontWeight: 600, color: "#0d1321",
-                      background: isFull
-                        ? "radial-gradient(circle at 35% 30%, #fde68a 0%, #d97706 85%)"
-                        : `radial-gradient(circle at 35% 30%, ${lc.color} 0%, ${lc.color}aa 85%)`,
-                      border: isFull ? "2px solid rgba(251,191,36,.85)" : `2px solid ${lc.color}cc`,
-                      boxShadow: isFull
-                        ? "0 4px 14px rgba(217,119,6,.35)"
-                        : "0 2px 10px rgba(0,0,0,0.3)",
                     }}>
-                      {s.avatar_url
-                        ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : s.avatar_emoji
-                        ? s.avatar_emoji
-                        : initial}
+                      {/* halo ring */}
+                      <div style={{
+                        position: "absolute", inset: -3,
+                        borderRadius: "50%",
+                        background: isFull
+                          ? "conic-gradient(from 90deg, #ec4899, #a855f7, #6366f1, #ec4899)"
+                          : `conic-gradient(from 90deg, ${lc.color}, ${lc.color}66, ${lc.color})`,
+                        opacity: isFull ? 1 : 0.55,
+                        filter: isFull ? "blur(0.5px)" : undefined,
+                        animation: isFull ? "starGlow 4s linear infinite" : undefined,
+                      }} />
+                      {/* avatar disc */}
+                      <div style={{
+                        position: "relative",
+                        width: 74, height: 74, borderRadius: "50%", overflow: "hidden",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: s.avatar_emoji ? 40 : 30, fontWeight: 800, color: "#fff",
+                        background: isFull
+                          ? "linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)"
+                          : `linear-gradient(135deg, ${lc.color} 0%, ${lc.color}aa 100%)`,
+                        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -10px 14px rgba(0,0,0,0.18)",
+                      }}>
+                        {s.avatar_url
+                          ? <img src={s.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : s.avatar_emoji
+                          ? s.avatar_emoji
+                          : initial}
+                      </div>
                     </div>
 
-                    {/* Name — serif, italic when full (they're the featured story) */}
+                    {/* Name — sans-serif, bold, modern */}
                     <div style={{
-                      fontFamily: serif, fontSize: 20,
-                      fontWeight: isFull ? 600 : 500,
-                      fontStyle: isFull ? "italic" : "normal",
-                      lineHeight: 1.05, letterSpacing: "-0.01em",
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                      fontSize: 19, fontWeight: 800,
+                      lineHeight: 1.05, letterSpacing: "-0.015em",
                       maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 6px",
-                      color: isFull ? "#fde68a" : "#f5f1e8",
+                      color: isFull ? "#fce7f3" : "#f5f1e8",
+                      textShadow: isFull ? "0 0 12px rgba(236,72,153,0.45)" : undefined,
                     }}>
                       {firstName}
                     </div>
@@ -1690,22 +1734,22 @@ export default function ClassroomBoard() {
                       );
                     })()}
 
-                    {/* Points — ClassDojo-style amber chip with coin icon */}
+                    {/* Points — modern violet/pink chip with coin icon */}
                     {typeof s.dojo_points === "number" && (
                       <div style={{
                         fontFamily: "'Inter', sans-serif",
                         display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "3px 10px", borderRadius: 999,
-                        background: "linear-gradient(135deg, rgba(217,119,6,0.22), rgba(251,191,36,0.12))",
-                        border: "1px solid rgba(251,191,36,0.45)",
-                        fontSize: 14, fontWeight: 700,
+                        padding: "4px 12px", borderRadius: 999,
+                        background: "linear-gradient(135deg, rgba(168,85,247,0.30), rgba(236,72,153,0.18))",
+                        border: "1px solid rgba(236,72,153,0.45)",
+                        fontSize: 14, fontWeight: 800,
                         color: "#fde68a",
                         letterSpacing: "0.01em",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                        boxShadow: "0 2px 8px -2px rgba(168,85,247,0.45)",
                       }}>
                         <span style={{ fontSize: 12 }}>🪙</span>
                         {s.dojo_points}
-                        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.65, marginLeft: 2 }}>pts</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.65, marginLeft: 2, color: "#fce7f3" }}>pts</span>
                       </div>
                     )}
 
@@ -1730,23 +1774,23 @@ export default function ClassroomBoard() {
                       return (
                         <div style={{ padding: "0 4px", marginTop: 2 }}>
                           <div style={{
-                            display: "flex", alignItems: "center", gap: 4,
-                            fontSize: 10, padding: "2px 5px", borderRadius: 3,
-                            background: "rgba(42,111,106,0.2)",
-                            border: "1px solid rgba(42,111,106,0.35)",
-                            borderLeft: "2px solid #2a6f6a",
+                            display: "flex", alignItems: "center", gap: 5,
+                            fontSize: 10, padding: "3px 7px", borderRadius: 6,
+                            background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.10))",
+                            border: "1px solid rgba(168,85,247,0.30)",
                           }}>
                             <span style={{
                               fontFamily: "ui-monospace, Menlo, monospace",
-                              fontSize: 9, fontWeight: 700,
-                              color: "#94e0d4", flexShrink: 0,
+                              fontSize: 9, fontWeight: 800,
+                              color: "#c4b5fd", flexShrink: 0,
                               fontVariantNumeric: "tabular-nums",
+                              letterSpacing: "0.02em",
                             }}>
                               {formatTimeShort(sc.start_time)}
                             </span>
-                            <span style={{ opacity: 0.7, fontSize: 10, flexShrink: 0 }}>{actEmoji(act)}</span>
+                            <span style={{ opacity: 0.85, fontSize: 11, flexShrink: 0 }}>{actEmoji(act)}</span>
                             <span style={{
-                              color: "#c9ece3", fontWeight: 600, flex: 1, minWidth: 0,
+                              color: "#e9d5ff", fontWeight: 700, flex: 1, minWidth: 0,
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10,
                             }}>
                               {act}
@@ -1756,14 +1800,16 @@ export default function ClassroomBoard() {
                       );
                     })()}
 
-                    {/* Reward tally — restrained, serif italic */}
+                    {/* Reward tally — small modern chip */}
                     {s.reward_count > 0 && (
                       <div style={{
-                        fontFamily: serif, fontStyle: "italic", fontSize: 11, fontWeight: 500,
-                        padding: "1px 8px", borderRadius: 2,
-                        background: "rgba(178,58,72,0.2)", color: "#fca5a5",
-                        border: "1px solid rgba(178,58,72,0.4)",
-                      }}>{s.reward_count}× rewarded</div>
+                        fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 700,
+                        padding: "2px 9px", borderRadius: 999,
+                        background: "linear-gradient(135deg, rgba(236,72,153,0.20), rgba(168,85,247,0.10))",
+                        color: "#fbcfe8",
+                        border: "1px solid rgba(236,72,153,0.35)",
+                        letterSpacing: "0.06em", textTransform: "uppercase",
+                      }}>★ {s.reward_count}× rewarded</div>
                     )}
                   </div>
                 </div>
@@ -1804,22 +1850,37 @@ export default function ClassroomBoard() {
                   const s = withPts[i];
                   return (
                     <div key={i} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "8px 12px", borderRadius: 4,
-                      background: i === 0 ? "rgba(217,119,6,0.12)" : "rgba(255,255,255,0.025)",
-                      borderLeft: `3px solid ${s ? accents[i] : "rgba(255,255,255,0.08)"}`,
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "10px 14px", borderRadius: 12,
+                      background: i === 0
+                        ? "linear-gradient(95deg, rgba(236,72,153,0.18) 0%, rgba(168,85,247,0.10) 50%, rgba(99,102,241,0.04) 100%)"
+                        : "linear-gradient(95deg, rgba(168,85,247,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+                      border: i === 0
+                        ? "1px solid rgba(236,72,153,0.40)"
+                        : `1px solid ${s ? "rgba(168,85,247,0.20)" : "rgba(255,255,255,0.05)"}`,
+                      boxShadow: i === 0 ? "0 6px 20px -10px rgba(236,72,153,0.45)" : undefined,
                       flex: 1, minHeight: 0,
+                      position: "relative", overflow: "hidden",
                     }}>
-                      <div style={{ fontSize: 24, flexShrink: 0, width: 30, opacity: s ? 1 : 0.25 }}>{medals[i]}</div>
+                      {/* rank chip */}
+                      <div style={{
+                        flexShrink: 0,
+                        width: 38, height: 38, borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 22, opacity: s ? 1 : 0.25,
+                        background: s ? `radial-gradient(circle at 35% 30%, ${accents[i]}55, ${accents[i]}11)` : "transparent",
+                        border: s ? `1px solid ${accents[i]}55` : `1px solid rgba(255,255,255,0.05)`,
+                      }}>{medals[i]}</div>
                       <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
                         <div style={{
-                          fontFamily: serif,
-                          fontSize: i === 0 ? 28 : 22,
-                          fontWeight: i === 0 ? 700 : 500,
-                          fontStyle: i === 0 ? "italic" : "normal",
-                          color: s ? "#f5f1e8" : "rgba(245,241,232,0.2)",
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: i === 0 ? 26 : 20,
+                          fontWeight: i === 0 ? 800 : 700,
+                          letterSpacing: "-0.015em",
+                          color: s ? (i === 0 ? "#fce7f3" : "#f5f1e8") : "rgba(245,241,232,0.2)",
                           lineHeight: 1.05,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          textShadow: i === 0 && s ? "0 0 12px rgba(236,72,153,0.35)" : undefined,
                         }}>
                           {s ? (s.name || "?").split(" ")[0] : "—"}
                         </div>
@@ -1827,12 +1888,13 @@ export default function ClassroomBoard() {
                       {s && (
                         <div style={{
                           fontFamily: "'Inter', sans-serif",
-                          fontSize: i === 0 ? 30 : 24,
-                          fontWeight: 800,
+                          fontSize: i === 0 ? 30 : 23,
+                          fontWeight: 900,
                           color: accents[i],
                           fontVariantNumeric: "tabular-nums",
                           display: "flex", alignItems: "center", gap: 4,
                           flexShrink: 0,
+                          textShadow: `0 0 10px ${accents[i]}66`,
                         }}>
                           {s.dojo_points}
                           <span style={{ fontSize: 16, opacity: 0.8 }}>🪙</span>
