@@ -2067,17 +2067,15 @@ export default function ClassroomBoard() {
                     }}>
                       <div style={{
                         fontFamily: "'Inter', system-ui, sans-serif",
-                        fontSize: 22, fontWeight: 900,
-                        color: gc.text,
+                        fontSize: 22, fontWeight: 800,
+                        color: "#fce7f3",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        lineHeight: 1.1,
-                        letterSpacing: "-0.015em",
-                        textRendering: "optimizeLegibility" as any,
+                        lineHeight: 1.15,
+                        letterSpacing: "0",
                         WebkitFontSmoothing: "antialiased",
                         MozOsxFontSmoothing: "grayscale",
-                        textShadow: `0 0 18px ${gc.glow}`,
                       }}>
-                        {act || <span style={{ opacity: 0.35, fontWeight: 600 }}>not yet scheduled</span>}
+                        {act || <span style={{ opacity: 0.35, fontWeight: 600, color: "rgba(245,241,232,0.50)" }}>not yet scheduled</span>}
                       </div>
                       <div style={{
                         fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
