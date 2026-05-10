@@ -180,20 +180,23 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     // ── IEP auto-log ──
     // If the assignment is tagged with an iepGoalId, write a daily IEP
     // log entry so the SEIF report picks up the progress automatically.
-    // Map: pct >= 80 → met; 50–79 → partial; < 50 → not. Skipped/absent/
-    // excused/makeup don't count (they're already filtered out elsewhere).
+    // Thresholds come from the goal itself first (real IEPs vary —
+    // "80% accuracy" vs "60% accuracy"), falling back to the global
+    // defaults set in /star → Settings.
     if (
       isCounting &&
       (entry as any).iepGoalId &&
       s.id
     ) {
       const goalArea = (entry as any).iepGoalArea || "IEP";
-      const iepStatus = pct >= 80 ? "met" : pct >= 50 ? "partial" : "not";
-      const iepNote = `Auto: ${entry.name} → ${score}/${max} (${pct}%, ${letter})`;
+      const goal = StarStore.getIepGoals().find((g) => g.id === (entry as any).iepGoalId);
+      const metT     = goal?.metThreshold     ?? StarStore.getIepDefaultMetThreshold();
+      const partialT = goal?.partialThreshold ?? StarStore.getIepDefaultPartialThreshold();
+      const iepStatus = pct >= metT ? "met" : pct >= partialT ? "partial" : "not";
+      const iepNote = `Auto: ${entry.name} → ${score}/${max} (${pct}%, ${letter}) · target ≥${metT}%`;
       try {
         StarStore.logIep(s.id, date, iepStatus, iepNote);
-        // Mention it inline so teacher knows this happened.
-        console.info(`[STAR] IEP auto-logged: ${s.firstName} · ${goalArea} · ${iepStatus}`);
+        console.info(`[STAR] IEP auto-logged: ${s.firstName} · ${goalArea} · ${iepStatus} (target ${metT}%)`);
       } catch (e) {
         console.warn("[STAR] IEP auto-log failed:", e);
       }
@@ -267,12 +270,22 @@ export default function GradebookModal({ barcode, onClose }: Props) {
               )}
               {(entry as any).iepGoalText}
             </div>
-            <div style={{
-              marginTop: 6, fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 600,
-            }}>
-              Saving with score ≥80% logs as <b style={{ color: "#86efac" }}>Met</b> ·
-              50–79% as <b style={{ color: "#fcd34d" }}>Partial</b> · &lt;50% as <b style={{ color: "#fca5a5" }}>Not yet</b>.
-            </div>
+            {(() => {
+              const goal = StarStore.getIepGoals().find((g) => g.id === (entry as any).iepGoalId);
+              const metT     = goal?.metThreshold     ?? StarStore.getIepDefaultMetThreshold();
+              const partialT = goal?.partialThreshold ?? StarStore.getIepDefaultPartialThreshold();
+              return (
+                <div style={{
+                  marginTop: 6, fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 600,
+                }}>
+                  Saving with score ≥{metT}% logs as <b style={{ color: "#86efac" }}>Met</b> ·
+                  {partialT}–{metT - 1}% as <b style={{ color: "#fcd34d" }}>Partial</b> · &lt;{partialT}% as <b style={{ color: "#fca5a5" }}>Not yet</b>.
+                  {goal?.metThreshold !== undefined && (
+                    <span style={{ marginLeft: 6, color: "#f9a8d4" }}>· goal-specific</span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

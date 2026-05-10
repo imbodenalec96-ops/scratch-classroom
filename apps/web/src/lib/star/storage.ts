@@ -193,7 +193,37 @@ const KEYS = {
   templates: "star_templates",
   iepGoals: "star_iep_goals",
   iepLog: "star_iep_log",
+  iepDefaultMet: "star_iep_default_met",
+  iepDefaultPartial: "star_iep_default_partial",
 } as const;
+
+/**
+ * Parse an explicit accuracy / mastery percentage out of an IEP goal
+ * sentence. Tries phrases like "80% accuracy", "with 90% accuracy",
+ * "achieving 80%", "scoring 2/2", and "4/5 ... assessments".
+ * Returns the % as a number (0–100), or undefined if nothing matched.
+ */
+export function inferMetThresholdFromGoalText(text: string): number | undefined {
+  if (!text) return undefined;
+  const t = text.toLowerCase();
+  // Direct percentage like "80% accuracy"
+  const pctMatch = t.match(/(\d{1,3})\s*%/);
+  if (pctMatch) {
+    const n = Number(pctMatch[1]);
+    if (n > 0 && n <= 100) return n;
+  }
+  // Fraction like "4/5 opportunities" → 80%, "3/4" → 75%, "8/10" → 80%
+  const fracMatch = t.match(/(\d+)\s*\/\s*(\d+)/);
+  if (fracMatch) {
+    const num = Number(fracMatch[1]);
+    const den = Number(fracMatch[2]);
+    if (den > 0) {
+      const pct = Math.round((num / den) * 100);
+      if (pct > 0 && pct <= 100) return pct;
+    }
+  }
+  return undefined;
+}
 
 export interface StarTemplate {
   id: string;
@@ -230,6 +260,14 @@ export interface IepGoal {
   studentId: string;
   goalText: string;       // the IEP goal as written in the doc
   area?: string;          // optional category — Reading / Behavior / etc.
+  // Per-goal grading thresholds. When set, the GradebookModal auto-log
+  // uses these instead of the global defaults — matches IEP wording
+  // like "80% accuracy" (Anna) or "60% accuracy" (sight words).
+  // pct >= metThreshold      → met
+  // pct >= partialThreshold  → partial
+  // else                     → not yet
+  metThreshold?: number;     // default 80
+  partialThreshold?: number; // default 50
   createdDate: string;    // ISO
   updatedDate: string;    // ISO
 }
@@ -392,14 +430,22 @@ export const StarStore = {
     ls.set(KEYS.iepGoals, all);
     return goal;
   },
-  updateIepGoal: (id: string, patch: { goalText?: string; area?: string }) => {
+  updateIepGoal: (id: string, patch: { goalText?: string; area?: string; metThreshold?: number | null; partialThreshold?: number | null }) => {
     const all = ls.get<IepGoal[]>(KEYS.iepGoals, []);
     const idx = all.findIndex((g) => g.id === id);
     if (idx < 0) return;
+    const clamp = (n: any) => {
+      if (n === null) return undefined;
+      const v = Number(n);
+      if (!Number.isFinite(v)) return all[idx].metThreshold;
+      return Math.max(0, Math.min(100, Math.round(v)));
+    };
     all[idx] = {
       ...all[idx],
       goalText: patch.goalText !== undefined ? patch.goalText.trim() : all[idx].goalText,
       area: patch.area !== undefined ? (patch.area.trim() || undefined) : all[idx].area,
+      metThreshold: patch.metThreshold !== undefined ? clamp(patch.metThreshold) : all[idx].metThreshold,
+      partialThreshold: patch.partialThreshold !== undefined ? clamp(patch.partialThreshold) : all[idx].partialThreshold,
       updatedDate: new Date().toISOString(),
     };
     ls.set(KEYS.iepGoals, all);
@@ -410,23 +456,36 @@ export const StarStore = {
   },
   // Bulk replace for a single student — used by the "Load my class
   // goals" import. Removes existing goals for that kid then adds the
-  // provided ones in order.
+  // provided ones in order. If the goal text mentions an explicit
+  // accuracy % (e.g. "80% accuracy" / "60% accuracy") that becomes the
+  // metThreshold automatically, so each imported IEP goal grades to
+  // its own success criterion out of the box.
   setStudentGoals: (studentId: string, goals: Array<{ area?: string; goalText: string }>) => {
     const allRaw: any = ls.get<any>(KEYS.iepGoals, []);
     const all: IepGoal[] = Array.isArray(allRaw) ? allRaw : [];
     const kept = all.filter((g) => g.studentId !== studentId);
     const now = new Date().toISOString();
     for (const g of goals) {
+      const inferredMet = inferMetThresholdFromGoalText(g.goalText);
       kept.push({
         id: `iep-g-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         studentId,
         goalText: g.goalText.trim(),
         area: (g.area || "").trim() || undefined,
+        metThreshold: inferredMet,
+        // Partial defaults to halfway between the met threshold and 0
+        partialThreshold: inferredMet ? Math.max(20, Math.floor(inferredMet / 2)) : undefined,
         createdDate: now, updatedDate: now,
       });
     }
     ls.set(KEYS.iepGoals, kept);
   },
+
+  // ── IEP grading thresholds (global defaults) ─────────────────────
+  getIepDefaultMetThreshold:     () => ls.get<number>(KEYS.iepDefaultMet, 80),
+  setIepDefaultMetThreshold:     (v: number) => ls.set(KEYS.iepDefaultMet, Math.max(0, Math.min(100, Math.round(v)))),
+  getIepDefaultPartialThreshold: () => ls.get<number>(KEYS.iepDefaultPartial, 50),
+  setIepDefaultPartialThreshold: (v: number) => ls.set(KEYS.iepDefaultPartial, Math.max(0, Math.min(100, Math.round(v)))),
 
   getIepLog: () => ls.get<IepLogEntry[]>(KEYS.iepLog, []),
   setIepLog: (v: IepLogEntry[]) => ls.set(KEYS.iepLog, v),

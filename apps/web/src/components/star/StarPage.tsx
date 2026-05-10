@@ -1048,19 +1048,23 @@ function IepGoalsPanel({ students }: { students: StarStudent[] }) {
   const [goals, setGoals] = useState(() => StarStore.getIepGoals());
   const [openId, setOpenId] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { area: string; goalText: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { area: string; goalText: string; metT: string; partT: string }>>({});
   const [importFlash, setImportFlash] = useState<string | null>(null);
+  const [defaultMet, setDefaultMet] = useState<number>(() => StarStore.getIepDefaultMetThreshold());
+  const [defaultPart, setDefaultPart] = useState<number>(() => StarStore.getIepDefaultPartialThreshold());
 
   const refresh = () => setGoals(StarStore.getIepGoals());
 
   const goalsForKid = (sid: string) => goals.filter((g) => g.studentId === sid);
 
-  const setDraft = (id: string, patch: { area?: string; goalText?: string }) => {
+  const setDraft = (id: string, patch: { area?: string; goalText?: string; metT?: string; partT?: string }) => {
     setDrafts((cur) => ({
       ...cur,
       [id]: {
-        area: patch.area !== undefined ? patch.area : (cur[id]?.area ?? ""),
+        area:     patch.area     !== undefined ? patch.area     : (cur[id]?.area     ?? ""),
         goalText: patch.goalText !== undefined ? patch.goalText : (cur[id]?.goalText ?? ""),
+        metT:     patch.metT     !== undefined ? patch.metT     : (cur[id]?.metT     ?? ""),
+        partT:    patch.partT    !== undefined ? patch.partT    : (cur[id]?.partT    ?? ""),
       },
     }));
   };
@@ -1068,7 +1072,15 @@ function IepGoalsPanel({ students }: { students: StarStudent[] }) {
   const persistGoal = (id: string) => {
     const d = drafts[id];
     if (!d) return;
-    StarStore.updateIepGoal(id, { goalText: d.goalText, area: d.area });
+    const numOrUndef = (s: string): number | undefined => {
+      const n = Number(s);
+      return s === "" || !Number.isFinite(n) ? undefined : Math.max(0, Math.min(100, Math.round(n)));
+    };
+    StarStore.updateIepGoal(id, {
+      goalText: d.goalText, area: d.area,
+      metThreshold: numOrUndef(d.metT) ?? null as any,
+      partialThreshold: numOrUndef(d.partT) ?? null as any,
+    });
     refresh();
     setSavedFlash(id);
     setTimeout(() => setSavedFlash((x) => x === id ? null : x), 800);
@@ -1138,6 +1150,50 @@ function IepGoalsPanel({ students }: { students: StarStudent[] }) {
           >📥 Load my class goals</button>
         </div>
       )}
+
+      {/* Global default thresholds — used when a goal doesn't specify its own */}
+      <div style={{
+        marginTop: 10, padding: "10px 14px", borderRadius: 10,
+        background: "rgba(168,85,247,0.06)",
+        border: "1px solid rgba(168,85,247,0.20)",
+        display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+          color: "rgba(196,181,253,0.65)",
+        }}>Default Grading</span>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#86efac", fontWeight: 700 }}>
+          ≥
+          <input
+            type="number" min={0} max={100}
+            value={defaultMet}
+            onChange={(e) => {
+              const v = Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)));
+              setDefaultMet(v);
+              StarStore.setIepDefaultMetThreshold(v);
+            }}
+            style={{ ...inp(), width: 76, padding: "5px 8px", textAlign: "center" }}
+          />
+          % Met
+        </label>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#fcd34d", fontWeight: 700 }}>
+          ≥
+          <input
+            type="number" min={0} max={100}
+            value={defaultPart}
+            onChange={(e) => {
+              const v = Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)));
+              setDefaultPart(v);
+              StarStore.setIepDefaultPartialThreshold(v);
+            }}
+            style={{ ...inp(), width: 76, padding: "5px 8px", textAlign: "center" }}
+          />
+          % Partial
+        </label>
+        <span style={{ flex: 1, fontSize: 11, color: "rgba(196,181,253,0.55)", fontWeight: 600 }}>
+          Used when a goal doesn't specify its own threshold below.
+        </span>
+      </div>
       {importFlash && (
         <div style={{
           marginTop: 8, padding: "8px 12px", borderRadius: 8,
@@ -1206,51 +1262,96 @@ function IepGoalsPanel({ students }: { students: StarStudent[] }) {
               {expanded && list.length > 0 && (
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                   {list.map((g) => {
-                    const draft = drafts[g.id] ?? { area: g.area || "", goalText: g.goalText };
+                    const draft = drafts[g.id] ?? {
+                      area: g.area || "",
+                      goalText: g.goalText,
+                      metT: g.metThreshold !== undefined ? String(g.metThreshold) : "",
+                      partT: g.partialThreshold !== undefined ? String(g.partialThreshold) : "",
+                    };
                     const flash = savedFlash === g.id;
                     return (
                       <div key={g.id} style={{
-                        display: "grid",
-                        gridTemplateColumns: "180px 1fr auto auto",
-                        gap: 6, alignItems: "center",
-                        padding: 6, borderRadius: 8,
+                        padding: 8, borderRadius: 10,
                         background: flash ? "rgba(34,197,94,0.10)" : "rgba(10,4,20,0.30)",
                         border: flash ? "1px solid rgba(34,197,94,0.45)" : "1px solid rgba(168,85,247,0.15)",
                       }}>
-                        <input
-                          value={draft.area}
-                          onChange={(e) => setDraft(g.id, { area: e.target.value })}
-                          onBlur={() => persistGoal(g.id)}
-                          placeholder="Area (e.g. Reading)"
-                          style={inp()}
-                        />
-                        <input
-                          value={draft.goalText}
-                          onChange={(e) => setDraft(g.id, { goalText: e.target.value })}
-                          onBlur={() => persistGoal(g.id)}
-                          placeholder="IEP goal text"
-                          style={inp()}
-                        />
-                        <button
-                          onClick={() => persistGoal(g.id)}
-                          style={{
-                            padding: "8px 12px", borderRadius: 8,
-                            background: draft.goalText ? "linear-gradient(135deg, #ec4899, #a855f7)" : "rgba(168,85,247,0.06)",
-                            border: draft.goalText ? "1px solid rgba(236,72,153,0.55)" : "1px solid rgba(168,85,247,0.20)",
-                            color: "white", fontWeight: 800, fontSize: 12,
-                            cursor: "pointer", touchAction: "manipulation",
-                          }}
-                        >{flash ? "✓" : "Save"}</button>
-                        <button
-                          onClick={() => remove(g.id)}
-                          title="Delete"
-                          style={{
-                            padding: "8px 10px", borderRadius: 8,
-                            background: "rgba(239,68,68,0.10)", color: "#fca5a5",
-                            border: "1px solid rgba(239,68,68,0.40)",
-                            cursor: "pointer", fontSize: 13,
-                          }}
-                        >🗑</button>
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "180px 1fr auto auto",
+                          gap: 6, alignItems: "center",
+                        }}>
+                          <input
+                            value={draft.area}
+                            onChange={(e) => setDraft(g.id, { area: e.target.value })}
+                            onBlur={() => persistGoal(g.id)}
+                            placeholder="Area (e.g. Reading)"
+                            style={inp()}
+                          />
+                          <input
+                            value={draft.goalText}
+                            onChange={(e) => setDraft(g.id, { goalText: e.target.value })}
+                            onBlur={() => persistGoal(g.id)}
+                            placeholder="IEP goal text"
+                            style={inp()}
+                          />
+                          <button
+                            onClick={() => persistGoal(g.id)}
+                            style={{
+                              padding: "8px 12px", borderRadius: 8,
+                              background: draft.goalText ? "linear-gradient(135deg, #ec4899, #a855f7)" : "rgba(168,85,247,0.06)",
+                              border: draft.goalText ? "1px solid rgba(236,72,153,0.55)" : "1px solid rgba(168,85,247,0.20)",
+                              color: "white", fontWeight: 800, fontSize: 12,
+                              cursor: "pointer", touchAction: "manipulation",
+                            }}
+                          >{flash ? "✓" : "Save"}</button>
+                          <button
+                            onClick={() => remove(g.id)}
+                            title="Delete"
+                            style={{
+                              padding: "8px 10px", borderRadius: 8,
+                              background: "rgba(239,68,68,0.10)", color: "#fca5a5",
+                              border: "1px solid rgba(239,68,68,0.40)",
+                              cursor: "pointer", fontSize: 13,
+                            }}
+                          >🗑</button>
+                        </div>
+                        {/* Per-goal grading thresholds */}
+                        <div style={{
+                          marginTop: 6, display: "flex", alignItems: "center",
+                          gap: 8, flexWrap: "wrap",
+                        }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase",
+                            color: "rgba(196,181,253,0.55)",
+                          }}>Grading thresholds</span>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#86efac", fontWeight: 700 }}>
+                            ≥
+                            <input
+                              type="number" min={0} max={100}
+                              value={draft.metT}
+                              onChange={(e) => setDraft(g.id, { metT: e.target.value })}
+                              onBlur={() => persistGoal(g.id)}
+                              placeholder={String(defaultMet)}
+                              style={{ ...inp(), width: 70, padding: "4px 6px", textAlign: "center" }}
+                            />
+                            % Met
+                          </label>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#fcd34d", fontWeight: 700 }}>
+                            ≥
+                            <input
+                              type="number" min={0} max={100}
+                              value={draft.partT}
+                              onChange={(e) => setDraft(g.id, { partT: e.target.value })}
+                              onBlur={() => persistGoal(g.id)}
+                              placeholder={String(defaultPart)}
+                              style={{ ...inp(), width: 70, padding: "4px 6px", textAlign: "center" }}
+                            />
+                            % Partial
+                          </label>
+                          <span style={{ fontSize: 11, color: "rgba(196,181,253,0.45)", fontWeight: 600, fontStyle: "italic" }}>
+                            blank → uses defaults ({defaultMet}% / {defaultPart}%)
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
