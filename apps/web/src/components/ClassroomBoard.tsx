@@ -661,7 +661,7 @@ export default function ClassroomBoard() {
   // Background: deep near-black with subtle violet+pink radial accents
   // in opposite corners — matches the STAR /star page identity for
   // visual continuity across the whole product.
-  const bg = `radial-gradient(1200px 800px at 0% 0%, rgba(99,102,241,0.10) 0%, transparent 60%), radial-gradient(1000px 700px at 100% 100%, rgba(236,72,153,0.08) 0%, transparent 60%), radial-gradient(ellipse at center, #14152a 0%, #0a0a14 100%)`;
+  const bg = `radial-gradient(1400px 900px at 0% 0%, rgba(168,85,247,0.20) 0%, transparent 55%), radial-gradient(1200px 800px at 100% 100%, rgba(236,72,153,0.18) 0%, transparent 55%), radial-gradient(900px 600px at 50% 0%, rgba(99,102,241,0.14) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)`;
   const musicPreset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
   const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#d97706";
 
@@ -748,12 +748,13 @@ export default function ClassroomBoard() {
         }} />
       )}
 
-      {/* Single bold brick-red masthead mark — top-left corner, structural not decorative */}
+      {/* Top-edge violet/pink gradient strip — structural masthead mark */}
       {!bgUrl && (
         <div style={{
-          position: "absolute", top: 0, left: 0, width: 200, height: 3,
-          background: "linear-gradient(90deg, #b23a48 0%, #d97706 55%, transparent 100%)",
+          position: "absolute", top: 0, left: 0, right: 0, height: 3,
+          background: "linear-gradient(90deg, #ec4899 0%, #a855f7 35%, #6366f1 65%, transparent 100%)",
           pointerEvents: "none", zIndex: 2,
+          boxShadow: "0 0 24px rgba(168,85,247,0.45)",
         }} />
       )}
 
@@ -1042,31 +1043,68 @@ export default function ClassroomBoard() {
         {/* Left: class identity */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <h1 style={{
-            fontFamily: serif, fontSize: 44, fontWeight: 500, fontStyle: "italic",
-            letterSpacing: "-0.015em", margin: 0, color: "#f5f1e8",
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontSize: 46, fontWeight: 900,
+            letterSpacing: "-0.035em", margin: 0,
+            background: "linear-gradient(135deg, #f5f1e8 0%, #c4b5fd 40%, #f9a8d4 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
             lineHeight: 1,
+            textShadow: "none",
           }}>{cls.name}</h1>
           <span style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 15,
-            color: "rgba(245,241,232,0.45)", letterSpacing: "0.01em",
-          }}>— {dateStr}</span>
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 12, fontWeight: 700,
+            color: "rgba(196,181,253,0.65)", letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            padding: "4px 10px", borderRadius: 999,
+            background: "rgba(168,85,247,0.10)",
+            border: "1px solid rgba(168,85,247,0.20)",
+          }}>{dateStr}</span>
         </div>
 
-        {/* Center: Day letter medallion — the one decorative focal point */}
+        {/* Center: Day letter medallion — circular violet badge with conic ring */}
         <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          padding: "2px 14px",
-          borderLeft: `1px solid ${g(0.1)}`, borderRight: `1px solid ${g(0.1)}`,
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "0 18px",
         }}>
-          <span style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-            color: "rgba(168,85,247,0.95)", letterSpacing: "0.28em", textTransform: "uppercase",
-          }}>Cycle Day</span>
-          <span style={{
-            fontFamily: serif, fontSize: 42, fontWeight: 600, lineHeight: 1,
-            color: "#c084fc", letterSpacing: "-0.02em",
-            textShadow: "0 0 24px rgba(168,85,247,0.45)",
-          }}>{dayLetter}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, textAlign: "right" }}>
+            <span style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 9, fontWeight: 800,
+              color: "rgba(196,181,253,0.85)",
+              letterSpacing: "0.28em", textTransform: "uppercase",
+            }}>Cycle</span>
+            <span style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 9, fontWeight: 800,
+              color: "rgba(245,241,232,0.45)",
+              letterSpacing: "0.28em", textTransform: "uppercase",
+            }}>Day</span>
+          </div>
+          <div style={{ position: "relative", width: 64, height: 64 }}>
+            <div style={{
+              position: "absolute", inset: -2, borderRadius: "50%",
+              background: "conic-gradient(from 0deg, #ec4899, #a855f7, #6366f1, #ec4899)",
+              animation: "starGlow 6s linear infinite",
+              opacity: 0.85,
+            }} />
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "50%",
+              background: "linear-gradient(135deg, #1a0f2e 0%, #0f0a1f 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "inset 0 2px 0 rgba(255,255,255,0.08), 0 0 24px rgba(168,85,247,0.35)",
+            }}>
+              <span style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 38, fontWeight: 900, lineHeight: 1,
+                background: "linear-gradient(135deg, #f9a8d4 0%, #c4b5fd 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                letterSpacing: "-0.04em",
+              }}>{dayLetter}</span>
+            </div>
+          </div>
         </div>
 
         {/* Right: time + controls */}
@@ -1116,36 +1154,75 @@ export default function ClassroomBoard() {
       {/* ── ROW 2: Right Now — the editorial "lead story" ── */}
       <section style={{
         position: "relative", zIndex: 1,
-        borderRadius: 4,
-        background: `linear-gradient(100deg, ${blockAccent}26 0%, ${blockAccent}10 45%, rgba(13,19,33,0.3) 100%)`,
-        border: `1px solid ${blockAccent}55`,
-        borderLeft: `4px solid ${blockAccent}`,
-        display: "flex", alignItems: "center", padding: "0 20px", gap: 18,
+        borderRadius: 18,
+        background: `
+          radial-gradient(circle at 0% 0%, rgba(236,72,153,0.18) 0%, transparent 45%),
+          radial-gradient(circle at 100% 100%, rgba(99,102,241,0.18) 0%, transparent 50%),
+          linear-gradient(135deg, ${blockAccent}1f 0%, rgba(168,85,247,0.10) 45%, rgba(15,15,28,0.40) 100%)
+        `,
+        border: `1px solid rgba(168,85,247,0.30)`,
+        boxShadow: `0 0 0 1px ${blockAccent}22 inset, 0 12px 40px -16px rgba(168,85,247,0.45), inset 0 1px 0 rgba(255,255,255,0.06)`,
+        display: "flex", alignItems: "center", padding: "0 24px", gap: 20,
+        overflow: "hidden",
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Decorative gradient bar on the left edge */}
+        <div style={{
+          position: "absolute", left: 0, top: 14, bottom: 14, width: 4,
+          borderRadius: 999,
+          background: "linear-gradient(180deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)",
+          boxShadow: "0 0 16px rgba(168,85,247,0.6)",
+        }} />
+        {/* Bottom-right glow accent */}
+        <div style={{
+          position: "absolute", right: -60, bottom: -60,
+          width: 220, height: 220, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(236,72,153,0.18) 0%, transparent 65%)",
+          pointerEvents: "none",
+        }} />
+        <div style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 1 }}>
           <div style={{
-            fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-            color: `${blockAccent}`, opacity: 0.9,
-            textTransform: "uppercase", letterSpacing: "0.28em", marginBottom: 3,
-          }}>The Hour</div>
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 11, fontWeight: 800,
+            color: "#f9a8d4",
+            textTransform: "uppercase", letterSpacing: "0.32em", marginBottom: 6,
+            display: "inline-flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{
+              display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+              background: "#ec4899", boxShadow: "0 0 10px rgba(236,72,153,0.85)",
+              animation: "presPulse 2s ease-in-out infinite",
+            }} />
+            Right Now
+          </div>
           {currentBlock ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
                 <span style={{
-                  fontFamily: serif, fontSize: 56, fontWeight: 600,
-                  letterSpacing: "-0.02em", color: "#f5f1e8", lineHeight: 1,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontSize: 60, fontWeight: 900,
+                  letterSpacing: "-0.035em", lineHeight: 1,
+                  background: "linear-gradient(135deg, #f5f1e8 0%, #f9a8d4 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
                 }}>{currentBlock.label || currentBlock.subject}</span>
                 <span style={{
-                  fontFamily: mono, fontSize: 20, color: "rgba(245,241,232,0.7)",
+                  fontFamily: mono, fontSize: 18, fontWeight: 700,
+                  color: "#c4b5fd",
                   fontVariantNumeric: "tabular-nums",
+                  padding: "4px 12px", borderRadius: 999,
+                  background: "rgba(168,85,247,0.12)",
+                  border: "1px solid rgba(168,85,247,0.28)",
                 }}>{currentBlock.start_time}–{currentBlock.end_time}</span>
                 {currentBlock.is_break && (
                   <span style={{
-                    fontFamily: serif, fontStyle: "italic", fontSize: 14, fontWeight: 500,
-                    padding: "3px 12px", borderRadius: 3,
-                    background: "rgba(42,111,106,0.25)", color: "#7dd3c5",
-                    border: "1px solid rgba(42,111,106,0.45)",
-                  }}>Break</span>
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 13, fontWeight: 800,
+                    padding: "4px 12px", borderRadius: 999,
+                    background: "linear-gradient(135deg, rgba(34,197,94,0.25), rgba(125,211,197,0.15))",
+                    color: "#86efac",
+                    border: "1px solid rgba(34,197,94,0.45)",
+                    letterSpacing: "0.10em", textTransform: "uppercase",
+                  }}>☕ Break</span>
                 )}
               </div>
               {/* Up next strip — show the next 3 blocks so kids can see
@@ -1163,27 +1240,27 @@ export default function ClassroomBoard() {
                 }
                 if (upcoming.length === 0) return null;
                 return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{
-                      fontFamily: serif, fontStyle: "italic", fontSize: 12,
-                      color: "rgba(245,241,232,0.45)", letterSpacing: "0.16em",
-                      textTransform: "uppercase", fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 800,
+                      color: "rgba(196,181,253,0.65)", letterSpacing: "0.22em",
+                      textTransform: "uppercase",
                     }}>Up Next</span>
                     {upcoming.map((b, i) => (
                       <span key={i} style={{
-                        display: "inline-flex", alignItems: "baseline", gap: 6,
-                        padding: "4px 12px", borderRadius: 3,
-                        background: "rgba(255,255,255,0.05)",
-                        border: `1px solid ${g(0.10)}`,
+                        display: "inline-flex", alignItems: "center", gap: 7,
+                        padding: "4px 12px", borderRadius: 999,
+                        background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.08))",
+                        border: `1px solid rgba(168,85,247,0.25)`,
                       }}>
                         <span style={{
-                          fontFamily: mono, fontSize: 12, fontWeight: 600,
-                          color: "rgba(245,241,232,0.85)",
+                          fontFamily: mono, fontSize: 11, fontWeight: 700,
+                          color: "#c4b5fd",
                           fontVariantNumeric: "tabular-nums",
                         }}>{b.start_time}</span>
                         <span style={{
-                          fontFamily: serif, fontSize: 14, fontWeight: 500,
-                          color: "#f5f1e8", letterSpacing: "-0.01em",
+                          fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
+                          color: "#f5f1e8", letterSpacing: "-0.005em",
                         }}>{b.label || b.subject}</span>
                       </span>
                     ))}
@@ -1200,40 +1277,55 @@ export default function ClassroomBoard() {
         </div>
         {countdown && (
           <div style={{
+            position: "relative", zIndex: 1,
             display: "flex", flexDirection: "column", alignItems: "center",
-            padding: "4px 16px", borderRadius: 3,
-            background: countdown.urgent ? "rgba(178,58,72,.25)" : "rgba(7,8,15,.5)",
-            border: `1px solid ${countdown.urgent ? "rgba(178,58,72,.6)" : g(0.12)}`,
+            padding: "8px 22px", borderRadius: 14,
+            background: countdown.urgent
+              ? "linear-gradient(135deg, rgba(239,68,68,0.30), rgba(236,72,153,0.18))"
+              : "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(99,102,241,0.10))",
+            border: countdown.urgent
+              ? "1px solid rgba(239,68,68,0.55)"
+              : "1px solid rgba(168,85,247,0.35)",
+            boxShadow: countdown.urgent
+              ? "0 0 24px rgba(239,68,68,0.35)"
+              : "0 0 18px rgba(168,85,247,0.25)",
             animation: countdown.urgent ? "tickPulse 1s ease-in-out infinite" : undefined,
           }}>
             <div style={{
-              fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-              color: countdown.urgent ? "rgba(252,165,165,0.85)" : "rgba(245,241,232,0.55)",
-              textTransform: "uppercase", letterSpacing: "0.22em",
-            }}>ends in</div>
+              fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 800,
+              color: countdown.urgent ? "#fca5a5" : "#c4b5fd",
+              textTransform: "uppercase", letterSpacing: "0.28em",
+              marginBottom: 2,
+            }}>Ends In</div>
             <div style={{
-              fontFamily: mono, fontSize: 30, fontWeight: 500,
-              color: countdown.urgent ? "#fca5a5" : "#f5f1e8",
+              fontFamily: mono, fontSize: 34, fontWeight: 800,
+              color: countdown.urgent ? "#fecaca" : "#fce7f3",
               fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em",
+              textShadow: countdown.urgent
+                ? "0 0 14px rgba(252,165,165,0.55)"
+                : "0 0 14px rgba(252,231,243,0.35)",
             }}>{countdown.str}</div>
           </div>
         )}
         {board.settings?.specialist_name && (
           <div style={{
-            padding: "5px 14px", borderRadius: 3,
-            background: "rgba(217,119,6,.14)",
-            border: "1px solid rgba(217,119,6,.4)",
-            borderLeft: "3px solid #d97706",
+            position: "relative", zIndex: 1,
+            padding: "8px 16px", borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(236,72,153,0.18), rgba(168,85,247,0.10))",
+            border: "1px solid rgba(236,72,153,0.40)",
             textAlign: "left",
+            boxShadow: "0 0 18px rgba(236,72,153,0.20)",
           }}>
             <div style={{
-              fontFamily: serif, fontStyle: "italic", fontSize: 10, fontWeight: 500,
-              color: "rgba(217,119,6,0.9)",
+              fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 800,
+              color: "#f9a8d4",
               textTransform: "uppercase", letterSpacing: "0.22em",
             }}>11 O'Clock Specialist</div>
             <div style={{
-              fontFamily: serif, fontSize: 16, fontWeight: 600,
-              color: "#fbbf24", letterSpacing: "-0.01em",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 17, fontWeight: 800,
+              color: "#fce7f3", letterSpacing: "-0.015em",
             }}>{board.settings.specialist_name}</div>
           </div>
         )}
