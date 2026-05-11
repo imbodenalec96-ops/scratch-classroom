@@ -14,6 +14,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { successBeep, errorBeep, scanReceivedBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { syncFromClassroom } from "../../lib/star/sync.ts";
+import { lookupBarcodeOnServer } from "../../lib/star/barcodeRelay.ts";
 import { onStarBoardEvent, getActiveClassId, setActiveClassId } from "../../lib/star/boardEvents.ts";
 import { api } from "../../lib/api.ts";
 
@@ -69,13 +70,19 @@ export default function StarPhonePage() {
   // a teacher scans an assignment somewhere, the phone auto-jumps to the
   // camera step for that barcode + pre-selects the assigned student.
   useEffect(() => {
-    return onStarBoardEvent((e) => {
+    return onStarBoardEvent(async (e) => {
       if (e.kind !== "scan-to-phone" || !e.barcode) return;
       const v = e.barcode.trim().toUpperCase();
-      const bc = StarStore.getBcDB()[v];
+      rehydrateBcDB();
+      let bc = StarStore.getBcDB()[v] as BcEntry | undefined;
       if (!bc) {
-        // Phone hasn't synced this barcode yet — show the unknown step
-        // with the relayed code preserved so user can hit Sync.
+        try { const r = await lookupBarcodeOnServer(v); if (r) bc = r; } catch {}
+      }
+      if (!bc) {
+        try { await syncFromClassroom(); bc = StarStore.getBcDB()[v] as BcEntry | undefined; } catch {}
+        refreshCounts();
+      }
+      if (!bc) {
         setEntry(null);
         setCode(v);
         setStep("unknown");
@@ -85,9 +92,7 @@ export default function StarPhonePage() {
       successBeep();
       setEntry(bc);
       setCode(v);
-      // If the originating scan carried a student id, use it; else fall
-      // back to the entry's assigned student; else require a manual pick.
-      const sid = e.studentId || bc.studentId;
+      const sid = e.studentId || (bc as any).studentId;
       if (sid) {
         setStudentId(sid);
         setStep("camera");
@@ -98,11 +103,50 @@ export default function StarPhonePage() {
     });
   }, []);
 
-  const onScan = (rawCode: string) => {
+  const acceptAssignment = (bc: BcEntry & { type: "assignment" }, v: string) => {
+    successBeep();
+    setEntry(bc);
+    setCode(v);
+    // Auto-fast-path when the assignment is already tagged to a student:
+    // skip the picker and jump straight to the camera. The student grid
+    // only appears for class-wide barcodes that have no assignee.
+    if ((bc as any).studentId) {
+      setStudentId((bc as any).studentId);
+      setStep("camera");
+    } else {
+      setStudentId("");
+      setStep("pick-student");
+    }
+  };
+
+  const onScan = async (rawCode: string) => {
     const v = rawCode.trim().toUpperCase();
     if (!v) return;
     scanReceivedBeep();
-    const bc = StarStore.getBcDB()[v];
+    // 1. Local bcDB — fast path. Rehydrate first so any newly-seeded
+    //    barcodes baked into the bundle are available even if this
+    //    phone's localStorage pre-dates them.
+    rehydrateBcDB();
+    let bc = StarStore.getBcDB()[v] as BcEntry | undefined;
+    // 2. Server-side fallback — when the assignment was minted on the
+    //    laptop and pushed via the relay, the phone may not have synced
+    //    it yet. Look it up live before declaring it unknown. This
+    //    mirrors what the desktop scanner does.
+    if (!bc) {
+      try {
+        const remote = await lookupBarcodeOnServer(v);
+        if (remote) bc = remote;
+      } catch {}
+    }
+    // 3. Last-ditch — auto-trigger a full sync, then re-check. Helps
+    //    when the active class id wasn't set yet on initial mount.
+    if (!bc) {
+      try {
+        await syncFromClassroom();
+        bc = StarStore.getBcDB()[v] as BcEntry | undefined;
+      } catch {}
+      refreshCounts();
+    }
     if (!bc) {
       errorBeep();
       setEntry(null);
@@ -111,25 +155,15 @@ export default function StarPhonePage() {
       return;
     }
     if (bc.type !== "assignment") {
+      // Non-assignment barcodes (movement, freetime, supply, timer, pass)
+      // belong on the projector / iPad scanner, not the phone-camera flow.
       errorBeep();
       setEntry(null);
       setCode(v);
       setStep("unknown");
       return;
     }
-    successBeep();
-    setEntry(bc);
-    setCode(v);
-    // Auto-fast-path when the assignment is already tagged to a student:
-    // skip the picker and jump straight to the camera. The student grid
-    // only appears for class-wide barcodes that have no assignee.
-    if (bc.studentId) {
-      setStudentId(bc.studentId);
-      setStep("camera");
-    } else {
-      setStudentId("");
-      setStep("pick-student");
-    }
+    acceptAssignment(bc as any, v);
   };
 
   const openCamera = () => {
