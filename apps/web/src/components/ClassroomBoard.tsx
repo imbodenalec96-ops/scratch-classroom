@@ -310,21 +310,92 @@ export default function ClassroomBoard() {
     } catch {}
   };
 
-  // Cross-device class-timer trigger — a TIMER-N barcode scanned on
-  // the iPad fires a "start-class-timer" event with a "N min" detail.
-  // The board listens here and kicks off the visual countdown
-  // automatically so the teacher doesn't need to walk over.
+  // Cross-device scan listener — handles events fired from the iPad
+  // (or any other device) so the projector reflects them too:
+  //   • start-class-timer → kick off the board's visual countdown
+  //   • freetime/movement/supply start/end → mirror to local
+  //     localStorage so the roster card status pills render correctly
+  //     (the renderer reads StarStore.getActive*() directly).
+  // Without this mirror step, scans on iPad would update only the
+  // iPad's localStorage; the projector's roster wouldn't know.
   useEffect(() => {
     if (!isTeacher) return;
     let unsub: (() => void) | null = null;
     (async () => {
       const { onStarBoardEvent } = await import("../lib/star/boardEvents.ts");
       unsub = onStarBoardEvent((e: any) => {
-        if (e?.kind !== "start-class-timer") return;
-        const m = /^(\d+)\s*min/i.exec(String(e.detail || ""));
-        const mins = m ? Math.max(1, Math.min(120, Number(m[1]))) : 10;
-        setTimerMinutes(mins);
-        sendTimer("start", mins);
+        if (!e?.kind) return;
+        try {
+          if (e.kind === "start-class-timer") {
+            const m = /^(\d+)\s*min/i.exec(String(e.detail || ""));
+            const mins = m ? Math.max(1, Math.min(120, Number(m[1]))) : 10;
+            setTimerMinutes(mins);
+            sendTimer("start", mins);
+            return;
+          }
+          if (e.kind === "freetime-start") {
+            const m = /^(\d+)\s*min/i.exec(String(e.detail || ""));
+            const mins = m ? Math.max(1, Math.min(120, Number(m[1]))) : 10;
+            StarStore.startFreetime({
+              studentId: e.studentId || "", studentName: e.studentName || "",
+              durationMin: mins, startedAt: new Date().toISOString(),
+            });
+            setTimerNow(Date.now()); // force re-render
+            return;
+          }
+          if (e.kind === "freetime-end") {
+            if (e.studentId) StarStore.endFreetime(e.studentId);
+            setTimerNow(Date.now());
+            return;
+          }
+          if (e.kind === "movement-out") {
+            // detail format: "🎨 Specials" / "🍱 Lunch"
+            const lower = String(e.detail || "").toLowerCase();
+            const kind: "specials" | "lunch" = lower.includes("lunch") ? "lunch" : "specials";
+            StarStore.startMovement({
+              studentId: e.studentId || "", studentName: e.studentName || "",
+              kind, startedAt: new Date().toISOString(),
+            });
+            setTimerNow(Date.now());
+            return;
+          }
+          if (e.kind === "movement-in") {
+            const lower = String(e.detail || "").toLowerCase();
+            const kind: "specials" | "lunch" = lower.includes("lunch") ? "lunch" : "specials";
+            if (e.studentId) StarStore.endMovement(e.studentId, kind);
+            setTimerNow(Date.now());
+            return;
+          }
+          if (e.kind === "supply-out") {
+            const lower = String(e.detail || "").toLowerCase();
+            let supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book" = "Pencil";
+            if (lower.includes("tablet"))     supplyKind = "Tablet";
+            else if (lower.includes("headph")) supplyKind = "Headphones";
+            else if (lower.includes("book") || lower.includes("\""))     supplyKind = "Book";
+            // For Book detail "📚 \"Title\"" — pull title between quotes
+            const titleMatch = /["']([^"']+)["']/.exec(String(e.detail || ""));
+            StarStore.checkoutSupply({
+              studentId: e.studentId || "",
+              studentName: e.studentName || "",
+              supplyKind,
+              bookTitle: supplyKind === "Book" && titleMatch ? titleMatch[1] : undefined,
+            });
+            setTimerNow(Date.now());
+            return;
+          }
+          if (e.kind === "supply-in") {
+            // Best-effort: find a matching active checkout and end it
+            const lower = String(e.detail || "").toLowerCase();
+            const all = StarStore.getSupplyCheckouts();
+            const guess = all.find((c) =>
+              (c.studentId === e.studentId) &&
+              lower.includes(c.supplyKind.toLowerCase())
+            );
+            if (guess) StarStore.returnSupply(guess.id);
+            setTimerNow(Date.now());
+            return;
+          }
+        } catch {}
       });
     })();
     return () => { if (unsub) unsub(); };
@@ -1498,6 +1569,76 @@ export default function ClassroomBoard() {
                 if (sid) passByStudentId[sid] = p;
               }
             })();
+            // Active free time / movement (specials, lunch) / supply
+            // checkouts — collected per-student so the roster card can
+            // surface a status pill at a glance.
+            interface CardStatus {
+              kind: "freetime" | "movement-specials" | "movement-lunch" | "supply";
+              label: string;
+              icon: string;
+              tone: "violet" | "indigo" | "pink" | "amber" | "green";
+              startedAt: string;
+            }
+            const statusByStudentId: Record<string, CardStatus[]> = {};
+            (() => {
+              const idByFirstName = new Map<string, string>();
+              const idByFullName  = new Map<string, string>();
+              for (const bs of board.students) {
+                const sid = String(bs.id);
+                const full = String(bs.name || "").trim().toLowerCase();
+                if (full) idByFullName.set(full, sid);
+                const first = full.split(/\s+/)[0];
+                if (first) idByFirstName.set(first, sid);
+              }
+              const resolve = (sid: string | undefined, sname: string | undefined): string | null => {
+                if (sid && board.students.some((b) => String(b.id) === sid)) return sid;
+                if (sname) {
+                  const lower = sname.trim().toLowerCase();
+                  return idByFullName.get(lower) || idByFirstName.get(lower.split(/\s+/)[0]) || null;
+                }
+                return null;
+              };
+              const push = (sid: string, status: CardStatus) => {
+                (statusByStudentId[sid] ||= []).push(status);
+              };
+              try {
+                for (const f of StarStore.getActiveFreetime()) {
+                  const sid = resolve(f.studentId, f.studentName);
+                  if (sid) push(sid, { kind: "freetime", icon: "🎮", label: `Free ${f.durationMin}m`, tone: "pink", startedAt: f.startedAt });
+                }
+              } catch {}
+              try {
+                for (const m of StarStore.getActiveMovement()) {
+                  const sid = resolve(m.studentId, m.studentName);
+                  if (sid) push(sid, {
+                    kind: m.kind === "specials" ? "movement-specials" : "movement-lunch",
+                    icon: m.kind === "specials" ? "🎨" : "🍱",
+                    label: m.kind === "specials" ? "Specials" : "Lunch",
+                    tone: m.kind === "specials" ? "violet" : "amber",
+                    startedAt: m.startedAt,
+                  });
+                }
+              } catch {}
+              try {
+                for (const c of StarStore.getSupplyCheckouts()) {
+                  const sid = resolve(c.studentId, c.studentName);
+                  if (sid) push(sid, {
+                    kind: "supply",
+                    icon: c.supplyKind === "Pencil" ? "✏️" : c.supplyKind === "Tablet" ? "📱" : c.supplyKind === "Headphones" ? "🎧" : "📚",
+                    label: c.supplyKind === "Book" && c.bookTitle ? c.bookTitle.slice(0, 18) : c.supplyKind,
+                    tone: "green",
+                    startedAt: c.checkedOutAt,
+                  });
+                }
+              } catch {}
+            })();
+            const TONE_BG: Record<string, { bg: string; border: string; color: string }> = {
+              violet: { bg: "rgba(168,85,247,0.20)", border: "rgba(168,85,247,0.55)", color: "#e9d5ff" },
+              indigo: { bg: "rgba(99,102,241,0.20)", border: "rgba(99,102,241,0.55)", color: "#c4b5fd" },
+              pink:   { bg: "rgba(236,72,153,0.20)", border: "rgba(236,72,153,0.55)", color: "#fce7f3" },
+              amber:  { bg: "rgba(245,158,11,0.22)", border: "rgba(245,158,11,0.55)", color: "#fde68a" },
+              green:  { bg: "rgba(16,185,129,0.20)", border: "rgba(16,185,129,0.55)", color: "#bbf7d0" },
+            };
             // Per-student overall letter grade — average percentage across
             // every STAR submission credited to this kid. Same name+id
             // matching pattern as the progress bar so CSV imports + new
@@ -2014,6 +2155,57 @@ export default function ClassroomBoard() {
                         border: "1px solid rgba(236,72,153,0.35)",
                         letterSpacing: "0.06em", textTransform: "uppercase",
                       }}>★ {s.reward_count}× rewarded</div>
+                    )}
+
+                    {/* Active status pills — free time / specials / lunch /
+                        supplies / books. One pill per status, color-coded.
+                        Live elapsed minutes from timerNow. Hidden when none. */}
+                    {(statusByStudentId[String(s.id)] || []).length > 0 && (
+                      <div style={{
+                        display: "flex", flexWrap: "wrap",
+                        justifyContent: "center", gap: 4,
+                        padding: "2px 6px",
+                      }}>
+                        {(statusByStudentId[String(s.id)] || []).map((st, i) => {
+                          const tone = TONE_BG[st.tone];
+                          const elapsedMin = Math.max(0, Math.floor((timerNow - new Date(st.startedAt).getTime()) / 60_000));
+                          const elapsedLabel = elapsedMin === 0 ? "<1m" : `${elapsedMin}m`;
+                          // Movement statuses = the kid is OUT of the room.
+                          // Tag them with "out" so the teacher can read at a
+                          // glance who is physically not present.
+                          const isOut = st.kind === "movement-specials" || st.kind === "movement-lunch";
+                          return (
+                            <span
+                              key={i}
+                              title={`${st.label} · ${elapsedLabel}${isOut ? " · OUT" : ""}`}
+                              style={{
+                                display: "inline-flex", alignItems: "center", gap: 3,
+                                padding: "2px 7px", borderRadius: 999,
+                                background: tone.bg,
+                                border: `1px solid ${tone.border}`,
+                                color: tone.color,
+                                fontSize: 10, fontWeight: 800,
+                                letterSpacing: "0.02em",
+                                lineHeight: 1.1,
+                                fontVariantNumeric: "tabular-nums",
+                                maxWidth: "100%",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden", textOverflow: "ellipsis",
+                              }}
+                            >
+                              <span style={{ fontSize: 11 }}>{st.icon}</span>
+                              {st.label}
+                              {isOut && <span style={{
+                                marginLeft: 2, padding: "0 4px", borderRadius: 4,
+                                background: "rgba(239,68,68,0.30)",
+                                color: "#fecaca",
+                                fontSize: 8, letterSpacing: "0.10em",
+                              }}>OUT</span>}
+                              <span style={{ opacity: 0.75 }}>{elapsedLabel}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
