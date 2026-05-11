@@ -351,7 +351,7 @@ function formatLabel(f: Format): string {
 /* ── Quiz builder for IEP context (uses the QuizGenerator pools) ───
    Avoid circular imports — duplicate the small bits we need. */
 
-function buildQuizForGoal(goal: IepGoal, subject: Subject, count: number, difficulty: Difficulty, grade: string): StarQuestion[] {
+export function buildQuizForGoal(goal: IepGoal, subject: Subject, count: number, difficulty: Difficulty, grade: string): StarQuestion[] {
   // Reuse the QuizGenerator pools. Import lazily to avoid module cycle.
   // The pools function is internal to QuizGenerator.tsx — we re-implement
   // a tiny picker here with very small defaults so this still works
@@ -394,7 +394,7 @@ function buildGenericQuiz(subject: Subject, count: number, difficulty: Difficult
 
 /* ── Reflection prompts for behavior / SEL goals ─────────────────── */
 
-function buildReflectionQuestions(goal: IepGoal, count: number): StarQuestion[] {
+export function buildReflectionQuestions(goal: IepGoal, count: number): StarQuestion[] {
   const base: string[] = [];
   const area = (goal.area || "").toLowerCase();
   if (area.includes("on-task") || /on[-\s]?task/i.test(goal.goalText)) {

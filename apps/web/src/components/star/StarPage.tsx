@@ -23,6 +23,7 @@ import RefusalFormGenerator from "./RefusalFormGenerator.tsx";
 import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
 import IepTracker from "./IepTracker.tsx";
 import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
+import IepPacketGenerator from "./IepPacketGenerator.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -273,9 +274,14 @@ export default function StarPage() {
 
           {/* GROUP 2 — IEP-aligned (auto-logs progress on grade) */}
           <CreateGroup label="IEP-Aligned" hint="Pick a kid's IEP goal — generated work auto-logs Met/Partial/Not yet on score.">
-            <SectionWrapper icon="🎯" title="From an IEP goal" description="Worksheet, quiz, or reflection — tied to a specific goal so the SEIF report fills in by itself.">
-              <IepAssignmentGenerator />
-            </SectionWrapper>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
+              <SectionWrapper icon="📦" title="IEP packet (every kid × every goal)" description="One tap — generates an IEP-aligned worksheet for each kid for each of their goals. Synthesizes a grade-level goal if a kid has none on file.">
+                <IepPacketGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="🎯" title="From an IEP goal" description="Worksheet, quiz, or reflection — tied to a specific goal so the SEIF report fills in by itself.">
+                <IepAssignmentGenerator />
+              </SectionWrapper>
+            </div>
           </CreateGroup>
 
           {/* GROUP 3 — Quizzes (MCQ format) */}
