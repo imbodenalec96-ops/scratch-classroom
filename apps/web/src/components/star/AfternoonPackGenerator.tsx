@@ -16,7 +16,7 @@ import {
 import { bc128svg } from "../../lib/star/barcode.ts";
 import { successBeep, errorBeep, loggedBeep } from "../../lib/star/sounds.ts";
 import { pushBarcodeToServer } from "../../lib/star/barcodeRelay.ts";
-import { buildLocalLesson, type Lesson } from "./AssignmentGenerator.tsx";
+import { buildLocalLesson, synthesizeChoicesForAll, type Lesson } from "./AssignmentGenerator.tsx";
 import { Modal } from "./ui.tsx";
 
 const SUBJECTS: Subject[] = ["Math", "Reading", "Writing", "Spelling", "Science", "Social Studies", "SEL"];
@@ -62,6 +62,9 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
   // gradebook to grade after scan, no paper key needed. Duplex
   // printers will fit two kids per sheet; no wasted paper.
   const [autoMatchGrade, setAutoMatchGrade] = useState(true);
+  // Multiple-choice mode — when on, every question in the pack gets
+  // 4 A/B/C/D bubble choices (real answer + 3 plausible distractors).
+  const [mcqMode, setMcqMode] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(students.map((s) => s.id)));
   const [overrides, setOverrides] = useState<Record<string, PerStudentOverride>>({});
   const [editing, setEditing] = useState<PackEntry | null>(null);
@@ -107,6 +110,7 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         const kidDifficulty = ov.difficulty || difficulty;
         const kidCount = ov.count || count;
         const built = buildLocalLesson({ subject: kidSubject, grade: kidGrade, count: kidCount, difficulty: kidDifficulty, goal: "" });
+        if (mcqMode) built.questions = synthesizeChoicesForAll(built.questions);
         // Keep the per-kid prefix consistent so different subjects in the
         // same pack don't collide on barcode IDs.
         const kidPrefix = kidSubject.slice(0, 2).toUpperCase();
@@ -185,6 +189,23 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
           <input type="checkbox" checked={autoMatchGrade} onChange={(e) => setAutoMatchGrade(e.target.checked)} />
           Use each kid's actual grade level (recommended)
+        </label>
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer",
+          padding: "4px 10px", borderRadius: 8,
+          background: mcqMode
+            ? "linear-gradient(135deg, rgba(16,185,129,0.20), rgba(99,102,241,0.10))"
+            : "rgba(255,255,255,0.04)",
+          border: `1px solid ${mcqMode ? "rgba(16,185,129,0.50)" : "rgba(255,255,255,0.10)"}`,
+          color: mcqMode ? "#bbf7d0" : "rgba(245,241,232,0.85)",
+          fontWeight: 700,
+        }}>
+          <input
+            type="checkbox" checked={mcqMode}
+            onChange={(e) => setMcqMode(e.target.checked)}
+            style={{ accentColor: "#a855f7" }}
+          />
+          🅰️ Multiple choice (A/B/C/D)
         </label>
       </div>
 
@@ -481,12 +502,30 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
       </div>
     ` : "";
 
-    const qHtml = p.questions.map((q) => `
-      <div style="margin-bottom:14px;page-break-inside:avoid">
-        <div style="font-size:14px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
-        <div style="border-bottom:1.5px solid #444;height:32px;margin-top:6px"></div>
-      </div>
-    `).join("");
+    const qHtml = p.questions.map((q) => {
+      const hasChoices = Array.isArray(q.choices) && q.choices.length >= 2;
+      if (hasChoices) {
+        const bubbles = q.choices!.map((c, i) => {
+          const letter = String.fromCharCode(65 + i);
+          return `<div style="font-size:13px;display:flex;gap:8px;align-items:flex-start;color:#222">
+            <span style="border:1.5px solid #555;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">${letter}</span>
+            <span>${escapeHtml(c)}</span>
+          </div>`;
+        }).join("");
+        return `
+          <div style="margin-bottom:14px;page-break-inside:avoid">
+            <div style="font-size:14px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
+            <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px">${bubbles}</div>
+          </div>
+        `;
+      }
+      return `
+        <div style="margin-bottom:14px;page-break-inside:avoid">
+          <div style="font-size:14px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
+          <div style="border-bottom:1.5px solid #444;height:32px;margin-top:6px"></div>
+        </div>
+      `;
+    }).join("");
 
     return `
       <div class="page">

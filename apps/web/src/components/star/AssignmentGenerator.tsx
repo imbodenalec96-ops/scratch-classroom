@@ -447,7 +447,7 @@ const SUBJECT_RULES: Record<string, string> = {
 // answer always included; distractors drawn from other answers in
 // the same pool (kept on-topic), padded with generic close-misses
 // when the pool is too small. Final list is shuffled.
-function synthesizeChoicesForAll(qs: StarQuestion[]): StarQuestion[] {
+export function synthesizeChoicesForAll(qs: StarQuestion[]): StarQuestion[] {
   const pool = qs.map((q) => q.answer).filter((a) => a && a.length > 0);
   return qs.map((q) => {
     if (Array.isArray(q.choices) && q.choices.length >= 2) return q;
