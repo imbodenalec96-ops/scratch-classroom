@@ -45,19 +45,31 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: "npm"
 
-      - name: Install root deps
-        run: npm install --no-audit --no-fund
+      # Skip the root workspace install entirely — npm hoists app-builder-bin
+      # and silently drops its postinstall, so the helper binary is never
+      # downloaded and electron-builder fails with ENOENT.
+      # Installing inside apps/desktop with --no-workspaces creates a real
+      # local node_modules with all postinstall scripts firing properly.
+      - name: Install desktop deps (standalone)
+        working-directory: apps/desktop
+        run: npm install --no-workspaces --no-audit --no-fund --foreground-scripts
 
-      # npm workspaces silently skips the postinstall on hoisted packages,
-      # so app-builder-bin/{mac,win}/<binary> never gets downloaded → the
-      # build fails with ENOENT spawning the helper. Force-rebuild to
-      # trigger the install.js for these specific packages.
-      - name: Rebuild native binaries (app-builder-bin, etc)
+      # Belt-and-suspenders: explicitly rebuild app-builder-bin in case
+      # npm STILL skipped its postinstall in some edge case.
+      - name: Force-trigger app-builder-bin postinstall
+        working-directory: apps/desktop
+        run: npm rebuild app-builder-bin --foreground-scripts
+
+      - name: Verify helper binary actually downloaded
+        working-directory: apps/desktop
+        shell: bash
         run: |
-          npm rebuild app-builder-bin
-          npm rebuild --workspace=@scratch/desktop
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            ls -la node_modules/app-builder-bin/mac/ || (echo "::error::Mac helper missing" && exit 1)
+          elif [ "${{ runner.os }}" = "Windows" ]; then
+            ls -la node_modules/app-builder-bin/win/x64/ || (echo "::error::Win helper missing" && exit 1)
+          fi
 
       - name: Generate icons
         working-directory: apps/desktop
@@ -66,8 +78,6 @@ jobs:
       - name: Build installer
         working-directory: apps/desktop
         env:
-          # electron-builder reaches GitHub for code-signing and update
-          # metadata; without a token we just skip publishing.
           GH_TOKEN: ""
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.target }}
