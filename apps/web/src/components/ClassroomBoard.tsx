@@ -293,6 +293,41 @@ export default function ClassroomBoard() {
   const timerVisible = !!timer && (timer.state === "running" || timer.state === "paused");
   const timerExpiringSoon = timer?.state === "running" && timerRemainingMs > 0 && timerRemainingMs <= 60_000;
   const timerHitZero = timer?.state === "running" && timerRemainingMs === 0;
+
+  // ── Done-chime ─────────────────────────────────────────────────
+  // Plays a synthesized 3-beep bell when the class timer hits zero.
+  // No audio asset needed — pure WebAudio. Guarded by a ref keyed to
+  // timer.ends_at so we play exactly once per timer instance even
+  // though timerHitZero stays true for the rest of that tick window.
+  const playedChimeForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!timerHitZero) return;
+    const key = String(timer?.ends_at || "");
+    if (!key || playedChimeForRef.current === key) return;
+    playedChimeForRef.current = key;
+    try {
+      const Ctx: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const beep = (when: number, freq: number, dur: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + when);
+        gain.gain.setValueAtTime(0, ctx.currentTime + when);
+        gain.gain.linearRampToValueAtTime(0.55, ctx.currentTime + when + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + dur);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + when);
+        osc.stop(ctx.currentTime + when + dur + 0.02);
+      };
+      beep(0,    880, 0.35);
+      beep(0.45, 880, 0.35);
+      beep(0.90, 1175, 0.55);
+      setTimeout(() => { try { ctx.close(); } catch {} }, 2200);
+    } catch {}
+  }, [timerHitZero, timer?.ends_at]);
+
   const fmtTime = (ms: number) => {
     const total = Math.ceil(ms / 1000);
     const m = Math.floor(total / 60);
