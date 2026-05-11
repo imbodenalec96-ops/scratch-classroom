@@ -86,11 +86,41 @@ export async function pullBarcodesFromServer(): Promise<number> {
  *  the cache. */
 export async function lookupBarcodeOnServer(barcode: string): Promise<BcEntry | null> {
   const classId = getActiveClassId();
-  if (!classId) return null;
+  // Try the class-scoped (authed) endpoint first when we have a class
+  // id — it's the same data but scoped, and any auth-only deploys keep
+  // working. If anything goes wrong (no class id, no auth, 404, etc.)
+  // fall through to the public global lookup so phones that have never
+  // logged in can still resolve a freshly-minted worksheet barcode.
+  if (classId) {
+    try {
+      const res = await api.starBarcodeGet(classId, barcode);
+      const entry = res?.payload as BcEntry;
+      if (entry && entry.id) {
+        return await cacheAndReturn(entry);
+      }
+    } catch {}
+  }
   try {
-    const res = await api.starBarcodeGet(classId, barcode);
+    const res = await api.starBarcodePublicLookup(barcode);
     const entry = res?.payload as BcEntry;
     if (!entry || !entry.id) return null;
+    // Side-effect: if the public lookup told us which class this
+    // barcode belongs to and we don't have one set yet, adopt it so
+    // future calls hit the fast authed path.
+    if (res.class_id && !getActiveClassId()) {
+      try {
+        const { setActiveClassId } = await import("./boardEvents.ts");
+        setActiveClassId(res.class_id);
+      } catch {}
+    }
+    return await cacheAndReturn(entry);
+  } catch {
+    return null;
+  }
+}
+
+async function cacheAndReturn(entry: BcEntry): Promise<BcEntry | null> {
+  try {
     const bcDB = StarStore.getBcDB();
     bcDB[entry.id] = entry;
     StarStore.setBcDB(bcDB);

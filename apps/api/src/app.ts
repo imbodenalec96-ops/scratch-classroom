@@ -37,6 +37,7 @@ import boardRoutes from "./routes/board.js";
 import storeRoutes from "./routes/store.js";
 import adminAssignmentRoutes from "./routes/admin-assignments.js";
 import extrasRoutes from "./routes/extras.js";
+import publicStarRoutes from "./routes/public-star.js";
 
 const app = express();
 
@@ -76,6 +77,10 @@ app.use("/api/auth", authRoutes);
 
 // Admin routes (no auth required for now)
 app.use("/api/admin", adminAssignmentRoutes);
+
+// Public STAR barcode lookup — phones that haven't logged in still
+// need to identify scanned worksheet barcodes. Read-only.
+app.use("/api/public", publicStarRoutes);
 
 // Protected routes
 app.use("/api/classes", authMiddleware, classRoutes);

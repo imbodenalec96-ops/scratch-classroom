@@ -39,6 +39,11 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
   const [count, setCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<typeof DIFFICULTIES[number]>("Medium");
   const [goal, setGoal] = useState("");
+  // Multiple-choice mode — when on, every question gets 4 plausible
+  // choices (one correct + 3 distractors). The print + GradebookModal
+  // both already honor q.choices[], so no rendering changes needed
+  // elsewhere.
+  const [mcqMode, setMcqMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ id: string; questions: StarQuestion[]; lesson: Lesson } | null>(null);
 
@@ -67,7 +72,7 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
                 },
                 {
                   role: "user",
-                  content: buildPrompt({ subject, grade, count, difficulty, goal, studentName }),
+                  content: buildPrompt({ subject, grade, count, difficulty, goal, studentName, mcq: mcqMode }),
                 },
               ],
               temperature: 0.6,
@@ -87,6 +92,9 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
               num: Number(q?.num ?? q?.number ?? (i + 1)) || (i + 1),
               text: String(q?.text || q?.question || q?.prompt || q?.q || `Question ${i + 1}`).trim(),
               answer: String(q?.answer || q?.response || q?.a || q?.solution || "").trim(),
+              choices: Array.isArray(q?.choices) && q.choices.length >= 2
+                ? q.choices.map((c: any) => String(c).trim()).filter(Boolean).slice(0, 4)
+                : undefined,
             })).filter((q: StarQuestion) => {
               if (!q.text || q.text.length <= 2) return false;
               const key = q.text.toLowerCase();
@@ -105,6 +113,14 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
         const local = buildLocalLesson({ subject, grade, count, difficulty, goal });
         questions = local.questions;
         lesson = local.lesson;
+      }
+
+      // MCQ mode — synthesize 4 choices per question if the generator
+      // didn't produce them (always true for the local fallback; AI may
+      // or may not honor the prompt). Distractors are drawn from other
+      // answers in the same set, which keeps them on-topic.
+      if (mcqMode && questions) {
+        questions = synthesizeChoicesForAll(questions);
       }
 
       // Build barcode ID
@@ -212,6 +228,28 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
             {DIFFICULTIES.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </Field>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer",
+          padding: "8px 12px", borderRadius: 10,
+          background: mcqMode
+            ? "linear-gradient(135deg, rgba(16,185,129,0.20), rgba(99,102,241,0.10))"
+            : "rgba(255,255,255,0.04)",
+          border: `1px solid ${mcqMode ? "rgba(16,185,129,0.50)" : "rgba(255,255,255,0.10)"}`,
+          fontSize: 13, color: mcqMode ? "#bbf7d0" : "rgba(245,241,232,0.75)", fontWeight: 700,
+        }}>
+          <input
+            type="checkbox" checked={mcqMode}
+            onChange={(e) => setMcqMode(e.target.checked)}
+            style={{ accentColor: "#a855f7", width: 16, height: 16 }}
+          />
+          <span>🅰️ Multiple choice (A/B/C/D)</span>
+          <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.65 }}>
+            — 4 options per question, real answer + 3 plausible distractors
+          </span>
+        </label>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, gap: 10, flexWrap: "wrap" }}>
@@ -405,7 +443,48 @@ const SUBJECT_RULES: Record<string, string> = {
   Library:          "ONLY questions about books, authors, library organization, or reading habits.",
 };
 
-function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string }) {
+// Add 4 plausible multiple-choice options to every question. Real
+// answer always included; distractors drawn from other answers in
+// the same pool (kept on-topic), padded with generic close-misses
+// when the pool is too small. Final list is shuffled.
+function synthesizeChoicesForAll(qs: StarQuestion[]): StarQuestion[] {
+  const pool = qs.map((q) => q.answer).filter((a) => a && a.length > 0);
+  return qs.map((q) => {
+    if (Array.isArray(q.choices) && q.choices.length >= 2) return q;
+    const others = pool.filter((a) => a.toLowerCase() !== (q.answer || "").toLowerCase());
+    const picked: string[] = [];
+    const seen = new Set([q.answer.toLowerCase()]);
+    const shuffled = [...others].sort(() => Math.random() - 0.5);
+    for (const o of shuffled) {
+      const key = o.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push(o);
+      if (picked.length === 3) break;
+    }
+    // Pad with simple close-misses for math (off-by-one / off-by-ten)
+    // and generic placeholders for everything else.
+    const num = Number(q.answer);
+    while (picked.length < 3) {
+      let extra = "";
+      if (Number.isFinite(num)) {
+        const offsets = [-1, 1, -2, 2, -10, 10];
+        for (const d of offsets) {
+          const cand = String(num + d);
+          if (!seen.has(cand.toLowerCase())) { extra = cand; break; }
+        }
+      }
+      if (!extra) extra = ["None of these", "All of these", "Not sure", "Other"][picked.length] || `Option ${picked.length + 1}`;
+      if (seen.has(extra.toLowerCase())) { extra = extra + " "; }
+      seen.add(extra.toLowerCase());
+      picked.push(extra);
+    }
+    const choices = [q.answer, ...picked.slice(0, 3)].sort(() => Math.random() - 0.5);
+    return { ...q, choices };
+  });
+}
+
+function buildPrompt(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; studentName: string; mcq?: boolean }) {
   const subjectBodyGuidance: Record<string, string> = {
     "Social Studies":
       "Write the lesson body as a SHORT NARRATIVE STORY (5–9 kid-friendly sentences) that names every fact a student needs.",
@@ -454,9 +533,11 @@ Return ONLY raw JSON in this exact shape (no markdown, no fences):
     "vocab": [{ "term": "key word", "definition": "kid-friendly meaning" }]
   },
   "questions": [
-    { "text": "Question that's answered in the body above", "answer": "Exact answer from the body" }
+    { "text": "Question that's answered in the body above", "answer": "Exact answer from the body"${opts.mcq ? `, "choices": ["correct answer", "plausible distractor #1", "plausible distractor #2", "plausible distractor #3"]` : ""} }
   ]
-}`;
+}${opts.mcq ? `
+
+MULTIPLE-CHOICE MODE: every question MUST include a "choices" array of EXACTLY 4 strings. The correct answer is one of them (do not mark which — the app shuffles them). The other 3 are plausible but wrong distractors at the same grade level. Distractors must NOT match the correct answer in meaning. For math, use off-by-one / off-by-ten style misses. For Reading/Science/Social Studies, pick close-but-wrong facts from the lesson body.` : ""}`;
 }
 
 function safeParseJSON(s: string): any | null {
@@ -1604,12 +1685,27 @@ function openPrintWindow(bc: BcEntry & { type: "assignment" }, questions: StarQu
         </div>`;
     }
     // student / key / large — same layout, knobs scale font + line height.
+    const hasChoices = Array.isArray(q.choices) && q.choices.length >= 2;
+    const mcqBlock = hasChoices ? `
+      <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px">
+        ${q.choices!.map((c, i) => {
+          const letter = String.fromCharCode(65 + i);
+          const isCorrect = isKey && c.trim().toLowerCase() === (q.answer || "").trim().toLowerCase();
+          return `<div style="font-size:${layout.qFs - 1}px;display:flex;gap:8px;align-items:flex-start;${isCorrect ? "color:#16a34a;font-weight:800" : "color:#222"}">
+            <span style="border:1.5px solid #555;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0;${isCorrect ? "border-color:#16a34a;background:#16a34a;color:white" : ""}">${letter}</span>
+            <span>${escapeHtml(c)}</span>
+          </div>`;
+        }).join("")}
+      </div>
+    ` : "";
     return `
       <div style="margin-bottom:${layout.gap}px;page-break-inside:avoid">
         <div style="font-size:${layout.qFs}px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
-        ${isKey
-          ? `<div style="font-size:${layout.qFs - 1}px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
-          : `<div style="border-bottom:1.5px solid #444;height:${layout.lineH}px;margin-top:6px"></div>`}
+        ${hasChoices
+          ? mcqBlock
+          : (isKey
+              ? `<div style="font-size:${layout.qFs - 1}px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
+              : `<div style="border-bottom:1.5px solid #444;height:${layout.lineH}px;margin-top:6px"></div>`)}
       </div>`;
   }).join("");
 

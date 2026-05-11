@@ -64,6 +64,13 @@ export const api = {
     request<{ barcode: string; payload: any; created_at: string }>(
       `/classes/${classId}/star-barcodes/${encodeURIComponent(barcode)}`,
     ),
+  // Public global lookup — does NOT require auth or a known class id.
+  // Used by phones / never-logged-in devices to identify a worksheet
+  // barcode for the photo-capture flow.
+  starBarcodePublicLookup: (barcode: string) =>
+    request<{ barcode: string; payload: any; class_id: string; created_at: string }>(
+      `/public/star-barcodes/${encodeURIComponent(barcode)}`,
+    ),
   getClasses: () => request<any[]>("/classes"),
   createClass: (name: string) => request<any>("/classes", { method: "POST", body: JSON.stringify({ name }) }),
   getClass: (id: string) => request<any>(`/classes/${id}`),
