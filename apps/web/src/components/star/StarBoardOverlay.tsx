@@ -47,6 +47,21 @@ export default function StarBoardOverlay() {
     if (e.kind === "pass-out" || e.kind === "pass-in") return;
     // scan-to-phone is consumed by /star/phone; not a board overlay.
     if (e.kind === "scan-to-phone") return;
+    // BUGFIX: these new event kinds were defaulting to the
+    // RefusalOverlay because the binary `kind === "completion"` ?
+    // CompletionOverlay : RefusalOverlay swallowed them. They have
+    // their own UI (status pills on the roster card / brief toast on
+    // the scanner / board timer kickoff) — no full takeover here.
+    if (
+      e.kind === "movement-out"     ||
+      e.kind === "movement-in"      ||
+      e.kind === "freetime-start"   ||
+      e.kind === "freetime-end"     ||
+      e.kind === "supply-out"       ||
+      e.kind === "supply-in"        ||
+      e.kind === "start-class-timer"||
+      e.kind === "photo-saved"
+    ) return;
     setEvt(e);
     if (e.kind === "completion") {
       successBeep();
