@@ -1,24 +1,29 @@
-// Polls /version.json every 60s. When the version on disk differs
-// from the version baked into THIS bundle, shows a small toast that
-// nudges the user to refresh. Fixes the "I shipped but my iPad is
-// still on the old build" problem without needing a service worker.
+// Polls /version.json every 30s + on tab-focus + on visibility change.
+// When the version on disk differs from the version baked into THIS
+// bundle, the user gets a 10-second warning toast then the page
+// auto-reloads.
+//
+// AUTO-RELOAD is on by default because the alternative is "user
+// keeps seeing stale code and getting confused." If the user is
+// actively typing/scanning, the in-flight work goes through before
+// the reload (the toast is shown for 10 seconds first).
 //
 // Mount once near the App root.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// Polling cadence — 60s is a reasonable balance between freshness and
-// not hammering the server. Kicks once on mount + when the tab returns
-// to focus (covers the "iPad locked overnight" case).
-const POLL_INTERVAL_MS = 60_000;
-
-// Don't pester until at least 5s after mount, so initial loads don't
-// flash "new version" if the in-flight version.json races the bundle.
+// Faster cadence — 30s. Cheap (one tiny JSON fetch).
+const POLL_INTERVAL_MS = 30_000;
+// Grace period before the very first poll, so cold-load races don't trigger a phantom "new version".
 const STARTUP_GRACE_MS = 5_000;
+// Once a mismatch is detected, how long to show the toast before auto-reloading.
+const AUTO_RELOAD_AFTER_MS = 10_000;
 
 export default function UpdateChecker() {
   const [latest, setLatest] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const reloadTimerRef = useRef<number | null>(null);
   const current = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
 
   useEffect(() => {
@@ -40,11 +45,8 @@ export default function UpdateChecker() {
       }
     };
 
-    // First tick on mount.
     check();
-    // Recurring tick.
     timer = window.setInterval(check, POLL_INTERVAL_MS);
-    // Re-check when the tab regains focus.
     const onFocus = () => check();
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -57,15 +59,64 @@ export default function UpdateChecker() {
     };
   }, [current]);
 
+  // Once a mismatch is detected (and not dismissed), start a 10-sec
+  // countdown then force a full reload. This is intentional: the
+  // alternative is "user keeps using stale code and reports bugs
+  // that aren't bugs."
+  useEffect(() => {
+    if (!latest || dismissed) {
+      if (reloadTimerRef.current) { window.clearInterval(reloadTimerRef.current); reloadTimerRef.current = null; }
+      setSecondsLeft(null);
+      return;
+    }
+    setSecondsLeft(Math.floor(AUTO_RELOAD_AFTER_MS / 1000));
+    reloadTimerRef.current = window.setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s == null) return s;
+        if (s <= 1) {
+          if (reloadTimerRef.current) window.clearInterval(reloadTimerRef.current);
+          // Wipe service workers + caches first so the reload definitely fetches fresh.
+          (async () => {
+            try {
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((r) => r.unregister()));
+              }
+              if ("caches" in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+              }
+            } catch {}
+            try { (window.location as any).reload(true); }
+            catch { window.location.reload(); }
+          })();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      if (reloadTimerRef.current) { window.clearInterval(reloadTimerRef.current); reloadTimerRef.current = null; }
+    };
+  }, [latest, dismissed]);
+
   if (!latest || dismissed) return null;
 
   const refresh = () => {
-    // Force a full reload (skip cache where possible). location.reload()
-    // accepts a deprecated `true` arg in older browsers; modern ones
-    // ignore it but still re-validate against the no-cache headers we
-    // set on /index.html.
-    try { (window.location as any).reload(true); }
-    catch { window.location.reload(); }
+    (async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch {}
+      try { (window.location as any).reload(true); }
+      catch { window.location.reload(); }
+    })();
   };
 
   return (
@@ -99,10 +150,10 @@ export default function UpdateChecker() {
         <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>🆕</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "-0.005em" }}>
-            New version available
+            New version — auto-refresh{secondsLeft != null ? ` in ${secondsLeft}s` : "…"}
           </div>
           <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600, marginTop: 2 }}>
-            You're on <code style={{ fontFamily: "Menlo, monospace" }}>{current}</code> · latest is <code style={{ fontFamily: "Menlo, monospace" }}>{latest}</code>
+            You're on <code style={{ fontFamily: "Menlo, monospace" }}>{current}</code> → updating to <code style={{ fontFamily: "Menlo, monospace" }}>{latest}</code>
           </div>
         </div>
       </div>
@@ -127,7 +178,7 @@ export default function UpdateChecker() {
             touchAction: "manipulation",
           }}
           aria-label="Dismiss"
-        >Later</button>
+        >Skip</button>
       </div>
     </div>
   );
