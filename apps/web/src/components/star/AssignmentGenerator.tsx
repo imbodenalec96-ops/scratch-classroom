@@ -744,6 +744,61 @@ const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 2, gradeMax: 4,
   },
+  // ── Round 2 ──────────────────────────────────────────────
+  {
+    title: "Why We Vote",
+    intro: "Read about voting in our country.",
+    body: "VOTING is how people in our country choose their leaders. The United States is a DEMOCRACY, which means the people get to pick. Every election, citizens 18 years old and older can vote. They go to a polling place or mail in a ballot. Each person gets ONE vote. The candidate with the most votes usually wins. We vote for our president, governors, mayors, and even for school board members. Voting matters because the leaders we pick make the laws and decisions that affect everyone. People without the right to vote in the past — including women and Black Americans — fought hard for it, and we honor that history every time we vote.",
+    qa: [
+      { text: "What is voting?", answer: "How people choose their leaders" },
+      { text: "What kind of country is the United States?", answer: "A democracy" },
+      { text: "How old must you be to vote?", answer: "18 years old" },
+      { text: "Where do people go to vote?", answer: "A polling place" },
+      { text: "What is another way to vote?", answer: "Mail in a ballot" },
+      { text: "How many votes does each person get?", answer: "One" },
+      { text: "Name one leader we vote for.", answer: "President, governor, mayor, or school board member" },
+      { text: "Who usually wins an election?", answer: "The candidate with the most votes" },
+      { text: "Why does voting matter?", answer: "Leaders we pick make the laws and decisions" },
+      { text: "Who fought for the right to vote in the past?", answer: "Women and Black Americans" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "Continents and Oceans",
+    intro: "Read about the big pieces of land and water on Earth.",
+    body: "Earth has SEVEN continents and FIVE oceans. The continents are: NORTH AMERICA, SOUTH AMERICA, EUROPE, ASIA, AFRICA, AUSTRALIA, and ANTARCTICA. ASIA is the biggest continent and has the most people. AUSTRALIA is the smallest. ANTARCTICA is the coldest — it is covered in ice. The five oceans are: PACIFIC, ATLANTIC, INDIAN, ARCTIC, and SOUTHERN. The PACIFIC is the biggest and deepest ocean. The ARCTIC is the smallest. The United States is in NORTH AMERICA. We are bordered by the ATLANTIC OCEAN on the east and the PACIFIC OCEAN on the west.",
+    qa: [
+      { text: "How many continents are there?", answer: "Seven" },
+      { text: "How many oceans are there?", answer: "Five" },
+      { text: "Which continent is the biggest?", answer: "Asia" },
+      { text: "Which continent has the most people?", answer: "Asia" },
+      { text: "Which continent is the smallest?", answer: "Australia" },
+      { text: "Which continent is the coldest?", answer: "Antarctica" },
+      { text: "Which ocean is the biggest?", answer: "The Pacific" },
+      { text: "Which ocean is the smallest?", answer: "The Arctic" },
+      { text: "Which continent is the United States on?", answer: "North America" },
+      { text: "Which ocean is on the east coast of the United States?", answer: "The Atlantic" },
+    ],
+    gradeMin: 2, gradeMax: 5,
+  },
+  {
+    title: "Money in the United States",
+    intro: "Read about how American money works.",
+    body: "American money comes in COINS and BILLS. The four coins kids learn first are the PENNY (1 cent), NICKEL (5 cents), DIME (10 cents), and QUARTER (25 cents). 100 pennies make a DOLLAR. Bills come in $1, $5, $10, $20, $50, and $100. Different presidents are pictured on each bill. George Washington is on the $1, Abraham Lincoln is on the $5, and Andrew Jackson is on the $20. We use money to buy things we need (like food and clothes) and things we want (like toys and games). When you put money away to use later, that's called SAVING. When you spend money, you usually get back CHANGE if you paid more than the price.",
+    qa: [
+      { text: "What two main forms does money come in?", answer: "Coins and bills" },
+      { text: "How much is a penny worth?", answer: "1 cent" },
+      { text: "How much is a nickel worth?", answer: "5 cents" },
+      { text: "How much is a dime worth?", answer: "10 cents" },
+      { text: "How much is a quarter worth?", answer: "25 cents" },
+      { text: "How many pennies make a dollar?", answer: "100" },
+      { text: "Which president is on the $1 bill?", answer: "George Washington" },
+      { text: "Which president is on the $5 bill?", answer: "Abraham Lincoln" },
+      { text: "What do we call putting money away to use later?", answer: "Saving" },
+      { text: "What do we call money you get back when you pay more than the price?", answer: "Change" },
+    ],
+    gradeMin: 1, gradeMax: 4,
+  },
 ];
 
 const SCIENCE_TOPICS: LocalTopic[] = [
@@ -943,6 +998,61 @@ const SCIENCE_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 3, gradeMax: 5,
   },
+  // ── Round 2 ──────────────────────────────────────────────
+  {
+    title: "Day and Night",
+    intro: "Read about why we have day and night.",
+    body: "Earth is shaped like a giant ball, and it spins around once every 24 hours. The side of Earth facing the SUN has DAY. The side facing away from the Sun has NIGHT. The Sun does not actually move across the sky — Earth's spinning makes it look that way. We see the Sun rise in the EAST in the morning and set in the WEST in the evening. At night we can see the MOON and STARS because the Sun's bright light is on the other side of the planet. Earth keeps spinning, so day and night happen everywhere, just at different times.",
+    qa: [
+      { text: "What shape is Earth?", answer: "Like a giant ball" },
+      { text: "How long does Earth take to spin once?", answer: "24 hours" },
+      { text: "Which side of Earth has day?", answer: "The side facing the Sun" },
+      { text: "Which side has night?", answer: "The side facing away from the Sun" },
+      { text: "Does the Sun actually move across the sky?", answer: "No" },
+      { text: "What direction does the Sun rise?", answer: "East" },
+      { text: "What direction does the Sun set?", answer: "West" },
+      { text: "What can we see in the night sky?", answer: "The Moon and stars" },
+      { text: "Why can't we see the Sun at night?", answer: "It is on the other side of the planet" },
+      { text: "Does day and night happen everywhere on Earth?", answer: "Yes" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Magnets",
+    intro: "Read about a special force called magnetism.",
+    body: "A MAGNET is an object that can pull certain metals toward it without touching them. The pulling force is called MAGNETISM. Magnets only stick to a few metals — mostly IRON, STEEL, NICKEL, and COBALT. They do not stick to wood, plastic, glass, paper, or aluminum. Every magnet has two ends called POLES: a NORTH pole and a SOUTH pole. Opposite poles attract each other (a north pole and a south pole pull together). Same poles repel each other (two norths push apart). The Earth itself acts like a giant magnet, which is why a compass needle always points to the North Pole.",
+    qa: [
+      { text: "What is a magnet?", answer: "An object that can pull certain metals toward it" },
+      { text: "What is the pulling force called?", answer: "Magnetism" },
+      { text: "Name two metals magnets stick to.", answer: "Iron and steel" },
+      { text: "Name something a magnet does NOT stick to.", answer: "Wood, plastic, glass, paper, or aluminum" },
+      { text: "What are the two ends of a magnet called?", answer: "Poles" },
+      { text: "What are the names of the two poles?", answer: "North and south" },
+      { text: "What happens with opposite poles?", answer: "They attract" },
+      { text: "What happens with same poles?", answer: "They repel" },
+      { text: "What does Earth act like?", answer: "A giant magnet" },
+      { text: "Why does a compass needle point north?", answer: "Because Earth acts like a giant magnet" },
+    ],
+    gradeMin: 2, gradeMax: 4,
+  },
+  {
+    title: "Sound and How We Hear It",
+    intro: "Read about what sound is.",
+    body: "SOUND is made when something VIBRATES, or shakes back and forth very fast. When you pluck a guitar string, the string vibrates. The vibration pushes the air around it. The air carries the vibration in waves to your ears. Inside your ear, a small skin called the EARDRUM catches the wave and starts to vibrate too. Tiny bones pass the vibration to your brain, which understands it as sound. LOUD sounds have BIG vibrations; QUIET sounds have small ones. HIGH-PITCHED sounds (like a whistle) have FAST vibrations; LOW-PITCHED sounds (like a drum) have slow ones. Sound cannot travel through empty space — it needs air, water, or another material to carry the vibration.",
+    qa: [
+      { text: "What makes sound?", answer: "Something vibrating" },
+      { text: "What does vibrate mean?", answer: "Shake back and forth very fast" },
+      { text: "What carries sound to your ears?", answer: "Waves in the air" },
+      { text: "What part of your ear catches the wave?", answer: "The eardrum" },
+      { text: "What pass the vibration to your brain?", answer: "Tiny bones" },
+      { text: "Do loud sounds have big or small vibrations?", answer: "Big" },
+      { text: "What kind of vibrations make a high-pitched sound?", answer: "Fast" },
+      { text: "What kind of vibrations make a low-pitched sound?", answer: "Slow" },
+      { text: "Give an example of a high-pitched sound.", answer: "A whistle" },
+      { text: "Can sound travel through empty space?", answer: "No" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
 ];
 
 const READING_TOPICS: LocalTopic[] = [
@@ -1106,6 +1216,79 @@ const READING_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 4, gradeMax: 5,
   },
+  // ── Round 2 of added stories ─────────────────────────────
+  {
+    title: "The Puddle on the Way to School",
+    intro: "Read about a small thing that turned into a big mess.",
+    body: "On a foggy Wednesday morning, Eli walked to school in new white sneakers. His mom had warned him to walk around any puddles. Halfway to school, he saw the biggest puddle he had ever seen — it took up the whole sidewalk. Eli decided to jump it. He took five running steps, leaped, and landed exactly in the middle. Brown water splashed up to his knees. His sneakers turned the color of mud. When he got to class, his teacher Mrs. Hill laughed kindly and lent him an old pair of gym shoes. Eli rinsed his sneakers in the bathroom sink. They never went back to perfect white again, but they were still his favorite.",
+    qa: [
+      { text: "What is the boy's name?", answer: "Eli" },
+      { text: "What day was it?", answer: "Wednesday" },
+      { text: "What was the weather like?", answer: "Foggy" },
+      { text: "What color were Eli's new sneakers?", answer: "White" },
+      { text: "What did Eli's mom warn him about?", answer: "Puddles" },
+      { text: "How many running steps did Eli take?", answer: "Five" },
+      { text: "Where did the splash reach?", answer: "His knees" },
+      { text: "Who is Eli's teacher?", answer: "Mrs. Hill" },
+      { text: "What did Mrs. Hill lend him?", answer: "An old pair of gym shoes" },
+      { text: "Did the sneakers go back to perfect white?", answer: "No" },
+    ],
+    gradeMin: 1, gradeMax: 2,
+  },
+  {
+    title: "Grandma's Pancake Recipe",
+    intro: "Read about a special Saturday tradition.",
+    body: "Every Saturday morning, Mei and her grandmother make pancakes together. The recipe came from Grandma's mother in Taiwan, written on a yellow index card that is now soft and faded. They mix two cups of flour, two tablespoons of sugar, one teaspoon of baking powder, and a pinch of salt in a big blue bowl. Then Mei cracks the egg — sometimes the shell falls in and they have to fish it out with a spoon. They pour in milk and a splash of vanilla. The secret ingredient is a small mashed banana, which makes the pancakes sweeter than any other recipe Mei has tried. Grandma flips the pancakes high in the air, but Mei is still learning. They eat them with warm maple syrup at the kitchen table while it is still dark outside.",
+    qa: [
+      { text: "What do Mei and her grandmother make every Saturday?", answer: "Pancakes" },
+      { text: "What country is the recipe from?", answer: "Taiwan" },
+      { text: "What color is the index card?", answer: "Yellow" },
+      { text: "How many cups of flour go in?", answer: "Two" },
+      { text: "What color is the mixing bowl?", answer: "Blue" },
+      { text: "What does Mei sometimes drop in by accident?", answer: "The eggshell" },
+      { text: "What is the secret ingredient?", answer: "A small mashed banana" },
+      { text: "What does the banana make the pancakes?", answer: "Sweeter" },
+      { text: "Who flips the pancakes high in the air?", answer: "Grandma" },
+      { text: "What do they eat the pancakes with?", answer: "Warm maple syrup" },
+    ],
+    gradeMin: 2, gradeMax: 3,
+  },
+  {
+    title: "The Mystery of the Missing Library Book",
+    intro: "Read this short mystery.",
+    body: "Ms. Carter the librarian discovered that the most popular book in the school library — Captain Comet and the Crater Caper — was missing from the shelf. She had loaned it to Jordan last Friday, and Jordan had returned it Monday morning. But by Tuesday lunch, the book was gone. Ms. Carter checked the cart, the return bin, and even her own desk. Then she remembered that Mr. Diaz, the music teacher, had borrowed three books that morning. She walked down to the music room. There, on the piano, sat all three books — including Captain Comet. Mr. Diaz had grabbed the wrong one by accident. He apologized, and Ms. Carter put the book back on its proper shelf, where Lila checked it out for the weekend.",
+    qa: [
+      { text: "Who is the librarian?", answer: "Ms. Carter" },
+      { text: "What is the name of the missing book?", answer: "Captain Comet and the Crater Caper" },
+      { text: "Who had it last Friday?", answer: "Jordan" },
+      { text: "When did Jordan return it?", answer: "Monday morning" },
+      { text: "When was the book noticed missing?", answer: "Tuesday lunch" },
+      { text: "Name two places Ms. Carter checked.", answer: "The cart and the return bin" },
+      { text: "What does Mr. Diaz teach?", answer: "Music" },
+      { text: "How many books did Mr. Diaz borrow that morning?", answer: "Three" },
+      { text: "Where were the books found?", answer: "On the piano" },
+      { text: "Who checked the book out for the weekend?", answer: "Lila" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "The Storm That Took Out the Power",
+    intro: "Read about a long night with no electricity.",
+    body: "On a Thursday night in October, a powerful storm rolled across town. Wind shook the trees and rain hammered the roof. At 8:47 p.m., the lights flickered twice and then went out. Sofia and her little brother Marco ran to find their mom in the kitchen. She was already lighting candles she kept in a drawer for emergencies. The whole family — including their black cat Pepper — gathered in the living room. They could not watch TV or play video games, so Marco suggested they tell stories instead. Sofia told a true story about her field trip to the aquarium. Mom told one about growing up in Mexico. Marco's story was about a dragon, and it was wonderfully silly. The power did not come back until 6:30 the next morning, but Sofia later said it was one of her favorite nights ever.",
+    qa: [
+      { text: "What month was the storm?", answer: "October" },
+      { text: "What day of the week did it happen?", answer: "Thursday" },
+      { text: "What time did the power go out?", answer: "8:47 p.m." },
+      { text: "What is the little brother's name?", answer: "Marco" },
+      { text: "What is the older sister's name?", answer: "Sofia" },
+      { text: "Where did Mom keep the candles?", answer: "In a drawer" },
+      { text: "What is the cat's name?", answer: "Pepper" },
+      { text: "Who suggested telling stories?", answer: "Marco" },
+      { text: "What was Marco's story about?", answer: "A dragon" },
+      { text: "What time did the power come back?", answer: "6:30 the next morning" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
 ];
 
 const WRITING_TOPICS: LocalTopic[] = [
@@ -1222,6 +1405,41 @@ const WRITING_TOPICS: LocalTopic[] = [
       { text: "How do you show one dog owns a bowl?", answer: "The dog's bowl" },
       { text: "Does 'its' (possession) have an apostrophe?", answer: "No" },
       { text: "What does 'it's' (with apostrophe) mean?", answer: "It is" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  // ── Round 2 ──────────────────────────────────────────────
+  {
+    title: "Quotation Marks for Talking",
+    intro: "Read about how to show somebody is speaking.",
+    body: "When you write what a person says out loud, you put their words inside QUOTATION MARKS. Quotation marks look like this: \" \". They go at the START and END of the spoken words. Example: Maya said, \"I love pancakes.\" The comma comes BEFORE the first quotation mark, and the period (or exclamation point or question mark) goes INSIDE the closing quotation mark. If the speaking part comes second, write the spoken words first: \"I love pancakes,\" said Maya. Always start a new line every time a different person starts talking. This makes it easy for the reader to keep track of who is speaking.",
+    qa: [
+      { text: "What punctuation shows that someone is speaking?", answer: "Quotation marks" },
+      { text: "Where do quotation marks go?", answer: "At the start and end of the spoken words" },
+      { text: "Where does the period go?", answer: "Inside the closing quotation mark" },
+      { text: "What punctuation comes before the first quotation mark in 'Maya said,'?", answer: "A comma" },
+      { text: "Should you start a new line when a new person speaks?", answer: "Yes" },
+      { text: "Why do we start a new line for each new speaker?", answer: "So the reader can keep track of who is speaking" },
+      { text: "Can a question mark go inside quotation marks?", answer: "Yes" },
+      { text: "Can an exclamation point go inside quotation marks?", answer: "Yes" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "Subject and Predicate",
+    intro: "Read about the two main parts of every sentence.",
+    body: "Every complete sentence has TWO main parts: a SUBJECT and a PREDICATE. The SUBJECT tells WHO or WHAT the sentence is about. The PREDICATE tells what the subject IS or DOES. Example: 'The big brown dog | barked at the mail truck.' The subject is 'the big brown dog' and the predicate is 'barked at the mail truck.' Every predicate must contain a VERB — an action or being word. If a sentence is missing a subject or a predicate, it is called a FRAGMENT — and a fragment is not a complete sentence.",
+    qa: [
+      { text: "How many main parts does every sentence have?", answer: "Two" },
+      { text: "What are the two main parts called?", answer: "Subject and predicate" },
+      { text: "What does the subject tell?", answer: "Who or what the sentence is about" },
+      { text: "What does the predicate tell?", answer: "What the subject is or does" },
+      { text: "In 'The big brown dog barked,' what is the subject?", answer: "The big brown dog" },
+      { text: "In 'The big brown dog barked,' what is the predicate?", answer: "Barked at the mail truck" },
+      { text: "What must every predicate contain?", answer: "A verb" },
+      { text: "What is a sentence missing a subject or predicate called?", answer: "A fragment" },
+      { text: "Is a fragment a complete sentence?", answer: "No" },
+      { text: "What is a verb?", answer: "An action or being word" },
     ],
     gradeMin: 3, gradeMax: 5,
   },
@@ -1371,6 +1589,43 @@ const SPELLING_TOPICS: LocalTopic[] = [
       { text: "Which spelling fits: '___ running fast'?", answer: "they're" },
       { text: "How can you tell if you should use 'they're'?", answer: "If you can replace it with 'they are'" },
       { text: "How can you tell if you should use 'there'?", answer: "If it's about a place" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  // ── Round 2 ──────────────────────────────────────────────
+  {
+    title: "Compound Words",
+    intro: "Read about words made of two smaller words.",
+    body: "A COMPOUND WORD is one big word made by joining two smaller words together. The meaning of the compound word usually comes from the two parts. For example, 'sunlight' is 'sun' + 'light' = the light that comes from the sun. Other examples: 'football' (foot + ball), 'rainbow' (rain + bow), 'butterfly' (butter + fly), 'classroom' (class + room), 'backpack' (back + pack), 'snowman' (snow + man), and 'birthday' (birth + day). When you see a long word, try splitting it into two — you may discover it's a compound. Compound words are spelled with NO space and NO hyphen between the two parts.",
+    qa: [
+      { text: "What is a compound word?", answer: "One big word made by joining two smaller words" },
+      { text: "What two words make 'sunlight'?", answer: "Sun and light" },
+      { text: "What two words make 'football'?", answer: "Foot and ball" },
+      { text: "What two words make 'rainbow'?", answer: "Rain and bow" },
+      { text: "What two words make 'butterfly'?", answer: "Butter and fly" },
+      { text: "What two words make 'classroom'?", answer: "Class and room" },
+      { text: "What two words make 'backpack'?", answer: "Back and pack" },
+      { text: "What two words make 'snowman'?", answer: "Snow and man" },
+      { text: "Are compound words spelled with a space?", answer: "No" },
+      { text: "Are compound words spelled with a hyphen?", answer: "No" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Prefixes: un-, re-, pre-, dis-",
+    intro: "Read about little word parts that change a word's meaning.",
+    body: "A PREFIX is a small group of letters added to the BEGINNING of a word that changes its meaning. UN- means 'not' or 'opposite of': unhappy = not happy, unlock = the opposite of lock. RE- means 'again': redo = do again, reread = read again. PRE- means 'before': preview = view before, preheat = heat before. DIS- often means 'not' or 'opposite of': disagree = not agree, dishonest = not honest. Knowing prefixes helps you figure out what a new word means even if you've never seen it before.",
+    qa: [
+      { text: "What is a prefix?", answer: "A small group of letters added to the beginning of a word" },
+      { text: "What does 'un-' mean?", answer: "Not, or the opposite of" },
+      { text: "What does 'unhappy' mean?", answer: "Not happy" },
+      { text: "What does 're-' mean?", answer: "Again" },
+      { text: "What does 'redo' mean?", answer: "Do again" },
+      { text: "What does 'pre-' mean?", answer: "Before" },
+      { text: "What does 'preview' mean?", answer: "View before" },
+      { text: "What does 'dis-' often mean?", answer: "Not, or the opposite of" },
+      { text: "What does 'disagree' mean?", answer: "Not agree" },
+      { text: "Why are prefixes useful?", answer: "They help you figure out what a new word means" },
     ],
     gradeMin: 3, gradeMax: 5,
   },
@@ -1546,6 +1801,61 @@ const SEL_TOPICS: LocalTopic[] = [
       { text: "What two things does sticking with something hard make you?", answer: "Smarter and stronger" },
       { text: "Is it okay to ask for help and still call it perseverance?", answer: "Yes" },
       { text: "What is the opposite of perseverance?", answer: "Quitting" },
+    ],
+    gradeMin: 2, gradeMax: 5,
+  },
+  // ── Round 2 ──────────────────────────────────────────────
+  {
+    title: "Listening: Whole-Body Listening",
+    intro: "Read about how to be a great listener.",
+    body: "Listening is more than just hearing — it's using your WHOLE BODY to show someone you're paying attention. Whole-body listening has five parts. EYES on the speaker. EARS open and quiet. MOUTH closed (no talking over the other person). HANDS still (not playing with stuff). BRAIN thinking about what's being said. When you listen this way, the speaker feels respected and you actually understand more. Hard truth: listening is a skill — even adults are still working on it. The good news is that every conversation is practice.",
+    qa: [
+      { text: "Is listening more than just hearing?", answer: "Yes" },
+      { text: "What kind of listening does the story describe?", answer: "Whole-body listening" },
+      { text: "How many parts are there to whole-body listening?", answer: "Five" },
+      { text: "What should your eyes do?", answer: "Look at the speaker" },
+      { text: "What should your ears do?", answer: "Be open and quiet" },
+      { text: "What should your mouth do?", answer: "Stay closed" },
+      { text: "What should your hands do?", answer: "Stay still" },
+      { text: "What should your brain do?", answer: "Think about what's being said" },
+      { text: "How does the speaker feel when you listen with your whole body?", answer: "Respected" },
+      { text: "Is listening a skill?", answer: "Yes" },
+    ],
+    gradeMin: 1, gradeMax: 4,
+  },
+  {
+    title: "Personal Space and Boundaries",
+    intro: "Read about an invisible bubble around every person.",
+    body: "Imagine every person walks around inside an invisible BUBBLE called PERSONAL SPACE. The bubble keeps people comfortable — about an arm's length away in most places. Standing too close can make others feel uncomfortable, even if you're being friendly. A BOUNDARY is a rule a person has about how they want to be treated. 'Please don't touch my hair' is a boundary. 'I don't like being tickled' is a boundary. We respect other people's boundaries by listening the FIRST time they ask. We also have the right to set our own boundaries — saying 'stop' is okay, and the other person should listen.",
+    qa: [
+      { text: "What is the invisible bubble around a person called?", answer: "Personal space" },
+      { text: "About how big is most people's personal space?", answer: "An arm's length" },
+      { text: "How does standing too close make people feel?", answer: "Uncomfortable" },
+      { text: "What is a boundary?", answer: "A rule about how a person wants to be treated" },
+      { text: "Give an example of a boundary from the story.", answer: "Please don't touch my hair, or I don't like being tickled" },
+      { text: "How many times should you have to ask someone to stop?", answer: "Just one — they should listen the first time" },
+      { text: "Do we have the right to set our own boundaries?", answer: "Yes" },
+      { text: "Is saying 'stop' okay?", answer: "Yes" },
+      { text: "What should the other person do when you say 'stop'?", answer: "Listen" },
+      { text: "How do we respect other people's boundaries?", answer: "By listening the first time they ask" },
+    ],
+    gradeMin: 1, gradeMax: 5,
+  },
+  {
+    title: "Gratitude: Noticing the Good",
+    intro: "Read about a small habit that grows happiness.",
+    body: "GRATITUDE is the feeling of being thankful for something good in your life. It can be big (a family member, a pet) or small (a sunny day, your favorite snack). Scientists have studied gratitude and found that people who notice good things on purpose feel HAPPIER and SLEEP BETTER. One easy way to practice is the 'three good things' habit: every night before bed, name three good things from your day. They don't have to be huge. 'I had pizza for lunch' counts. 'My friend laughed at my joke' counts. Over time, your brain gets better at noticing the good — even on hard days.",
+    qa: [
+      { text: "What is gratitude?", answer: "The feeling of being thankful for something good" },
+      { text: "Can gratitude be for small things?", answer: "Yes" },
+      { text: "Give an example of a big thing to be grateful for.", answer: "A family member or a pet" },
+      { text: "Give an example of a small thing.", answer: "A sunny day or your favorite snack" },
+      { text: "Who has studied gratitude?", answer: "Scientists" },
+      { text: "Name one thing scientists found about people who notice good things.", answer: "They feel happier and sleep better" },
+      { text: "What is the easy gratitude habit called?", answer: "Three good things" },
+      { text: "When do you do the three-good-things habit?", answer: "Every night before bed" },
+      { text: "How many good things do you name?", answer: "Three" },
+      { text: "What does your brain get better at over time?", answer: "Noticing the good" },
     ],
     gradeMin: 2, gradeMax: 5,
   },
@@ -1744,7 +2054,7 @@ const MATH_VOCAB = [
   { term: "equation",   definition: "a math sentence with an equals sign, like 2 + 3 = 5" },
 ];
 
-function pickTopic(bank: LocalTopic[], goal: string, grade?: string): LocalTopic {
+function pickTopic(bank: LocalTopic[], goal: string, grade?: string, excludeTitles?: Set<string>): LocalTopic {
   // Filter by grade level first — only topics whose [gradeMin, gradeMax]
   // include this grade survive. Untagged topics fall through (legacy).
   let pool = bank;
@@ -1757,7 +2067,14 @@ function pickTopic(bank: LocalTopic[], goal: string, grade?: string): LocalTopic
     });
     if (inGrade.length > 0) pool = inGrade;
   }
-  // Goal-string match within the grade-filtered pool — lets a teacher
+  // Drop already-used titles. If everything in the in-grade pool is
+  // exhausted, fall back to the full in-grade pool (still better than
+  // crashing on a 30-kid pack with only 6 in-grade topics).
+  if (excludeTitles && excludeTitles.size > 0) {
+    const fresh = pool.filter((t) => !excludeTitles.has(t.title));
+    if (fresh.length > 0) pool = fresh;
+  }
+  // Goal-string match within the (filtered) pool — lets a teacher
   // type "vowels" or "fractions" and steer to a matching topic.
   if (goal) {
     const gLower = goal.toLowerCase();
@@ -1767,8 +2084,8 @@ function pickTopic(bank: LocalTopic[], goal: string, grade?: string): LocalTopic
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
-  const { subject, count, difficulty, goal } = opts;
+export function buildLocalLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; excludeTitles?: Set<string> }): { questions: StarQuestion[]; lesson: Lesson; topicTitle?: string } {
+  const { subject, count, difficulty, goal, excludeTitles } = opts;
 
   // Math is procedural — generate fresh problems, but the operations and
   // number ranges have to follow the student's actual grade level. A 2nd
@@ -1788,7 +2105,7 @@ export function buildLocalLesson(opts: { subject: Subject; grade: string; count:
     subject === "SEL"            ? SEL_TOPICS :
     /* Art / Music / Library / PE */ READING_TOPICS;
 
-  const topic = pickTopic(bank, goal, opts.grade);
+  const topic = pickTopic(bank, goal, opts.grade, excludeTitles);
 
   // CORRELATION RULE: only pull questions from the picked topic's own qa.
   // Cross-topic borrowing was leaving kids with a story about Maya's
@@ -1815,7 +2132,7 @@ export function buildLocalLesson(opts: { subject: Subject; grade: string; count:
     vocab: topic.vocab,
   };
 
-  return { questions, lesson };
+  return { questions, lesson, topicTitle: topic.title };
 }
 
 type PrintMode = "student" | "key" | "large" | "quiz" | "notebook" | "flashcards";

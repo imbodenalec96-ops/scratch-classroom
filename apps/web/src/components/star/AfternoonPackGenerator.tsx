@@ -99,6 +99,11 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
       let seq = 1;
       while (bcDB[`${subjPrefix}-${datePart}-${String(seq).padStart(3, "0")}`]) seq++;
 
+      // Track topics used so each kid in this pack gets a DIFFERENT
+      // story+questions even if they share a grade level. Keyed by
+      // subject because "Maya's Garden" (Reading) shouldn't block
+      // "Maya's Garden" if it ever appeared in another bank.
+      const usedTitlesBySubject: Record<string, Set<string>> = {};
       const out: PackEntry[] = [];
       for (const s of students) {
         if (!picked.has(s.id)) continue;
@@ -109,7 +114,13 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         const kidGrade = ov.grade || ((autoMatchGrade && s.grade) ? s.grade : (s.grade || "3rd"));
         const kidDifficulty = ov.difficulty || difficulty;
         const kidCount = ov.count || count;
-        const built = buildLocalLesson({ subject: kidSubject, grade: kidGrade, count: kidCount, difficulty: kidDifficulty, goal: "" });
+        const exclude = (usedTitlesBySubject[kidSubject] ||= new Set<string>());
+        const built = buildLocalLesson({
+          subject: kidSubject, grade: kidGrade, count: kidCount,
+          difficulty: kidDifficulty, goal: "",
+          excludeTitles: exclude,
+        });
+        if (built.topicTitle) exclude.add(built.topicTitle);
         if (mcqMode) built.questions = synthesizeChoicesForAll(built.questions);
         // Keep the per-kid prefix consistent so different subjects in the
         // same pack don't collide on barcode IDs.
