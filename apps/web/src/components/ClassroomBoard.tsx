@@ -310,6 +310,27 @@ export default function ClassroomBoard() {
     } catch {}
   };
 
+  // Cross-tab localStorage listener — when the iPad in another tab
+  // (or split-screen) writes to star_active_movement / freetime / supply,
+  // the browser fires a "storage" event. Force a re-render so the
+  // roster card status pills appear immediately without waiting for
+  // the per-second timerNow tick.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (
+        e.key === "star_active_movement" ||
+        e.key === "star_active_freetime" ||
+        e.key === "star_supply_checkouts" ||
+        e.key === "star_active_passes"
+      ) {
+        setTimerNow(Date.now());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // Cross-device scan listener — handles events fired from the iPad
   // (or any other device) so the projector reflects them too:
   //   • start-class-timer → kick off the board's visual countdown
@@ -1585,16 +1606,33 @@ export default function ClassroomBoard() {
               const idByFullName  = new Map<string, string>();
               for (const bs of board.students) {
                 const sid = String(bs.id);
-                const full = String(bs.name || "").trim().toLowerCase();
-                if (full) idByFullName.set(full, sid);
-                const first = full.split(/\s+/)[0];
+                // Same normalization as the resolve fn — strip punctuation,
+                // collapse whitespace, lowercase. So "Aiden Smith" matches
+                // "aiden smith" matches "Aiden  Smith." matches "AIDEN".
+                const norm = String(bs.name || "").trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+                if (norm) idByFullName.set(norm, sid);
+                const first = norm.split(/\s+/)[0];
                 if (first) idByFirstName.set(first, sid);
               }
               const resolve = (sid: string | undefined, sname: string | undefined): string | null => {
                 if (sid && board.students.some((b) => String(b.id) === sid)) return sid;
                 if (sname) {
-                  const lower = sname.trim().toLowerCase();
-                  return idByFullName.get(lower) || idByFirstName.get(lower.split(/\s+/)[0]) || null;
+                  const norm = sname.trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+                  if (idByFullName.get(norm)) return idByFullName.get(norm)!;
+                  const first = norm.split(/\s+/)[0];
+                  if (first && idByFirstName.get(first)) return idByFirstName.get(first)!;
+                }
+                // Last resort: cross-reference STAR's own roster — the iPad
+                // might be sending a STAR-local id that doesn't match the
+                // board's API id, but the names should line up.
+                if (sid) {
+                  try {
+                    const starStudent = StarStore.getStudents().find((x) => x.id === sid);
+                    if (starStudent) {
+                      const fname = (starStudent.firstName || "").trim().toLowerCase();
+                      if (fname && idByFirstName.get(fname)) return idByFirstName.get(fname)!;
+                    }
+                  } catch {}
                 }
                 return null;
               };
