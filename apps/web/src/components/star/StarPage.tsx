@@ -293,7 +293,7 @@ export default function StarPage() {
           {/* GROUP — Reports & Share (parent/student snapshots + sub plans) */}
           <CreateGroup label="Reports & Share" hint="One-tap printable PDFs — for parents, kids, and substitutes.">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: T.space.lg }}>
-              <SectionWrapper icon="📤" title="Today's Snapshot" description="One-page PDF of a kid's day — parent edition or kid-friendly student edition.">
+              <SectionWrapper icon="📤" title="Day / Month Snapshot" description="One-page PDF of a kid's day OR month — parent edition or kid-friendly student edition.">
                 <SnapshotGenerator />
               </SectionWrapper>
               <SectionWrapper icon="📋" title="Sub plans packet" description="Schedule + roster + IEP cliff notes + your emergency procedures, all in one PDF.">

@@ -1,28 +1,31 @@
-// "Today's Snapshot" — one-tap PDF for any kid, in two flavors:
+// "Snapshot" — one-tap PDF for any kid, two audience flavors × two
+// period flavors:
+//
+//   • Today's   — single-day rollup
+//   • Monthly   — month-to-date rollup (calendar month)
 //
 //   • Parent edition  — formal, full data, signature line, contact info.
 //   • Student edition — first-person, kid-friendly, encouraging tone,
 //                       big colorful blocks they can take home.
 //
 // Pulls everything from local STAR storage (offline-capable):
-//   - Today's grades   ← StarStore.getAsnTrack()
-//   - IEP progress     ← StarStore.getIepLog() + getIepGoals()
+//   - Grades           ← StarStore.getAsnTrack()
 //   - 1 photo of work  ← StarStore.getPhotos() filtered by student
 //   - Pass log         ← StarStore.getPassLog()
 
 import { useMemo, useState } from "react";
 import {
   StarStore, countsTowardGrade, letterGradeColor,
-  type StarStudent, type IepGoal, type IepLogEntry,
+  type StarStudent,
   type StarPhoto, type StarTrackerEntry,
 } from "../../lib/star/storage.ts";
 import { successBeep, loggedBeep } from "../../lib/star/sounds.ts";
 
 type Variant = "parent" | "student";
+type Period  = "day" | "month";
 
 interface DayData {
-  grades: Array<{ name: string; subject: string; pct: number; letter: string; counted: boolean }>;
-  iepEntries: Array<{ goal: IepGoal | null; entry: IepLogEntry }>;
+  grades: Array<{ name: string; subject: string; pct: number; letter: string; counted: boolean; date: string }>;
   photo: StarPhoto | null;
   passes: number;
 }
@@ -32,10 +35,20 @@ function todayPacific(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-function gatherDayData(s: StarStudent, date: string): DayData {
+function monthBoundsPacific(refDate: string): { start: string; end: string } {
+  const [y, m] = refDate.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, "0");
+  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+}
+
+function inRange(date: string | undefined, start: string, end: string): boolean {
+  if (!date) return false;
+  return date >= start && date <= end;
+}
+
+function gatherData(s: StarStudent, start: string, end: string): DayData {
   const tracker = StarStore.getAsnTrack();
-  const iepGoals = StarStore.getIepGoals();
-  const log = StarStore.getIepLog();
   const photos = StarStore.getPhotos();
   const passLog = StarStore.getPassLog();
   const first = (s.firstName || "").trim().toLowerCase();
@@ -47,31 +60,26 @@ function gatherDayData(s: StarStudent, date: string): DayData {
     return false;
   };
 
-  // Grades for this date
   const grades: DayData["grades"] = [];
   for (const t of Object.values(tracker) as StarTrackerEntry[]) {
     for (const sub of t.submissions || []) {
-      if (sub.completedDate !== date) continue;
+      if (!inRange(sub.completedDate, start, end)) continue;
       if (!matchesStudent(sub.studentId, sub.studentName)) continue;
       grades.push({
         name: t.name, subject: t.subject || "Other",
         pct: sub.pct, letter: sub.letterGrade,
         counted: countsTowardGrade(sub),
+        date: sub.completedDate || "",
       });
     }
   }
+  grades.sort((a, b) => b.date.localeCompare(a.date));
 
-  // IEP entries for this date
-  const iepEntries = log
-    .filter((e) => e.studentId === s.id && e.date === date)
-    .map((entry) => ({ goal: iepGoals.find((g) => g.studentId === s.id) || null, entry }));
-
-  // Most recent photo from today (any barcode)
   let photo: StarPhoto | null = null;
   for (const list of Object.values(photos)) {
     for (const p of list) {
       const dateStr = new Date(p.ts).toISOString().slice(0, 10);
-      if (dateStr !== date) continue;
+      if (!inRange(dateStr, start, end)) continue;
       const matches = (p.studentId && p.studentId === s.id) ||
         (!p.studentId && p.studentName && (p.studentName || "").trim().toLowerCase().split(/\s+/)[0] === first);
       if (matches) {
@@ -80,26 +88,29 @@ function gatherDayData(s: StarStudent, date: string): DayData {
     }
   }
 
-  // Bathroom / water passes today
   const passes = passLog.filter((p) => {
     const dateStr = (p.startedAt || "").slice(0, 10);
-    if (dateStr !== date) return false;
+    if (!inRange(dateStr, start, end)) return false;
     return matchesStudent(p.studentId, p.studentName);
   }).length;
 
-  return { grades, iepEntries, photo, passes };
+  return { grades, photo, passes };
 }
 
 export default function SnapshotGenerator() {
   const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
   const [studentId, setStudentId] = useState("");
   const [variant, setVariant] = useState<Variant>("parent");
+  const [period,  setPeriod]  = useState<Period>("day");
   const [teacherName, setTeacherName] = useState("");
   const [teacherMessage, setTeacherMessage] = useState("");
   const [date, setDate] = useState(todayPacific());
 
   const sel = students.find((s) => s.id === studentId);
-  const data = useMemo(() => sel ? gatherDayData(sel, date) : null, [sel, date]);
+  const { start, end } = useMemo(() => {
+    return period === "month" ? monthBoundsPacific(date) : { start: date, end: date };
+  }, [period, date]);
+  const data = useMemo(() => sel ? gatherData(sel, start, end) : null, [sel, start, end]);
 
   const print = () => {
     if (!sel || !data) return;
@@ -107,7 +118,10 @@ export default function SnapshotGenerator() {
       student: sel,
       data,
       variant,
+      period,
       date,
+      start,
+      end,
       teacherName: teacherName.trim(),
       teacherMessage: teacherMessage.trim(),
     });
@@ -136,7 +150,13 @@ export default function SnapshotGenerator() {
             <option value="student">🎒 Student edition</option>
           </select>
         </Field>
-        <Field label="Date">
+        <Field label="Period">
+          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={inp()}>
+            <option value="day">📅 Today's snapshot</option>
+            <option value="month">🗓 Monthly snapshot</option>
+          </select>
+        </Field>
+        <Field label={period === "month" ? "Month of" : "Date"}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp()} />
         </Field>
         <Field label="Teacher (optional)">
@@ -167,17 +187,16 @@ export default function SnapshotGenerator() {
             color: "#f9a8d4", marginBottom: 6,
           }}>Preview</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-            <Stat n={data.grades.length}    l="Grades" />
-            <Stat n={data.iepEntries.length} l="IEP entries" />
+            <Stat n={data.grades.length}    l={period === "month" ? "Grades this month" : "Grades"} />
             <Stat n={data.photo ? 1 : 0}     l="Photo" />
-            <Stat n={data.passes}            l="Passes out" />
+            <Stat n={data.passes}            l={period === "month" ? "Passes this month" : "Passes out"} />
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 8 }}>
         <button onClick={print} disabled={!sel} style={primaryBtn(!sel)}>
-          🖨 Print {variant === "parent" ? "Parent" : "Student"} Snapshot
+          🖨 Print {period === "month" ? "Monthly" : "Today's"} {variant === "parent" ? "Parent" : "Student"} Snapshot
         </button>
       </div>
     </div>
@@ -190,61 +209,58 @@ function openSnapshotWindow(args: {
   student: StarStudent;
   data: DayData;
   variant: Variant;
+  period: Period;
   date: string;
+  start: string;
+  end: string;
   teacherName: string;
   teacherMessage: string;
 }) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
-  const { student, data, variant, date, teacherName, teacherMessage } = args;
-  const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  const { student, data, variant, period, date, start, end, teacherName, teacherMessage } = args;
+  const periodLabel = period === "month"
+    ? new Date(start + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long" })
+    : new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const titleWord = period === "month" ? "Monthly" : "Today's";
 
   const html = variant === "parent"
-    ? renderParent(student, data, dateLabel, teacherName, teacherMessage)
-    : renderStudent(student, data, dateLabel, teacherName, teacherMessage);
+    ? renderParent(student, data, periodLabel, titleWord, teacherName, teacherMessage)
+    : renderStudent(student, data, periodLabel, titleWord, teacherName, teacherMessage);
+
+  // Silence unused warnings — keep end available for future ranges.
+  void end;
 
   w.document.write(html);
   w.document.close();
   successBeep();
 }
 
-function renderParent(s: StarStudent, d: DayData, dateLabel: string, teacher: string, message: string): string {
+function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string): string {
   const counted = d.grades.filter((g) => g.counted);
   const avg = counted.length ? Math.round(counted.reduce((a, g) => a + g.pct, 0) / counted.length) : null;
+  const periodLower = titleWord === "Monthly" ? "this month" : "today";
 
   const grades = d.grades.length === 0
-    ? `<div class="empty">No graded work today.</div>`
+    ? `<div class="empty">No graded work ${periodLower}.</div>`
     : `<table>
-        <thead><tr><th>Subject</th><th>Assignment</th><th>Score</th><th>Grade</th></tr></thead>
+        <thead><tr><th>Subject</th><th>Assignment</th>${titleWord === "Monthly" ? "<th>Date</th>" : ""}<th>Score</th><th>Grade</th></tr></thead>
         <tbody>${d.grades.map((g) => {
           const c = g.counted ? letterGradeColor(g.letter) : "#94a3b8";
+          const datePart = titleWord === "Monthly"
+            ? `<td>${g.date ? new Date(g.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</td>`
+            : "";
           return `<tr>
             <td>${escapeHtml(g.subject)}</td>
             <td>${escapeHtml(g.name)}</td>
+            ${datePart}
             <td>${g.counted ? `${g.pct}%` : "—"}</td>
             <td><span class="badge" style="background:${c}25;color:${c};border:1px solid ${c}">${g.counted ? g.letter : "—"}</span></td>
           </tr>`;
         }).join("")}</tbody>
       </table>`;
 
-  const iep = d.iepEntries.length === 0
-    ? `<div class="empty">No IEP progress logged today.</div>`
-    : `<ul class="iep">${d.iepEntries.map(({ entry, goal }) => {
-        const lbl = entry.status === "met" ? "Met"
-                  : entry.status === "partial" ? "Partial" : "Not yet";
-        const c = entry.status === "met" ? "#10b981"
-                : entry.status === "partial" ? "#f59e0b" : "#ef4444";
-        return `<li>
-          <span class="iep-pill" style="background:${c}20;color:${c};border:1px solid ${c}">${lbl}</span>
-          <b>${goal?.area ? escapeHtml(goal.area) + ":" : "IEP:"}</b>
-          ${escapeHtml(goal?.goalText || "—")}
-          ${entry.note ? `<div class="note">📝 ${escapeHtml(entry.note)}</div>` : ""}
-        </li>`;
-      }).join("")}</ul>`;
-
-  return `<!doctype html><html><head><title>Today's Snapshot — ${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</title>
+  return `<!doctype html><html><head><title>${escapeHtml(titleWord)} Snapshot — ${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</title>
     <style>${PARENT_CSS}</style></head>
     <body>
       <div class="toolbar no-print">
@@ -254,25 +270,22 @@ function renderParent(s: StarStudent, d: DayData, dateLabel: string, teacher: st
       <section class="page">
         <header class="hero">
           <div>
-            <div class="kicker">Today's Snapshot</div>
+            <div class="kicker">${escapeHtml(titleWord)} Snapshot</div>
             <h1>${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</h1>
-            <div class="meta">${escapeHtml(dateLabel)}${s.grade ? ` · Grade ${escapeHtml(s.grade)}` : ""}</div>
+            <div class="meta">${escapeHtml(periodLabel)}${s.grade ? ` · Grade ${escapeHtml(s.grade)}` : ""}</div>
           </div>
           <div class="hero-stat">
-            ${avg !== null ? `<div class="big">${avg}<span>%</span></div><div class="small">Today's average</div>` : `<div class="small">No grades yet today</div>`}
+            ${avg !== null ? `<div class="big">${avg}<span>%</span></div><div class="small">${escapeHtml(periodLower)}'s average</div>` : `<div class="small">No grades yet ${escapeHtml(periodLower)}</div>`}
           </div>
         </header>
 
         ${message ? `<div class="msg"><b>From your teacher${teacher ? ` (${escapeHtml(teacher)})` : ""}:</b> ${escapeHtml(message)}</div>` : ""}
 
-        <h2>📚 Today's grades</h2>
+        <h2>📚 Grades ${escapeHtml(periodLower)}</h2>
         ${grades}
 
-        <h2>🎯 IEP progress today</h2>
-        ${iep}
-
         ${d.photo ? `
-          <h2>📷 Sample of today's work</h2>
+          <h2>📷 Sample of work</h2>
           <div class="photo-frame">
             <img src="${d.photo.dataUrl}" alt="Sample of student work" />
             ${d.photo.note ? `<div class="caption">${escapeHtml(d.photo.note)}</div>` : ""}
@@ -292,7 +305,7 @@ function renderParent(s: StarStudent, d: DayData, dateLabel: string, teacher: st
         </div>
 
         <div class="meta footnote">
-          Sent home from STAR · ${escapeHtml(dateLabel)}
+          Sent home from STAR · ${escapeHtml(periodLabel)}
           ${s.parentEmail ? ` · ${escapeHtml(s.parentEmail)}` : ""}
         </div>
       </section>
@@ -300,71 +313,61 @@ function renderParent(s: StarStudent, d: DayData, dateLabel: string, teacher: st
     </body></html>`;
 }
 
-function renderStudent(s: StarStudent, d: DayData, dateLabel: string, teacher: string, message: string): string {
-  const wins = d.iepEntries.filter((e) => e.entry.status === "met").length;
+function renderStudent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string): string {
+  const isMonth = titleWord === "Monthly";
   const greatGrade = d.grades.find((g) => g.counted && g.pct >= 80);
+  const counted = d.grades.filter((g) => g.counted);
+  const aCount = counted.filter((g) => g.letter === "A").length;
+  const bCount = counted.filter((g) => g.letter === "B").length;
   const cheers: string[] = [];
-  if (wins > 0) cheers.push(`${wins} IEP win${wins === 1 ? "" : "s"}`);
-  if (greatGrade) cheers.push(`A great ${greatGrade.subject} grade`);
+  if (aCount > 0) cheers.push(`${aCount} A${aCount === 1 ? "" : "s"}!`);
+  if (bCount > 0) cheers.push(`${bCount} B${bCount === 1 ? "" : "s"}`);
+  if (greatGrade && aCount === 0 && bCount === 0) cheers.push(`A great ${greatGrade.subject} grade`);
   if (d.photo) cheers.push(`Awesome work in the photo`);
+  if (counted.length >= 5) cheers.push(`${counted.length} assignments done`);
   if (cheers.length === 0) cheers.push("Showed up and tried");
 
+  const periodLower = isMonth ? "this month" : "today";
   const grades = d.grades.length === 0
-    ? `<div class="kid-empty">No work scored today — that's OK!</div>`
+    ? `<div class="kid-empty">No work scored ${periodLower} — that's OK!</div>`
     : `<div class="kid-grades">${d.grades.map((g) => {
         const c = g.counted ? letterGradeColor(g.letter) : "#94a3b8";
+        const dateBit = isMonth && g.date ? ` · ${new Date(g.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "";
         return `<div class="kid-grade" style="border-color:${c}; background:${c}15">
           <div class="kid-grade-letter" style="color:${c}">${g.counted ? g.letter : "—"}</div>
           <div class="kid-grade-info">
             <div class="kid-grade-name">${escapeHtml(g.name)}</div>
-            <div class="kid-grade-meta">${escapeHtml(g.subject)}${g.counted ? ` · ${g.pct}%` : ""}</div>
+            <div class="kid-grade-meta">${escapeHtml(g.subject)}${g.counted ? ` · ${g.pct}%` : ""}${dateBit}</div>
           </div>
         </div>`;
       }).join("")}</div>`;
 
-  const iep = d.iepEntries.length === 0
-    ? `<div class="kid-empty">No IEP goal practice today.</div>`
-    : `<div class="kid-iep">${d.iepEntries.map(({ entry, goal }) => {
-        const lbl = entry.status === "met" ? "I MET IT! ⭐"
-                  : entry.status === "partial" ? "Almost there!"
-                  : "We'll try again tomorrow";
-        const c = entry.status === "met" ? "#10b981"
-                : entry.status === "partial" ? "#f59e0b" : "#a855f7";
-        return `<div class="kid-iep-row" style="border-color:${c}; background:${c}10">
-          <div class="kid-iep-status" style="background:${c}; color:white">${lbl}</div>
-          <div class="kid-iep-text">${goal?.area ? "<b>" + escapeHtml(goal.area) + "</b><br>" : ""}${escapeHtml(goal?.goalText || "—")}</div>
-        </div>`;
-      }).join("")}</div>`;
-
-  return `<!doctype html><html><head><title>${escapeHtml(s.firstName)}'s Day</title>
+  return `<!doctype html><html><head><title>${escapeHtml(s.firstName)}'s ${escapeHtml(isMonth ? "Month" : "Day")}</title>
     <style>${STUDENT_CSS}</style></head>
     <body>
       <div class="toolbar no-print">
-        <div>🎒 ${escapeHtml(s.firstName)}'s Snapshot — Student Edition</div>
+        <div>🎒 ${escapeHtml(s.firstName)}'s ${escapeHtml(titleWord)} Snapshot — Student Edition</div>
         <button onclick="window.print()">🖨 Print</button>
       </div>
       <section class="kid-page">
         <header class="kid-hero">
           <div class="kid-confetti">🎉</div>
           <div>
-            <div class="kid-kicker">${escapeHtml(dateLabel)}</div>
+            <div class="kid-kicker">${escapeHtml(periodLabel)}</div>
             <h1>Hi, ${escapeHtml(s.firstName)}!</h1>
-            <div class="kid-sub">Look at everything you did today 👇</div>
+            <div class="kid-sub">Look at everything you did ${escapeHtml(periodLower)} 👇</div>
           </div>
         </header>
 
         ${message ? `<div class="kid-msg">💬 ${escapeHtml(message)}${teacher ? ` <span class="kid-msg-from">— ${escapeHtml(teacher)}</span>` : ""}</div>` : ""}
 
         <div class="kid-cheer">
-          <div class="kid-cheer-label">⭐ Today you crushed it with:</div>
+          <div class="kid-cheer-label">⭐ ${escapeHtml(isMonth ? "This month" : "Today")} you crushed it with:</div>
           <div class="kid-cheer-list">${cheers.map((c) => `<span class="kid-chip">${escapeHtml(c)}</span>`).join("")}</div>
         </div>
 
-        <h2>📚 My work today</h2>
+        <h2>📚 My work ${escapeHtml(periodLower)}</h2>
         ${grades}
-
-        <h2>🎯 My IEP goals today</h2>
-        ${iep}
 
         ${d.photo ? `
           <h2>📷 Look what I made!</h2>
@@ -374,7 +377,7 @@ function renderStudent(s: StarStudent, d: DayData, dateLabel: string, teacher: s
         ` : ""}
 
         <div class="kid-end">
-          <div class="kid-end-line">High five! ✋ See you tomorrow.</div>
+          <div class="kid-end-line">High five! ✋ ${escapeHtml(isMonth ? "Awesome month!" : "See you tomorrow.")}</div>
         </div>
       </section>
       <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250))</script>
