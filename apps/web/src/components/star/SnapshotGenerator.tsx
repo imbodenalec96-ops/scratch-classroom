@@ -463,6 +463,13 @@ const STR: Record<Lang, Record<string, string>> = {
     fromTeacher: "From your teacher",
     noGradedWork: "No graded work this period.",
     learnedWords: "Words learned",
+    disclaimerHeading: "Important Notice to Parent/Guardian and Student",
+    disclaimerLead: "This progress snapshot is provided by STAR room staff for informational purposes only. It is intended to give parents and students a general overview of academic engagement and classroom participation — not to serve as an official academic evaluation.",
+    disclaimerPleaseNote: "Please note:",
+    disclaimerB1: "This report does not appear in Infinite Campus or any official CCSD student information system",
+    disclaimerB2: "This does not constitute an official grade or become part of the student's academic record",
+    disclaimerB3: "This snapshot is a supplemental communication from classroom staff only",
+    disclaimerFooter: "For official grades and academic records, please refer to Infinite Campus or contact your child's school directly.",
   },
   es: {
     snapshot: "Resumen", todays: "de Hoy", monthly: "Mensual", parentEd: "Edición para Padres",
@@ -484,11 +491,38 @@ const STR: Record<Lang, Record<string, string>> = {
     fromTeacher: "De su maestro/a",
     noGradedWork: "No hubo trabajo calificado en este periodo.",
     learnedWords: "Palabras aprendidas",
+    disclaimerHeading: "Aviso Importante para Padres/Tutores y Estudiantes",
+    disclaimerLead: "Este resumen de progreso es proporcionado por el personal de la sala STAR únicamente con fines informativos. Tiene como objetivo dar a los padres y estudiantes una visión general de la participación académica y la participación en clase — no sirve como evaluación académica oficial.",
+    disclaimerPleaseNote: "Tenga en cuenta:",
+    disclaimerB1: "Este informe NO aparece en Infinite Campus ni en ningún sistema oficial de información estudiantil del CCSD",
+    disclaimerB2: "No constituye una calificación oficial ni forma parte del expediente académico del estudiante",
+    disclaimerB3: "Este resumen es una comunicación suplementaria del personal del aula únicamente",
+    disclaimerFooter: "Para calificaciones oficiales y registros académicos, consulte Infinite Campus o comuníquese directamente con la escuela de su hijo/a.",
   },
 };
 
 function tr(lang: Lang, key: keyof typeof STR["en"]): string {
   return STR[lang][key] || STR.en[key] || String(key);
+}
+
+// Required disclaimer — STAR snapshots are NOT official CCSD records.
+// Same markup is used by parent + student editions so the styling
+// hooks (.disclaimer, .disclaimer-lead, etc.) live in both PARENT_CSS
+// and STUDENT_CSS and stay in lockstep.
+function renderDisclaimer(lang: Lang): string {
+  return `
+    <div class="disclaimer">
+      <div class="disclaimer-head">⚠️ ${escapeHtml(tr(lang, "disclaimerHeading"))}</div>
+      <div class="disclaimer-lead">${escapeHtml(tr(lang, "disclaimerLead"))}</div>
+      <div class="disclaimer-note"><b>${escapeHtml(tr(lang, "disclaimerPleaseNote"))}</b></div>
+      <ul class="disclaimer-list">
+        <li>${escapeHtml(tr(lang, "disclaimerB1"))}</li>
+        <li>${escapeHtml(tr(lang, "disclaimerB2"))}</li>
+        <li>${escapeHtml(tr(lang, "disclaimerB3"))}</li>
+      </ul>
+      <div class="disclaimer-foot">${escapeHtml(tr(lang, "disclaimerFooter"))}</div>
+    </div>
+  `;
 }
 
 function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string, period: Period, start: string, end: string, lang: Lang): string {
@@ -652,6 +686,8 @@ function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord
             ${d.photo.note ? `<div class="caption">${escapeHtml(d.photo.note)}</div>` : ""}
           </div>
         ` : ""}
+
+        ${renderDisclaimer(lang)}
 
         <div class="footer">
           <div>
@@ -822,6 +858,8 @@ function renderStudent(s: StarStudent, d: DayData, periodLabel: string, titleWor
         <div class="kid-end">
           <div class="kid-end-line">${escapeHtml(lang === "es" ? "¡Choca esos cinco! ✋" : "High five! ✋")} ${escapeHtml(isMonth ? (lang === "es" ? "¡Mes increíble!" : "Awesome month!") : (lang === "es" ? "¡Hasta mañana!" : "See you tomorrow."))}</div>
         </div>
+
+        ${renderDisclaimer(lang)}
       </section>
       <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250))</script>
     </body></html>`;
@@ -893,6 +931,13 @@ const PARENT_CSS = `
   .hm-cell.hm-on { background: #6d28d9; border-color: #6d28d9; color: white; }
   .hm-cell.hm-blank { background: transparent; border: none; }
   .hm-cell.hm-dow { aspect-ratio: auto; padding: 4px 0; justify-content: center; align-items: center; background: transparent; border: none; font-size: 9px; color: #6d28d9; font-weight: 800; letter-spacing: 0.06em; }
+  .disclaimer { margin: 22px 0 14px; padding: 12px 14px; border: 2px solid #f59e0b; border-radius: 10px; background: #fffbeb; color: #422006; page-break-inside: avoid; }
+  .disclaimer-head { font-size: 13px; font-weight: 900; color: #92400e; margin-bottom: 6px; letter-spacing: 0.01em; }
+  .disclaimer-lead { font-size: 11px; line-height: 1.5; margin-bottom: 6px; }
+  .disclaimer-note { font-size: 11px; margin-bottom: 4px; }
+  .disclaimer-list { font-size: 11px; line-height: 1.5; padding-left: 20px; margin: 0 0 8px; }
+  .disclaimer-list li { margin-bottom: 2px; }
+  .disclaimer-foot { font-size: 11px; line-height: 1.5; font-style: italic; color: #78350f; }
 `;
 
 const STUDENT_CSS = `
@@ -942,6 +987,13 @@ const STUDENT_CSS = `
   .kid-vocab-card { padding: 8px 10px; border-radius: 10px; background: #ecfdf5; border: 2px solid #86efac; }
   .kid-vocab-term { font-weight: 900; color: #065f46; font-size: 14px; }
   .kid-vocab-def { font-size: 12px; color: #064e3b; margin-top: 2px; }
+  .disclaimer { margin: 18px 0 4px; padding: 12px 14px; border: 2px solid #f59e0b; border-radius: 12px; background: #fffbeb; color: #422006; page-break-inside: avoid; font-family: -apple-system, sans-serif; }
+  .disclaimer-head { font-size: 13px; font-weight: 900; color: #92400e; margin-bottom: 6px; }
+  .disclaimer-lead { font-size: 11px; line-height: 1.5; margin-bottom: 6px; }
+  .disclaimer-note { font-size: 11px; margin-bottom: 4px; }
+  .disclaimer-list { font-size: 11px; line-height: 1.5; padding-left: 20px; margin: 0 0 8px; }
+  .disclaimer-list li { margin-bottom: 2px; }
+  .disclaimer-foot { font-size: 11px; line-height: 1.5; font-style: italic; color: #78350f; }
 `;
 
 /* ── small UI helpers ────────────────────────────────────────────── */
