@@ -104,6 +104,38 @@ export type BcEntry =
       // they're written to a freetime log.
       freetimeMinutes: number;
       createdDate: string;
+    }
+  | {
+      id: string;
+      type: "movement-action";
+      name: string;
+      // SPECIALS-OUT/IN, LUNCH-OUT/IN — kid scans on the way out, scans
+      // again on the way back. Tracks attendance + auto-clears them
+      // from the in-room tally on the board.
+      movementKind: "specials" | "lunch";
+      direction: "out" | "in";
+      createdDate: string;
+    }
+  | {
+      id: string;
+      type: "timer-action";
+      name: string;
+      // TIMER-5/10/15/20 — scan starts the class-wide visual timer
+      // on the projector board. No modal needed; fires a cross-device
+      // event the board listens for.
+      timerMinutes: number;
+      createdDate: string;
+    }
+  | {
+      id: string;
+      type: "supply-action";
+      name: string;
+      // SUPPLY-PENCIL/TABLET/HEADPHONES + BOOK-OUT/IN — track who
+      // borrowed what. Book scans accept a free-text title input in
+      // the modal; other supplies are item-only.
+      supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book";
+      direction: "out" | "in";
+      createdDate: string;
     };
 
 export interface ActivePass {
@@ -124,6 +156,34 @@ export interface ActiveFreetime {
 export interface FreetimeLogEntry extends ActiveFreetime {
   endedAt: string;       // ISO
   elapsedSec: number;
+}
+
+// SPECIALS / LUNCH — kid is currently out of the room for one of these
+// activities. One active per student per kind.
+export interface ActiveMovement {
+  studentId: string;
+  studentName: string;
+  kind: "specials" | "lunch";
+  startedAt: string;
+}
+export interface MovementLogEntry extends ActiveMovement {
+  endedAt: string;
+  elapsedSec: number;
+}
+
+// Supply / library checkout — currently borrowed item per student.
+// One active checkout per (studentId, supplyKind) combination.
+export interface SupplyCheckout {
+  id: string;
+  studentId: string;
+  studentName: string;
+  supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book";
+  bookTitle?: string;     // only for Book checkouts
+  checkedOutAt: string;   // ISO
+}
+export interface SupplyLogEntry extends SupplyCheckout {
+  returnedAt: string;
+  durationSec: number;
 }
 
 export interface StarSubmission {
@@ -228,6 +288,10 @@ const KEYS = {
   iepDefaultPartial: "star_iep_default_partial",
   activeFreetime: "star_active_freetime",
   freetimeLog: "star_freetime_log",
+  activeMovement: "star_active_movement",
+  movementLog: "star_movement_log",
+  supplyCheckouts: "star_supply_checkouts",
+  supplyLog: "star_supply_log",
 } as const;
 
 /**
@@ -420,6 +484,67 @@ export const StarStore = {
     return log;
   },
   getFreetimeLog: () => ls.get<FreetimeLogEntry[]>(KEYS.freetimeLog, []),
+
+  // ── SPECIALS / LUNCH movement ───────────────────────────────────
+  getActiveMovement: () => ls.get<ActiveMovement[]>(KEYS.activeMovement, []),
+  startMovement: (s: ActiveMovement) => {
+    const all = ls.get<ActiveMovement[]>(KEYS.activeMovement, []);
+    // One active per (studentId, kind) — replace any prior.
+    const next = all.filter((x) => !(x.studentId === s.studentId && x.kind === s.kind));
+    next.push(s);
+    ls.set(KEYS.activeMovement, next);
+  },
+  endMovement: (studentId: string, kind: ActiveMovement["kind"]): MovementLogEntry | null => {
+    const all = ls.get<ActiveMovement[]>(KEYS.activeMovement, []);
+    const idx = all.findIndex((x) => x.studentId === studentId && x.kind === kind);
+    if (idx < 0) return null;
+    const entry = all[idx];
+    const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(entry.startedAt).getTime()) / 1000));
+    const log: MovementLogEntry = { ...entry, endedAt: new Date().toISOString(), elapsedSec };
+    const remaining = all.filter((_, i) => i !== idx);
+    ls.set(KEYS.activeMovement, remaining);
+    const arr = ls.get<MovementLogEntry[]>(KEYS.movementLog, []);
+    arr.unshift(log);
+    ls.set(KEYS.movementLog, arr.slice(0, 500));
+    return log;
+  },
+  getMovementLog: () => ls.get<MovementLogEntry[]>(KEYS.movementLog, []),
+
+  // ── Supply / library checkouts ──────────────────────────────────
+  getSupplyCheckouts: () => ls.get<SupplyCheckout[]>(KEYS.supplyCheckouts, []),
+  checkoutSupply: (s: Omit<SupplyCheckout, "id" | "checkedOutAt"> & { checkedOutAt?: string }): SupplyCheckout => {
+    const all = ls.get<SupplyCheckout[]>(KEYS.supplyCheckouts, []);
+    // For non-book items, one per (studentId, supplyKind). For books a kid
+    // can borrow multiple at once, so keyed by id.
+    const filtered = s.supplyKind === "Book"
+      ? all
+      : all.filter((x) => !(x.studentId === s.studentId && x.supplyKind === s.supplyKind));
+    const entry: SupplyCheckout = {
+      id: `sup-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      studentId: s.studentId,
+      studentName: s.studentName,
+      supplyKind: s.supplyKind,
+      bookTitle: s.bookTitle,
+      checkedOutAt: s.checkedOutAt || new Date().toISOString(),
+    };
+    filtered.push(entry);
+    ls.set(KEYS.supplyCheckouts, filtered);
+    return entry;
+  },
+  returnSupply: (id: string): SupplyLogEntry | null => {
+    const all = ls.get<SupplyCheckout[]>(KEYS.supplyCheckouts, []);
+    const idx = all.findIndex((x) => x.id === id);
+    if (idx < 0) return null;
+    const entry = all[idx];
+    const durationSec = Math.max(0, Math.round((Date.now() - new Date(entry.checkedOutAt).getTime()) / 1000));
+    const log: SupplyLogEntry = { ...entry, returnedAt: new Date().toISOString(), durationSec };
+    ls.set(KEYS.supplyCheckouts, all.filter((_, i) => i !== idx));
+    const arr = ls.get<SupplyLogEntry[]>(KEYS.supplyLog, []);
+    arr.unshift(log);
+    ls.set(KEYS.supplyLog, arr.slice(0, 500));
+    return log;
+  },
+  getSupplyLog: () => ls.get<SupplyLogEntry[]>(KEYS.supplyLog, []),
 
   getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
   setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),
@@ -614,6 +739,36 @@ export const FREETIME_BARCODES: Array<{ id: string; freetimeMinutes: number; nam
   { id: "FREETIME-20", freetimeMinutes: 20, name: "🎮 Free Time · 20 min" },
 ];
 
+// Movement barcodes — kid scans on the way to/from specials or lunch.
+export const MOVEMENT_BARCODES: Array<{ id: string; movementKind: "specials" | "lunch"; direction: "out" | "in"; name: string }> = [
+  { id: "SPECIALS-OUT", movementKind: "specials", direction: "out", name: "🎨 Heading to Specials" },
+  { id: "SPECIALS-IN",  movementKind: "specials", direction: "in",  name: "🎨 Back from Specials"  },
+  { id: "LUNCH-OUT",    movementKind: "lunch",    direction: "out", name: "🍱 Heading to Lunch"    },
+  { id: "LUNCH-IN",     movementKind: "lunch",    direction: "in",  name: "🍱 Back from Lunch"     },
+];
+
+// Class timer barcodes — scan to start the class-wide visual timer
+// on the projector board. Fires a cross-device event the board listens
+// for; no modal, just a confirmation toast.
+export const TIMER_BARCODES: Array<{ id: string; timerMinutes: number; name: string }> = [
+  { id: "TIMER-5",  timerMinutes: 5,  name: "⏱ Class Timer · 5 min"  },
+  { id: "TIMER-10", timerMinutes: 10, name: "⏱ Class Timer · 10 min" },
+  { id: "TIMER-15", timerMinutes: 15, name: "⏱ Class Timer · 15 min" },
+  { id: "TIMER-20", timerMinutes: 20, name: "⏱ Class Timer · 20 min" },
+];
+
+// Supply / library checkout barcodes.
+export const SUPPLY_BARCODES: Array<{ id: string; supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book"; direction: "out" | "in"; name: string }> = [
+  { id: "SUPPLY-PENCIL-OUT",     supplyKind: "Pencil",     direction: "out", name: "✏️ Borrowed Pencil" },
+  { id: "SUPPLY-PENCIL-IN",      supplyKind: "Pencil",     direction: "in",  name: "✏️ Returned Pencil" },
+  { id: "SUPPLY-TABLET-OUT",     supplyKind: "Tablet",     direction: "out", name: "📱 Borrowed Tablet" },
+  { id: "SUPPLY-TABLET-IN",      supplyKind: "Tablet",     direction: "in",  name: "📱 Returned Tablet" },
+  { id: "SUPPLY-HEADPHONES-OUT", supplyKind: "Headphones", direction: "out", name: "🎧 Borrowed Headphones" },
+  { id: "SUPPLY-HEADPHONES-IN",  supplyKind: "Headphones", direction: "in",  name: "🎧 Returned Headphones" },
+  { id: "BOOK-OUT",              supplyKind: "Book",       direction: "out", name: "📚 Checked Out Book" },
+  { id: "BOOK-IN",               supplyKind: "Book",       direction: "in",  name: "📚 Returned Book" },
+];
+
 export function rehydrateBcDB(): Record<string, BcEntry> {
   const bcDB = StarStore.getBcDB();
   const asnTrack = StarStore.getAsnTrack();
@@ -642,6 +797,21 @@ export function rehydrateBcDB(): Record<string, BcEntry> {
   for (const f of FREETIME_BARCODES) {
     if (!bcDB[f.id]) {
       bcDB[f.id] = { id: f.id, type: "freetime-action", name: f.name, freetimeMinutes: f.freetimeMinutes, createdDate: new Date().toISOString() };
+    }
+  }
+  for (const m of MOVEMENT_BARCODES) {
+    if (!bcDB[m.id]) {
+      bcDB[m.id] = { id: m.id, type: "movement-action", name: m.name, movementKind: m.movementKind, direction: m.direction, createdDate: new Date().toISOString() };
+    }
+  }
+  for (const t of TIMER_BARCODES) {
+    if (!bcDB[t.id]) {
+      bcDB[t.id] = { id: t.id, type: "timer-action", name: t.name, timerMinutes: t.timerMinutes, createdDate: new Date().toISOString() };
+    }
+  }
+  for (const sup of SUPPLY_BARCODES) {
+    if (!bcDB[sup.id]) {
+      bcDB[sup.id] = { id: sup.id, type: "supply-action", name: sup.name, supplyKind: sup.supplyKind, direction: sup.direction, createdDate: new Date().toISOString() };
     }
   }
   StarStore.setBcDB(bcDB);

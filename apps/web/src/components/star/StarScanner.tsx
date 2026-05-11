@@ -20,6 +20,8 @@ import GradebookModal from "./GradebookModal.tsx";
 import PassModal from "./PassModal.tsx";
 import StatusModal from "./StatusModal.tsx";
 import FreetimeModal from "./FreetimeModal.tsx";
+import MovementModal from "./MovementModal.tsx";
+import SupplyModal from "./SupplyModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
@@ -27,6 +29,9 @@ interface ScanState {
   pass?: { barcode: string; passKind: "Bathroom" | "Water" | "Break" };
   status?: { barcode: string; statusKind: "Absent" | "Skipped" | "Excused" | "Makeup" };
   freetime?: { barcode: string; minutes: number };
+  movement?: { barcode: string; kind: "specials" | "lunch"; direction: "out" | "in" };
+  supply?: { barcode: string; supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book"; direction: "out" | "in" };
+  timerToast?: { minutes: number };
   unknown?: { barcode: string };
 }
 
@@ -101,6 +106,34 @@ export default function StarScanner() {
           const mins = Math.max(1, Math.min(120, Number(ftMatch[1]) || 10));
           entry = { id: v, type: "freetime-action", name: `🎮 Free Time · ${mins} min`, freetimeMinutes: mins, createdDate: new Date().toISOString() };
         }
+        // SPECIALS-OUT/IN, LUNCH-OUT/IN
+        const moveMatch = /^(SPECIALS|LUNCH)-(OUT|IN)$/i.exec(v);
+        if (moveMatch) {
+          const kind = moveMatch[1].toLowerCase() as "specials" | "lunch";
+          const direction = moveMatch[2].toLowerCase() as "out" | "in";
+          const meta = kind === "specials" ? { icon: "🎨", label: "Specials" } : { icon: "🍱", label: "Lunch" };
+          entry = { id: v, type: "movement-action", name: `${meta.icon} ${meta.label}-${direction.toUpperCase()}`, movementKind: kind, direction, createdDate: new Date().toISOString() };
+        }
+        // TIMER-{minutes}
+        const timerMatch = /^TIMER-(\d+)$/i.exec(v);
+        if (timerMatch) {
+          const mins = Math.max(1, Math.min(120, Number(timerMatch[1]) || 10));
+          entry = { id: v, type: "timer-action", name: `⏱ Class Timer · ${mins} min`, timerMinutes: mins, createdDate: new Date().toISOString() };
+        }
+        // SUPPLY-{KIND}-{OUT|IN} or BOOK-{OUT|IN}
+        const supMatch = /^(?:SUPPLY-(PENCIL|TABLET|HEADPHONES)|(BOOK))-(OUT|IN)$/i.exec(v);
+        if (supMatch) {
+          const supplyKindRaw = (supMatch[1] || supMatch[2]).toUpperCase();
+          const supplyKind = (
+            supplyKindRaw === "PENCIL"     ? "Pencil"
+            : supplyKindRaw === "TABLET"   ? "Tablet"
+            : supplyKindRaw === "HEADPHONES" ? "Headphones"
+            : "Book"
+          ) as "Pencil" | "Tablet" | "Headphones" | "Book";
+          const direction = supMatch[3].toLowerCase() as "out" | "in";
+          const icon = supplyKind === "Pencil" ? "✏️" : supplyKind === "Tablet" ? "📱" : supplyKind === "Headphones" ? "🎧" : "📚";
+          entry = { id: v, type: "supply-action", name: `${icon} ${supplyKind}-${direction.toUpperCase()}`, supplyKind, direction, createdDate: new Date().toISOString() };
+        }
       }
       if (entry) {
         successBeep();
@@ -127,6 +160,21 @@ export default function StarScanner() {
           setScan({ status: { barcode: v, statusKind: entry.statusKind } });
         } else if (entry.type === "freetime-action") {
           setScan({ freetime: { barcode: v, minutes: entry.freetimeMinutes } });
+        } else if (entry.type === "movement-action") {
+          setScan({ movement: { barcode: v, kind: entry.movementKind, direction: entry.direction } });
+        } else if (entry.type === "supply-action") {
+          setScan({ supply: { barcode: v, supplyKind: entry.supplyKind, direction: entry.direction } });
+        } else if (entry.type === "timer-action") {
+          // No modal — fire the cross-device event directly so the
+          // board picks it up + starts the visual countdown. Brief
+          // local toast confirms the scan.
+          fireStarBoardEvent({
+            kind: "start-class-timer",
+            studentName: "—",
+            detail: `${entry.timerMinutes} min`,
+          });
+          setScan({ timerToast: { minutes: entry.timerMinutes } });
+          setTimeout(() => setScan({}), 2000);
         }
       } else {
         // Local miss → try the server lookup.
@@ -168,6 +216,18 @@ export default function StarScanner() {
             setScan({ status: { barcode: v, statusKind: (final as any).statusKind } });
           } else if (final.type === "freetime-action") {
             setScan({ freetime: { barcode: v, minutes: (final as any).freetimeMinutes } });
+          } else if (final.type === "movement-action") {
+            setScan({ movement: { barcode: v, kind: (final as any).movementKind, direction: (final as any).direction } });
+          } else if (final.type === "supply-action") {
+            setScan({ supply: { barcode: v, supplyKind: (final as any).supplyKind, direction: (final as any).direction } });
+          } else if (final.type === "timer-action") {
+            fireStarBoardEvent({
+              kind: "start-class-timer",
+              studentName: "—",
+              detail: `${(final as any).timerMinutes} min`,
+            });
+            setScan({ timerToast: { minutes: (final as any).timerMinutes } });
+            setTimeout(() => setScan({}), 2000);
           }
           return;
         }
@@ -216,6 +276,40 @@ export default function StarScanner() {
           onClose={() => setScan({})}
         />
       )}
+      {scan.movement && (
+        <MovementModal
+          kind={scan.movement.kind}
+          direction={scan.movement.direction}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.supply && (
+        <SupplyModal
+          supplyKind={scan.supply.supplyKind}
+          direction={scan.supply.direction}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.timerToast && (
+        <div role="status" aria-live="polite" style={{
+          position: "fixed",
+          right: "max(env(safe-area-inset-right), 16px)",
+          bottom: "max(env(safe-area-inset-bottom), 16px)",
+          zIndex: 9999,
+          padding: "14px 18px", borderRadius: 14,
+          background: "linear-gradient(135deg, rgba(168,85,247,0.95), rgba(236,72,153,0.95))",
+          border: "1px solid rgba(255,255,255,0.20)",
+          color: "white", fontFamily: "'Inter', system-ui, sans-serif",
+          boxShadow: "0 16px 40px -8px rgba(168,85,247,0.55)",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 22 }}>⏱</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "-0.005em" }}>Class timer started</div>
+            <div style={{ fontSize: 11, opacity: 0.9, fontWeight: 600 }}>{scan.timerToast.minutes} min on the board</div>
+          </div>
+        </div>
+      )}
       {scan.unknown && (
         <UnknownBarcodeOverlay
           barcode={scan.unknown.barcode}
@@ -247,6 +341,14 @@ export default function StarScanner() {
                 setScan({ status: { barcode: code, statusKind: (found as any).statusKind } });
               } else if (found.type === "freetime-action") {
                 setScan({ freetime: { barcode: code, minutes: (found as any).freetimeMinutes } });
+              } else if (found.type === "movement-action") {
+                setScan({ movement: { barcode: code, kind: (found as any).movementKind, direction: (found as any).direction } });
+              } else if (found.type === "supply-action") {
+                setScan({ supply: { barcode: code, supplyKind: (found as any).supplyKind, direction: (found as any).direction } });
+              } else if (found.type === "timer-action") {
+                fireStarBoardEvent({ kind: "start-class-timer", studentName: "—", detail: `${(found as any).timerMinutes} min` });
+                setScan({ timerToast: { minutes: (found as any).timerMinutes } });
+                setTimeout(() => setScan({}), 2000);
               }
             } else {
               errorBeep();

@@ -310,6 +310,27 @@ export default function ClassroomBoard() {
     } catch {}
   };
 
+  // Cross-device class-timer trigger — a TIMER-N barcode scanned on
+  // the iPad fires a "start-class-timer" event with a "N min" detail.
+  // The board listens here and kicks off the visual countdown
+  // automatically so the teacher doesn't need to walk over.
+  useEffect(() => {
+    if (!isTeacher) return;
+    let unsub: (() => void) | null = null;
+    (async () => {
+      const { onStarBoardEvent } = await import("../lib/star/boardEvents.ts");
+      unsub = onStarBoardEvent((e: any) => {
+        if (e?.kind !== "start-class-timer") return;
+        const m = /^(\d+)\s*min/i.exec(String(e.detail || ""));
+        const mins = m ? Math.max(1, Math.min(120, Number(m[1]))) : 10;
+        setTimerMinutes(mins);
+        sendTimer("start", mins);
+      });
+    })();
+    return () => { if (unsub) unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTeacher, cls?.id]);
+
   // Sunday auto-clear of McDonald's stars. Once per Sunday (Pacific),
   // wipe every kid's stars=5 → 0 since the reward day (Saturday) has
   // passed. localStorage gate keeps it idempotent within the day.

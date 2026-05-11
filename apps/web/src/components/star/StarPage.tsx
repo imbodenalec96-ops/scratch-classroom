@@ -326,6 +326,15 @@ export default function StarPage() {
               <SectionWrapper icon="🎮" title="Free time barcodes" description="Earned reward or sensory regulation timer — 5 / 10 / 15 / 20 min.">
                 <FreetimeBarcodesPanel />
               </SectionWrapper>
+              <SectionWrapper icon="🚪" title="Movement (Specials + Lunch)" description="Kids scan on the way to/from PE/Music/Art and lunch — auto-tracks who's out.">
+                <MovementBarcodesPanel />
+              </SectionWrapper>
+              <SectionWrapper icon="⏱" title="Class timer barcodes" description="Scan + the projector board kicks off the visual countdown — no walking back to the iPad.">
+                <TimerBarcodesPanel />
+              </SectionWrapper>
+              <SectionWrapper icon="🛠" title="Supplies & library" description="Track who borrowed the iPad / pencil / headphones / library books.">
+                <SupplyBarcodesPanel />
+              </SectionWrapper>
             </div>
             <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
               <ManualAssignmentEntry key={syncStamp} onOpenGradebook={(id) => setOpenGradebook(id)} />
@@ -693,6 +702,99 @@ function FreetimeBarcodesPanel() {
           background: "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)", color: "white",
           border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
         }}>🖨 Print free time sheet</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+        {items.map((p) => (
+          <div key={p.id} style={{
+            padding: 10, borderRadius: 10,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>{p.label}</div>
+            <div dangerouslySetInnerHTML={{ __html: bc128svg(p.id, 0, 56, true, 1.4) }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Movement barcodes (Specials in/out, Lunch in/out) ─────────── */
+function MovementBarcodesPanel() {
+  const items = [
+    { id: "SPECIALS-OUT", label: "🎨 Specials — OUT", note: "Scan + tap kids leaving for PE/Music/Art." },
+    { id: "SPECIALS-IN",  label: "🎨 Specials — IN",  note: "Scan + tap kids walking back in." },
+    { id: "LUNCH-OUT",    label: "🍱 Lunch — OUT",    note: "Scan + tap kids leaving for lunch." },
+    { id: "LUNCH-IN",     label: "🍱 Lunch — IN",     note: "Scan + tap returning kids." },
+  ];
+  return <BarcodeSheetPanel items={items} title="Movement" sheetTitle="STAR — Movement Barcodes (laminate by the door)" />;
+}
+
+/* ── Class timer barcodes (TIMER-N) ────────────────────────────── */
+function TimerBarcodesPanel() {
+  const items = [
+    { id: "TIMER-5",  label: "⏱ 5 min",  note: "Scan to start a 5-min countdown on the projector." },
+    { id: "TIMER-10", label: "⏱ 10 min", note: "Same — 10 min." },
+    { id: "TIMER-15", label: "⏱ 15 min", note: "Same — 15 min." },
+    { id: "TIMER-20", label: "⏱ 20 min", note: "Same — 20 min." },
+  ];
+  return <BarcodeSheetPanel items={items} title="Timer" sheetTitle="STAR — Class Timer Barcodes (laminate near your desk)" />;
+}
+
+/* ── Supply / library barcodes ─────────────────────────────────── */
+function SupplyBarcodesPanel() {
+  const items = [
+    { id: "SUPPLY-PENCIL-OUT",     label: "✏️ Pencil — OUT",      note: "Borrow a pencil." },
+    { id: "SUPPLY-PENCIL-IN",      label: "✏️ Pencil — IN",       note: "Return a pencil." },
+    { id: "SUPPLY-TABLET-OUT",     label: "📱 Tablet — OUT",      note: "Borrow a tablet (no more 'where's the iPad')." },
+    { id: "SUPPLY-TABLET-IN",      label: "📱 Tablet — IN",       note: "Return a tablet." },
+    { id: "SUPPLY-HEADPHONES-OUT", label: "🎧 Headphones — OUT",  note: "Borrow headphones." },
+    { id: "SUPPLY-HEADPHONES-IN",  label: "🎧 Headphones — IN",   note: "Return headphones." },
+    { id: "BOOK-OUT",              label: "📚 Book — OUT",        note: "Class library checkout. Type the title in the popup." },
+    { id: "BOOK-IN",               label: "📚 Book — IN",         note: "Library return." },
+  ];
+  return <BarcodeSheetPanel items={items} title="Supplies & Library" sheetTitle="STAR — Supply Barcodes (laminate by the supply tub)" />;
+}
+
+/* ── shared print-sheet renderer (saves duplicating all 4 panels) ── */
+function BarcodeSheetPanel({ items, title, sheetTitle }: {
+  items: Array<{ id: string; label: string; note: string }>;
+  title: string;
+  sheetTitle: string;
+}) {
+  const print = () => {
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) return;
+    const cells = items.map((p) => `
+      <div style="border:2px dashed #999;border-radius:14px;padding:24px;text-align:center;page-break-inside:avoid">
+        <div style="font-size:24px;font-weight:800;margin-bottom:8px">${p.label}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:14px">${p.note}</div>
+        ${bc128svg(p.id, 0, 100, true, 2.4)}
+      </div>
+    `).join("");
+    w.document.write(`<!doctype html><html><head><title>${sheetTitle}</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.5in; } }
+        body { font-family: -apple-system, sans-serif; padding: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+        h2 { font-size: 18px; margin: 0 0 12px; }
+      </style>
+    </head><body>
+      <h2>${sheetTitle}</h2>
+      <div class="grid">${cells}</div>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+    </body></html>`);
+    w.document.close();
+  };
+  return (
+    <div style={{ color: "#f5f1e8" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <button onClick={print} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)", color: "white",
+          border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
+        }}>🖨 Print {title.toLowerCase()} sheet</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
         {items.map((p) => (
