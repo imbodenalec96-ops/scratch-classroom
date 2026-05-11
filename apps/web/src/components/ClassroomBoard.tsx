@@ -12,7 +12,7 @@ import ReactionRain from "./ReactionRain.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
-import { StarStore, countsTowardGrade, type ActivePass } from "../lib/star/storage.ts";
+import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
@@ -223,6 +223,7 @@ export default function ClassroomBoard() {
   // for fast per-tile lookups during render.
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [presenceByStudent, setPresenceByStudent] = useState<Record<string, { last_seen: string; activity: string; isOnline: boolean }>>({});
+  useEffect(() => { backfillStudentGrades(); }, []);
   useEffect(() => {
     if (!cls?.id) return;
     let cancelled = false;

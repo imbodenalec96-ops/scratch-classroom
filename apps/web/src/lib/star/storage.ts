@@ -769,7 +769,41 @@ export const SUPPLY_BARCODES: Array<{ id: string; supplyKind: "Pencil" | "Tablet
   { id: "BOOK-IN",               supplyKind: "Book",       direction: "in",  name: "📚 Returned Book" },
 ];
 
+// Authoritative grade-level map by first name. Edited in code so every
+// device picks up the same levels — no per-device Settings entry needed.
+// Bump the version key whenever this map changes so devices re-apply.
+const STUDENT_GRADE_MAP: Record<string, string> = {
+  zoey:  "1st",
+  kaleb: "2nd",
+  ameer: "4th",
+  anna:  "1st",
+  ryan:  "5th",
+  jaida: "5th",
+  aiden: "2nd",
+};
+const STUDENT_GRADE_MAP_VERSION = "v3-2026-05-11";
+
+export function backfillStudentGrades(): void {
+  try {
+    const appliedVersion = localStorage.getItem("star_grade_map_version");
+    if (appliedVersion === STUDENT_GRADE_MAP_VERSION) return;
+    const students = StarStore.getStudents();
+    let changed = false;
+    for (const s of students) {
+      const fn = (s.firstName || "").trim().toLowerCase();
+      const want = STUDENT_GRADE_MAP[fn];
+      if (want && s.grade !== want) {
+        s.grade = want;
+        changed = true;
+      }
+    }
+    if (changed) StarStore.setStudents(students);
+    localStorage.setItem("star_grade_map_version", STUDENT_GRADE_MAP_VERSION);
+  } catch {}
+}
+
 export function rehydrateBcDB(): Record<string, BcEntry> {
+  backfillStudentGrades();
   const bcDB = StarStore.getBcDB();
   const asnTrack = StarStore.getAsnTrack();
   for (const id in asnTrack) {
