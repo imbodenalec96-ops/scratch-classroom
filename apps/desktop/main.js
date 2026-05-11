@@ -9,12 +9,13 @@
 // To make this an offline-first app later, swap PROD_URL for a
 // `loadFile(...)` that points at a bundled apps/web/dist build.
 
-const { app, BrowserWindow, shell, Menu, dialog } = require("electron");
+const { app, BrowserWindow, shell, Menu, dialog, session } = require("electron");
 const path = require("path");
+const fs = require("fs");
 
 // Production URL the desktop window opens. Override at launch time
-// with --url=https://... to test against a preview deploy or local
-// dev server.
+// with --url=https://... or via a scratch-url.txt next to the app's
+// userData folder.
 //
 // Use the api-td1x.vercel.app domain — it's the project that's
 // actually receiving auto-deploys. The shorter scratch-classroom.vercel.app
@@ -26,6 +27,19 @@ function pickUrl() {
   const flag = process.argv.find((a) => a.startsWith("--url="));
   if (flag) return flag.slice("--url=".length);
   if (process.env.SCRATCH_URL) return process.env.SCRATCH_URL;
+  // Belt-and-suspenders: if the user drops a scratch-url.txt next to
+  // the app's userData dir, use that — gives you a manual override
+  // without needing to rebuild the .dmg/.exe.
+  try {
+    const overrideFile = path.join(app.getPath("userData"), "scratch-url.txt");
+    if (fs.existsSync(overrideFile)) {
+      const u = fs.readFileSync(overrideFile, "utf8").trim();
+      if (u && /^https?:\/\//i.test(u)) {
+        console.log("[scratch-desktop] Using URL from override file:", u);
+        return u;
+      }
+    }
+  } catch {}
   return DEFAULT_PROD_URL;
 }
 
@@ -41,6 +55,11 @@ let mainWindow = null;
 
 function createWindow() {
   const url = pickUrl();
+  console.log("[scratch-desktop] Loading URL:", url);
+
+  // Nuke persisted HTTP cache so a stale entry from a previous URL
+  // can't serve old content under the new domain. Idempotent + cheap.
+  session.defaultSession.clearCache().catch(() => {});
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -49,7 +68,8 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#0a0414", // matches the violet/pink dark theme so
                                 // the white-flash on load is invisible
-    title: "Scratch Classroom",
+    // Title bar shows the URL it loaded so the user can VERIFY at a glance.
+    title: `Scratch Classroom — ${url.replace(/^https?:\/\//, "").replace(/\/$/, "")}`,
     show: false, // wait for ready-to-show so users don't see a blank flash
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
