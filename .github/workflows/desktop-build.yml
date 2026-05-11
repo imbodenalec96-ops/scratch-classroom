@@ -50,6 +50,15 @@ jobs:
       - name: Install root deps
         run: npm install --no-audit --no-fund
 
+      # npm workspaces silently skips the postinstall on hoisted packages,
+      # so app-builder-bin/{mac,win}/<binary> never gets downloaded → the
+      # build fails with ENOENT spawning the helper. Force-rebuild to
+      # trigger the install.js for these specific packages.
+      - name: Rebuild native binaries (app-builder-bin, etc)
+        run: |
+          npm rebuild app-builder-bin
+          npm rebuild --workspace=@scratch/desktop
+
       - name: Generate icons
         working-directory: apps/desktop
         run: node build/make-icons.js
