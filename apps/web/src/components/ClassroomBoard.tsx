@@ -1995,14 +1995,15 @@ export default function ClassroomBoard() {
                             : "#ef4444";
                           return (
                             <span style={{
-                              display: "inline-flex", alignItems: "baseline", gap: 4,
-                              padding: "2px 8px", borderRadius: 999,
-                              background: `${color}1f`,
-                              border: `1px solid ${color}55`,
+                              display: "inline-flex", alignItems: "baseline", gap: 6,
+                              padding: "4px 12px", borderRadius: 999,
+                              background: `${color}26`,
+                              border: `1.5px solid ${color}77`,
+                              boxShadow: `0 0 12px -2px ${color}55`,
                               fontFamily: serif,
                             }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color, letterSpacing: "0.02em" }}>{lg.letter}</span>
-                              <span style={{ fontSize: 10, fontStyle: "italic", color: "rgba(245,241,232,0.55)" }}>{lg.pct}%</span>
+                              <span style={{ fontSize: 20, fontWeight: 800, color, letterSpacing: "0.02em", textShadow: `0 0 8px ${color}88` }}>{lg.letter}</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, fontStyle: "italic", color: "rgba(245,241,232,0.85)" }}>{lg.pct}%</span>
                             </span>
                           );
                         })()}
