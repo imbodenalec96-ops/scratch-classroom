@@ -8,10 +8,15 @@
 //   • Student edition — first-person, kid-friendly, encouraging tone,
 //                       big colorful blocks they can take home.
 //
-// Pulls everything from local STAR storage (offline-capable):
-//   - Grades           ← StarStore.getAsnTrack()
-//   - 1 photo of work  ← StarStore.getPhotos() filtered by student
-//   - Pass log         ← StarStore.getPassLog()
+// Computed sections (all pulled from local STAR storage, offline):
+//   - Grades, photo, pass breakdown, refusal count, vocabulary mastered,
+//     streak, total questions, best grade, most-improved subject,
+//     prior-period delta, calendar heatmap (monthly), birthday banner.
+//
+// Deferred (need new infra, not in this pass):
+//   - Audio voice-memo from teacher (MediaRecorder + storage)
+//   - Sign-and-return QR (needs backend ack endpoint)
+//   - Whole-family combined snapshot (separate flow)
 
 import { useMemo, useState } from "react";
 import {
@@ -23,11 +28,25 @@ import { successBeep, loggedBeep } from "../../lib/star/sounds.ts";
 
 type Variant = "parent" | "student";
 type Period  = "day" | "month";
+type Lang    = "en" | "es";
+
+interface PassBreakdown { bathroom: number; water: number; break: number }
 
 interface DayData {
-  grades: Array<{ name: string; subject: string; pct: number; letter: string; counted: boolean; date: string }>;
+  grades: Array<{ name: string; subject: string; pct: number; letter: string; counted: boolean; date: string; questionCount: number }>;
   photo: StarPhoto | null;
   passes: number;
+  passBreakdown: PassBreakdown;
+  refusals: number;
+  totalQuestions: number;
+  bestGrade: { name: string; pct: number; subject: string } | null;
+  vocab: Array<{ term: string; definition: string }>;
+  streakDays: number;            // consecutive days ending at `end` with at least one completed assignment
+  daysWithWork: string[];        // ISO date strings within range that had completed work
+  subjectAverages: Array<{ subject: string; avg: number; n: number }>;
+  prior: { avg: number | null; gradesCount: number } | null;  // same-length window immediately before
+  mostImproved: { subject: string; delta: number; cur: number; prev: number } | null;
+  isBirthday: boolean;
 }
 
 function todayPacific(): string {
@@ -47,10 +66,24 @@ function inRange(date: string | undefined, start: string, end: string): boolean 
   return date >= start && date <= end;
 }
 
+// Subtract one day from a YYYY-MM-DD string.
+function addDays(date: string, days: number): string {
+  const d = new Date(date + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+function dayDiff(a: string, b: string): number {
+  const da = new Date(a + "T00:00:00Z").getTime();
+  const db = new Date(b + "T00:00:00Z").getTime();
+  return Math.round((db - da) / 86400000);
+}
+
 function gatherData(s: StarStudent, start: string, end: string): DayData {
   const tracker = StarStore.getAsnTrack();
   const photos = StarStore.getPhotos();
   const passLog = StarStore.getPassLog();
+  const refusalLog = StarStore.getLog();
   const first = (s.firstName || "").trim().toLowerCase();
   const matchesStudent = (sid: string | undefined, sname: string | undefined): boolean => {
     if (sid && sid === s.id) return true;
@@ -60,21 +93,37 @@ function gatherData(s: StarStudent, start: string, end: string): DayData {
     return false;
   };
 
+  // ── Grades + per-grade question count + vocab harvest ────────
   const grades: DayData["grades"] = [];
+  const vocabSeen = new Set<string>();
+  const vocab: Array<{ term: string; definition: string }> = [];
   for (const t of Object.values(tracker) as StarTrackerEntry[]) {
     for (const sub of t.submissions || []) {
       if (!inRange(sub.completedDate, start, end)) continue;
       if (!matchesStudent(sub.studentId, sub.studentName)) continue;
+      const qCount = (typeof sub.maxScore === "number" && sub.maxScore > 0)
+        ? sub.maxScore
+        : Array.isArray(t.questions) ? t.questions.length : 0;
       grades.push({
         name: t.name, subject: t.subject || "Other",
         pct: sub.pct, letter: sub.letterGrade,
         counted: countsTowardGrade(sub),
         date: sub.completedDate || "",
+        questionCount: qCount,
       });
+      // Harvest vocab from the lesson the kid actually completed.
+      const v = (t.lesson as any)?.vocab as Array<{ term: string; definition: string }> | undefined;
+      if (Array.isArray(v)) {
+        for (const w of v) {
+          const k = (w?.term || "").trim().toLowerCase();
+          if (k && !vocabSeen.has(k)) { vocabSeen.add(k); vocab.push({ term: w.term, definition: w.definition }); }
+        }
+      }
     }
   }
   grades.sort((a, b) => b.date.localeCompare(a.date));
 
+  // ── Photo (most recent in range) ────────────────────────────
   let photo: StarPhoto | null = null;
   for (const list of Object.values(photos)) {
     for (const p of list) {
@@ -88,13 +137,120 @@ function gatherData(s: StarStudent, start: string, end: string): DayData {
     }
   }
 
-  const passes = passLog.filter((p) => {
+  // ── Passes (count + breakdown by kind) ──────────────────────
+  const passBreakdown: PassBreakdown = { bathroom: 0, water: 0, break: 0 };
+  let passes = 0;
+  for (const p of passLog) {
     const dateStr = (p.startedAt || "").slice(0, 10);
-    if (!inRange(dateStr, start, end)) return false;
-    return matchesStudent(p.studentId, p.studentName);
+    if (!inRange(dateStr, start, end)) continue;
+    if (!matchesStudent(p.studentId, p.studentName)) continue;
+    passes += 1;
+    const k = String(p.passKind || "").toLowerCase();
+    if (k === "bathroom") passBreakdown.bathroom += 1;
+    else if (k === "water") passBreakdown.water += 1;
+    else if (k === "break") passBreakdown.break += 1;
+  }
+
+  // ── Refusals in range ───────────────────────────────────────
+  const refusals = refusalLog.filter((r) => {
+    if (!inRange(r.date, start, end)) return false;
+    if (r.studentId && r.studentId === s.id) return true;
+    if (!r.studentId && r.student) {
+      return r.student.trim().toLowerCase().split(/\s+/)[0] === first;
+    }
+    return false;
   }).length;
 
-  return { grades, photo, passes };
+  // ── Aggregates ───────────────────────────────────────────────
+  const totalQuestions = grades.reduce((a, g) => a + (g.questionCount || 0), 0);
+  const counted = grades.filter((g) => g.counted);
+  let bestGrade: DayData["bestGrade"] = null;
+  for (const g of counted) {
+    if (!bestGrade || g.pct > bestGrade.pct) {
+      bestGrade = { name: g.name, pct: g.pct, subject: g.subject };
+    }
+  }
+
+  // ── Per-subject averages ────────────────────────────────────
+  const bySubject: Record<string, { sum: number; n: number }> = {};
+  for (const g of counted) {
+    const k = g.subject || "Other";
+    (bySubject[k] ||= { sum: 0, n: 0 }).sum += g.pct;
+    bySubject[k].n += 1;
+  }
+  const subjectAverages = Object.entries(bySubject)
+    .map(([subject, v]) => ({ subject, avg: Math.round(v.sum / v.n), n: v.n }))
+    .sort((a, b) => b.avg - a.avg);
+
+  // ── Days-with-work + streak ─────────────────────────────────
+  const dayKeys = new Set<string>();
+  for (const g of grades) if (g.date) dayKeys.add(g.date);
+  const daysWithWork = Array.from(dayKeys).sort();
+  let streakDays = 0;
+  for (let i = 0; ; i++) {
+    const day = addDays(end, -i);
+    if (dayKeys.has(day)) streakDays += 1;
+    else break;
+  }
+
+  // ── Prior-period comparison (same-length window before) ─────
+  const len = dayDiff(start, end) + 1; // inclusive
+  const priorEnd = addDays(start, -1);
+  const priorStart = addDays(priorEnd, -(len - 1));
+  const priorGrades: Array<{ subject: string; pct: number; counted: boolean }> = [];
+  for (const t of Object.values(tracker) as StarTrackerEntry[]) {
+    for (const sub of t.submissions || []) {
+      if (!inRange(sub.completedDate, priorStart, priorEnd)) continue;
+      if (!matchesStudent(sub.studentId, sub.studentName)) continue;
+      priorGrades.push({
+        subject: t.subject || "Other",
+        pct: sub.pct,
+        counted: countsTowardGrade(sub),
+      });
+    }
+  }
+  const priorCounted = priorGrades.filter((g) => g.counted);
+  const prior = priorCounted.length === 0
+    ? null
+    : { avg: Math.round(priorCounted.reduce((a, g) => a + g.pct, 0) / priorCounted.length), gradesCount: priorCounted.length };
+
+  // ── Most-improved subject (current avg vs prior avg) ───────
+  const priorBySubject: Record<string, { sum: number; n: number }> = {};
+  for (const g of priorCounted) {
+    const k = g.subject || "Other";
+    (priorBySubject[k] ||= { sum: 0, n: 0 }).sum += g.pct;
+    priorBySubject[k].n += 1;
+  }
+  let mostImproved: DayData["mostImproved"] = null;
+  for (const cur of subjectAverages) {
+    const p = priorBySubject[cur.subject];
+    if (!p || p.n === 0) continue;
+    const prevAvg = Math.round(p.sum / p.n);
+    const delta = cur.avg - prevAvg;
+    if (!mostImproved || delta > mostImproved.delta) {
+      mostImproved = { subject: cur.subject, delta, cur: cur.avg, prev: prevAvg };
+    }
+  }
+  if (mostImproved && mostImproved.delta <= 0) mostImproved = null; // only celebrate gains
+
+  // ── Birthday detection (against `end`) ──────────────────────
+  let isBirthday = false;
+  try {
+    const bdayKey = "star_student_birthdays";
+    const map: Record<string, string> = JSON.parse(localStorage.getItem(bdayKey) || "{}");
+    const stored = map[s.id];
+    if (stored) {
+      const md = stored.length === 5 ? stored : stored.slice(5);
+      const endMD = end.slice(5);
+      if (md === endMD) isBirthday = true;
+    }
+  } catch {}
+
+  return {
+    grades, photo, passes, passBreakdown, refusals, totalQuestions,
+    bestGrade, vocab, streakDays, daysWithWork, subjectAverages,
+    prior, mostImproved, isBirthday,
+  };
 }
 
 export default function SnapshotGenerator() {
@@ -102,6 +258,7 @@ export default function SnapshotGenerator() {
   const [studentId, setStudentId] = useState("");
   const [variant, setVariant] = useState<Variant>("parent");
   const [period,  setPeriod]  = useState<Period>("day");
+  const [lang,    setLang]    = useState<Lang>("en");
   const [teacherName, setTeacherName] = useState("");
   const [teacherMessage, setTeacherMessage] = useState("");
   const [date, setDate] = useState(todayPacific());
@@ -119,6 +276,7 @@ export default function SnapshotGenerator() {
       data,
       variant,
       period,
+      lang,
       date,
       start,
       end,
@@ -126,6 +284,35 @@ export default function SnapshotGenerator() {
       teacherMessage: teacherMessage.trim(),
     });
     loggedBeep();
+  };
+
+  // Email button uses a basic mailto: with a plain-text summary (HTML
+  // bodies aren't supported across mail clients). The full PDF still
+  // has to print, but the parent gets a quick text recap right away.
+  const emailToParent = () => {
+    if (!sel || !data) return;
+    const to = sel.parentEmail || "";
+    const periodLabel = period === "month"
+      ? new Date(start + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long" })
+      : new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    const counted = data.grades.filter((g) => g.counted);
+    const avg = counted.length ? Math.round(counted.reduce((a, g) => a + g.pct, 0) / counted.length) : null;
+    const lines = [
+      `${sel.firstName} ${sel.lastName} — ${period === "month" ? "Monthly" : "Today's"} Snapshot`,
+      periodLabel,
+      "",
+      avg !== null ? `Average: ${avg}%` : "No graded work this period.",
+      `Assignments completed: ${counted.length}`,
+      `Questions answered: ${data.totalQuestions}`,
+      data.bestGrade ? `Best work: ${data.bestGrade.name} (${data.bestGrade.pct}%)` : "",
+      data.streakDays > 1 ? `Streak: ${data.streakDays} days in a row` : "",
+      data.refusals > 0 ? `Refusals to note: ${data.refusals}` : "",
+      teacherMessage ? `\nTeacher note: ${teacherMessage}` : "",
+      `\n— ${teacherName || "Mrs. Imboden"}`,
+    ].filter(Boolean).join("\n");
+    const subj = encodeURIComponent(`${sel.firstName}'s ${period === "month" ? "monthly" : "daily"} snapshot — ${periodLabel}`);
+    const body = encodeURIComponent(lines);
+    window.open(`mailto:${encodeURIComponent(to)}?subject=${subj}&body=${body}`, "_blank");
   };
 
   return (
@@ -159,6 +346,12 @@ export default function SnapshotGenerator() {
         <Field label={period === "month" ? "Month of" : "Date"}>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp()} />
         </Field>
+        <Field label="Language">
+          <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} style={inp()}>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </Field>
         <Field label="Teacher (optional)">
           <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Your name" style={inp()} />
         </Field>
@@ -188,13 +381,26 @@ export default function SnapshotGenerator() {
           }}>Preview</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
             <Stat n={data.grades.length}    l={period === "month" ? "Grades this month" : "Grades"} />
-            <Stat n={data.photo ? 1 : 0}     l="Photo" />
-            <Stat n={data.passes}            l={period === "month" ? "Passes this month" : "Passes out"} />
+            <Stat n={data.totalQuestions}    l="Questions answered" />
+            <Stat n={data.streakDays}        l="Day streak" />
+            <Stat n={data.passes}            l={period === "month" ? "Passes this month" : "Passes"} />
+            <Stat n={data.vocab.length}      l="Vocab words" />
+            <Stat n={data.refusals}          l="Refusals" />
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 8, flexWrap: "wrap" }}>
+        {variant === "parent" && (
+          <button
+            onClick={emailToParent}
+            disabled={!sel || !(sel.parentEmail)}
+            title={sel && !sel.parentEmail ? "Add a parent email in /star → Settings to enable" : "Open mail client with a quick text recap"}
+            style={ghostBtn(!sel || !sel?.parentEmail)}
+          >
+            ✉️ Email parent recap
+          </button>
+        )}
         <button onClick={print} disabled={!sel} style={primaryBtn(!sel)}>
           🖨 Print {period === "month" ? "Monthly" : "Today's"} {variant === "parent" ? "Parent" : "Student"} Snapshot
         </button>
@@ -210,6 +416,7 @@ function openSnapshotWindow(args: {
   data: DayData;
   variant: Variant;
   period: Period;
+  lang: Lang;
   date: string;
   start: string;
   end: string;
@@ -218,41 +425,102 @@ function openSnapshotWindow(args: {
 }) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
-  const { student, data, variant, period, date, start, end, teacherName, teacherMessage } = args;
+  const { student, data, variant, period, lang, date, start, end, teacherName, teacherMessage } = args;
+  const localeTag = lang === "es" ? "es-ES" : "en-US";
   const periodLabel = period === "month"
-    ? new Date(start + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long" })
-    : new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    ? new Date(start + "T00:00:00").toLocaleDateString(localeTag, { year: "numeric", month: "long" })
+    : new Date(date + "T00:00:00").toLocaleDateString(localeTag, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const titleWord = period === "month" ? "Monthly" : "Today's";
 
   const html = variant === "parent"
-    ? renderParent(student, data, periodLabel, titleWord, teacherName, teacherMessage)
-    : renderStudent(student, data, periodLabel, titleWord, teacherName, teacherMessage);
-
-  // Silence unused warnings — keep end available for future ranges.
-  void end;
+    ? renderParent(student, data, periodLabel, titleWord, teacherName, teacherMessage, period, start, end, lang)
+    : renderStudent(student, data, periodLabel, titleWord, teacherName, teacherMessage, period, lang);
 
   w.document.write(html);
   w.document.close();
   successBeep();
 }
 
-function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string): string {
+// ── Translation dictionary (parent + student static labels) ────
+const STR: Record<Lang, Record<string, string>> = {
+  en: {
+    snapshot: "Snapshot", todays: "Today's", monthly: "Monthly", parentEd: "Parent Edition",
+    studentEd: "Student Edition", grade: "Grade", today: "today", thisMonth: "this month",
+    average: "average", noGradesYet: "No grades yet",
+    grades: "Grades", subject: "Subject", assignment: "Assignment", date: "Date",
+    score: "Score", vsPrior: "vs. prior period", noChange: "no change",
+    bestWork: "Best work", improvedMost: "Most-improved subject",
+    photo: "Sample of work", vocab: "Vocabulary learned",
+    questionsAnswered: "Questions answered", streak: "Day streak",
+    passes: "Bathroom passes", break: "Sensory breaks", water: "Water breaks",
+    refusalsToNote: "Work refusals to note this period",
+    bathroom: "Bathroom",
+    teacherSig: "Teacher signature", parentAck: "Parent acknowledged",
+    sentHome: "Sent home from STAR",
+    happyBirthday: "Happy Birthday!",
+    monthlyAtAGlance: "Month at a glance",
+    subjectBars: "Subject averages",
+    fromTeacher: "From your teacher",
+    noGradedWork: "No graded work this period.",
+    learnedWords: "Words learned",
+  },
+  es: {
+    snapshot: "Resumen", todays: "de Hoy", monthly: "Mensual", parentEd: "Edición para Padres",
+    studentEd: "Edición para el Estudiante", grade: "Grado", today: "hoy", thisMonth: "este mes",
+    average: "promedio", noGradesYet: "Aún no hay calificaciones",
+    grades: "Calificaciones", subject: "Materia", assignment: "Tarea", date: "Fecha",
+    score: "Puntuación", vsPrior: "vs. periodo anterior", noChange: "sin cambio",
+    bestWork: "Mejor trabajo", improvedMost: "Materia con más mejora",
+    photo: "Muestra de trabajo", vocab: "Vocabulario aprendido",
+    questionsAnswered: "Preguntas respondidas", streak: "Días seguidos",
+    passes: "Pases al baño", break: "Pausas sensoriales", water: "Pausas de agua",
+    refusalsToNote: "Negativas a trabajar este periodo",
+    bathroom: "Baño",
+    teacherSig: "Firma del maestro", parentAck: "Firma del padre/madre",
+    sentHome: "Enviado a casa desde STAR",
+    happyBirthday: "¡Feliz cumpleaños!",
+    monthlyAtAGlance: "El mes de un vistazo",
+    subjectBars: "Promedios por materia",
+    fromTeacher: "De su maestro/a",
+    noGradedWork: "No hubo trabajo calificado en este periodo.",
+    learnedWords: "Palabras aprendidas",
+  },
+};
+
+function tr(lang: Lang, key: keyof typeof STR["en"]): string {
+  return STR[lang][key] || STR.en[key] || String(key);
+}
+
+function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string, period: Period, start: string, end: string, lang: Lang): string {
   const counted = d.grades.filter((g) => g.counted);
   const avg = counted.length ? Math.round(counted.reduce((a, g) => a + g.pct, 0) / counted.length) : null;
-  const periodLower = titleWord === "Monthly" ? "this month" : "today";
+  const periodLower = titleWord === "Monthly" ? tr(lang, "thisMonth") : tr(lang, "today");
 
+  // Trend strip — period vs prior
+  const trend = (avg !== null && d.prior?.avg != null)
+    ? (() => {
+        const delta = avg - d.prior!.avg;
+        const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "■";
+        const color = delta > 0 ? "#16a34a" : delta < 0 ? "#dc2626" : "#6b7280";
+        const lbl = delta === 0 ? tr(lang, "noChange") : `${delta > 0 ? "+" : ""}${delta} pts`;
+        return `<span class="trend" style="color:${color}">${arrow} ${escapeHtml(lbl)} <small>${escapeHtml(tr(lang, "vsPrior"))}</small></span>`;
+      })()
+    : "";
+
+  // Grades table
   const grades = d.grades.length === 0
-    ? `<div class="empty">No graded work ${periodLower}.</div>`
+    ? `<div class="empty">${escapeHtml(tr(lang, "noGradedWork"))}</div>`
     : `<table>
-        <thead><tr><th>Subject</th><th>Assignment</th>${titleWord === "Monthly" ? "<th>Date</th>" : ""}<th>Score</th><th>Grade</th></tr></thead>
+        <thead><tr><th>${escapeHtml(tr(lang, "subject"))}</th><th>${escapeHtml(tr(lang, "assignment"))}</th>${titleWord === "Monthly" ? `<th>${escapeHtml(tr(lang, "date"))}</th>` : ""}<th>${escapeHtml(tr(lang, "score"))}</th><th>${escapeHtml(tr(lang, "grade"))}</th></tr></thead>
         <tbody>${d.grades.map((g) => {
           const c = g.counted ? letterGradeColor(g.letter) : "#94a3b8";
+          const isBest = !!d.bestGrade && g.name === d.bestGrade.name && g.pct === d.bestGrade.pct;
           const datePart = titleWord === "Monthly"
-            ? `<td>${g.date ? new Date(g.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</td>`
+            ? `<td>${g.date ? new Date(g.date + "T00:00:00").toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", day: "numeric" }) : "—"}</td>`
             : "";
-          return `<tr>
+          return `<tr${isBest ? ` style="background:#fef3c7"` : ""}>
             <td>${escapeHtml(g.subject)}</td>
-            <td>${escapeHtml(g.name)}</td>
+            <td>${escapeHtml(g.name)}${isBest ? ' <span class="best-pill">⭐</span>' : ""}</td>
             ${datePart}
             <td>${g.counted ? `${g.pct}%` : "—"}</td>
             <td><span class="badge" style="background:${c}25;color:${c};border:1px solid ${c}">${g.counted ? g.letter : "—"}</span></td>
@@ -260,32 +528,125 @@ function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord
         }).join("")}</tbody>
       </table>`;
 
-  return `<!doctype html><html><head><title>${escapeHtml(titleWord)} Snapshot — ${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</title>
+  // Subject bar chart (only when there are at least 2 subjects)
+  const subjectBars = d.subjectAverages.length >= 2 ? `
+    <h2>📊 ${escapeHtml(tr(lang, "subjectBars"))}</h2>
+    <div class="bars">
+      ${d.subjectAverages.map((sa) => {
+        const c = letterGradeColor(sa.avg >= 90 ? "A" : sa.avg >= 80 ? "B" : sa.avg >= 70 ? "C" : sa.avg >= 60 ? "D" : "F");
+        return `<div class="bar-row">
+          <div class="bar-lbl">${escapeHtml(sa.subject)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${sa.avg}%;background:${c}"></div></div>
+          <div class="bar-val">${sa.avg}%</div>
+        </div>`;
+      }).join("")}
+    </div>
+  ` : "";
+
+  // Calendar heatmap (monthly only)
+  const heatmap = period === "month" ? renderHeatmap(start, end, new Set(d.daysWithWork), lang) : "";
+
+  // Best-grade callout
+  const bestCallout = d.bestGrade ? `
+    <div class="callout best">
+      <div class="callout-lbl">⭐ ${escapeHtml(tr(lang, "bestWork"))}</div>
+      <div class="callout-body"><b>${escapeHtml(d.bestGrade.name)}</b> — ${d.bestGrade.pct}% · ${escapeHtml(d.bestGrade.subject)}</div>
+    </div>
+  ` : "";
+
+  // Most-improved subject (only if positive delta + only meaningful for monthly)
+  const improvedCallout = (period === "month" && d.mostImproved) ? `
+    <div class="callout improved">
+      <div class="callout-lbl">📈 ${escapeHtml(tr(lang, "improvedMost"))}</div>
+      <div class="callout-body"><b>${escapeHtml(d.mostImproved.subject)}</b> +${d.mostImproved.delta} pts (${d.mostImproved.prev}% → ${d.mostImproved.cur}%)</div>
+    </div>
+  ` : "";
+
+  // Refusal callout (parent only)
+  const refusalCallout = d.refusals > 0 ? `
+    <div class="callout refusal">
+      <div class="callout-lbl">⚠️ ${escapeHtml(tr(lang, "refusalsToNote"))}</div>
+      <div class="callout-body">${d.refusals}</div>
+    </div>
+  ` : "";
+
+  // Pass breakdown
+  const passBreakdown = d.passes > 0 ? `
+    <h2>🚪 ${escapeHtml(tr(lang, "passes"))}</h2>
+    <div class="pass-row">
+      <span class="pass-chip">🚻 ${escapeHtml(tr(lang, "bathroom"))}: <b>${d.passBreakdown.bathroom}</b></span>
+      <span class="pass-chip">💧 ${escapeHtml(tr(lang, "water"))}: <b>${d.passBreakdown.water}</b></span>
+      <span class="pass-chip">🛋 ${escapeHtml(tr(lang, "break"))}: <b>${d.passBreakdown["break"]}</b></span>
+    </div>
+  ` : "";
+
+  // Vocabulary mastered
+  const vocabHtml = d.vocab.length > 0 ? `
+    <h2>📖 ${escapeHtml(tr(lang, "vocab"))}</h2>
+    <div class="vocab-grid">
+      ${d.vocab.slice(0, 24).map((v) => `
+        <div class="vocab-card">
+          <div class="vocab-term">${escapeHtml(v.term)}</div>
+          <div class="vocab-def">${escapeHtml(v.definition)}</div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+  // Birthday banner
+  const birthday = d.isBirthday ? `<div class="bday">🎂 ${escapeHtml(tr(lang, "happyBirthday"))}</div>` : "";
+
+  // Fun stats row
+  const funStats = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-n">${d.totalQuestions}</div><div class="stat-l">${escapeHtml(tr(lang, "questionsAnswered"))}</div></div>
+      <div class="stat-card"><div class="stat-n">${d.streakDays}</div><div class="stat-l">${escapeHtml(tr(lang, "streak"))}</div></div>
+      <div class="stat-card"><div class="stat-n">${counted.length}</div><div class="stat-l">${escapeHtml(tr(lang, "assignment"))}</div></div>
+      <div class="stat-card"><div class="stat-n">${d.vocab.length}</div><div class="stat-l">${escapeHtml(tr(lang, "learnedWords"))}</div></div>
+    </div>
+  `;
+
+  return `<!doctype html><html lang="${lang}"><head><title>${escapeHtml(titleWord)} Snapshot — ${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</title>
     <style>${PARENT_CSS}</style></head>
     <body>
       <div class="toolbar no-print">
-        <div>📤 ${escapeHtml(s.firstName)}'s Snapshot — Parent Edition</div>
+        <div>📤 ${escapeHtml(s.firstName)}'s ${escapeHtml(tr(lang, "snapshot"))} — ${escapeHtml(tr(lang, "parentEd"))}</div>
         <button onclick="window.print()">🖨 Print</button>
       </div>
       <section class="page">
+        ${birthday}
         <header class="hero">
           <div>
-            <div class="kicker">${escapeHtml(titleWord)} Snapshot</div>
+            <div class="kicker">${escapeHtml(titleWord === "Monthly" ? tr(lang, "monthly") : tr(lang, "todays"))} ${escapeHtml(tr(lang, "snapshot"))}</div>
             <h1>${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</h1>
-            <div class="meta">${escapeHtml(periodLabel)}${s.grade ? ` · Grade ${escapeHtml(s.grade)}` : ""}</div>
+            <div class="meta">${escapeHtml(periodLabel)}${s.grade ? ` · ${escapeHtml(tr(lang, "grade"))} ${escapeHtml(s.grade)}` : ""}</div>
           </div>
           <div class="hero-stat">
-            ${avg !== null ? `<div class="big">${avg}<span>%</span></div><div class="small">${escapeHtml(periodLower)}'s average</div>` : `<div class="small">No grades yet ${escapeHtml(periodLower)}</div>`}
+            ${avg !== null ? `<div class="big">${avg}<span>%</span></div><div class="small">${escapeHtml(periodLower)} ${escapeHtml(tr(lang, "average"))}</div>${trend}` : `<div class="small">${escapeHtml(tr(lang, "noGradesYet"))} ${escapeHtml(periodLower)}</div>`}
           </div>
         </header>
 
-        ${message ? `<div class="msg"><b>From your teacher${teacher ? ` (${escapeHtml(teacher)})` : ""}:</b> ${escapeHtml(message)}</div>` : ""}
+        ${message ? `<div class="msg"><b>${escapeHtml(tr(lang, "fromTeacher"))}${teacher ? ` (${escapeHtml(teacher)})` : ""}:</b> ${escapeHtml(message)}</div>` : ""}
 
-        <h2>📚 Grades ${escapeHtml(periodLower)}</h2>
+        ${funStats}
+
+        ${bestCallout}
+        ${improvedCallout}
+        ${refusalCallout}
+
+        <h2>📚 ${escapeHtml(tr(lang, "grades"))} ${escapeHtml(periodLower)}</h2>
         ${grades}
 
+        ${subjectBars}
+
+        ${heatmap}
+
+        ${passBreakdown}
+
+        ${vocabHtml}
+
         ${d.photo ? `
-          <h2>📷 Sample of work</h2>
+          <h2>📷 ${escapeHtml(tr(lang, "photo"))}</h2>
           <div class="photo-frame">
             <img src="${d.photo.dataUrl}" alt="Sample of student work" />
             ${d.photo.note ? `<div class="caption">${escapeHtml(d.photo.note)}</div>` : ""}
@@ -294,18 +655,18 @@ function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord
 
         <div class="footer">
           <div>
-            <div class="signlbl">Teacher signature</div>
+            <div class="signlbl">${escapeHtml(tr(lang, "teacherSig"))}</div>
             <div class="signline"></div>
             ${teacher ? `<div class="signname">${escapeHtml(teacher)}</div>` : ""}
           </div>
           <div>
-            <div class="signlbl">Parent acknowledged</div>
+            <div class="signlbl">${escapeHtml(tr(lang, "parentAck"))}</div>
             <div class="signline"></div>
           </div>
         </div>
 
         <div class="meta footnote">
-          Sent home from STAR · ${escapeHtml(periodLabel)}
+          ${escapeHtml(tr(lang, "sentHome"))} · ${escapeHtml(periodLabel)}
           ${s.parentEmail ? ` · ${escapeHtml(s.parentEmail)}` : ""}
         </div>
       </section>
@@ -313,27 +674,66 @@ function renderParent(s: StarStudent, d: DayData, periodLabel: string, titleWord
     </body></html>`;
 }
 
-function renderStudent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string): string {
+// Mini calendar heatmap of the month — one cell per day, green if work
+// was completed, gray if not, dim border if outside the month.
+function renderHeatmap(start: string, end: string, daysWithWork: Set<string>, lang: Lang): string {
+  const startD = new Date(start + "T00:00:00Z");
+  const endD = new Date(end + "T00:00:00Z");
+  const firstDow = startD.getUTCDay(); // 0=Sun
+  const totalDays = Math.round((endD.getTime() - startD.getTime()) / 86400000) + 1;
+  const cells: string[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(`<div class="hm-cell hm-blank"></div>`);
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(startD.getTime() + i * 86400000);
+    const iso = d.toISOString().slice(0, 10);
+    const has = daysWithWork.has(iso);
+    cells.push(`<div class="hm-cell${has ? " hm-on" : ""}" title="${iso}">${d.getUTCDate()}</div>`);
+  }
+  const dows = lang === "es"
+    ? ["D", "L", "M", "X", "J", "V", "S"]
+    : ["S", "M", "T", "W", "T", "F", "S"];
+  return `
+    <h2>🗓 ${escapeHtml(tr(lang, "monthlyAtAGlance"))}</h2>
+    <div class="hm">
+      <div class="hm-row hm-head">${dows.map((d) => `<div class="hm-cell hm-dow">${escapeHtml(d)}</div>`).join("")}</div>
+      <div class="hm-grid">${cells.join("")}</div>
+    </div>
+  `;
+}
+
+function renderStudent(s: StarStudent, d: DayData, periodLabel: string, titleWord: string, teacher: string, message: string, period: Period, lang: Lang): string {
   const isMonth = titleWord === "Monthly";
-  const greatGrade = d.grades.find((g) => g.counted && g.pct >= 80);
   const counted = d.grades.filter((g) => g.counted);
   const aCount = counted.filter((g) => g.letter === "A").length;
   const bCount = counted.filter((g) => g.letter === "B").length;
   const cheers: string[] = [];
-  if (aCount > 0) cheers.push(`${aCount} A${aCount === 1 ? "" : "s"}!`);
-  if (bCount > 0) cheers.push(`${bCount} B${bCount === 1 ? "" : "s"}`);
-  if (greatGrade && aCount === 0 && bCount === 0) cheers.push(`A great ${greatGrade.subject} grade`);
-  if (d.photo) cheers.push(`Awesome work in the photo`);
-  if (counted.length >= 5) cheers.push(`${counted.length} assignments done`);
-  if (cheers.length === 0) cheers.push("Showed up and tried");
+  if (lang === "es") {
+    if (aCount > 0) cheers.push(`${aCount} ${aCount === 1 ? "calificación de A" : "calificaciones de A"} 🎉`);
+    if (bCount > 0) cheers.push(`${bCount} ${bCount === 1 ? "B" : "Bs"} sólidas`);
+    if (d.streakDays >= 2) cheers.push(`${d.streakDays} días seguidos de trabajo 🔥`);
+    if (d.bestGrade) cheers.push(`¡Mejor trabajo: ${d.bestGrade.pct}%!`);
+    if (d.photo) cheers.push("Foto de trabajo increíble");
+    if (d.totalQuestions >= 20) cheers.push(`${d.totalQuestions} preguntas respondidas`);
+    if (cheers.length === 0) cheers.push("Te presentaste y lo intentaste");
+  } else {
+    if (aCount > 0) cheers.push(`${aCount} A${aCount === 1 ? "" : "s"}!`);
+    if (bCount > 0) cheers.push(`${bCount} solid B${bCount === 1 ? "" : "s"}`);
+    if (d.streakDays >= 2) cheers.push(`🔥 ${d.streakDays}-day streak`);
+    if (d.bestGrade) cheers.push(`Best work: ${d.bestGrade.pct}%`);
+    if (d.photo) cheers.push("Awesome photo of your work");
+    if (d.totalQuestions >= 20) cheers.push(`${d.totalQuestions} questions answered`);
+    if (cheers.length === 0) cheers.push("Showed up and tried");
+  }
 
-  const periodLower = isMonth ? "this month" : "today";
+  const periodLower = isMonth ? tr(lang, "thisMonth") : tr(lang, "today");
   const grades = d.grades.length === 0
-    ? `<div class="kid-empty">No work scored ${periodLower} — that's OK!</div>`
+    ? `<div class="kid-empty">${escapeHtml(lang === "es" ? `Hoy no hay trabajo calificado — ¡está bien!` : `No work scored ${periodLower} — that's OK!`)}</div>`
     : `<div class="kid-grades">${d.grades.map((g) => {
         const c = g.counted ? letterGradeColor(g.letter) : "#94a3b8";
-        const dateBit = isMonth && g.date ? ` · ${new Date(g.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "";
+        const isBest = !!d.bestGrade && g.name === d.bestGrade.name && g.pct === d.bestGrade.pct;
+        const dateBit = isMonth && g.date ? ` · ${new Date(g.date + "T00:00:00").toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", day: "numeric" })}` : "";
         return `<div class="kid-grade" style="border-color:${c}; background:${c}15">
+          ${isBest ? `<div class="kid-best-badge">⭐ ${escapeHtml(tr(lang, "bestWork"))}</div>` : ""}
           <div class="kid-grade-letter" style="color:${c}">${g.counted ? g.letter : "—"}</div>
           <div class="kid-grade-info">
             <div class="kid-grade-name">${escapeHtml(g.name)}</div>
@@ -342,42 +742,85 @@ function renderStudent(s: StarStudent, d: DayData, periodLabel: string, titleWor
         </div>`;
       }).join("")}</div>`;
 
-  return `<!doctype html><html><head><title>${escapeHtml(s.firstName)}'s ${escapeHtml(isMonth ? "Month" : "Day")}</title>
+  // Streak ribbon (kid edition only — feels duo-like)
+  const streakRibbon = d.streakDays >= 2 ? `
+    <div class="kid-streak">
+      <div class="kid-streak-fire">🔥</div>
+      <div class="kid-streak-num">${d.streakDays}</div>
+      <div class="kid-streak-lbl">${escapeHtml(lang === "es" ? "días seguidos!" : "day streak!")}</div>
+    </div>
+  ` : "";
+
+  // Vocabulary I learned
+  const vocabHtml = d.vocab.length > 0 ? `
+    <h2>📖 ${escapeHtml(lang === "es" ? "¡Aprendí estas palabras!" : "Words I learned!")}</h2>
+    <div class="kid-vocab">
+      ${d.vocab.slice(0, 12).map((v) => `
+        <div class="kid-vocab-card">
+          <div class="kid-vocab-term">${escapeHtml(v.term)}</div>
+          <div class="kid-vocab-def">${escapeHtml(v.definition)}</div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+  // Birthday
+  const birthday = d.isBirthday ? `<div class="kid-bday">🎂🎈 ${escapeHtml(tr(lang, "happyBirthday"))} 🎈🎂</div>` : "";
+
+  // Mini fun-stats row
+  const funStats = `
+    <div class="kid-stats">
+      <div class="kid-stat"><div class="kid-stat-n">${d.totalQuestions}</div><div class="kid-stat-l">${escapeHtml(lang === "es" ? "preguntas" : "questions")}</div></div>
+      <div class="kid-stat"><div class="kid-stat-n">${counted.length}</div><div class="kid-stat-l">${escapeHtml(lang === "es" ? "tareas" : "assignments")}</div></div>
+      <div class="kid-stat"><div class="kid-stat-n">${d.vocab.length}</div><div class="kid-stat-l">${escapeHtml(lang === "es" ? "palabras" : "words")}</div></div>
+    </div>
+  `;
+
+  void period;
+
+  return `<!doctype html><html lang="${lang}"><head><title>${escapeHtml(s.firstName)}'s ${escapeHtml(isMonth ? "Month" : "Day")}</title>
     <style>${STUDENT_CSS}</style></head>
     <body>
       <div class="toolbar no-print">
-        <div>🎒 ${escapeHtml(s.firstName)}'s ${escapeHtml(titleWord)} Snapshot — Student Edition</div>
+        <div>🎒 ${escapeHtml(s.firstName)}'s ${escapeHtml(titleWord)} ${escapeHtml(tr(lang, "snapshot"))} — ${escapeHtml(tr(lang, "studentEd"))}</div>
         <button onclick="window.print()">🖨 Print</button>
       </div>
       <section class="kid-page">
+        ${birthday}
         <header class="kid-hero">
           <div class="kid-confetti">🎉</div>
           <div>
             <div class="kid-kicker">${escapeHtml(periodLabel)}</div>
-            <h1>Hi, ${escapeHtml(s.firstName)}!</h1>
-            <div class="kid-sub">Look at everything you did ${escapeHtml(periodLower)} 👇</div>
+            <h1>${escapeHtml(lang === "es" ? `¡Hola, ${s.firstName}!` : `Hi, ${s.firstName}!`)}</h1>
+            <div class="kid-sub">${escapeHtml(lang === "es" ? `Mira todo lo que hiciste ${periodLower} 👇` : `Look at everything you did ${periodLower} 👇`)}</div>
           </div>
         </header>
+
+        ${streakRibbon}
 
         ${message ? `<div class="kid-msg">💬 ${escapeHtml(message)}${teacher ? ` <span class="kid-msg-from">— ${escapeHtml(teacher)}</span>` : ""}</div>` : ""}
 
         <div class="kid-cheer">
-          <div class="kid-cheer-label">⭐ ${escapeHtml(isMonth ? "This month" : "Today")} you crushed it with:</div>
+          <div class="kid-cheer-label">⭐ ${escapeHtml(lang === "es" ? "Lo lograste con:" : (isMonth ? "This month you crushed it with:" : "Today you crushed it with:"))}</div>
           <div class="kid-cheer-list">${cheers.map((c) => `<span class="kid-chip">${escapeHtml(c)}</span>`).join("")}</div>
         </div>
 
-        <h2>📚 My work ${escapeHtml(periodLower)}</h2>
+        ${funStats}
+
+        <h2>📚 ${escapeHtml(lang === "es" ? `Mi trabajo ${periodLower}` : `My work ${periodLower}`)}</h2>
         ${grades}
 
+        ${vocabHtml}
+
         ${d.photo ? `
-          <h2>📷 Look what I made!</h2>
+          <h2>📷 ${escapeHtml(lang === "es" ? "¡Mira lo que hice!" : "Look what I made!")}</h2>
           <div class="kid-photo">
             <img src="${d.photo.dataUrl}" alt="My work" />
           </div>
         ` : ""}
 
         <div class="kid-end">
-          <div class="kid-end-line">High five! ✋ ${escapeHtml(isMonth ? "Awesome month!" : "See you tomorrow.")}</div>
+          <div class="kid-end-line">${escapeHtml(lang === "es" ? "¡Choca esos cinco! ✋" : "High five! ✋")} ${escapeHtml(isMonth ? (lang === "es" ? "¡Mes increíble!" : "Awesome month!") : (lang === "es" ? "¡Hasta mañana!" : "See you tomorrow."))}</div>
         </div>
       </section>
       <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250))</script>
@@ -417,6 +860,39 @@ const PARENT_CSS = `
   .signline { border-bottom: 1.5px solid #444; height: 30px; margin-top: 4px; }
   .signname { font-size: 11px; color: #777; margin-top: 2px; }
   .footnote { margin-top: 18px; font-size: 10px; text-align: center; color: #888; }
+  .trend { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 800; }
+  .trend small { font-weight: 600; opacity: 0.7; margin-left: 4px; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+  .stat-card { padding: 8px 10px; border-radius: 10px; background: linear-gradient(135deg, #f5f3ff, #fdf2f8); border: 1px solid #d8b4fe; text-align: center; }
+  .stat-n { font-size: 20px; font-weight: 900; color: #6d28d9; line-height: 1; }
+  .stat-l { font-size: 9px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: #6d28d9; opacity: 0.75; margin-top: 3px; }
+  .callout { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; border-radius: 10px; margin: 8px 0; font-size: 13px; }
+  .callout.best { background: #fef3c7; border: 1px solid #fbbf24; color: #92400e; }
+  .callout.improved { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; }
+  .callout.refusal { background: #fef2f2; border: 1px solid #f87171; color: #991b1b; }
+  .callout-lbl { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; flex-shrink: 0; }
+  .callout-body { flex: 1; }
+  .best-pill { display: inline-block; font-size: 12px; }
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+  .bar-row { display: grid; grid-template-columns: 90px 1fr 50px; gap: 8px; align-items: center; font-size: 12px; }
+  .bar-lbl { font-weight: 700; color: #4c1d95; }
+  .bar-track { height: 14px; background: #f3f4f6; border-radius: 7px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .bar-fill { height: 100%; border-radius: 7px; }
+  .bar-val { font-weight: 800; color: #4c1d95; text-align: right; }
+  .pass-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pass-chip { padding: 6px 12px; border-radius: 999px; background: #faf5ff; border: 1px solid #d8b4fe; font-size: 12px; color: #4c1d95; }
+  .vocab-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+  .vocab-card { padding: 6px 9px; border-radius: 6px; background: #f0fdf4; border: 1px solid #86efac; }
+  .vocab-term { font-weight: 800; font-size: 12px; color: #065f46; }
+  .vocab-def { font-size: 11px; color: #064e3b; margin-top: 2px; }
+  .bday { padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; background: linear-gradient(90deg, #fce7f3, #fef3c7, #ede9fe); font-size: 16px; font-weight: 800; text-align: center; color: #831843; border: 2px dashed #ec4899; }
+  .hm { font-family: -apple-system, sans-serif; }
+  .hm-row, .hm-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .hm-grid { margin-top: 3px; }
+  .hm-cell { aspect-ratio: 1 / 1; border-radius: 4px; background: #f3f4f6; border: 1px solid #e5e7eb; font-size: 9px; color: #6b7280; display: flex; align-items: flex-start; justify-content: flex-start; padding: 2px 4px; font-weight: 700; }
+  .hm-cell.hm-on { background: #6d28d9; border-color: #6d28d9; color: white; }
+  .hm-cell.hm-blank { background: transparent; border: none; }
+  .hm-cell.hm-dow { aspect-ratio: auto; padding: 4px 0; justify-content: center; align-items: center; background: transparent; border: none; font-size: 9px; color: #6d28d9; font-weight: 800; letter-spacing: 0.06em; }
 `;
 
 const STUDENT_CSS = `
@@ -452,6 +928,20 @@ const STUDENT_CSS = `
   .kid-photo img { width: 100%; max-height: 360px; object-fit: contain; display: block; }
   .kid-end { margin-top: 24px; padding: 16px; border-radius: 14px; background: linear-gradient(135deg, #ec4899, #a855f7); color: white; text-align: center; }
   .kid-end-line { font-size: 18px; font-weight: 900; }
+  .kid-bday { padding: 12px; margin-bottom: 12px; border-radius: 16px; background: linear-gradient(90deg, #fce7f3, #fef3c7, #ede9fe); border: 3px dashed #ec4899; text-align: center; font-size: 22px; font-weight: 900; color: #be185d; }
+  .kid-streak { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(135deg, #fed7aa, #fda4af); border: 3px solid #f97316; }
+  .kid-streak-fire { font-size: 38px; line-height: 1; }
+  .kid-streak-num { font-size: 38px; font-weight: 900; color: #9a3412; line-height: 1; }
+  .kid-streak-lbl { font-size: 18px; font-weight: 800; color: #9a3412; }
+  .kid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 14px; }
+  .kid-stat { padding: 10px; border-radius: 12px; background: #faf5ff; border: 2px solid #c4b5fd; text-align: center; }
+  .kid-stat-n { font-size: 28px; font-weight: 900; color: #6d28d9; line-height: 1; }
+  .kid-stat-l { font-size: 11px; font-weight: 800; color: #6b21a8; margin-top: 4px; }
+  .kid-best-badge { font-size: 10px; font-weight: 800; color: #b45309; margin-bottom: 4px; }
+  .kid-vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .kid-vocab-card { padding: 8px 10px; border-radius: 10px; background: #ecfdf5; border: 2px solid #86efac; }
+  .kid-vocab-term { font-weight: 900; color: #065f46; font-size: 14px; }
+  .kid-vocab-def { font-size: 12px; color: #064e3b; margin-top: 2px; }
 `;
 
 /* ── small UI helpers ────────────────────────────────────────────── */
@@ -498,6 +988,18 @@ function primaryBtn(disabled: boolean): React.CSSProperties {
     cursor: disabled ? "not-allowed" : "pointer", fontSize: 14,
     opacity: disabled ? 0.55 : 1,
     boxShadow: disabled ? "none" : "0 8px 22px -6px rgba(168,85,247,0.55)",
+    touchAction: "manipulation",
+  };
+}
+
+function ghostBtn(disabled: boolean): React.CSSProperties {
+  return {
+    padding: "11px 16px", borderRadius: 12,
+    background: "rgba(168,85,247,0.10)", color: "#fce7f3",
+    border: "1px solid rgba(168,85,247,0.40)",
+    fontWeight: 800, fontSize: 13,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.45 : 1,
     touchAction: "manipulation",
   };
 }
