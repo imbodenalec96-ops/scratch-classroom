@@ -58,7 +58,9 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
     const d = new Date();
     return `${defaultLabel} ${d.toLocaleDateString()}`;
   });
-  const [includeAnswerKey, setIncludeAnswerKey] = useState(true);
+  // Answer key is intentionally NEVER printed — teacher uses the
+  // gradebook to grade after scan, no paper key needed. Duplex
+  // printers will fit two kids per sheet; no wasted paper.
   const [autoMatchGrade, setAutoMatchGrade] = useState(true);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(students.map((s) => s.id)));
   const [overrides, setOverrides] = useState<Record<string, PerStudentOverride>>({});
@@ -150,7 +152,7 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
 
   const printAll = () => {
     if (generated.length === 0) return;
-    openBulkPrintWindow(generated, packLabel, includeAnswerKey);
+    openBulkPrintWindow(generated, packLabel);
     loggedBeep();
   };
 
@@ -183,10 +185,6 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
           <input type="checkbox" checked={autoMatchGrade} onChange={(e) => setAutoMatchGrade(e.target.checked)} />
           Use each kid's actual grade level (recommended)
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-          <input type="checkbox" checked={includeAnswerKey} onChange={(e) => setIncludeAnswerKey(e.target.checked)} />
-          Include teacher answer key after each kid's worksheet
         </label>
       </div>
 
@@ -444,11 +442,11 @@ function EditEntryModal({ entry, onClose, onSave }: {
 
 /* ── single-print bulk window ─────────────────────────────────── */
 
-function openBulkPrintWindow(pack: PackEntry[], packLabel: string, includeKey: boolean) {
+function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
 
-  const renderOne = (p: PackEntry, isKey: boolean) => {
+  const renderOne = (p: PackEntry) => {
     const barcodeSvg = bc128svg(p.barcode, 0, 80, true, 2.0);
     const lessonAny: any = p.lesson;
     const vocabCards = p.lesson?.vocab?.length ? `
@@ -486,9 +484,7 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string, includeKey: b
     const qHtml = p.questions.map((q) => `
       <div style="margin-bottom:14px;page-break-inside:avoid">
         <div style="font-size:14px"><b>${q.num}.</b> ${escapeHtml(q.text)}</div>
-        ${isKey
-          ? `<div style="font-size:13px;color:#16a34a;font-weight:700;margin-top:4px;font-family:Menlo,monospace">✓ ${escapeHtml(q.answer)}</div>`
-          : `<div style="border-bottom:1.5px solid #444;height:32px;margin-top:6px"></div>`}
+        <div style="border-bottom:1.5px solid #444;height:32px;margin-top:6px"></div>
       </div>
     `).join("");
 
@@ -496,7 +492,7 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string, includeKey: b
       <div class="page">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
           <div>
-            <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#555">${isKey ? "📑 Teacher Answer Key" : "📝 Student Worksheet"}</div>
+            <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#555">📝 Student Worksheet</div>
             <div style="font-size:22px;font-weight:800;margin-top:2px">${escapeHtml(p.name)}</div>
             <div style="font-size:13px;color:#555;margin-top:4px">
               Student: <b>${escapeHtml(p.studentName)}</b> · Grade: ${escapeHtml(p.grade)}
@@ -512,8 +508,7 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string, includeKey: b
 
   const pages: string[] = [];
   for (const p of pack) {
-    pages.push(renderOne(p, false));
-    if (includeKey) pages.push(renderOne(p, true));
+    pages.push(renderOne(p));
   }
 
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(packLabel)}</title>
