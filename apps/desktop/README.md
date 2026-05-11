@@ -1,6 +1,6 @@
 # Scratch Classroom — Desktop
 
-Electron wrapper that opens [scratch-classroom.vercel.app](https://scratch-classroom.vercel.app/) in a native window. Distributable as **.dmg** for Mac and **.exe** for Windows.
+Electron wrapper that opens [scratch-classroom.vercel.app](https://scratch-classroom-api-td1x.vercel.app/) in a native window. Distributable as **.dmg** for Mac and **.exe** for Windows.
 
 ## Why a wrapper?
 

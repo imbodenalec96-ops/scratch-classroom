@@ -114,7 +114,7 @@ jobs:
             - **Mac** (Apple Silicon + Intel) — grab the `.dmg`
             - **Windows** (x64) — grab the `.exe`
 
-            Both wrap the live website at https://scratch-classroom.vercel.app/, so updates land automatically — no separate version management.
+            Both wrap the live website at https://scratch-classroom-api-td1x.vercel.app/, so updates land automatically — no separate version management.
 
             ## First-run notes
             - **Mac**: right-click → Open the first time (Gatekeeper warning since the build isn't code-signed)
