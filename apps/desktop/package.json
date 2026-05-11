@@ -10,9 +10,9 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:mac": "electron-builder --mac --x64 --arm64",
+    "build:mac": "electron-builder --mac --universal",
     "build:win": "electron-builder --win --x64",
-    "build:all": "electron-builder --mac --x64 --arm64 --win --x64"
+    "build:all": "electron-builder --mac --universal --win --x64"
   },
   "devDependencies": {
     "electron": "^31.7.7",
@@ -38,7 +38,7 @@
     "mac": {
       "category": "public.app-category.education",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        { "target": "dmg", "arch": "universal" }
       ],
       "icon": "build/icon.icns",
       "hardenedRuntime": false,
