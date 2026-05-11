@@ -1,6 +1,6 @@
 {
   "name": "@scratch/desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Desktop wrapper for Scratch Classroom — produces .dmg (Mac) and .exe (Windows) installers from the live web app.",
   "main": "main.js",

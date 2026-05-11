@@ -15,7 +15,12 @@ const path = require("path");
 // Production URL the desktop window opens. Override at launch time
 // with --url=https://... to test against a preview deploy or local
 // dev server.
-const DEFAULT_PROD_URL = "https://scratch-classroom.vercel.app/";
+//
+// Use the api-td1x.vercel.app domain — it's the project that's
+// actually receiving auto-deploys. The shorter scratch-classroom.vercel.app
+// alias is from a deleted older project and is permanently stuck on
+// the May 8 build.
+const DEFAULT_PROD_URL = "https://scratch-classroom-api-td1x.vercel.app/";
 
 function pickUrl() {
   const flag = process.argv.find((a) => a.startsWith("--url="));
