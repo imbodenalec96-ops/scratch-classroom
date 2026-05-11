@@ -689,6 +689,61 @@ const SOCIAL_STUDIES_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 4, gradeMax: 5,
   },
+  // ── Added topics ─────────────────────────────────────────
+  {
+    title: "Rules and Laws",
+    intro: "Read about why we have rules and laws.",
+    body: "Rules are made for small groups, like a family or a classroom. Laws are made for everyone in a town, a state, or a country. We have rules and laws to keep people safe and fair. Parents make rules at home. Teachers make rules at school. The government makes laws for everyone. A speed limit is a law that keeps drivers safe. Raising your hand is a rule that keeps the classroom calm. People who break the law can get in trouble with the police. We follow rules to be good citizens.",
+    qa: [
+      { text: "Who are rules for?", answer: "Small groups like a family or classroom" },
+      { text: "Who are laws for?", answer: "Everyone in a town, state, or country" },
+      { text: "Why do we have rules and laws?", answer: "To keep people safe and fair" },
+      { text: "Who makes rules at home?", answer: "Parents" },
+      { text: "Who makes rules at school?", answer: "Teachers" },
+      { text: "Who makes laws for everyone?", answer: "The government" },
+      { text: "What kind of law keeps drivers safe?", answer: "A speed limit" },
+      { text: "What is a classroom rule from the story?", answer: "Raising your hand" },
+      { text: "Who can people get in trouble with for breaking the law?", answer: "The police" },
+      { text: "Why do we follow rules?", answer: "To be good citizens" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Native Americans Before the Colonists",
+    intro: "Read about the first people who lived in North America.",
+    body: "Long before the colonists arrived, Native Americans lived all across North America. Different tribes lived in different places and had different ways of life. The Lakota lived on the Great Plains and hunted buffalo. The Wampanoag lived near the East Coast and fished and farmed corn, beans, and squash. The Navajo lived in the Southwest and raised sheep. Native Americans built homes that fit their land — tipis on the plains, longhouses in the forests, and pueblos in the desert. They had their own languages, songs, and stories. When the Pilgrims arrived at Plymouth in 1620, the Wampanoag people taught them how to grow food and survive the winter.",
+    qa: [
+      { text: "Who lived in North America before the colonists?", answer: "Native Americans" },
+      { text: "Where did the Lakota live?", answer: "On the Great Plains" },
+      { text: "What animal did the Lakota hunt?", answer: "Buffalo" },
+      { text: "Where did the Wampanoag live?", answer: "Near the East Coast" },
+      { text: "What three crops did the Wampanoag farm?", answer: "Corn, beans, and squash" },
+      { text: "Where did the Navajo live?", answer: "In the Southwest" },
+      { text: "What homes did people on the plains build?", answer: "Tipis" },
+      { text: "What homes did desert people build?", answer: "Pueblos" },
+      { text: "Who taught the Pilgrims to grow food?", answer: "The Wampanoag" },
+      { text: "When did the Pilgrims arrive at Plymouth?", answer: "1620" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "Goods and Services",
+    intro: "Read about two things people buy.",
+    body: "People buy two kinds of things: goods and services. Goods are things you can touch, like apples, shoes, or a bike. Services are jobs people do for you, like cutting hair or fixing a car. A bakery sells goods — bread and cupcakes. A doctor sells a service — a checkup. Money is what we use to buy goods and services. People who make goods are called producers. People who buy them are called consumers. Sometimes one person is both — a farmer who grows tomatoes is a producer, but at the store they are also a consumer.",
+    qa: [
+      { text: "What are two kinds of things people buy?", answer: "Goods and services" },
+      { text: "What are goods?", answer: "Things you can touch" },
+      { text: "Give an example of a good from the story.", answer: "Apples, shoes, or a bike" },
+      { text: "What are services?", answer: "Jobs people do for you" },
+      { text: "What service does a doctor sell?", answer: "A checkup" },
+      { text: "What does a bakery sell?", answer: "Bread and cupcakes" },
+      { text: "What do we use to buy goods and services?", answer: "Money" },
+      { text: "What do we call people who make goods?", answer: "Producers" },
+      { text: "What do we call people who buy goods?", answer: "Consumers" },
+      { text: "Can one person be both a producer and a consumer?", answer: "Yes" },
+    ],
+    gradeMin: 2, gradeMax: 4,
+  },
 ];
 
 const SCIENCE_TOPICS: LocalTopic[] = [
@@ -815,6 +870,79 @@ const SCIENCE_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 4, gradeMax: 5,
   },
+  // ── Added topics ─────────────────────────────────────────
+  {
+    title: "Weather and the Seasons",
+    intro: "Read about the four seasons of the year.",
+    body: "A year has four seasons: spring, summer, fall, and winter. In SPRING, the weather warms up. Flowers bloom and baby animals are born. In SUMMER, the days are long and hot. Many people swim and play outside. In FALL, the air gets cool and leaves on trees turn red, orange, and yellow before falling off. In WINTER, the days are short and cold. In some places it snows. The Earth tilts as it goes around the Sun, and that tilt is what causes the seasons to change. Each season lasts about three months.",
+    qa: [
+      { text: "How many seasons are in a year?", answer: "Four" },
+      { text: "Name the four seasons.", answer: "Spring, summer, fall, and winter" },
+      { text: "In what season do flowers bloom?", answer: "Spring" },
+      { text: "Which season has the longest and hottest days?", answer: "Summer" },
+      { text: "What colors do leaves turn in fall?", answer: "Red, orange, and yellow" },
+      { text: "In what season does it snow in some places?", answer: "Winter" },
+      { text: "What causes the seasons?", answer: "The Earth's tilt as it goes around the Sun" },
+      { text: "About how long does each season last?", answer: "Three months" },
+      { text: "Which season comes after fall?", answer: "Winter" },
+      { text: "When are baby animals born?", answer: "In spring" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Animal Habitats",
+    intro: "Read about where animals live.",
+    body: "A HABITAT is the place where an animal lives and gets what it needs. Different animals need different habitats. A FOREST is a habitat full of trees, with bears, deer, and owls living there. A DESERT is a hot, dry habitat with very little water — lizards, snakes, and cactus plants live there. An OCEAN is a habitat full of salty water where fish, whales, and dolphins live. The ARCTIC is a very cold habitat covered with ice; polar bears and penguins live there. Every animal's body is built for its habitat. A polar bear has thick fur to stay warm. A camel can go a long time without water because the desert is dry.",
+    qa: [
+      { text: "What is a habitat?", answer: "The place where an animal lives" },
+      { text: "Name three animals that live in a forest.", answer: "Bears, deer, and owls" },
+      { text: "What is the desert like?", answer: "Hot and dry" },
+      { text: "Name two animals that live in the desert.", answer: "Lizards and snakes" },
+      { text: "What kind of water is in the ocean?", answer: "Salty" },
+      { text: "Name two ocean animals.", answer: "Whales and dolphins" },
+      { text: "What is the Arctic like?", answer: "Very cold and covered with ice" },
+      { text: "What animal has thick fur to stay warm?", answer: "A polar bear" },
+      { text: "Why can a camel survive in the desert?", answer: "It can go a long time without water" },
+      { text: "What is built for an animal's habitat?", answer: "Its body" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Food Chains",
+    intro: "Read about how energy passes from one living thing to another.",
+    body: "A FOOD CHAIN shows how energy moves from one living thing to another. Every food chain starts with the SUN. Plants are PRODUCERS — they use sunlight to make their own food. Animals that eat plants are called HERBIVORES, like rabbits and deer. Animals that eat other animals are called CARNIVORES, like wolves and hawks. Animals that eat both plants and other animals are called OMNIVORES, like bears and people. DECOMPOSERS, like mushrooms and worms, break down dead things and return nutrients to the soil so plants can grow again. A simple food chain could be: sun → grass → rabbit → fox.",
+    qa: [
+      { text: "What does a food chain show?", answer: "How energy moves from one living thing to another" },
+      { text: "What does every food chain start with?", answer: "The sun" },
+      { text: "What are plants called in a food chain?", answer: "Producers" },
+      { text: "What do plants use to make food?", answer: "Sunlight" },
+      { text: "What is an animal that eats only plants called?", answer: "An herbivore" },
+      { text: "Name an herbivore from the story.", answer: "A rabbit or a deer" },
+      { text: "What is an animal that eats only other animals called?", answer: "A carnivore" },
+      { text: "What is an animal that eats both plants and animals called?", answer: "An omnivore" },
+      { text: "What do decomposers do?", answer: "Break down dead things and return nutrients to the soil" },
+      { text: "Give an example of a decomposer.", answer: "A mushroom or a worm" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "The Human Body — Major Systems",
+    intro: "Read about how your body keeps you alive.",
+    body: "Your body has many systems that work together. The SKELETAL system is your bones — they hold you up and protect organs like your brain and heart. The MUSCULAR system is your muscles — they pull on bones to move you. The CIRCULATORY system is your heart and blood vessels — your heart pumps blood that carries oxygen to every part of your body. The RESPIRATORY system is your lungs — they take in oxygen from the air and breathe out carbon dioxide. The DIGESTIVE system breaks down food in your stomach and intestines so your body can use it for energy. The NERVOUS system is your brain and nerves — it sends messages all over your body. All these systems work together every second of every day.",
+    qa: [
+      { text: "What system is made of bones?", answer: "The skeletal system" },
+      { text: "What do bones do?", answer: "Hold you up and protect organs" },
+      { text: "What system is made of muscles?", answer: "The muscular system" },
+      { text: "What does the heart do?", answer: "Pumps blood" },
+      { text: "What does blood carry?", answer: "Oxygen" },
+      { text: "What do your lungs take in?", answer: "Oxygen" },
+      { text: "What do your lungs breathe out?", answer: "Carbon dioxide" },
+      { text: "Where is food broken down?", answer: "In the stomach and intestines" },
+      { text: "What is the digestive system used for?", answer: "Breaking down food for energy" },
+      { text: "What system sends messages all over your body?", answer: "The nervous system" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
 ];
 
 const READING_TOPICS: LocalTopic[] = [
@@ -923,6 +1051,61 @@ const READING_TOPICS: LocalTopic[] = [
     ],
     gradeMin: 4, gradeMax: 5,
   },
+  // ── Added stories ────────────────────────────────────────
+  {
+    title: "Theo's Loose Tooth",
+    intro: "Read about Theo's big day.",
+    body: "Theo had a loose tooth that wiggled when he ate. On Tuesday morning at breakfast, he bit into a green apple and the tooth fell right out. Theo screamed, but his mom laughed and gave him a hug. She put the tiny tooth in a small plastic bag for safekeeping. At school, Theo showed his best friend Owen the gap in his smile. Owen said it looked cool. That night, Theo placed the tooth under his pillow. When he woke up Wednesday morning, the tooth was gone and a shiny silver dollar was in its place.",
+    qa: [
+      { text: "Whose tooth fell out?", answer: "Theo's" },
+      { text: "What day did the tooth fall out?", answer: "Tuesday" },
+      { text: "What was Theo eating when the tooth fell out?", answer: "A green apple" },
+      { text: "What did Theo do when the tooth fell out?", answer: "Screamed" },
+      { text: "What did his mom put the tooth in?", answer: "A small plastic bag" },
+      { text: "Who is Theo's best friend?", answer: "Owen" },
+      { text: "What did Owen say the gap looked like?", answer: "Cool" },
+      { text: "Where did Theo put the tooth at night?", answer: "Under his pillow" },
+      { text: "What day did Theo wake up to find the tooth gone?", answer: "Wednesday" },
+      { text: "What did Theo find in place of the tooth?", answer: "A shiny silver dollar" },
+    ],
+    gradeMin: 1, gradeMax: 2,
+  },
+  {
+    title: "The Field Trip to the Aquarium",
+    intro: "Read about Ms. Park's class on a field trip.",
+    body: "Ms. Park's third grade class took a field trip to the city aquarium on a rainy Friday in April. There were 22 students. Every student wore a bright yellow shirt so they were easy to spot. At the aquarium, they saw three things they would never forget: a giant sea turtle named Goliath, a tank full of jellyfish that glowed blue, and a sharks-and-stingrays tunnel where you could walk underneath the water. The class ate lunch in a picnic area near the gift shop. Most kids bought a postcard or a stuffed octopus. On the bus ride home, every single student fell asleep — even the loud ones.",
+    qa: [
+      { text: "Whose class went on the field trip?", answer: "Ms. Park's" },
+      { text: "What grade was the class?", answer: "Third grade" },
+      { text: "Where did they go?", answer: "To the city aquarium" },
+      { text: "What month was the trip?", answer: "April" },
+      { text: "What was the weather like?", answer: "Rainy" },
+      { text: "How many students were on the trip?", answer: "22" },
+      { text: "What color shirts did the students wear?", answer: "Bright yellow" },
+      { text: "What was the giant sea turtle's name?", answer: "Goliath" },
+      { text: "What color did the jellyfish glow?", answer: "Blue" },
+      { text: "What happened to the students on the bus ride home?", answer: "Every one of them fell asleep" },
+    ],
+    gradeMin: 2, gradeMax: 3,
+  },
+  {
+    title: "The Soccer Tryouts",
+    intro: "Read about Priya's big chance.",
+    body: "Priya had wanted to make the school soccer team since she was in second grade. Now she was in fifth, and tryouts were finally here. She practiced in her backyard every night for two weeks before the tryouts began. On the morning of the tryout, she ate oatmeal and a banana for breakfast — her dad said it was 'fuel' for her muscles. When she got to the field, fifty kids were already there. Coach Diaz blew her whistle and the drills began: dribbling, passing, sprinting, and finally a scrimmage game. Priya scored two goals in the scrimmage. Three days later, the coach posted the team list outside the gym. Priya's name was on it. She called her dad right away and yelled, 'I MADE IT!' so loud that her dad had to hold the phone away from his ear.",
+    qa: [
+      { text: "What sport did Priya want to play?", answer: "Soccer" },
+      { text: "Since what grade did Priya want to make the team?", answer: "Second grade" },
+      { text: "What grade is Priya in now?", answer: "Fifth" },
+      { text: "How long did she practice before tryouts?", answer: "Two weeks" },
+      { text: "What did Priya eat for breakfast on tryout day?", answer: "Oatmeal and a banana" },
+      { text: "What did Priya's dad call her breakfast?", answer: "Fuel" },
+      { text: "How many kids were at the tryouts?", answer: "Fifty" },
+      { text: "What is the coach's name?", answer: "Coach Diaz" },
+      { text: "How many goals did Priya score in the scrimmage?", answer: "Two" },
+      { text: "How many days later was the team list posted?", answer: "Three days" },
+    ],
+    gradeMin: 4, gradeMax: 5,
+  },
 ];
 
 const WRITING_TOPICS: LocalTopic[] = [
@@ -1006,6 +1189,41 @@ const WRITING_TOPICS: LocalTopic[] = [
       { text: "How many topics should a paragraph have?", answer: "One" },
     ],
     gradeMin: 4, gradeMax: 5,
+  },
+  // ── Added topics ─────────────────────────────────────────
+  {
+    title: "Commas in a List",
+    intro: "Read about how to use commas in a list.",
+    body: "When you write a list of three or more things, you use commas to separate them. The comma tells the reader to take a tiny pause. Look at this sentence: 'I packed apples, sandwiches, and juice for the picnic.' There is a comma after 'apples' and a comma after 'sandwiches.' The word 'and' comes before the last item. If you only have two things, you do NOT use a comma — just write 'apples and juice.' Commas in a list make your writing clearer and easier to read.",
+    qa: [
+      { text: "What do you use to separate items in a list?", answer: "Commas" },
+      { text: "How many items do you need before using list commas?", answer: "Three or more" },
+      { text: "What word usually comes before the last item?", answer: "And" },
+      { text: "Do you use a comma for only two things?", answer: "No" },
+      { text: "In 'apples, sandwiches, and juice,' how many commas are there?", answer: "Two" },
+      { text: "What does the comma tell the reader to do?", answer: "Take a tiny pause" },
+      { text: "Why do we use commas in a list?", answer: "To make writing clearer and easier to read" },
+      { text: "Do you need a comma in 'apples and juice'?", answer: "No" },
+    ],
+    gradeMin: 2, gradeMax: 4,
+  },
+  {
+    title: "Apostrophes: Contractions and Possession",
+    intro: "Read about the two main jobs of an apostrophe.",
+    body: "An apostrophe ( ' ) has two jobs. Job 1: CONTRACTIONS. An apostrophe takes the place of missing letters when we squish two words together. 'Do not' becomes 'don't' — the apostrophe replaces the 'o' in 'not.' 'I am' becomes 'I'm.' 'It is' becomes 'it's.' Job 2: POSSESSION. An apostrophe shows that something belongs to someone. 'Maya's book' means the book belongs to Maya. For a singular owner, add 's: the dog's bowl. For plural owners that end in s, add only an apostrophe: the dogs' bowls (many dogs). Watch out: 'its' shows possession with NO apostrophe, but 'it's' is the contraction for 'it is.'",
+    qa: [
+      { text: "How many main jobs does an apostrophe have?", answer: "Two" },
+      { text: "What is the first job of an apostrophe?", answer: "Contractions" },
+      { text: "What is 'do not' as a contraction?", answer: "Don't" },
+      { text: "What letter does the apostrophe replace in 'don't'?", answer: "The o" },
+      { text: "What is 'I am' as a contraction?", answer: "I'm" },
+      { text: "What is the second job of an apostrophe?", answer: "Possession" },
+      { text: "What does 'Maya's book' mean?", answer: "The book belongs to Maya" },
+      { text: "How do you show one dog owns a bowl?", answer: "The dog's bowl" },
+      { text: "Does 'its' (possession) have an apostrophe?", answer: "No" },
+      { text: "What does 'it's' (with apostrophe) mean?", answer: "It is" },
+    ],
+    gradeMin: 3, gradeMax: 5,
   },
 ];
 
@@ -1116,6 +1334,43 @@ const SPELLING_TOPICS: LocalTopic[] = [
       { text: "What is the plural of baby?", answer: "babies" },
       { text: "What is the plural of city?", answer: "cities" },
       { text: "What ending do you add to a word ending in CH?", answer: "-es" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  // ── Added topics ─────────────────────────────────────────
+  {
+    title: "Long Vowel Teams: ai, ay, ee, ea",
+    intro: "Read about long vowel teams.",
+    body: "Two vowels next to each other can team up to make one long vowel sound. The team AI makes the long A sound, as in 'rain' and 'mail.' The team AY also makes the long A sound, usually at the end of a word, as in 'play' and 'day.' The team EE makes the long E sound, as in 'tree' and 'sheep.' The team EA also makes the long E sound, as in 'beach' and 'leaf.' Quick rule: 'When two vowels go walking, the first one does the talking.' That means the first vowel says its long-vowel name and the second one is silent.",
+    qa: [
+      { text: "How do you spell the word that means a falling water sound?", answer: "rain" },
+      { text: "What vowel team is in 'rain'?", answer: "ai" },
+      { text: "What sound does 'ai' make?", answer: "Long A" },
+      { text: "What vowel team is usually at the END of a word for long A?", answer: "ay" },
+      { text: "How do you spell the word that means a tall plant with leaves?", answer: "tree" },
+      { text: "What vowel team is in 'tree'?", answer: "ee" },
+      { text: "What sound does 'ea' make in 'beach'?", answer: "Long E" },
+      { text: "How do you spell the word that means a place with sand and water?", answer: "beach" },
+      { text: "In the rhyme, which vowel 'does the talking'?", answer: "The first one" },
+      { text: "Which vowel is silent in a vowel team?", answer: "The second one" },
+    ],
+    gradeMin: 1, gradeMax: 3,
+  },
+  {
+    title: "Common Homophones: their / there / they're",
+    intro: "Read about three words that sound the same but mean different things.",
+    body: "HOMOPHONES are words that sound the same but are spelled differently and mean different things. Three tricky homophones are 'their,' 'there,' and 'they're.' THEIR shows that something belongs to a group of people — 'That is their dog.' THERE is a place, like 'over there by the door,' or it starts a sentence about something existing — 'There is a cat in the yard.' THEY'RE is a contraction for 'they are' — 'They're running fast.' Memory trick: if you can replace it with 'they are,' use they're. If it's about a place, use there. If it shows ownership, use their.",
+    qa: [
+      { text: "What are homophones?", answer: "Words that sound the same but are spelled differently" },
+      { text: "Which spelling shows ownership?", answer: "their" },
+      { text: "Which spelling means a place?", answer: "there" },
+      { text: "Which spelling is a contraction?", answer: "they're" },
+      { text: "What does 'they're' stand for?", answer: "They are" },
+      { text: "Which spelling fits: 'That is ___ dog'?", answer: "their" },
+      { text: "Which spelling fits: 'Over ___ by the door'?", answer: "there" },
+      { text: "Which spelling fits: '___ running fast'?", answer: "they're" },
+      { text: "How can you tell if you should use 'they're'?", answer: "If you can replace it with 'they are'" },
+      { text: "How can you tell if you should use 'there'?", answer: "If it's about a place" },
     ],
     gradeMin: 3, gradeMax: 5,
   },
@@ -1238,6 +1493,61 @@ const SEL_TOPICS: LocalTopic[] = [
       { text: "Who can you ask if you can't solve the conflict?", answer: "An adult" },
     ],
     gradeMin: 4, gradeMax: 5,
+  },
+  // ── Added topics ─────────────────────────────────────────
+  {
+    title: "Self-Advocacy: Asking for What You Need",
+    intro: "Read about how to speak up for yourself.",
+    body: "SELF-ADVOCACY means speaking up for what you need, in a kind and clear way. Everyone needs help sometimes — that doesn't mean you're weak, it means you're smart enough to ask. To self-advocate well, follow three steps. STEP 1: Notice what you need (a break, a quieter spot, a different pencil, more time). STEP 2: Find the right person to ask (a teacher, a parent, a friend, a counselor). STEP 3: Use polite words and explain why. Example: 'Mrs. Park, can I take a 5-minute break? My brain feels foggy and a quick walk would help me focus.' Self-advocacy works at school, at home, and with friends. The more you practice, the easier it gets.",
+    qa: [
+      { text: "What does self-advocacy mean?", answer: "Speaking up for what you need" },
+      { text: "How should you speak up — in what kind of way?", answer: "Kind and clear" },
+      { text: "Does asking for help mean you're weak?", answer: "No" },
+      { text: "How many steps are in good self-advocacy?", answer: "Three" },
+      { text: "What is Step 1?", answer: "Notice what you need" },
+      { text: "What is Step 2?", answer: "Find the right person to ask" },
+      { text: "What is Step 3?", answer: "Use polite words and explain why" },
+      { text: "Name one thing you might need a break from in the story.", answer: "A foggy brain (or to focus)" },
+      { text: "Where does self-advocacy work?", answer: "At school, at home, and with friends" },
+      { text: "How do you get better at self-advocacy?", answer: "Practice" },
+    ],
+    gradeMin: 3, gradeMax: 5,
+  },
+  {
+    title: "Honesty and Telling the Truth",
+    intro: "Read about why honesty matters.",
+    body: "Being HONEST means telling the truth even when it's hard. People trust honest people. If you break something by accident, telling the truth is brave. You might feel scared, but adults usually appreciate honesty more than the broken thing. LIES can grow — one lie often leads to more lies to cover the first one. That's called a 'snowball.' If you DID lie and want to fix it, you can use these three steps. ONE: Take a deep breath. TWO: Say 'I have to tell you the truth — I was not honest before.' THREE: Tell what really happened. People may be a little upset at first, but they will trust you more for owning up to it.",
+    qa: [
+      { text: "What does it mean to be honest?", answer: "Telling the truth even when it's hard" },
+      { text: "What do honest people earn?", answer: "Trust" },
+      { text: "Is it brave to tell the truth after an accident?", answer: "Yes" },
+      { text: "What do lies often do?", answer: "Grow into more lies" },
+      { text: "What is the nickname for one lie leading to more?", answer: "A snowball" },
+      { text: "How many steps are there to fix a lie?", answer: "Three" },
+      { text: "What is Step 1?", answer: "Take a deep breath" },
+      { text: "What is Step 2?", answer: "Say 'I have to tell you the truth'" },
+      { text: "What is Step 3?", answer: "Tell what really happened" },
+      { text: "Why will people trust you more after owning up?", answer: "Because you were honest" },
+    ],
+    gradeMin: 2, gradeMax: 5,
+  },
+  {
+    title: "Perseverance: When Something Is Hard",
+    intro: "Read about not giving up.",
+    body: "PERSEVERANCE means to keep trying when something is hard. It does NOT mean you never feel frustrated — it means you don't quit just because you feel frustrated. Think about learning to ride a bike. The first time, you probably fell. Maybe you fell ten times. But each fall taught your body a little more about balance, and one day you rode all the way down the sidewalk. That's perseverance. When you feel like giving up, try one of these tricks: take a break and come back, ask for help, break the big task into smaller pieces, or remind yourself how good it will feel when you finish. Hard things make our brains grow. Every time you stick with something hard, you are getting smarter and stronger.",
+    qa: [
+      { text: "What does perseverance mean?", answer: "Keep trying when something is hard" },
+      { text: "Does perseverance mean you never feel frustrated?", answer: "No" },
+      { text: "What example does the story use to explain perseverance?", answer: "Learning to ride a bike" },
+      { text: "What did each fall teach your body?", answer: "About balance" },
+      { text: "Name one trick for when you feel like giving up.", answer: "Take a break, ask for help, break the task into smaller pieces, or remind yourself how good it will feel when you finish" },
+      { text: "Why is breaking a big task into pieces helpful?", answer: "It makes the hard thing easier to start" },
+      { text: "What do hard things do to our brains?", answer: "Make them grow" },
+      { text: "What two things does sticking with something hard make you?", answer: "Smarter and stronger" },
+      { text: "Is it okay to ask for help and still call it perseverance?", answer: "Yes" },
+      { text: "What is the opposite of perseverance?", answer: "Quitting" },
+    ],
+    gradeMin: 2, gradeMax: 5,
   },
 ];
 
@@ -1480,34 +1790,17 @@ export function buildLocalLesson(opts: { subject: Subject; grade: string; count:
 
   const topic = pickTopic(bank, goal, opts.grade);
 
-  // Build a unique question pool. Start with this topic's qa, then borrow
-  // from sibling in-grade topics if we need more — never repeat a question
-  // text within a single worksheet.
+  // CORRELATION RULE: only pull questions from the picked topic's own qa.
+  // Cross-topic borrowing was leaving kids with a story about Maya's
+  // Garden and questions about a different kid's backpack — answers
+  // nowhere in the displayed body. If the topic doesn't have enough
+  // unique QAs, we ship fewer questions (cleaner than a wrong story).
   const seen = new Set<string>();
-  const collectFrom = (t: LocalTopic) => {
-    for (const q of t.qa) {
-      const key = q.text.trim().toLowerCase();
-      if (!seen.has(key)) { seen.add(key); pool.push({ ...q, _from: t.title }); }
-    }
-  };
-  const pool: Array<{ text: string; answer: string; _from?: string }> = [];
-  collectFrom(topic);
-  if (pool.length < count) {
-    // Pull from other in-grade topics in the same bank (skip the picked one).
-    const g = gradeNum(opts.grade);
-    const inGrade = bank.filter((t) => {
-      if (t.title === topic.title) return false;
-      const lo = t.gradeMin ?? 0;
-      const hi = t.gradeMax ?? 5;
-      return g >= lo && g <= hi;
-    });
-    for (const t of inGrade) {
-      if (pool.length >= count) break;
-      collectFrom(t);
-    }
+  const pool: Array<{ text: string; answer: string }> = [];
+  for (const q of topic.qa) {
+    const key = q.text.trim().toLowerCase();
+    if (!seen.has(key)) { seen.add(key); pool.push({ text: q.text, answer: q.answer }); }
   }
-  // Shuffle the deduplicated pool, then take exactly `count` (or all of
-  // pool if smaller — better to ship 8 unique questions than 10 with repeats).
   pool.sort(() => Math.random() - 0.5);
   const taken = pool.slice(0, count);
   const questions: StarQuestion[] = taken.map((q, i) => ({
