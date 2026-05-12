@@ -14,7 +14,7 @@ import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
 import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
-import { MUSIC_PRESETS } from "../lib/musicPresets.ts";
+import { getAllMusicPresets } from "../lib/musicPresets.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -621,7 +621,7 @@ export default function ClassroomBoard() {
 
   const toggleMusic = useCallback(() => {
     if (!musicRef.current) return;
-    const preset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
+    const preset = getAllMusicPresets().find(p => p.id === effectiveMusicPresetId);
     if (!preset) return;
     if (!musicLoaded) {
       // First tap: assign src synchronously inside gesture so iOS allows autoplay
@@ -642,7 +642,7 @@ export default function ClassroomBoard() {
   // autoplay before user interaction.
   useEffect(() => {
     if (!musicLoaded || !musicRef.current || !effectiveMusicPresetId) return;
-    const preset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
+    const preset = getAllMusicPresets().find(p => p.id === effectiveMusicPresetId);
     if (!preset) return;
     musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
     setMusicPlaying(true);
@@ -670,7 +670,7 @@ export default function ClassroomBoard() {
           const ts = new Date(t.created_at).getTime();
           if (ts < fiveMinAgo) { seenMusicTxRef.current.add(t.id); continue; }
           const trackLabel = m[1].trim();
-          const preset = MUSIC_PRESETS.find(p => p.label.toLowerCase() === trackLabel.toLowerCase());
+          const preset = getAllMusicPresets().find(p => p.label.toLowerCase() === trackLabel.toLowerCase());
           if (!preset) { seenMusicTxRef.current.add(t.id); continue; }
           seenMusicTxRef.current.add(t.id);
           setActiveMusicOverride({ presetId: preset.id, until: Date.now() + 25 * 60_000 });
@@ -888,7 +888,7 @@ export default function ClassroomBoard() {
   // in opposite corners — matches the STAR /star page identity for
   // visual continuity across the whole product.
   const bg = `radial-gradient(1400px 900px at 0% 0%, rgba(168,85,247,0.20) 0%, transparent 55%), radial-gradient(1200px 800px at 100% 100%, rgba(236,72,153,0.18) 0%, transparent 55%), radial-gradient(900px 600px at 50% 0%, rgba(99,102,241,0.14) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)`;
-  const musicPreset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
+  const musicPreset = getAllMusicPresets().find(p => p.id === effectiveMusicPresetId);
   const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#d97706";
 
   const g = (a: number) => `rgba(255,255,255,${a})`;

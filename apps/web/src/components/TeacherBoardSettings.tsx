@@ -6,22 +6,14 @@ import {
   CalendarDays, Plus, Trash2, ExternalLink, Printer, Users,
   ChevronDown, ChevronUp,
 } from "lucide-react";
-import { MUSIC_PRESETS as ALL_MUSIC, MOOD_LABELS, type MusicMood } from "../lib/musicPresets.ts";
+import {
+  MUSIC_PRESETS as BUNDLED_MUSIC,
+  getCustomMusicPresets, setCustomMusicPresets, parseYouTubeId,
+  type MusicPreset, type MusicMood,
+} from "../lib/musicPresets.ts";
 
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
-
-// Includes a "No music" sentinel + every preset from the shared
-// library, so adding a track in lib/musicPresets.ts shows up here
-// automatically.
-const MUSIC_PRESETS = [
-  { id: "", label: "No music", mood: "nature" as MusicMood, emoji: "🔇" },
-  ...ALL_MUSIC.map((p) => ({ id: p.id, label: p.label, mood: p.mood, emoji: p.emoji })),
-];
-
-const MUSIC_ICONS: Record<string, string> = Object.fromEntries(
-  ALL_MUSIC.map((p) => [p.id, p.emoji])
-);
 
 const LEVEL_COLORS: Record<number, { bg: string; text: string; border: string }> = {
   1: { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.25)" },
@@ -111,7 +103,46 @@ export default function TeacherBoardSettings() {
   const currentClass = classes.find(c => c.id === classId);
   const boardUrl = currentClass ? `/board?class=${encodeURIComponent(currentClass.id)}` : "/board";
   const currentMusicId = board.settings.music_playlist_id || "";
-  const currentMusicLabel = MUSIC_PRESETS.find(p => p.id === currentMusicId)?.label || "No music";
+
+  // Music presets — bundled (verified) + custom (teacher-added).
+  const [customMusic, setCustomMusic] = useState<MusicPreset[]>(() => getCustomMusicPresets());
+  const allMusicPresets: Array<{ id: string; label: string; mood: MusicMood; emoji: string; isCustom?: boolean }> = [
+    { id: "", label: "No music", mood: "nature" as MusicMood, emoji: "🔇" },
+    ...BUNDLED_MUSIC.map((p) => ({ id: p.id, label: p.label, mood: p.mood, emoji: p.emoji })),
+    ...customMusic.map((p) => ({ id: p.id, label: p.label, mood: p.mood, emoji: p.emoji, isCustom: true })),
+  ];
+  const currentMusicLabel = allMusicPresets.find(p => p.id === currentMusicId)?.label || "No music";
+
+  // Add-custom-track state
+  const [showAddMusic, setShowAddMusic] = useState(false);
+  const [newMusic, setNewMusic] = useState({ url: "", label: "", emoji: "🎵" });
+  const [addMusicErr, setAddMusicErr] = useState("");
+
+  const addCustomMusic = () => {
+    setAddMusicErr("");
+    const videoId = parseYouTubeId(newMusic.url);
+    if (!videoId) { setAddMusicErr("That doesn't look like a YouTube URL or 11-char video ID."); return; }
+    const label = newMusic.label.trim() || `Custom · ${videoId.slice(0, 6)}`;
+    if (allMusicPresets.some((p) => p.label.toLowerCase() === label.toLowerCase())) {
+      setAddMusicErr("A track with that name already exists.");
+      return;
+    }
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const preset: MusicPreset = { id, label, videoId, emoji: newMusic.emoji.trim() || "🎵", mood: "custom", price: 15, isCustom: true };
+    const next = [...customMusic, preset];
+    setCustomMusic(next);
+    setCustomMusicPresets(next);
+    setNewMusic({ url: "", label: "", emoji: "🎵" });
+    setShowAddMusic(false);
+  };
+
+  const deleteCustomMusic = (id: string) => {
+    if (!window.confirm("Remove this custom track?")) return;
+    const next = customMusic.filter((p) => p.id !== id);
+    setCustomMusic(next);
+    setCustomMusicPresets(next);
+    if (currentMusicId === id) saveSetting("music_playlist_id", "");
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto pb-16 animate-page-enter" style={{ color: "var(--t1)" }}>
@@ -212,25 +243,92 @@ export default function TeacherBoardSettings() {
           </div>
           <div className="space-y-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Ambient playlist</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>
+                Ambient playlist · {currentMusicLabel}
+              </span>
               <div className="grid grid-cols-3 gap-1.5">
-                {MUSIC_PRESETS.map(p => {
+                {allMusicPresets.map(p => {
                   const active = currentMusicId === p.id;
                   return (
-                    <button key={p.id}
-                      onClick={() => saveSetting("music_playlist_id", p.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all"
-                      style={{
-                        background: active ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.03)",
-                        borderColor: active ? "rgba(168,85,247,0.35)" : "rgba(255,255,255,0.07)",
-                        color: active ? "#c084fc" : "var(--t3)",
-                      }}>
-                      {p.id ? MUSIC_ICONS[p.id] : "—"} {p.label}
-                    </button>
+                    <div key={p.id} className="relative">
+                      <button
+                        onClick={() => saveSetting("music_playlist_id", p.id)}
+                        className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all w-full"
+                        style={{
+                          background: active ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.03)",
+                          borderColor: active ? "rgba(168,85,247,0.35)" : (p.isCustom ? "rgba(236,72,153,0.20)" : "rgba(255,255,255,0.07)"),
+                          color: active ? "#c084fc" : "var(--t3)",
+                        }}
+                      >
+                        <span>{p.emoji}</span>
+                        <span className="truncate">{p.label}</span>
+                      </button>
+                      {p.isCustom && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteCustomMusic(p.id); }}
+                          className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                          style={{ background: "rgba(239,68,68,0.85)", color: "white", fontSize: 11, fontWeight: 800 }}
+                          title="Delete custom track"
+                        >×</button>
+                      )}
+                    </div>
                   );
                 })}
+                {/* Add-custom button as one of the chips */}
+                <button
+                  onClick={() => setShowAddMusic((v) => !v)}
+                  className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold border transition-all"
+                  style={{
+                    background: showAddMusic ? "rgba(239,68,68,0.10)" : "linear-gradient(135deg, rgba(236,72,153,0.18), rgba(168,85,247,0.10))",
+                    borderColor: showAddMusic ? "rgba(239,68,68,0.40)" : "rgba(236,72,153,0.40)",
+                    color: showAddMusic ? "#fca5a5" : "#f9a8d4",
+                  }}
+                >{showAddMusic ? "✕ Cancel" : "+ Add YouTube track"}</button>
               </div>
             </label>
+
+            {showAddMusic && (
+              <div
+                className="p-3 rounded-xl border space-y-2"
+                style={{ background: "rgba(168,85,247,0.06)", borderColor: "rgba(168,85,247,0.30)" }}
+              >
+                <input
+                  value={newMusic.url}
+                  onChange={(e) => setNewMusic((m) => ({ ...m, url: e.target.value }))}
+                  placeholder="Paste any YouTube URL (or just the 11-char video ID)"
+                  className="input text-sm w-full"
+                />
+                <div className="grid grid-cols-[60px_1fr] gap-2">
+                  <input
+                    value={newMusic.emoji}
+                    onChange={(e) => setNewMusic((m) => ({ ...m, emoji: e.target.value }))}
+                    placeholder="🎵"
+                    maxLength={4}
+                    className="input text-sm text-center"
+                  />
+                  <input
+                    value={newMusic.label}
+                    onChange={(e) => setNewMusic((m) => ({ ...m, label: e.target.value }))}
+                    placeholder="Track name (e.g. 'Ghibli piano')"
+                    className="input text-sm w-full"
+                  />
+                </div>
+                {addMusicErr && <div className="text-[11px] font-bold" style={{ color: "#fca5a5" }}>{addMusicErr}</div>}
+                <button
+                  onClick={addCustomMusic}
+                  disabled={!newMusic.url.trim()}
+                  className="px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                  style={{
+                    background: "linear-gradient(135deg, #db2777, #a855f7)",
+                    color: "white",
+                  }}
+                >+ Save track</button>
+                <div className="text-[10px]" style={{ color: "var(--t3)" }}>
+                  💡 Test the YouTube link works in a browser first. Long-form ambient streams ("10 hour" or "live radio") work best — short videos will end and replay from start.
+                </div>
+              </div>
+            )}
+
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--t3)" }}>Background image URL</span>
               <input

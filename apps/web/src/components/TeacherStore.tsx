@@ -182,12 +182,13 @@ export default function TeacherStore() {
   // listener can match them. Skips presets that already have a
   // matching item (idempotent — safe to run twice).
   const seedMusicItems = async () => {
-    const { MUSIC_PRESETS } = await import("../lib/musicPresets.ts");
+    const { getAllMusicPresets } = await import("../lib/musicPresets.ts");
+    const all = getAllMusicPresets();
     setBulkBusy(true);
     try {
       const existingNames = new Set(items.map((it) => it.name.toLowerCase()));
       let added = 0;
-      for (const m of MUSIC_PRESETS) {
+      for (const m of all) {
         const name = `🎵 Music · ${m.label}`;
         if (existingNames.has(name.toLowerCase())) continue;
         try {
@@ -425,7 +426,7 @@ export default function TeacherStore() {
             🎵 Seed music in store
           </button>
           <span className="text-xs" style={{ color: "var(--t3)" }}>
-            22 calming tracks (lo-fi, nature, instrumental). Kids can cash out points to switch the board music.
+            6 verified tracks + your custom YouTube tracks (added via /board → Settings). Kids cash out points to switch the board music for 25 min.
           </span>
         </div>
 
