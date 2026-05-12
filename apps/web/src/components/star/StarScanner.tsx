@@ -43,6 +43,15 @@ export default function StarScanner() {
   const [scan, setScan] = useState<ScanState>({});
   const bufRef = useRef<string>("");
   const tmrRef = useRef<number | null>(null);
+  // Manual entry — small always-visible button that opens a text
+  // input. Solves the "Cmd+V doesn't work" problem in browsers that
+  // don't fire document-level paste events.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
+  // handleScan is defined inside the keypress useEffect closure;
+  // expose it via a ref so the manual entry button can fire it.
+  const handleScanRef = useRef<((v: string) => Promise<void> | void) | null>(null);
 
   useEffect(() => {
     // Rehydrate barcode DB on mount so freshly created assignments
@@ -85,6 +94,7 @@ export default function StarScanner() {
       }, 80);
     };
 
+    handleScanRef.current = handleScan;
     async function handleScan(v: string) {
       scanReceivedBeep();
       // STU-{studentId} — printed by the FolderLabelsGenerator. Pulls
@@ -294,8 +304,105 @@ export default function StarScanner() {
     };
   }, []);
 
+  // Manual entry → reuse the same handleScan via the ref the
+  // keypress effect populated. Strips whitespace + uppercases for
+  // consistent matching with the scanner path.
+  const dispatchManual = (raw: string) => {
+    const v = raw.trim().toUpperCase();
+    if (!v) return;
+    handleScanRef.current?.(v);
+  };
+
   return (
     <>
+      {/* Manual barcode entry — small floating pill bottom-right.
+          Always available in the app since StarScanner is mounted
+          globally in App.tsx. Tap → input box opens auto-focused. */}
+      <div style={{
+        position: "fixed",
+        right: "max(env(safe-area-inset-right), 14px)",
+        bottom: "max(env(safe-area-inset-bottom), 78px)",
+        zIndex: 9990,
+      }}>
+        {!manualOpen ? (
+          <button
+            onClick={() => {
+              setManualOpen(true);
+              setTimeout(() => manualInputRef.current?.focus(), 50);
+            }}
+            title="Type or paste a barcode (STU-..., BH-..., PASS-..., etc.)"
+            style={{
+              padding: "10px 14px", borderRadius: 999,
+              background: "linear-gradient(135deg, rgba(168,85,247,0.85), rgba(236,72,153,0.85))",
+              color: "white", border: "1px solid rgba(255,255,255,0.20)",
+              fontSize: 13, fontWeight: 800, cursor: "pointer",
+              boxShadow: "0 8px 22px -6px rgba(168,85,247,0.55)",
+              touchAction: "manipulation",
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >📋 Paste / type barcode</button>
+        ) : (
+          <div style={{
+            display: "flex", gap: 6, alignItems: "center",
+            padding: "8px 10px", borderRadius: 14,
+            background: "rgba(15,15,28,0.95)",
+            border: "1.5px solid rgba(168,85,247,0.55)",
+            boxShadow: "0 12px 32px -8px rgba(168,85,247,0.55)",
+            minWidth: 320,
+          }}>
+            <input
+              ref={manualInputRef}
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && manualText.trim()) {
+                  dispatchManual(manualText);
+                  setManualText("");
+                  setManualOpen(false);
+                } else if (e.key === "Escape") {
+                  setManualText("");
+                  setManualOpen(false);
+                }
+              }}
+              placeholder="STU-... · BH-... · PASS-... · etc."
+              autoFocus
+              style={{
+                flex: 1, minWidth: 0,
+                padding: "8px 10px", borderRadius: 8,
+                background: "rgba(0,0,0,0.30)", color: "white",
+                border: "1px solid rgba(168,85,247,0.30)",
+                fontSize: 13, outline: "none",
+                fontFamily: "Menlo, monospace",
+              }}
+            />
+            <button
+              onClick={() => {
+                if (!manualText.trim()) return;
+                dispatchManual(manualText);
+                setManualText("");
+                setManualOpen(false);
+              }}
+              style={{
+                padding: "8px 12px", borderRadius: 8,
+                background: "linear-gradient(135deg, #6366f1, #a855f7, #ec4899)",
+                color: "white", border: "none", fontWeight: 800, cursor: "pointer", fontSize: 13,
+              }}
+            >Go</button>
+            <button
+              onClick={() => { setManualText(""); setManualOpen(false); }}
+              aria-label="Close"
+              style={{
+                width: 30, height: 30, borderRadius: 8,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "rgba(245,241,232,0.85)",
+                fontSize: 14, cursor: "pointer",
+              }}
+            >✕</button>
+          </div>
+        )}
+      </div>
+
       {scan.refusal && (
         <RefusalModal
           barcode={scan.refusal.barcode}
