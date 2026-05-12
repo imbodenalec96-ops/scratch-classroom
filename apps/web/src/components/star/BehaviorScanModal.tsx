@@ -783,7 +783,7 @@ function Flash({ flash }: { flash: { kind: "ok" | "err"; text: string } }) {
 // with a single navy accent, tabular fact sheet, FERPA confidentiality
 // footer, and three signature lines (reporter, administrator, parent
 // acknowledgment).
-function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, e: BehaviorEvent) {
+export function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, e: BehaviorEvent) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
   const dt = new Date(e.ts);

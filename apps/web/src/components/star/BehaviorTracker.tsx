@@ -8,6 +8,7 @@ import {
   type StarStudent, type BehaviorDef, type BehaviorEvent,
 } from "../../lib/star/storage.ts";
 import { successBeep, loggedBeep } from "../../lib/star/sounds.ts";
+import { openIncidentPrintWindow } from "./BehaviorScanModal.tsx";
 
 const TONE_COLOR: Record<BehaviorDef["tone"], string> = {
   positive:  "#10b981",
@@ -319,34 +320,123 @@ export default function BehaviorTracker() {
             )}
           </div>
 
-          {/* Recent timeline */}
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
-            Recent (last 12)
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {log.filter((e) => e.studentId === studentId).slice(-12).reverse().map((e) => {
-              const def = defs.find((d) => d.id === e.defId);
-              if (!def) return null;
-              const c = TONE_COLOR[def.tone];
-              const ts = new Date(e.ts);
-              return (
-                <div key={e.id} style={{
-                  display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 8, alignItems: "center",
-                  padding: "6px 10px", borderRadius: 8,
-                  background: "rgba(0,0,0,0.20)", borderLeft: `3px solid ${c}`,
-                }}>
-                  <span style={{ fontSize: 16 }}>{def.emoji}</span>
-                  <span style={{ fontSize: 13, color: "#fce7f3", fontWeight: 700 }}>
-                    {def.label}{e.note ? ` — ${e.note}` : ""}
-                  </span>
-                  <span style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", fontFamily: "Menlo, monospace" }}>
-                    {ts.toLocaleString()}
-                  </span>
-                  <button onClick={() => removeEvent(e.id)} style={miniBtn()} title="Delete this entry">✕</button>
+          {/* Full timeline — every entry in the selected range, with a
+              print button on each so the teacher can reopen the
+              official incident report at any time. Date headers + a
+              "📄" badge on entries that carry the full ABC fields. */}
+          {(() => {
+            const entries = log
+              .filter((e) => e.studentId === studentId && e.date >= report.start)
+              .sort((a, b) => b.ts.localeCompare(a.ts));
+            return (
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+                    Timeline · {entries.length} entr{entries.length === 1 ? "y" : "ies"}
+                  </div>
+                  <div style={{ fontSize: 10, color: "rgba(196,181,253,0.55)" }}>
+                    Tap 🖨 to reopen the official report
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+                {entries.length === 0 ? (
+                  <div style={{ padding: 14, textAlign: "center", color: "rgba(196,181,253,0.45)", fontSize: 12, fontStyle: "italic" }}>
+                    No entries in this range. Try a wider range above.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 460, overflowY: "auto", paddingRight: 4 }}>
+                    {(() => {
+                      // Group consecutive same-date entries under a date header.
+                      const nodes: React.ReactNode[] = [];
+                      let lastDate = "";
+                      for (const e of entries) {
+                        const def = defs.find((d) => d.id === e.defId);
+                        if (!def) continue;
+                        if (e.date !== lastDate) {
+                          lastDate = e.date;
+                          const dLabel = new Date(`${e.date}T12:00:00Z`).toLocaleDateString("en-US", {
+                            weekday: "short", month: "short", day: "numeric", year: "numeric",
+                          });
+                          nodes.push(
+                            <div key={`hdr-${e.date}`} style={{
+                              fontSize: 10, fontWeight: 800, letterSpacing: "0.14em",
+                              textTransform: "uppercase", color: "#f9a8d4",
+                              padding: "10px 4px 4px", borderBottom: "1px solid rgba(168,85,247,0.18)",
+                              marginTop: nodes.length === 0 ? 0 : 6,
+                            }}>{dLabel}</div>,
+                          );
+                        }
+                        const c = TONE_COLOR[def.tone];
+                        const ts = new Date(e.ts);
+                        const isFullReport =
+                          !!(e.antecedent || e.behaviorDetail || e.response || e.outcome ||
+                             e.severity   || e.location       || e.durationMin || e.followUp ||
+                             e.witnesses  || e.photoDataUrl   || e.photoPath   || e.parentNotified);
+                        const stu = students.find((s) => s.id === studentId);
+                        nodes.push(
+                          <div key={e.id} style={{
+                            display: "grid",
+                            gridTemplateColumns: "auto 1fr auto auto auto",
+                            gap: 8, alignItems: "center",
+                            padding: "8px 10px", borderRadius: 8,
+                            background: "rgba(0,0,0,0.22)", borderLeft: `3px solid ${c}`,
+                          }}>
+                            <span style={{ fontSize: 18 }}>{def.emoji}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, color: "#fce7f3", fontWeight: 700, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>
+                                  {def.label}
+                                </span>
+                                {isFullReport && (
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+                                    padding: "1px 6px", borderRadius: 4,
+                                    background: "rgba(30,58,138,0.45)", color: "#bfdbfe",
+                                    border: "1px solid rgba(96,165,250,0.45)",
+                                  }}>📄 FULL REPORT</span>
+                                )}
+                                {e.severity ? (
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 800,
+                                    padding: "1px 6px", borderRadius: 4,
+                                    background: e.severity >= 4 ? "rgba(239,68,68,0.30)" : "rgba(245,158,11,0.25)",
+                                    color: e.severity >= 4 ? "#fca5a5" : "#fde68a",
+                                    border: `1px solid ${e.severity >= 4 ? "rgba(239,68,68,0.55)" : "rgba(245,158,11,0.45)"}`,
+                                  }}>Lvl {e.severity}</span>
+                                ) : null}
+                              </div>
+                              <div style={{ fontSize: 11, color: "rgba(196,181,253,0.65)", marginTop: 2, lineHeight: 1.35 }}>
+                                {e.note ? <i>"{e.note}" · </i> : null}
+                                {e.location ? `${e.location} · ` : ""}
+                                {e.durationMin ? `${e.durationMin} min · ` : ""}
+                                {e.parentNotified ? "parent notified" : ""}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", fontFamily: "Menlo, monospace", whiteSpace: "nowrap" }}>
+                              {ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                            <button
+                              onClick={() => { if (stu) openIncidentPrintWindow(stu, def, e); }}
+                              style={miniBtn()}
+                              title="Reopen the official incident report (print-ready)"
+                            >🖨</button>
+                            <button
+                              onClick={() => {
+                                if (!window.confirm(`Delete this ${def.label} entry from ${ts.toLocaleString()}?`)) return;
+                                removeEvent(e.id);
+                              }}
+                              style={miniBtn()}
+                              title="Delete this entry"
+                            >✕</button>
+                          </div>,
+                        );
+                      }
+                      return nodes;
+                    })()}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </>
       ) : (
         <div style={{ padding: 18, textAlign: "center", color: "rgba(196,181,253,0.55)", fontSize: 13 }}>
