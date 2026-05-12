@@ -98,23 +98,24 @@ export default function StarScanner() {
     async function handleScan(v: string) {
       scanReceivedBeep();
       // STU-{studentId} — printed by the FolderLabelsGenerator. Pulls
-      // up that kid's folder view (pending assignments + recent grades)
-      // so a teacher / aide / sub can scan a folder and see what's
-      // there. Synthetic — never lives in bcDB.
+      // up that kid's folder view (pending assignments + recent grades).
+      // The id may be a UUID with mixed case; the modal does a
+      // case-insensitive lookup so we lower-case the payload here for
+      // consistent matching downstream.
       const stuMatch = /^STU-(.+)$/i.exec(v);
       if (stuMatch) {
         successBeep();
-        setScan({ studentFolder: { studentId: stuMatch[1] } });
+        setScan({ studentFolder: { studentId: stuMatch[1].toLowerCase() } });
         return;
       }
-      // KUDOS-{studentId}-{date} — printed by KudosCertificate. For
-      // now we acknowledge the scan with a success beep + show the
-      // student folder so the teacher can route to the gradebook
-      // / kudos points workflow from there.
-      const kudosMatch = /^KUDOS-([^-]+)-(\d+)$/i.exec(v);
+      // KUDOS-{studentId}-{date} — printed by KudosCertificate. The
+      // student id is the first dash-segment; the date is the last.
+      // For UUIDs that contain dashes, take everything between the
+      // KUDOS- prefix and the trailing -{date}.
+      const kudosMatch = /^KUDOS-(.+)-(\d{6,})$/i.exec(v);
       if (kudosMatch) {
         successBeep();
-        setScan({ studentFolder: { studentId: kudosMatch[1] } });
+        setScan({ studentFolder: { studentId: kudosMatch[1].toLowerCase() } });
         return;
       }
       // BH-{defId} — printed by the BehaviorBarcodes panel. Opens

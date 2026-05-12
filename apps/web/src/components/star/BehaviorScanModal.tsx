@@ -146,21 +146,22 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
       stuBufRef.current = "";
       const m = /^STU-(.+)$/.exec(v);
       if (!m) return;
-      const sid = m[1];
-      if (!students.some((s) => s.id === sid)) {
+      const sidLower = m[1].toLowerCase();
+      // Case-insensitive roster match — UUIDs may be mixed case.
+      const matched = students.find((s) => s.id.toLowerCase() === sidLower);
+      if (!matched) {
         showFlash("err", "Scanned student isn't on the roster");
         return;
       }
       // Per-kid behaviors: only allow scanning that one student.
-      if (def?.scope === "student" && def.studentId && def.studentId !== sid) {
+      if (def?.scope === "student" && def.studentId && def.studentId.toLowerCase() !== sidLower) {
         showFlash("err", "This behavior is locked to a different student");
         return;
       }
-      setStudentId(sid);
+      setStudentId(matched.id);
       setStage("form");
       successBeep();
-      const stu = students.find((s) => s.id === sid);
-      showFlash("ok", `Picked ${stu?.firstName || "kid"} via scan`);
+      showFlash("ok", `Picked ${matched.firstName || "kid"} via scan`);
     };
     const onKey = (e: KeyboardEvent) => {
       // Don't hijack typing in form fields.

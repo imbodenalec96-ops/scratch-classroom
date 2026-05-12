@@ -35,9 +35,13 @@ interface GradedItem {
 }
 
 export default function StudentFolderModal({ studentId, onClose }: Props) {
+  // Case-insensitive lookup so a pasted/scanned UUID in upper case
+  // (the global scanner uppercases everything) still matches the
+  // lowercase IDs we store in /star.
   const [student] = useState<StarStudent | null>(() => {
     const all = StarStore.getStudents();
-    return all.find((s) => s.id === studentId) || null;
+    const wantLower = studentId.toLowerCase();
+    return all.find((s) => s.id.toLowerCase() === wantLower) || null;
   });
 
   // Behavior + points state — refreshed when actions land so chip

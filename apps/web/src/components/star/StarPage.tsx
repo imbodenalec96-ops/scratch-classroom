@@ -29,6 +29,7 @@ import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
 import StudentReferenceSheet from "./StudentReferenceSheet.tsx";
 import PecsBuilder from "./PecsBuilder.tsx";
 import BehaviorTracker from "./BehaviorTracker.tsx";
+import EndOfDayReport from "./EndOfDayReport.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -310,6 +311,9 @@ export default function StarPage() {
               </SectionWrapper>
               <SectionWrapper icon="📋" title="Sub plans packet" description="Schedule + roster + IEP cliff notes + your emergency procedures, all in one PDF.">
                 <SubPlansGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="📊" title="End-of-day report" description="One-tap recap of the whole day — assignments completed, behaviors logged, refusals, passes. Print at 3pm to file with admin or share with co-teachers.">
+                <EndOfDayReport />
               </SectionWrapper>
               <SectionWrapper icon="🏆" title="Kudos certificate" description="One-tap fun certificate on cardstock — kid's name, photo, and a kudos barcode for the fridge.">
                 <KudosCertificate />
