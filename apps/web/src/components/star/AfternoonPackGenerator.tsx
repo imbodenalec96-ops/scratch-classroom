@@ -82,7 +82,7 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
     setOverrides((cur) => ({ ...cur, [id]: { ...(cur[id] || {}), ...patch } }));
   };
 
-  const generatePack = () => {
+  const generatePack = async () => {
     if (picked.size === 0) { errorBeep(); return; }
     setBusy(true);
     try {
@@ -152,7 +152,24 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
           questions: built.questions, lesson: built.lesson, name, subject: kidSubject,
         });
       }
-      saveAll({ bcDB, asnTracker: tracker, asns });
+      try {
+        saveAll({ bcDB, asnTracker: tracker, asns });
+      } catch (e: any) {
+        if (e?.quota) {
+          const { getLocalStorageUsage, clearBehaviorPhotos, clearStudentPhotos } = await import("../../lib/star/storage.ts");
+          const before = getLocalStorageUsage().totalKB;
+          const ok = window.confirm(
+            `Couldn't save the pack — local storage is full (${Math.round(before)} KB).\n\n` +
+            `Free up space by removing saved photos? Behavior-report + worksheet snap photos take the most room. Grades and assignments stay.\n\nOK = clear photos and retry.`
+          );
+          if (!ok) throw e;
+          clearBehaviorPhotos();
+          clearStudentPhotos();
+          saveAll({ bcDB, asnTracker: tracker, asns });
+        } else {
+          throw e;
+        }
+      }
       // Push every minted barcode to the server so other devices can scan it.
       for (const o of out) pushBarcodeToServer(bcDB[o.barcode]);
       successBeep();

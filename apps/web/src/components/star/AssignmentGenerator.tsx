@@ -159,7 +159,39 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
       const asns = StarStore.getAsns();
       asns.unshift({ id, name, subject, type: "Assignment", grade });
 
-      saveAll({ bcDB, asnTracker: tracker, asns });
+      try {
+        saveAll({ bcDB, asnTracker: tracker, asns });
+      } catch (e: any) {
+        if (e?.quota) {
+          errorBeep();
+          const { getLocalStorageUsage, clearBehaviorPhotos, clearStudentPhotos } = await import("../../lib/star/storage.ts");
+          const before = getLocalStorageUsage().totalKB;
+          const wantClear = window.confirm(
+            `Couldn't save — local storage is full (${Math.round(before)} KB used).\n\n` +
+            `Free up space by removing saved photos? Behavior-report photos and ` +
+            `worksheet snap photos take the most room. Grades and assignments stay.\n\n` +
+            `Tap OK to clear photos and retry the save.`
+          );
+          if (wantClear) {
+            const b = clearBehaviorPhotos();
+            const p = clearStudentPhotos();
+            const after = getLocalStorageUsage().totalKB;
+            try {
+              saveAll({ bcDB, asnTracker: tracker, asns });
+              alert(`Freed ${Math.round(before - after)} KB (${b.stripped} behavior photos + ${p.stripped} worksheet photos). Assignment saved.`);
+            } catch (e2: any) {
+              alert(`Still full after cleanup. Try /star → Reports → Clear old data, or open Settings → Cross-device backup → Download backup, then clear data.`);
+              throw e2;
+            }
+          } else {
+            return;
+          }
+        } else {
+          errorBeep();
+          alert(`Couldn't save the assignment: ${e?.message || e}`);
+          return;
+        }
+      }
       pushBarcodeToServer(bcDB[id]);
       // Second-chance push: if the class id wasn't set when the
       // first push ran, the entry stayed local. Try once more

@@ -438,7 +438,11 @@ export interface BehaviorTemplate {
   createdDate: string;
 }
 
-// LocalStorage with safe parse + default fallback
+// LocalStorage with safe parse + default fallback. `set` used to
+// silently swallow quota errors — which caused the worst kind of
+// bug: the teacher generated assignments that vanished without
+// any sign of failure. Now `set` throws on quota so callers can
+// surface a "free up space" prompt.
 const ls = {
   get<T>(key: string, fallback: T): T {
     try {
@@ -449,9 +453,75 @@ const ls = {
     } catch { return fallback; }
   },
   set(key: string, value: unknown) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e: any) {
+      // QuotaExceededError / NS_ERROR_DOM_QUOTA_REACHED — re-throw
+      // a typed error so callers can detect it cleanly.
+      const name = e?.name || "";
+      const code = (e?.code ?? 0) | 0;
+      if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED" || code === 22 || code === 1014) {
+        const err = new Error(`localStorage full — couldn't save "${key}"`);
+        (err as any).quota = true;
+        throw err;
+      }
+      // Any other write error also re-thrown — silent dropping is
+      // worse than failing loudly.
+      throw e;
+    }
   },
 };
+
+/** Estimate the localStorage size used by every key in bytes. Used
+ *  by the cleanup UI to show what's eating space. */
+export function getLocalStorageUsage(): { totalKB: number; byKey: Array<{ key: string; kb: number }> } {
+  const byKey: Array<{ key: string; kb: number }> = [];
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const v = localStorage.getItem(k) || "";
+      const bytes = (k.length + v.length) * 2; // rough UTF-16
+      total += bytes;
+      byKey.push({ key: k, kb: bytes / 1024 });
+    }
+  } catch {}
+  byKey.sort((a, b) => b.kb - a.kb);
+  return { totalKB: total / 1024, byKey };
+}
+
+/** Strip photoDataUrl from every behavior log entry. Big photos
+ *  are the most common quota-blower; this frees the most space
+ *  with the least lost. The frequency report + timeline still
+ *  work without the photos. */
+export function clearBehaviorPhotos(): { stripped: number } {
+  try {
+    const log = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
+    let stripped = 0;
+    for (const e of log) {
+      if ((e as any).photoDataUrl) { delete (e as any).photoDataUrl; stripped += 1; }
+    }
+    if (stripped > 0) ls.set(KEYS.behaviorLog, log);
+    return { stripped };
+  } catch {
+    return { stripped: 0 };
+  }
+}
+
+/** Strip every kid's STAR-photo cache (the snap-a-worksheet
+ *  photos). Doesn't affect grades — those photos are duplicate
+ *  attachments only. */
+export function clearStudentPhotos(): { stripped: number } {
+  try {
+    const photos = ls.get<Record<string, StarPhoto[]>>(KEYS.photos, {});
+    const count = Object.values(photos).reduce((a, list) => a + (list || []).length, 0);
+    ls.set(KEYS.photos, {});
+    return { stripped: count };
+  } catch {
+    return { stripped: 0 };
+  }
+}
 
 export const DEFAULT_TPLS = [
   "Refused after 3 verbal prompts",
