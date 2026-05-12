@@ -26,6 +26,7 @@ import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
 import IepPacketGenerator from "./IepPacketGenerator.tsx";
 import KudosCertificate from "./KudosCertificate.tsx";
 import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
+import PecsBuilder from "./PecsBuilder.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -310,8 +311,11 @@ export default function StarPage() {
               <SectionWrapper icon="🏆" title="Kudos certificate" description="One-tap fun certificate on cardstock — kid's name, photo, and a kudos barcode for the fridge.">
                 <KudosCertificate />
               </SectionWrapper>
-              <SectionWrapper icon="📌" title="Folder labels" description="Avery 5160 sheet with each kid's name + photo + a scannable STAR barcode.">
+              <SectionWrapper icon="📌" title="Folder labels" description="Avery 5160 sheet with each kid's name + photo + a scannable STAR barcode. Scan the label on the iPad to pull up the kid's pending assignments and recent grades.">
                 <FolderLabelsGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="🟦" title="PECS card builder" description="Build a printable set of 2&quot; picture symbols for sentence boards, AAC, or first/then. 74 bundled symbols + custom cards.">
+                <PecsBuilder />
               </SectionWrapper>
             </div>
           </CreateGroup>

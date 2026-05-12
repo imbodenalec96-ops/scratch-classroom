@@ -22,6 +22,7 @@ import StatusModal from "./StatusModal.tsx";
 import FreetimeModal from "./FreetimeModal.tsx";
 import MovementModal from "./MovementModal.tsx";
 import SupplyModal from "./SupplyModal.tsx";
+import StudentFolderModal from "./StudentFolderModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
@@ -32,6 +33,7 @@ interface ScanState {
   movement?: { barcode: string; kind: "specials" | "lunch"; direction: "out" | "in" };
   supply?: { barcode: string; supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book"; direction: "out" | "in" };
   timerToast?: { minutes: number };
+  studentFolder?: { studentId: string };
   unknown?: { barcode: string };
 }
 
@@ -83,6 +85,26 @@ export default function StarScanner() {
 
     async function handleScan(v: string) {
       scanReceivedBeep();
+      // STU-{studentId} — printed by the FolderLabelsGenerator. Pulls
+      // up that kid's folder view (pending assignments + recent grades)
+      // so a teacher / aide / sub can scan a folder and see what's
+      // there. Synthetic — never lives in bcDB.
+      const stuMatch = /^STU-(.+)$/i.exec(v);
+      if (stuMatch) {
+        successBeep();
+        setScan({ studentFolder: { studentId: stuMatch[1] } });
+        return;
+      }
+      // KUDOS-{studentId}-{date} — printed by KudosCertificate. For
+      // now we acknowledge the scan with a success beep + show the
+      // student folder so the teacher can route to the gradebook
+      // / kudos points workflow from there.
+      const kudosMatch = /^KUDOS-([^-]+)-(\d+)$/i.exec(v);
+      if (kudosMatch) {
+        successBeep();
+        setScan({ studentFolder: { studentId: kudosMatch[1] } });
+        return;
+      }
       // Always rehydrate so freshly-deployed seed barcodes (PASS-*, STATUS-*)
       // are guaranteed to be in the lookup, even if the user's bcDB
       // pre-dates the seed.
@@ -287,6 +309,12 @@ export default function StarScanner() {
         <SupplyModal
           supplyKind={scan.supply.supplyKind}
           direction={scan.supply.direction}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.studentFolder && (
+        <StudentFolderModal
+          studentId={scan.studentFolder.studentId}
           onClose={() => setScan({})}
         />
       )}
