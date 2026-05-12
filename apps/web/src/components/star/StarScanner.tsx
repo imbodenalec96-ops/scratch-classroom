@@ -49,6 +49,18 @@ export default function StarScanner() {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState("");
   const manualInputRef = useRef<HTMLInputElement | null>(null);
+  // Track which page we're on so the manual-entry pill shows only
+  // on STAR pages (/star, /star/phone, /star/aac, /scan) and stays
+  // hidden on the projector board (/board) which should be clean.
+  const [pathname, setPathname] = useState<string>(() => (typeof window !== "undefined" ? window.location.pathname : ""));
+  useEffect(() => {
+    const onChange = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", onChange);
+    // SPA route changes don't fire popstate — poll lightly.
+    const iv = window.setInterval(onChange, 1000);
+    return () => { window.removeEventListener("popstate", onChange); window.clearInterval(iv); };
+  }, []);
+  const showManualPill = /^\/(star|scan)/.test(pathname);
   // handleScan is defined inside the keypress useEffect closure;
   // expose it via a ref so the manual entry button can fire it.
   const handleScanRef = useRef<((v: string) => Promise<void> | void) | null>(null);
@@ -317,9 +329,9 @@ export default function StarScanner() {
   return (
     <>
       {/* Manual barcode entry — small floating pill bottom-right.
-          Always available in the app since StarScanner is mounted
-          globally in App.tsx. Tap → input box opens auto-focused. */}
-      <div style={{
+          Only visible on STAR pages (/star, /scan) so the projector
+          /board view stays clean. Tap → input box opens auto-focused. */}
+      {showManualPill && <div style={{
         position: "fixed",
         right: "max(env(safe-area-inset-right), 14px)",
         bottom: "max(env(safe-area-inset-bottom), 78px)",
@@ -402,7 +414,7 @@ export default function StarScanner() {
             >✕</button>
           </div>
         )}
-      </div>
+      </div>}
 
       {scan.refusal && (
         <RefusalModal

@@ -295,6 +295,7 @@ const KEYS = {
   behaviorDefs: "star_behavior_defs",
   behaviorLog: "star_behavior_log",
   behaviorTemplates: "star_behavior_templates",
+  dailyNotes: "star_daily_notes",
 } as const;
 
 /**
@@ -464,6 +465,26 @@ export const DEFAULT_TPLS = [
 // the API on first /star visit. (Earlier versions seeded STU-001..STU-008
 // placeholders; those get wiped the first time sync runs in replace mode.)
 export const DEFAULT_STUDENTS: StarStudent[] = [];
+
+// One per-kid daily note. The end-of-day report exposes a form
+// per kid where the teacher writes a narrative + sets mood +
+// attendance + flags whether parents should hear about today.
+// Class-wide notes use studentId === "__class__".
+export interface DailyNote {
+  date: string;             // YYYY-MM-DD (Pacific)
+  studentId: string;        // or "__class__" for class-wide note
+  body?: string;            // main narrative — what the kid did today
+  highlights?: string;      // wins / shoutouts
+  growthAreas?: string;     // what to work on tomorrow
+  mood?: "great" | "good" | "ok" | "hard" | "crisis";
+  attendance?: "present" | "tardy" | "left-early" | "partial" | "absent";
+  parentFollowUp?: boolean; // does the parent need to hear about today?
+  parentFollowNote?: string;// what to tell the parent
+  updatedAt: string;        // ISO
+}
+
+const CLASS_NOTE_STUDENT_ID = "__class__";
+export { CLASS_NOTE_STUDENT_ID };
 
 // Reusable text snippets for the ABC report fields. The teacher
 // can edit/delete in the tracker UI and add new ones from the
@@ -678,6 +699,24 @@ export const StarStore = {
   removeBehaviorTemplate: (id: string) => {
     const cur = ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES);
     ls.set(KEYS.behaviorTemplates, cur.filter((t) => t.id !== id));
+  },
+  // Daily notes — narratives written per kid (and one class-wide)
+  // for the end-of-day report. Keyed by `${date}::${studentId}` so
+  // upsert is cheap.
+  getDailyNotes: (): Record<string, DailyNote> => ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {}),
+  getDailyNote: (date: string, studentId: string): DailyNote | undefined => {
+    const all = ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {});
+    return all[`${date}::${studentId}`];
+  },
+  upsertDailyNote: (note: DailyNote) => {
+    const all = ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {});
+    all[`${note.date}::${note.studentId}`] = { ...note, updatedAt: new Date().toISOString() };
+    ls.set(KEYS.dailyNotes, all);
+  },
+  clearDailyNote: (date: string, studentId: string) => {
+    const all = ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {});
+    delete all[`${date}::${studentId}`];
+    ls.set(KEYS.dailyNotes, all);
   },
   // Record a full behavior incident report. All non-required fields
   // are optional; the form sends whatever the teacher filled in.
