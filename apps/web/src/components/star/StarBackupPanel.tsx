@@ -242,6 +242,44 @@ export default function StarBackupPanel() {
         >🚀 Push all my barcodes to the server</button>
       </div>
 
+      {/* SUPABASE — push every behavior, daily note, IEP entry, template,
+          and custom-music track from this device up to Supabase so other
+          devices (iPad, second laptop) see the same data. Same idea as the
+          barcode button above, but for the new cross-device STAR sync. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(16,185,129,0.08)",
+        border: "1px solid rgba(16,185,129,0.30)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#bbf7d0", marginBottom: 6 }}>
+          ☁️ STAR data → Supabase
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Pushes every behavior log entry, daily note, IEP goal + status, template, and custom-music
+          track from this device up to Supabase so the iPad sees the same data. Already runs on every
+          app boot, but tap here to backfill entries (like today's 5/12 behaviors) right now.
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const { fullStarPush } = await import("../../lib/star/supabaseSync.ts");
+              const r = await fullStarPush();
+              successBeep();
+              showFlash("ok", `Pushed ${r.pushed} STAR row${r.pushed === 1 ? "" : "s"} to Supabase.`, 4000);
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Push failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #10b981, #0ea5e9)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >☁️ Push all STAR data to Supabase</button>
+      </div>
+
       {/* BACKUP */}
       <div style={{
         padding: 14, borderRadius: 12, marginBottom: 14,
