@@ -871,7 +871,7 @@ export function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, 
 
       <header class="letterhead">
         <div>
-          <div class="lh-school">Special Education Services</div>
+          <div class="lh-school">STAR Room · Special Education Services</div>
           <div class="lh-title">Behavior Incident Report</div>
           <div class="lh-sub">Confidential student record — for school use only</div>
         </div>
@@ -885,7 +885,7 @@ export function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, 
       <table class="facts">
         ${factRow("Student name", `${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}`)}
         ${factRow("Grade level", student.grade ? `Grade ${escapeHtml(student.grade)}` : "—")}
-        ${factRow("Classroom", "Mrs. Imboden — Special Education")}
+        ${factRow("Classroom", "STAR Room — Mrs. Imboden")}
         ${factRow("IEP / 504 on file", student.iep ? "Yes (IEP)" : "—")}
       </table>
 
