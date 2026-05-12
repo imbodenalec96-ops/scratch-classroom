@@ -59,6 +59,19 @@ function playKaching() {
   } catch {}
 }
 
+// Curated emoji palette kids can pick from for their wallet icon.
+// Grouped roughly by category so the picker doesn't feel random.
+const AVATAR_CHOICES: string[] = [
+  // Faces
+  "🐱", "🐶", "🐰", "🐼", "🦊", "🐻", "🐨", "🦁", "🐯", "🐸",
+  "🐵", "🦄", "🐲", "🐢", "🐙", "🦋", "🐝", "🦉", "🦒", "🦔",
+  "🐺", "🐧", "🦩", "🦜", "🐠", "🐬", "🦈", "🐳", "🦖", "🦕",
+  // Symbols / objects
+  "⭐", "🌟", "✨", "💫", "🌈", "🔥", "❄️", "⚡", "💎", "🎯",
+  "🚀", "🛸", "🌙", "☀️", "🌸", "🌺", "🍀", "🍕", "🍔", "🍩",
+  "⚽", "🏀", "🎮", "🎨", "🎵", "📚", "🦸", "🧙", "👽", "🤖",
+];
+
 export default function StudentWallet({ students, classId: _classId, onClose }: Props) {
   const [picked, setPicked] = useState<Student | null>(null);
   const [data, setData] = useState<{
@@ -73,6 +86,28 @@ export default function StudentWallet({ students, classId: _classId, onClose }: 
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [storeOpen, setStoreOpen] = useState<{ open: boolean; source: string; until: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editingAvatar, setEditingAvatar] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+
+  const saveAvatar = async (emoji: string) => {
+    if (!picked) return;
+    setSavingAvatar(true);
+    try {
+      await api.updateStudent(picked.id, { avatar_emoji: emoji });
+      // Update local state so the wallet reflects immediately, and the
+      // picker grid (when the kid backs out) shows the new icon too.
+      const next = { ...picked, avatar_emoji: emoji };
+      setPicked(next);
+      const idx = students.findIndex((s) => s.id === picked.id);
+      if (idx >= 0) students[idx] = next;
+      setEditingAvatar(false);
+      showFlash("ok", `New icon saved!`);
+    } catch {
+      showFlash("err", "Couldn't save icon — try again.");
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
 
   const showFlash = (kind: "ok" | "err", text: string) => {
     setFlash({ kind, text });
@@ -329,6 +364,80 @@ export default function StudentWallet({ students, classId: _classId, onClose }: 
                   <StatCard label="Grade"      value={counted.length ? `${overallLetter} ${overallPct}%` : "—"} accent={counted.length ? letterGradeColor(overallLetter) : undefined} />
                   {data.rank && <StatCard label="Class Rank" value={`#${data.rank}`} />}
                 </div>
+
+                {/* MY ICON — kid can pick a new emoji avatar */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                  borderRadius: 14, marginBottom: 16,
+                  background: "rgba(168,85,247,0.06)",
+                  border: "1px solid rgba(168,85,247,0.20)",
+                }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: "50%",
+                    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 26, color: "white", fontWeight: 900,
+                    boxShadow: "0 6px 16px -4px rgba(168,85,247,0.55)",
+                    flexShrink: 0,
+                  }}>{picked.avatar_emoji || (picked.name || "?")[0].toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(196,181,253,0.85)", letterSpacing: "0.10em", textTransform: "uppercase" }}>My icon</div>
+                    <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", marginTop: 2 }}>Pick anything you want!</div>
+                  </div>
+                  <button
+                    onClick={() => setEditingAvatar((v) => !v)}
+                    style={{
+                      padding: "9px 14px", borderRadius: 10,
+                      background: editingAvatar
+                        ? "rgba(239,68,68,0.20)"
+                        : "linear-gradient(135deg, rgba(168,85,247,0.30), rgba(236,72,153,0.20))",
+                      border: editingAvatar
+                        ? "1px solid rgba(239,68,68,0.45)"
+                        : "1px solid rgba(168,85,247,0.45)",
+                      color: editingAvatar ? "#fca5a5" : "#fce7f3",
+                      fontWeight: 800, fontSize: 13, cursor: "pointer", touchAction: "manipulation",
+                    }}
+                  >{editingAvatar ? "✕ Cancel" : "✏️ Change"}</button>
+                </div>
+
+                {editingAvatar && (
+                  <div style={{
+                    padding: 14, borderRadius: 14, marginBottom: 16,
+                    background: "linear-gradient(135deg, rgba(168,85,247,0.12), rgba(236,72,153,0.06))",
+                    border: "1.5px solid rgba(168,85,247,0.40)",
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#f9a8d4", letterSpacing: "0.10em", textTransform: "uppercase", marginBottom: 10 }}>
+                      Pick a new icon
+                    </div>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))",
+                      gap: 6,
+                    }}>
+                      {AVATAR_CHOICES.map((emoji) => {
+                        const sel = picked.avatar_emoji === emoji;
+                        return (
+                          <button
+                            key={emoji}
+                            onClick={() => saveAvatar(emoji)}
+                            disabled={savingAvatar}
+                            aria-label={`Pick ${emoji}`}
+                            style={{
+                              width: "100%", aspectRatio: "1 / 1",
+                              borderRadius: 10,
+                              background: sel ? "rgba(236,72,153,0.30)" : "rgba(0,0,0,0.30)",
+                              border: sel ? "2px solid #ec4899" : "1px solid rgba(255,255,255,0.10)",
+                              fontSize: 26, cursor: savingAvatar ? "wait" : "pointer",
+                              touchAction: "manipulation",
+                              transition: "transform 100ms",
+                              opacity: savingAvatar ? 0.6 : 1,
+                            }}
+                          >{emoji}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* MY GRADES — aggregated locally so it matches what's in /star */}
                 <SectionTitle icon="📊">My Grades {grades.length ? `· ${grades.length}` : ""}</SectionTitle>
