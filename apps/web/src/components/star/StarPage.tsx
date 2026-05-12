@@ -77,8 +77,18 @@ export default function StarPage() {
     runSync();
     // Capture the active class id so STAR events fired from this device
     // (iPad) get relayed to the server and picked up by the projector.
-    api.getClasses().then((cs) => {
-      if (Array.isArray(cs) && cs[0]?.id) setActiveClassId(cs[0].id);
+    // After the class id is set, push every local QZ/AS/WR/SP
+    // barcode to the server (idempotent upsert) to catch up any
+    // assignments that were minted before the class id was ready —
+    // fixes "I made it today but the iPad can't find it".
+    api.getClasses().then(async (cs) => {
+      if (Array.isArray(cs) && cs[0]?.id) {
+        setActiveClassId(cs[0].id);
+        try {
+          const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
+          await pushAllLocalBarcodes();
+        } catch {}
+      }
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

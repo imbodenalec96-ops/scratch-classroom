@@ -20,6 +20,7 @@
 import { useRef, useState } from "react";
 import { StarStore } from "../../lib/star/storage.ts";
 import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
+import { pushAllLocalBarcodes } from "../../lib/star/barcodeRelay.ts";
 
 // Keys included in the backup. NEW LOCAL KEYS GO HERE so future
 // teacher-customizable data still rides across devices.
@@ -202,6 +203,44 @@ export default function StarBackupPanel() {
           fontWeight: 800, fontSize: 13,
         }}>{flash.text}</div>
       )}
+
+      {/* PUSH-TO-SERVER — fixes "made today, can't scan on iPad" */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(245,158,11,0.08)",
+        border: "1px solid rgba(245,158,11,0.30)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fde68a", marginBottom: 6 }}>
+          🔧 If a barcode shows "Not found" on another device
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Sometimes a freshly-minted barcode doesn't push to the server (the active class ID
+          can race the save). One tap re-uploads every QZ-, AS-, WR-, SP- barcode from this
+          device to the relay. Safe to run repeatedly.
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const r = await pushAllLocalBarcodes();
+              if (r.pushed === 0 && r.failed === 0) {
+                showFlash("ok", "No barcodes to push (or class id not set yet).");
+              } else {
+                showFlash(r.failed > 0 ? "err" : "ok", `Pushed ${r.pushed} barcodes${r.failed ? `, ${r.failed} failed` : ""}.`, 4000);
+              }
+              successBeep();
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #f59e0b, #ec4899)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >🚀 Push all my barcodes to the server</button>
+      </div>
 
       {/* BACKUP */}
       <div style={{

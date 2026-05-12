@@ -11,10 +11,19 @@ import { api } from "../api.ts";
 import { StarStore, type BcEntry, type StarTrackerEntry } from "./storage.ts";
 import { getActiveClassId } from "./boardEvents.ts";
 
-const PREFIXES_TO_PUSH = /^(QZ|AS|WR|SP)-/i;
+// Matches every assignment barcode shape we mint: a 2-letter subject
+// prefix (e.g. MA / RE / SC / SO / SE / WR / SP / AR / MU / LI / PE)
+// followed by YYMMDD-NNN. The previous whitelist only had QZ/AS/WR/SP
+// so SEL ("SE"), Social Studies ("SO"), Science ("SC"), Reading
+// ("RE"), and Math ("MA") barcodes silently skipped the server push —
+// the iPad / projector then couldn't find them.
+const PREFIXES_TO_PUSH = /^[A-Z]{2,3}-\d{6}-\d{2,4}$/i;
 
 /** Push a freshly-minted barcode to the server so other devices can
- *  scan it. Silent on error — scanning still works on the local device. */
+ *  scan it. Silent on error — scanning still works on the local
+ *  device. When the active class id isn't set yet (the page-load
+ *  race), the entry stays in localStorage and pushAllLocalBarcodes
+ *  on the next /star mount will pick it up. */
 export function pushBarcodeToServer(entry: BcEntry | undefined | null): void {
   if (!entry || !entry.id) return;
   if (!PREFIXES_TO_PUSH.test(entry.id)) return;
@@ -23,6 +32,36 @@ export function pushBarcodeToServer(entry: BcEntry | undefined | null): void {
   api.starBarcodePost(classId, entry.id, entry).catch((e) => {
     console.warn("[STAR barcode relay] push failed:", e?.message || e);
   });
+}
+
+/** One-shot catch-up sync. Looks through localStorage bcDB for every
+ *  QZ-/AS-/WR-/SP- prefixed entry and pushes it to the server. The
+ *  server endpoint upserts on conflict so this is idempotent — safe
+ *  to run on every /star mount.
+ *
+ *  This fixes the most common "I made an assignment today but the
+ *  iPad can't find it" case: the original push silently skipped
+ *  because the active class id hadn't been set yet during creation.
+ */
+export async function pushAllLocalBarcodes(): Promise<{ pushed: number; skipped: number; failed: number }> {
+  const classId = getActiveClassId();
+  if (!classId) return { pushed: 0, skipped: 0, failed: 0 };
+  const bcDB = StarStore.getBcDB();
+  const candidates = Object.values(bcDB).filter((e) => e && PREFIXES_TO_PUSH.test(e.id));
+  let pushed = 0;
+  let failed = 0;
+  // Sequential to avoid blasting the API with 100 parallel POSTs
+  // on a fresh sync. The upsert is cheap.
+  for (const entry of candidates) {
+    try {
+      await api.starBarcodePost(classId, entry.id, entry);
+      pushed += 1;
+    } catch (e: any) {
+      console.warn("[STAR barcode relay] catch-up push failed for", entry.id, e?.message || e);
+      failed += 1;
+    }
+  }
+  return { pushed, skipped: 0, failed };
 }
 
 /** Pull every persisted barcode for the active class and merge into

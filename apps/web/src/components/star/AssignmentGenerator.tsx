@@ -161,6 +161,10 @@ export default function AssignmentGenerator({ onCreated }: { onCreated?: (id: st
 
       saveAll({ bcDB, asnTracker: tracker, asns });
       pushBarcodeToServer(bcDB[id]);
+      // Second-chance push: if the class id wasn't set when the
+      // first push ran, the entry stayed local. Try once more
+      // after a beat so the active class id has time to settle.
+      setTimeout(() => { try { pushBarcodeToServer(bcDB[id]); } catch {} }, 500);
       successBeep();
       setCreated({ id, questions: questions!, lesson: lesson! });
       onCreated?.(id);
