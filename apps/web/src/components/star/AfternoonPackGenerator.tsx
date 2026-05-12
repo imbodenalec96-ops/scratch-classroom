@@ -557,27 +557,35 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
   };
 
   // Duplex printing was putting two different kids on opposite sides
-  // of the same sheet (Anna on the front, Jaida on the back). Since
-  // each kid's worksheet is one page, we insert a blank "back" page
-  // after every kid EXCEPT the last so each kid lands on their own
-  // physical sheet (worksheet on front, blank on back). The blank
-  // page carries a faint footer so the teacher can spot it's
-  // intentional rather than a printer misfeed.
+  // of the same sheet (Anna on the front, Jaida on the back). The
+  // first fix added a faint back page — but most printer drivers
+  // detect very-low-ink pages and silently SKIP them ("save paper"
+  // mode). So we now make the back page UNAMBIGUOUSLY non-blank
+  // with a real watermark + border + multi-line content so the
+  // printer can't collapse it.
+  //
+  // Belt-and-suspenders: every actual worksheet also gets a
+  // `break-before: page` so each kid forces a new sheet boundary
+  // regardless of what the printer does with the back page.
   const blankBack = (kidName: string) => `
     <div class="page back">
-      <div style="height:100%;display:flex;align-items:flex-end;justify-content:center;">
-        <div style="font-size:9px;color:#cbd5e1;letter-spacing:0.2em;text-transform:uppercase;">
-          ${escapeHtml(kidName)} · back of duplex sheet · intentionally blank
-        </div>
+      <div class="back-frame">
+        <div class="back-title">↩ Back of ${escapeHtml(kidName)}'s sheet</div>
+        <div class="back-watermark">${escapeHtml(kidName.toUpperCase())}</div>
+        <div class="back-foot">This side is intentionally left blank — keep with the worksheet on the other side.</div>
       </div>
     </div>
   `;
 
   const pages: string[] = [];
   for (let i = 0; i < pack.length; i++) {
-    pages.push(renderOne(pack[i]));
+    // Force every kid (except the first) to start on a fresh sheet
+    // via break-before: page directly on the worksheet div.
+    pages.push(renderOne(pack[i]).replace('<div class="page">', `<div class="page${i > 0 ? " kid-start" : ""}">`));
     // Pad with a blank back-page after every kid except the last so
-    // the next kid starts on a fresh sheet under duplex printing.
+    // the next kid is guaranteed to land on the front of a new
+    // duplex sheet — protects against printers that override
+    // break-before with "skip blank pages" anyway.
     if (i < pack.length - 1) {
       pages.push(blankBack(pack[i].studentName));
     }
@@ -585,11 +593,48 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
 
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(packLabel)}</title>
     <style>
-      @media print { @page { size: letter; margin: 0.5in; } }
+      @media print {
+        @page { size: letter; margin: 0.5in; }
+        /* Modern + legacy break props for max printer compatibility */
+        .page         { page-break-after: always; break-after: page; }
+        .kid-start    { page-break-before: always; break-before: page; }
+        .page:last-child { page-break-after: auto; break-after: auto; }
+      }
       body { font-family: -apple-system, sans-serif; color: #111; padding: 16px; }
-      .page { page-break-after: always; min-height: 9.5in; }
-      .page:last-child { page-break-after: auto; }
-      .page.back { background: white; }
+      .page { min-height: 9.5in; box-sizing: border-box; }
+      /* Back-of-sheet visual — substantial ink so drivers don't
+         "skip blank pages". A large faded watermark + visible
+         border guarantees the printer registers a non-empty page. */
+      .page.back { padding: 0; }
+      .back-frame {
+        height: 9.5in;
+        border: 3px dashed #94a3b8;
+        border-radius: 12px;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        text-align: center;
+        position: relative;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .back-title {
+        position: absolute; top: 24px; left: 0; right: 0;
+        font-size: 14px; font-weight: 800; color: #475569;
+        letter-spacing: 0.16em; text-transform: uppercase;
+      }
+      .back-watermark {
+        font-size: 96px; font-weight: 900;
+        color: #e2e8f0;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        transform: rotate(-12deg);
+        user-select: none;
+      }
+      .back-foot {
+        position: absolute; bottom: 24px; left: 0; right: 0;
+        font-size: 11px; color: #64748b;
+        padding: 0 24px;
+      }
     </style>
   </head><body>
     ${pages.join("")}
