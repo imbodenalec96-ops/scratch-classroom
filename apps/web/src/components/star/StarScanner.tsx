@@ -552,7 +552,11 @@ function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal, onRetry }: {
   onRetry: () => Promise<void>;
 }) {
   const guessRefusal = barcode.startsWith("WR-") || barcode.startsWith("SP-");
-  const isLocallyMinted = /^(QZ|AS|WR|SP|MA|MO)-/i.test(barcode);
+  // Same broad pattern the relay now uses — any 2-3 letter subject
+  // prefix followed by YYMMDD-NNN counts as a STAR-minted code.
+  // (Previously only QZ/AS/WR/SP/MA/MO matched, which missed SE-,
+  // SO-, SC-, RE-, etc. and showed the wrong "wiped" copy.)
+  const isLocallyMinted = /^[A-Z]{2,3}-\d{6}-\d{2,4}$/i.test(barcode);
   const [retrying, setRetrying] = useState(false);
   const [retried, setRetried] = useState(false);
   const handleRetry = async () => {
@@ -588,9 +592,10 @@ function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal, onRetry }: {
         </div>
         <div style={{ fontSize: 13, color: "rgba(245,241,232,0.85)", lineHeight: 1.55, marginBottom: 16 }}>
           {isLocallyMinted ? (
-            <>This barcode was created on another device. The cross-device sync
-            should have caught it — tap <b style={{ color: "#fce7f3" }}>🔄 Sync &amp; Retry</b> below
-            to pull the latest from the server and try again.</>
+            <>This barcode looks like one you minted in STAR — but it isn't on
+            the server yet. Either tap <b style={{ color: "#fce7f3" }}>🚀 Push my barcodes</b> below
+            (this device pushes everything it has), or open <b style={{ color: "#fce7f3" }}>/star</b> on the
+            laptop where you made it and the auto-sync will catch it.</>
           ) : (
             <>This barcode isn't in any STAR database. Either it was wiped, or it's
             a code from a different system.</>
@@ -598,18 +603,54 @@ function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal, onRetry }: {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {isLocallyMinted && (
-            <button onClick={handleRetry} disabled={retrying} style={{
-              padding: "13px 18px", borderRadius: 12, border: "none",
-              background: retrying
-                ? "rgba(168,85,247,0.20)"
-                : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
-              color: "white", fontWeight: 900, fontSize: 14,
-              cursor: retrying ? "wait" : "pointer",
-              boxShadow: retrying ? "none" : "0 8px 22px -6px rgba(168,85,247,0.55)",
-              touchAction: "manipulation",
-            }}>
-              {retrying ? "Syncing…" : retried ? "🔄 Sync &amp; Retry again" : "🔄 Sync &amp; Retry"}
-            </button>
+            <>
+              <button
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
+                    const r = await pushAllLocalBarcodes();
+                    if (r.pushed > 0) {
+                      // After uploading, give the server a beat then retry the scan.
+                      await new Promise((res) => setTimeout(res, 600));
+                      await onRetry();
+                      setRetried(true);
+                    } else {
+                      // Nothing local to push — fall back to the regular sync.
+                      await onRetry();
+                      setRetried(true);
+                    }
+                  } finally {
+                    setRetrying(false);
+                  }
+                }}
+                disabled={retrying}
+                style={{
+                  padding: "13px 18px", borderRadius: 12, border: "none",
+                  background: retrying
+                    ? "rgba(245,158,11,0.20)"
+                    : "linear-gradient(135deg, #f59e0b 0%, #db2777 50%, #a855f7 100%)",
+                  color: "white", fontWeight: 900, fontSize: 14,
+                  cursor: retrying ? "wait" : "pointer",
+                  boxShadow: retrying ? "none" : "0 8px 22px -6px rgba(219,39,119,0.55)",
+                  touchAction: "manipulation",
+                }}
+              >
+                {retrying ? "Pushing + retrying…" : "🚀 Push my barcodes + retry"}
+              </button>
+              <button onClick={handleRetry} disabled={retrying} style={{
+                padding: "11px 16px", borderRadius: 12, border: "none",
+                background: retrying
+                  ? "rgba(168,85,247,0.20)"
+                  : "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)",
+                color: "white", fontWeight: 900, fontSize: 14,
+                cursor: retrying ? "wait" : "pointer",
+                boxShadow: retrying ? "none" : "0 8px 22px -6px rgba(168,85,247,0.55)",
+                touchAction: "manipulation",
+              }}>
+                {retrying ? "Syncing…" : retried ? "🔄 Just sync &amp; retry" : "🔄 Sync &amp; retry only"}
+              </button>
+            </>
           )}
           <button onClick={onClose} style={{
             padding: "11px 16px", borderRadius: 12,
