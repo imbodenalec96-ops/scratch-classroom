@@ -23,6 +23,7 @@ import FreetimeModal from "./FreetimeModal.tsx";
 import MovementModal from "./MovementModal.tsx";
 import SupplyModal from "./SupplyModal.tsx";
 import StudentFolderModal from "./StudentFolderModal.tsx";
+import BehaviorScanModal from "./BehaviorScanModal.tsx";
 
 interface ScanState {
   refusal?: { barcode: string; type: "Work Refusal" | "Specials Refusal" };
@@ -34,6 +35,7 @@ interface ScanState {
   supply?: { barcode: string; supplyKind: "Pencil" | "Tablet" | "Headphones" | "Book"; direction: "out" | "in" };
   timerToast?: { minutes: number };
   studentFolder?: { studentId: string };
+  behavior?: { defId: string };
   unknown?: { barcode: string };
 }
 
@@ -103,6 +105,15 @@ export default function StarScanner() {
       if (kudosMatch) {
         successBeep();
         setScan({ studentFolder: { studentId: kudosMatch[1] } });
+        return;
+      }
+      // BH-{defId} — printed by the BehaviorBarcodes panel. Opens
+      // the BehaviorScanModal: pick a kid + optional note + optional
+      // points. Synthetic — never lives in bcDB.
+      const bhMatch = /^BH-(.+)$/i.exec(v);
+      if (bhMatch) {
+        successBeep();
+        setScan({ behavior: { defId: bhMatch[1] } });
         return;
       }
       // Always rehydrate so freshly-deployed seed barcodes (PASS-*, STATUS-*)
@@ -315,6 +326,12 @@ export default function StarScanner() {
       {scan.studentFolder && (
         <StudentFolderModal
           studentId={scan.studentFolder.studentId}
+          onClose={() => setScan({})}
+        />
+      )}
+      {scan.behavior && (
+        <BehaviorScanModal
+          defId={scan.behavior.defId}
           onClose={() => setScan({})}
         />
       )}

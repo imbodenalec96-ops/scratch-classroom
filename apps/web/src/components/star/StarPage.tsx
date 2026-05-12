@@ -6,7 +6,7 @@
 //
 // Tip: scan a barcode anywhere in the app to pop the right modal.
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   StarStore, saveAll, rehydrateBcDB,
   type StarStudent, type StarTrackerEntry, type BcEntry, type Subject,
@@ -354,6 +354,9 @@ export default function StarPage() {
               </SectionWrapper>
               <SectionWrapper icon="🛠" title="Supplies & library" description="Track who borrowed the iPad / pencil / headphones / library books.">
                 <SupplyBarcodesPanel />
+              </SectionWrapper>
+              <SectionWrapper icon="📈" title="Behavior barcodes" description="One barcode per behavior you've defined. Scan to log + tap a kid. Add new behaviors at /star → 📈 Behavior.">
+                <BehaviorBarcodesPanel />
               </SectionWrapper>
             </div>
             <SectionWrapper icon="📥" title="Add old paper assignment" description="Mint a barcode for a worksheet you already had on paper.">
@@ -749,6 +752,86 @@ function FreetimeBarcodesPanel() {
       </div>
     </div>
   );
+}
+
+/* ── Behavior barcodes — one per behavior def, scan to log ──────── */
+function BehaviorBarcodesPanel() {
+  const [defs, setDefs] = React.useState(() => StarStore.getBehaviorDefs());
+  React.useEffect(() => {
+    const refresh = () => setDefs(StarStore.getBehaviorDefs());
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+  const visible = defs.filter((d) => !d.archived);
+  const print = () => {
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) return;
+    const cells = visible.map((d) => {
+      const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+      const code = `BH-${d.id}`;
+      return `
+        <div style="border:2.5px dashed ${c};border-radius:14px;padding:18px;text-align:center;page-break-inside:avoid">
+          <div style="font-size:42px;line-height:1;margin-bottom:6px">${d.emoji}</div>
+          <div style="font-size:18px;font-weight:900;margin-bottom:4px;color:#111">${d.label}</div>
+          <div style="font-size:10px;font-weight:800;color:${c};letter-spacing:0.10em;text-transform:uppercase;margin-bottom:10px">${d.tone}${d.scope === "student" ? " · per-kid" : ""}</div>
+          ${require_bc128(code)}
+        </div>
+      `;
+    }).join("");
+    w.document.write(`<!doctype html><html><head><title>STAR behavior barcodes</title>
+      <style>
+        @media print { @page { size: letter; margin: 0.4in; } }
+        body { font-family: -apple-system, sans-serif; padding: 16px; color: #111; }
+        h2 { font-size: 18px; margin: 0 0 6px; }
+        .lede { font-size: 12px; color: #555; margin-bottom: 14px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      </style>
+    </head><body>
+      <h2>STAR — Behavior Barcodes</h2>
+      <div class="lede">Scan a barcode → roster grid pops on the iPad → tap a kid (or +&nbsp;to add note + points). Long-press a kid for a note. Add or edit behaviors at /star → 📈 Behavior.</div>
+      <div class="grid">${cells}</div>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))</script>
+    </body></html>`);
+    w.document.close();
+  };
+  return (
+    <div style={{ color: "#f5f1e8" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "rgba(196,181,253,0.65)", fontWeight: 600 }}>
+          {visible.length} behavior{visible.length === 1 ? "" : "s"} on file · scan to log
+        </div>
+        <button onClick={print} disabled={visible.length === 0} style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: visible.length === 0 ? "rgba(168,85,247,0.18)" : "linear-gradient(135deg,#6366f1,#a855f7,#ec4899)",
+          color: "white", border: "none", fontWeight: 800,
+          cursor: visible.length === 0 ? "not-allowed" : "pointer",
+          fontSize: 13, opacity: visible.length === 0 ? 0.55 : 1,
+        }}>🖨 Print behavior sheet</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+        {visible.map((d) => {
+          const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+          return (
+            <div key={d.id} style={{
+              padding: 10, borderRadius: 10,
+              background: "rgba(255,255,255,0.03)",
+              border: `1px solid ${c}55`, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 2 }}>{d.emoji}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6, color: "#fce7f3" }}>{d.label}</div>
+              <div dangerouslySetInnerHTML={{ __html: bc128svg(`BH-${d.id}`, 0, 44, false, 1.0) }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Tiny inline helper so the template above can call bc128svg as a
+// stringifier (we call the same fn the React panel uses).
+function require_bc128(code: string): string {
+  return bc128svg(code, 0, 70, true, 1.6);
 }
 
 /* ── Movement barcodes (Specials in/out, Lunch in/out) ─────────── */
