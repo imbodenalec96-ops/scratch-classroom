@@ -175,6 +175,54 @@ export default function TeacherStore() {
     }
   };
 
+  // One-tap: seed every calming-music preset as a redeemable store
+  // item. Names are tagged "🎵 Music · <Track Label>" so the board's
+  // music-redemption listener can match them. Skips presets that
+  // already have a matching item (idempotent — safe to run twice).
+  const seedMusicItems = async () => {
+    const MUSIC_PRESETS = [
+      { label: "Forest Spa", emoji: "🌿", price: 15 },
+      { label: "Ocean Waves", emoji: "🌊", price: 15 },
+      { label: "Gentle Rain", emoji: "🌧", price: 15 },
+      { label: "Rain on a Window", emoji: "💧", price: 15 },
+      { label: "Distant Thunder", emoji: "⛈", price: 20 },
+      { label: "Forest Creek", emoji: "🍃", price: 15 },
+      { label: "Crackling Fireplace", emoji: "🔥", price: 15 },
+      { label: "Soft Snowfall", emoji: "❄️", price: 15 },
+      { label: "Birds in the Garden", emoji: "🐦", price: 15 },
+      { label: "Spa Piano", emoji: "🎹", price: 15 },
+      { label: "Healing Bowls", emoji: "🔔", price: 20 },
+      { label: "Soft Acoustic", emoji: "🎸", price: 15 },
+      { label: "Floating Harp", emoji: "🪕", price: 20 },
+      { label: "Celtic Calm", emoji: "🍀", price: 20 },
+      { label: "Classical for Focus", emoji: "🎼", price: 20 },
+      { label: "Lo-Fi Study Beats", emoji: "📚", price: 10 },
+      { label: "Chill Lo-Fi", emoji: "🌙", price: 10 },
+      { label: "Lo-Fi Jazz", emoji: "🎷", price: 10 },
+      { label: "Alpha Focus Waves", emoji: "🧠", price: 25 },
+      { label: "Deep Focus", emoji: "🎯", price: 20 },
+      { label: "Storybook Lullabies", emoji: "🧸", price: 10 },
+      { label: "Music Box", emoji: "🎵", price: 10 },
+    ];
+    setBulkBusy(true);
+    try {
+      const existingNames = new Set(items.map((it) => it.name.toLowerCase()));
+      let added = 0;
+      for (const m of MUSIC_PRESETS) {
+        const name = `🎵 Music · ${m.label}`;
+        if (existingNames.has(name.toLowerCase())) continue;
+        try {
+          const row = await api.createStoreItem({ name, emoji: m.emoji, price: m.price });
+          setItems((list) => [...list, row]);
+          added += 1;
+        } catch {}
+      }
+      showFlash(added === 0 ? "Music items already in store" : `Added ${added} music track${added === 1 ? "" : "s"}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const removeItem = async (it: StoreItem) => {
     if (!window.confirm(`Delete ${it.name}? This can't be undone.`)) return;
     const before = items;
@@ -380,6 +428,26 @@ export default function TeacherStore() {
           >
             {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add item
           </button>
+        </div>
+
+        {/* Bulk seeders */}
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={seedMusicItems}
+            disabled={bulkBusy}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+            style={{
+              background: "linear-gradient(135deg, #db2777, #a855f7)",
+              color: "white",
+              boxShadow: "0 2px 12px rgba(168,85,247,0.30)",
+            }}
+            title="Adds 22 calming music tracks as redeemable store items. When kids cash out for one, the board switches to that track for ~25 minutes."
+          >
+            🎵 Seed music in store
+          </button>
+          <span className="text-xs" style={{ color: "var(--t3)" }}>
+            22 calming tracks (lo-fi, nature, instrumental). Kids can cash out points to switch the board music.
+          </span>
         </div>
 
         {/* Item list */}

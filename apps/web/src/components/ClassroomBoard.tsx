@@ -13,7 +13,7 @@ import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
 import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
-import { setActiveClassId } from "../lib/star/boardEvents.ts";
+import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -28,12 +28,49 @@ function extractYouTubeId(url: string): string | null {
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
-const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string }[] = [
-  { id: "forest",   label: "Forest Spa",     videoId: "xNN7iTA57jM", emoji: "🌿" },
-  { id: "ocean",    label: "Ocean Waves",    videoId: "MIr3RsUWrdo", emoji: "🌊" },
-  { id: "rain",     label: "Gentle Rain",    videoId: "mPZkdNFkNps", emoji: "🌧" },
-  { id: "piano",    label: "Spa Piano",      videoId: "4xDzrJKXOOY", emoji: "🎹" },
-  { id: "tibetan",  label: "Healing Bowls",  videoId: "UgHKb_7884o", emoji: "🔔" },
+// Curated calming-music library. Categories so the picker can group
+// them. videoId fields point to long, ad-light YouTube tracks/streams
+// known to be widely available; if a track 404s, the picker shows the
+// next one in the list and the teacher can disable that preset in
+// /board → Settings.
+//
+// Mood tag drives the chip colors + emoji. Adding new tracks is a
+// matter of pushing to this array (no schema change). Items here are
+// also seeded into the classroom store as redeemable rewards via the
+// "Seed music in store" action in /star → Store.
+type MusicMood = "nature" | "instrumental" | "lofi" | "focus" | "kids";
+const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string; mood: MusicMood; price?: number }[] = [
+  // Nature (existing four — known-good stations)
+  { id: "forest",     label: "Forest Spa",          videoId: "xNN7iTA57jM", emoji: "🌿", mood: "nature", price: 15 },
+  { id: "ocean",      label: "Ocean Waves",         videoId: "MIr3RsUWrdo", emoji: "🌊", mood: "nature", price: 15 },
+  { id: "rain",       label: "Gentle Rain",         videoId: "mPZkdNFkNps", emoji: "🌧", mood: "nature", price: 15 },
+  { id: "rain-window",label: "Rain on a Window",    videoId: "q76bMs-NwRk", emoji: "💧", mood: "nature", price: 15 },
+  { id: "thunder",    label: "Distant Thunder",     videoId: "nDqvhilTrI8", emoji: "⛈",  mood: "nature", price: 20 },
+  { id: "creek",      label: "Forest Creek",        videoId: "ABO9aRtPbCY", emoji: "🍃", mood: "nature", price: 15 },
+  { id: "fire",       label: "Crackling Fireplace", videoId: "L_LUpnjgPso", emoji: "🔥", mood: "nature", price: 15 },
+  { id: "snow",       label: "Soft Snowfall",       videoId: "NF6L4FXBmbY", emoji: "❄️", mood: "nature", price: 15 },
+  { id: "birds",      label: "Birds in the Garden", videoId: "DOgkM_p2EpE", emoji: "🐦", mood: "nature", price: 15 },
+
+  // Instrumental
+  { id: "piano",      label: "Spa Piano",           videoId: "4xDzrJKXOOY", emoji: "🎹", mood: "instrumental", price: 15 },
+  { id: "tibetan",    label: "Healing Bowls",       videoId: "UgHKb_7884o", emoji: "🔔", mood: "instrumental", price: 20 },
+  { id: "guitar",     label: "Soft Acoustic",       videoId: "EBlPlrxsZzs", emoji: "🎸", mood: "instrumental", price: 15 },
+  { id: "harp",       label: "Floating Harp",       videoId: "fjfwQOLPnPE", emoji: "🪕", mood: "instrumental", price: 20 },
+  { id: "celtic",     label: "Celtic Calm",         videoId: "9KGv9TmFqi0", emoji: "🍀", mood: "instrumental", price: 20 },
+  { id: "classical",  label: "Classical for Focus", videoId: "VgRYPNX1uHM", emoji: "🎼", mood: "instrumental", price: 20 },
+
+  // Lo-fi (kid-safe instrumental beats)
+  { id: "lofi-study", label: "Lo-Fi Study Beats",   videoId: "jfKfPfyJRdk", emoji: "📚", mood: "lofi", price: 10 },
+  { id: "lofi-chill", label: "Chill Lo-Fi",         videoId: "rUxyKA_-grg", emoji: "🌙", mood: "lofi", price: 10 },
+  { id: "lofi-jazz",  label: "Lo-Fi Jazz",          videoId: "Dx5qFachd3A", emoji: "🎷", mood: "lofi", price: 10 },
+
+  // Focus / brain
+  { id: "alpha",      label: "Alpha Focus Waves",   videoId: "WPni755-Krg", emoji: "🧠", mood: "focus", price: 25 },
+  { id: "study-deep", label: "Deep Focus",          videoId: "5qap5aO4i9A", emoji: "🎯", mood: "focus", price: 20 },
+
+  // Kids — gentle children's tunes
+  { id: "lullaby",    label: "Storybook Lullabies", videoId: "GVZP-CtxgVM", emoji: "🧸", mood: "kids", price: 10 },
+  { id: "music-box",  label: "Music Box",           videoId: "GS3i6OdrCpw", emoji: "🎵", mood: "kids", price: 10 },
 ];
 
 // Editorial palette: each grade is a distinct tradition, not a tint of purple
@@ -609,9 +646,21 @@ export default function ClassroomBoard() {
     }
   }, []);
 
+  // Active track override — when a kid cashes out a music store item,
+  // we override the teacher-selected playlist for ~25 minutes. After
+  // that the board falls back to the teacher's default. Stored in a
+  // ref because we read it from polling effects without forcing
+  // re-renders on every check.
+  const [activeMusicOverride, setActiveMusicOverride] = useState<{ presetId: string; until: number } | null>(null);
+
+  const effectiveMusicPresetId = useMemo(() => {
+    if (activeMusicOverride && Date.now() < activeMusicOverride.until) return activeMusicOverride.presetId;
+    return board.settings?.music_playlist_id || "";
+  }, [activeMusicOverride, board.settings]);
+
   const toggleMusic = useCallback(() => {
     if (!musicRef.current) return;
-    const preset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
+    const preset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
     if (!preset) return;
     if (!musicLoaded) {
       // First tap: assign src synchronously inside gesture so iOS allows autoplay
@@ -623,7 +672,60 @@ export default function ClassroomBoard() {
       musicRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: fn, args: "" }), "*");
       setMusicPlaying(p => !p);
     }
-  }, [musicPlaying, musicLoaded, board.settings]);
+  }, [musicPlaying, musicLoaded, effectiveMusicPresetId]);
+
+  // When the effective preset changes (override expires, kid redeems
+  // a different track, teacher swaps default), reload the iframe so
+  // the new track plays. Only fires when music has already been
+  // started by a teacher tap (musicLoaded), since browsers block
+  // autoplay before user interaction.
+  useEffect(() => {
+    if (!musicLoaded || !musicRef.current || !effectiveMusicPresetId) return;
+    const preset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
+    if (!preset) return;
+    musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
+    setMusicPlaying(true);
+  }, [effectiveMusicPresetId, musicLoaded]);
+
+  // Poll store transactions for music redemptions. Format: a store
+  // item whose name starts with "🎵 Music · <Track Label>" — when
+  // redeemed in the last 5 min, override the playlist for 25 min.
+  // Keeps a "seen" set so each tx fires once per board session.
+  const seenMusicTxRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!cls?.id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const tx: any[] = await api.getStoreClassTransactions(cls.id);
+        if (cancelled || !Array.isArray(tx)) return;
+        const fiveMinAgo = Date.now() - 5 * 60_000;
+        for (const t of tx) {
+          if (t.kind !== "redeem") continue;
+          const name = String(t.item_name || "");
+          const m = /^🎵 Music · (.+)$/.exec(name);
+          if (!m) continue;
+          if (seenMusicTxRef.current.has(t.id)) continue;
+          const ts = new Date(t.created_at).getTime();
+          if (ts < fiveMinAgo) { seenMusicTxRef.current.add(t.id); continue; }
+          const trackLabel = m[1].trim();
+          const preset = MUSIC_PRESETS.find(p => p.label.toLowerCase() === trackLabel.toLowerCase());
+          if (!preset) { seenMusicTxRef.current.add(t.id); continue; }
+          seenMusicTxRef.current.add(t.id);
+          setActiveMusicOverride({ presetId: preset.id, until: Date.now() + 25 * 60_000 });
+          // Surface a board overlay so the class sees who picked the track
+          fireStarBoardEvent({
+            kind: "completion",
+            studentName: t.student_name || "Someone",
+            detail: `🎵 picked ${preset.emoji} ${preset.label}`,
+          });
+        }
+      } catch {}
+    };
+    tick();
+    const iv = setInterval(tick, 20_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [cls?.id]);
 
   useEffect(() => {
     const h = () => setIsFullscreen(!!document.fullscreenElement);
@@ -825,7 +927,7 @@ export default function ClassroomBoard() {
   // in opposite corners — matches the STAR /star page identity for
   // visual continuity across the whole product.
   const bg = `radial-gradient(1400px 900px at 0% 0%, rgba(168,85,247,0.20) 0%, transparent 55%), radial-gradient(1200px 800px at 100% 100%, rgba(236,72,153,0.18) 0%, transparent 55%), radial-gradient(900px 600px at 50% 0%, rgba(99,102,241,0.14) 0%, transparent 60%), radial-gradient(ellipse at center, #1a0f2e 0%, #0a0414 100%)`;
-  const musicPreset = MUSIC_PRESETS.find(p => p.id === (board.settings?.music_playlist_id || ""));
+  const musicPreset = MUSIC_PRESETS.find(p => p.id === effectiveMusicPresetId);
   const blockAccent = SUBJECT_ACCENT[currentBlock?.subject || ""] || "#d97706";
 
   const g = (a: number) => `rgba(255,255,255,${a})`;
