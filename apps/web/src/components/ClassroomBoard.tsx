@@ -15,6 +15,7 @@ import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/Boar
 import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
 import { getAllMusicPresets } from "../lib/musicPresets.ts";
+import { startSynth, type SynthHandle } from "../lib/musicSynth.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -619,12 +620,40 @@ export default function ClassroomBoard() {
     return board.settings?.music_playlist_id || "";
   }, [activeMusicOverride, board.settings]);
 
+  // Synth handle when the active preset is a Web Audio synth.
+  // Only one synth at a time; swapping presets stops the old one.
+  const synthRef = useRef<SynthHandle | null>(null);
+  const stopSynth = useCallback(() => {
+    if (synthRef.current) {
+      try { synthRef.current.stop(); } catch {}
+      synthRef.current = null;
+    }
+  }, []);
+
   const toggleMusic = useCallback(() => {
-    if (!musicRef.current) return;
     const preset = getAllMusicPresets().find(p => p.id === effectiveMusicPresetId);
     if (!preset) return;
+
+    // Synth path — Web Audio. No iframe needed.
+    if (preset.synth) {
+      // Always stop any iframe music.
+      if (musicRef.current) musicRef.current.src = "about:blank";
+      if (synthRef.current && musicPlaying) {
+        stopSynth();
+        setMusicPlaying(false);
+      } else {
+        stopSynth();
+        synthRef.current = startSynth(preset.synth, { volume: 0.40 });
+        setMusicLoaded(true);
+        setMusicPlaying(true);
+      }
+      return;
+    }
+
+    // YouTube path
+    if (!musicRef.current) return;
+    if (synthRef.current) stopSynth();
     if (!musicLoaded) {
-      // First tap: assign src synchronously inside gesture so iOS allows autoplay
       musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
       setMusicLoaded(true);
       setMusicPlaying(true);
@@ -633,20 +662,33 @@ export default function ClassroomBoard() {
       musicRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: fn, args: "" }), "*");
       setMusicPlaying(p => !p);
     }
-  }, [musicPlaying, musicLoaded, effectiveMusicPresetId]);
+  }, [musicPlaying, musicLoaded, effectiveMusicPresetId, stopSynth]);
 
   // When the effective preset changes (override expires, kid redeems
-  // a different track, teacher swaps default), reload the iframe so
-  // the new track plays. Only fires when music has already been
-  // started by a teacher tap (musicLoaded), since browsers block
-  // autoplay before user interaction.
+  // a different track, teacher swaps default), swap source. Only
+  // fires when music has already been started by a teacher tap
+  // (musicLoaded), since browsers block autoplay before user interaction.
   useEffect(() => {
-    if (!musicLoaded || !musicRef.current || !effectiveMusicPresetId) return;
+    if (!musicLoaded || !effectiveMusicPresetId) return;
     const preset = getAllMusicPresets().find(p => p.id === effectiveMusicPresetId);
     if (!preset) return;
-    musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
-    setMusicPlaying(true);
-  }, [effectiveMusicPresetId, musicLoaded]);
+
+    if (preset.synth) {
+      // Tear down iframe + start synth
+      if (musicRef.current) musicRef.current.src = "about:blank";
+      stopSynth();
+      synthRef.current = startSynth(preset.synth, { volume: 0.40 });
+      setMusicPlaying(true);
+    } else if (musicRef.current && preset.videoId) {
+      // Tear down synth + start iframe
+      stopSynth();
+      musicRef.current.src = `https://www.youtube-nocookie.com/embed/${preset.videoId}?autoplay=1&loop=1&playlist=${preset.videoId}&enablejsapi=1`;
+      setMusicPlaying(true);
+    }
+  }, [effectiveMusicPresetId, musicLoaded, stopSynth]);
+
+  // Stop synth on unmount.
+  useEffect(() => () => stopSynth(), [stopSynth]);
 
   // Poll store transactions for music redemptions. Format: a store
   // item whose name starts with "🎵 Music · <Track Label>" — when

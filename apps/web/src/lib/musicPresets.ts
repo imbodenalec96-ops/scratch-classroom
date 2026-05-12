@@ -11,31 +11,47 @@
 // merged; consumers should call getAllMusicPresets() to read the
 // merged list, NOT MUSIC_PRESETS directly.
 
-export type MusicMood = "nature" | "instrumental" | "lofi" | "focus" | "kids" | "custom";
+export type MusicMood = "nature" | "instrumental" | "lofi" | "focus" | "kids" | "custom" | "synth";
+import type { SynthKind } from "./musicSynth.ts";
 
 export interface MusicPreset {
   id: string;
   label: string;
-  videoId: string;
   emoji: string;
   mood: MusicMood;
   /** Default cash-out price when seeded into the store. */
   price: number;
+  /** YouTube video id — set when source is YouTube. */
+  videoId?: string;
+  /** Web Audio synth kind — set when source is local synthesis. */
+  synth?: SynthKind;
   /** Set true on teacher-added entries from localStorage. */
   isCustom?: boolean;
 }
 
-// Verified bundled set — the 5 originals plus the famous Lofi Girl
-// stream (jfKfPfyJRdk has been live for years). Anything beyond this
-// the teacher should add via the custom picker so the URL is
-// guaranteed to be one she's pasted herself.
+// Verified bundled set. Two flavors:
+//   YouTube tracks — long-form streams that have been live for years.
+//   Synth tracks   — generated client-side via Web Audio. CANNOT 404
+//                    since they're produced on the device. Loop forever,
+//                    work offline, no copyright risk.
 export const MUSIC_PRESETS: MusicPreset[] = [
+  // YouTube tracks
   { id: "forest",     label: "Forest Spa",        videoId: "xNN7iTA57jM", emoji: "🌿", mood: "nature",       price: 15 },
   { id: "ocean",      label: "Ocean Waves",       videoId: "MIr3RsUWrdo", emoji: "🌊", mood: "nature",       price: 15 },
   { id: "rain",       label: "Gentle Rain",       videoId: "mPZkdNFkNps", emoji: "🌧", mood: "nature",       price: 15 },
   { id: "piano",      label: "Spa Piano",         videoId: "4xDzrJKXOOY", emoji: "🎹", mood: "instrumental", price: 15 },
   { id: "tibetan",    label: "Healing Bowls",     videoId: "UgHKb_7884o", emoji: "🔔", mood: "instrumental", price: 20 },
   { id: "lofi-study", label: "Lo-Fi Study Beats", videoId: "jfKfPfyJRdk", emoji: "📚", mood: "lofi",         price: 10 },
+
+  // Synth — guaranteed to work, generated on device
+  { id: "synth-rain",      label: "Synth Rain",       synth: "rain",         emoji: "💧", mood: "synth", price: 5  },
+  { id: "synth-waves",     label: "Synth Ocean",      synth: "waves",        emoji: "🌊", mood: "synth", price: 5  },
+  { id: "synth-fan",       label: "Soft Fan Hum",     synth: "fan",          emoji: "🌀", mood: "synth", price: 5  },
+  { id: "synth-pink",      label: "Pink Noise",       synth: "pink-noise",   emoji: "🟣", mood: "synth", price: 5  },
+  { id: "synth-brown",     label: "Brown Noise",      synth: "brown-noise",  emoji: "🟤", mood: "synth", price: 5  },
+  { id: "synth-white",     label: "White Noise",      synth: "white-noise",  emoji: "⚪", mood: "synth", price: 5  },
+  { id: "synth-bowl",      label: "Singing Bowl",     synth: "bowl",         emoji: "🔔", mood: "synth", price: 8  },
+  { id: "synth-heartbeat", label: "Slow Heartbeat",   synth: "heartbeat",    emoji: "❤️", mood: "synth", price: 8  },
 ];
 
 export const MOOD_LABELS: Record<MusicMood, string> = {
@@ -45,6 +61,7 @@ export const MOOD_LABELS: Record<MusicMood, string> = {
   focus: "Focus",
   kids: "Kids",
   custom: "Custom",
+  synth: "Synth (offline)",
 };
 
 // Custom tracks stored in localStorage so they persist per device but
