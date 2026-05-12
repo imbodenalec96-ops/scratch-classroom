@@ -250,6 +250,23 @@ export default function StarScanner() {
             }
           } catch {}
         }
+        // STILL missing? This is the "I minted on this device but
+        // the relay never picked it up" case. Force-push every
+        // local assignment barcode now, then look one more time.
+        // Most of the time this rescues the scan without showing
+        // the not-found overlay.
+        if (!server && !entry) {
+          try {
+            const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
+            const r = await pushAllLocalBarcodes();
+            if (r.pushed > 0) {
+              await new Promise((res) => setTimeout(res, 400));
+              const refreshed = StarStore.getBcDB();
+              if (refreshed[v]) entry = refreshed[v];
+              else server = await lookupBarcodeOnServer(v);
+            }
+          } catch {}
+        }
         const final = entry || server || undefined;
         if (final) {
           successBeep();

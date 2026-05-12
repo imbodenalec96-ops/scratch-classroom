@@ -180,11 +180,22 @@ export default function App() {
     return () => clearInterval(iv);
   }, []);
 
-  // Bootstrap the STAR cross-device relay on app load: store the user's
-  // first class id in localStorage so save events POST + the board polls.
+  // Bootstrap the STAR cross-device relay on app load: store the
+  // user's first class id in localStorage so save events POST + the
+  // board polls. Then immediately push every QZ/AS/WR/SP/SE/SO/etc.
+  // barcode in local bcDB to the server. This is the safety net for
+  // assignments minted on this device that never made it to the
+  // relay (race conditions / old code / quota errors) — runs on
+  // EVERY app load, not just when the teacher visits /star.
   useEffect(() => {
-    starApi.getClasses().then((cs: any[]) => {
-      if (Array.isArray(cs) && cs[0]?.id) setActiveClassId(cs[0].id);
+    starApi.getClasses().then(async (cs: any[]) => {
+      if (Array.isArray(cs) && cs[0]?.id) {
+        setActiveClassId(cs[0].id);
+        try {
+          const { pushAllLocalBarcodes } = await import("./lib/star/barcodeRelay.ts");
+          await pushAllLocalBarcodes();
+        } catch {}
+      }
     }).catch(() => {});
   }, []);
 

@@ -147,6 +147,24 @@ export default function StarPhonePage() {
       } catch {}
       refreshCounts();
     }
+    // 4. Force-push every local barcode + retry. Most common case:
+    //    the assignment was minted on THIS device but the relay
+    //    didn't push it (race / network / quota). Pushing rescues
+    //    the scan without falling to the unknown step.
+    if (!bc) {
+      try {
+        const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
+        const r = await pushAllLocalBarcodes();
+        if (r.pushed > 0) {
+          await new Promise((res) => setTimeout(res, 400));
+          bc = StarStore.getBcDB()[v] as BcEntry | undefined;
+          if (!bc) {
+            const remote = await lookupBarcodeOnServer(v);
+            if (remote) bc = remote;
+          }
+        }
+      } catch {}
+    }
     if (!bc) {
       errorBeep();
       setEntry(null);
@@ -285,14 +303,30 @@ export default function StarPhonePage() {
               {code}
             </div>
             <div style={{ fontSize: 13, marginBottom: 16, color: "rgba(245,241,232,0.85)", lineHeight: 1.5, fontWeight: 500 }}>
-              This phone has <b>{bcdbSize}</b> barcode{bcdbSize === 1 ? "" : "s"}.
-              If the barcode lives on your computer but isn't here, hit Sync to pull
-              the classroom roster + assignments. (STAR-locally-generated barcodes
-              don't sync — open them on the same device they were created on.)
+              This phone has <b>{bcdbSize}</b> barcode{bcdbSize === 1 ? "" : "s"} cached.
+              If you just made this assignment on your <b>laptop</b>, it may not be on the
+              server yet. Open <b>/star</b> on the laptop and refresh — the catch-up sync
+              fires automatically, then scan again here.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button onClick={runSync} disabled={syncing} style={primary({ fullWidth: true, large: true })}>
-                {syncing ? "Syncing…" : "🔄 Sync from Classroom"}
+              <button
+                onClick={async () => {
+                  setSyncing(true);
+                  try {
+                    const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
+                    await pushAllLocalBarcodes();
+                    await runSync();
+                  } finally {
+                    setSyncing(false);
+                  }
+                }}
+                disabled={syncing}
+                style={primary({ fullWidth: true, large: true })}
+              >
+                {syncing ? "Working…" : "🚀 Push my barcodes + re-sync"}
+              </button>
+              <button onClick={runSync} disabled={syncing} style={ghost({ fullWidth: true })}>
+                {syncing ? "…" : "🔄 Sync only"}
               </button>
               <button onClick={reset} style={ghost({ fullWidth: true })}>← Try another barcode</button>
             </div>
