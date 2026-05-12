@@ -203,6 +203,38 @@ export default function TeacherStore() {
     }
   };
 
+  // Remove any "🎵 Music · ..." items in the store that don't match a
+  // current preset. Catches presets that got renamed / removed (e.g.
+  // when we trimmed the bundled list of unverified YouTube IDs).
+  const cleanStaleMusicItems = async () => {
+    const { getAllMusicPresets } = await import("../lib/musicPresets.ts");
+    const allowed = new Set(
+      getAllMusicPresets().map((m) => `🎵 Music · ${m.label}`.toLowerCase())
+    );
+    const stale = items.filter((it) =>
+      it.name.toLowerCase().startsWith("🎵 music · ") && !allowed.has(it.name.toLowerCase())
+    );
+    if (stale.length === 0) {
+      showFlash("No stale music items found");
+      return;
+    }
+    if (!window.confirm(`Remove ${stale.length} stale music item${stale.length === 1 ? "" : "s"}? This deletes them from the store but doesn't touch any redemptions kids have already made.`)) return;
+    setBulkBusy(true);
+    try {
+      let removed = 0;
+      for (const it of stale) {
+        try {
+          await api.deleteStoreItem(it.id);
+          removed += 1;
+        } catch {}
+      }
+      setItems((list) => list.filter((it) => !stale.some((s) => s.id === it.id)));
+      showFlash(`Removed ${removed} stale music item${removed === 1 ? "" : "s"}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const removeItem = async (it: StoreItem) => {
     if (!window.confirm(`Delete ${it.name}? This can't be undone.`)) return;
     const before = items;
@@ -411,7 +443,7 @@ export default function TeacherStore() {
         </div>
 
         {/* Bulk seeders */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
           <button
             onClick={seedMusicItems}
             disabled={bulkBusy}
@@ -421,13 +453,26 @@ export default function TeacherStore() {
               color: "white",
               boxShadow: "0 2px 12px rgba(168,85,247,0.30)",
             }}
-            title="Adds 22 calming music tracks as redeemable store items. When kids cash out for one, the board switches to that track for ~25 minutes."
+            title="Adds every current music preset (bundled + your custom tracks) to the store as a redeemable item."
           >
             🎵 Seed music in store
           </button>
-          <span className="text-xs" style={{ color: "var(--t3)" }}>
-            6 verified tracks + your custom YouTube tracks (added via /board → Settings). Kids cash out points to switch the board music for 25 min.
-          </span>
+          <button
+            onClick={cleanStaleMusicItems}
+            disabled={bulkBusy}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+            style={{
+              background: "rgba(239,68,68,0.10)",
+              color: "#fca5a5",
+              border: "1px solid rgba(239,68,68,0.40)",
+            }}
+            title="Removes any 🎵 Music · ... items that don't match a current music preset. Use after dropping or renaming tracks."
+          >
+            🧹 Clean stale music items
+          </button>
+        </div>
+        <div className="text-xs mb-4" style={{ color: "var(--t3)" }}>
+          6 verified YouTube tracks + 7 synth-on-device tracks + any custom YouTube tracks you've added (via /board → Settings). Kids cash out points to switch the board music for 25 min. Hit "Clean stale" if you've changed the music list and want old store items removed.
         </div>
 
         {/* Item list */}

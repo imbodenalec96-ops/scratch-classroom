@@ -5,6 +5,15 @@
 //
 // Each generator returns a stop() function. AudioContext lifecycle
 // is managed by the caller (one ctx per active sound is fine).
+//
+// Tuning notes:
+//  - All sounds are mastered through a -3dB shelf so high frequencies
+//    don't sound harsh on tinny classroom speakers.
+//  - Default master gain is 0.18 (down from 0.40) so they sit under
+//    voice without being startling. The teacher's hardware volume is
+//    the real volume control.
+//  - "Noise" presets are pink/brown only — pure white noise was
+//    rejected as too harsh and removed from the bundled list.
 
 export type SynthKind =
   | "white-noise"
@@ -80,82 +89,109 @@ export function startSynth(kind: SynthKind, opts: { volume?: number } = {}): Syn
   const ctx = makeContext();
   const master = ctx.createGain();
   master.gain.value = 0;
-  master.connect(ctx.destination);
-  const targetVol = opts.volume ?? 0.40;
+  // Global high-shelf cut so nothing sounds tinny on small speakers.
+  const highShelf = ctx.createBiquadFilter();
+  highShelf.type = "highshelf"; highShelf.frequency.value = 4000; highShelf.gain.value = -6;
+  master.connect(highShelf).connect(ctx.destination);
+  const targetVol = opts.volume ?? 0.18;
 
   // Track all nodes so stop() can clean them up.
   const cleanup: Array<() => void> = [];
 
   if (kind === "white-noise" || kind === "pink-noise" || kind === "brown-noise") {
     const noiseKind = kind === "white-noise" ? "white" : kind === "pink-noise" ? "pink" : "brown";
-    const src = loopNoise(ctx, noiseKind, master);
+    // Pre-filter for warmth — even the "raw" noise tracks get a gentle
+    // rolloff so they don't shred eardrums on classroom speakers.
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoiseBuffer(ctx, noiseKind);
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = noiseKind === "white" ? 5500 : noiseKind === "pink" ? 4000 : 1500;
+    src.connect(lp).connect(master);
+    src.start();
     cleanup.push(() => { try { src.stop(); } catch {} });
   }
   else if (kind === "rain") {
-    // Pink noise heavily low-passed, with a sprinkle of high-frequency
-    // clicks for the patter on a roof.
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 1100;
-    const noise = ctx.createBufferSource();
-    noise.buffer = makeNoiseBuffer(ctx, "pink");
-    noise.loop = true;
-    noise.connect(lp).connect(master);
-    noise.start();
-    // Click sprinkles via short envelopes on filtered white noise.
-    const clickBuf = makeNoiseBuffer(ctx, "white");
-    const dripTimer = window.setInterval(() => {
-      const drip = ctx.createBufferSource();
-      drip.buffer = clickBuf;
-      const dripLP = ctx.createBiquadFilter();
-      dripLP.type = "highpass"; dripLP.frequency.value = 2200;
-      const dripGain = ctx.createGain();
-      dripGain.gain.setValueAtTime(0.0, ctx.currentTime);
-      dripGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.005);
-      dripGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.06);
-      drip.connect(dripLP).connect(dripGain).connect(master);
-      const start = ctx.currentTime + Math.random() * 0.05;
-      drip.start(start);
-      drip.stop(start + 0.08);
-    }, 90);
-    cleanup.push(() => { try { noise.stop(); } catch {}; window.clearInterval(dripTimer); });
+    // Two layers of filtered noise for depth — low rumble + mid hiss.
+    // No "drip" clicks; they sounded like rim shots on small speakers.
+    const rumble = ctx.createBufferSource();
+    rumble.buffer = makeNoiseBuffer(ctx, "brown");
+    rumble.loop = true;
+    const rumbleLP = ctx.createBiquadFilter();
+    rumbleLP.type = "lowpass"; rumbleLP.frequency.value = 350;
+    const rumbleGain = ctx.createGain(); rumbleGain.gain.value = 0.55;
+    rumble.connect(rumbleLP).connect(rumbleGain).connect(master);
+    rumble.start();
+
+    const hiss = ctx.createBufferSource();
+    hiss.buffer = makeNoiseBuffer(ctx, "pink");
+    hiss.loop = true;
+    const hissLP = ctx.createBiquadFilter();
+    hissLP.type = "lowpass"; hissLP.frequency.value = 2500;
+    const hissHP = ctx.createBiquadFilter();
+    hissHP.type = "highpass"; hissHP.frequency.value = 400;
+    const hissGain = ctx.createGain(); hissGain.gain.value = 0.35;
+    hiss.connect(hissHP).connect(hissLP).connect(hissGain).connect(master);
+    hiss.start();
+
+    cleanup.push(() => {
+      try { rumble.stop(); } catch {}
+      try { hiss.stop(); } catch {}
+    });
   }
   else if (kind === "waves") {
-    // Brown noise modulated by a slow LFO for the swell + retreat.
+    // Brown noise heavily low-passed + slow LFO swell. Adds a sub-LFO
+    // on the filter cutoff so the "wash" follows the volume swell —
+    // sounds way more like a real wave than a static-volume swell.
     const noise = ctx.createBufferSource();
     noise.buffer = makeNoiseBuffer(ctx, "brown");
     noise.loop = true;
     const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass"; lp.frequency.value = 800;
+    lp.type = "lowpass"; lp.frequency.value = 500;
     const swell = ctx.createGain();
-    swell.gain.value = 0.5;
+    swell.gain.value = 0.35;
     noise.connect(lp).connect(swell).connect(master);
     noise.start();
-    // LFO oscillator → swell.gain so the waves rise and fall every 9 sec.
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.11; // ~9 sec period
-    lfoGain.gain.value = 0.45;
-    lfo.connect(lfoGain).connect(swell.gain);
-    lfo.start();
+    // Volume LFO: slow, 11-second period.
+    const volLfo = ctx.createOscillator();
+    const volLfoGain = ctx.createGain();
+    volLfo.frequency.value = 0.09;
+    volLfoGain.gain.value = 0.30;
+    volLfo.connect(volLfoGain).connect(swell.gain);
+    volLfo.start();
+    // Filter LFO: same period, opens up slightly during the swell.
+    const filtLfo = ctx.createOscillator();
+    const filtLfoGain = ctx.createGain();
+    filtLfo.frequency.value = 0.09;
+    filtLfoGain.gain.value = 200;
+    filtLfo.connect(filtLfoGain).connect(lp.frequency);
+    filtLfo.start();
     cleanup.push(() => {
       try { noise.stop(); } catch {}
-      try { lfo.stop(); } catch {}
+      try { volLfo.stop(); } catch {}
+      try { filtLfo.stop(); } catch {}
     });
   }
   else if (kind === "fan") {
-    // White noise low-passed to fan-blade hum.
+    // Soft fan: brown noise heavily low-passed (no high-pitched whine).
     const noise = ctx.createBufferSource();
-    noise.buffer = makeNoiseBuffer(ctx, "white");
+    noise.buffer = makeNoiseBuffer(ctx, "brown");
     noise.loop = true;
     const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass"; lp.frequency.value = 600;
-    noise.connect(lp).connect(master);
+    lp.type = "lowpass"; lp.frequency.value = 350;
+    const g = ctx.createGain(); g.gain.value = 0.7;
+    noise.connect(lp).connect(g).connect(master);
     noise.start();
     cleanup.push(() => { try { noise.stop(); } catch {} });
   }
   else if (kind === "heartbeat") {
-    // Soft bass thump every ~1 sec, gentler thump 0.3s after.
+    // Soft bass thump (lub-DUB) every ~1.1 sec at resting pulse.
+    // Filtered through a low-pass so it doesn't click — sounds more
+    // like a chest sound than a synth blip.
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 250;
+    lp.connect(master);
     const beatTimer = window.setInterval(() => {
       const t = ctx.currentTime;
       const beat = (when: number, freq: number, amp: number, dur: number) => {
@@ -163,44 +199,68 @@ export function startSynth(kind: SynthKind, opts: { volume?: number } = {}): Syn
         const g = ctx.createGain();
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, t + when);
-        osc.frequency.exponentialRampToValueAtTime(freq * 0.6, t + when + dur);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + when + dur);
         g.gain.setValueAtTime(0, t + when);
-        g.gain.linearRampToValueAtTime(amp, t + when + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, t + when + dur);
-        osc.connect(g).connect(master);
+        g.gain.linearRampToValueAtTime(amp, t + when + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + when + dur);
+        osc.connect(g).connect(lp);
         osc.start(t + when);
-        osc.stop(t + when + dur + 0.05);
+        osc.stop(t + when + dur + 0.1);
       };
-      beat(0, 60, 0.7, 0.18);
-      beat(0.32, 55, 0.5, 0.14);
-    }, 980);
+      beat(0, 75, 0.55, 0.22);    // lub
+      beat(0.28, 65, 0.40, 0.20); // DUB
+    }, 1100);
     cleanup.push(() => window.clearInterval(beatTimer));
   }
   else if (kind === "bowl") {
-    // Continuous singing-bowl drone — low fundamental + harmonic ring.
-    const fundamentals = [110, 165, 220];
+    // Singing bowl: triangle waves on near-harmonic ratios with a
+    // soft attack on each oscillator + slow detune shimmer. Triangle
+    // sounds more "metal-ringing" than pure sine.
     const oscs: OscillatorNode[] = [];
-    fundamentals.forEach((f, i) => {
+    const gains: GainNode[] = [];
+    const partials = [
+      { freq: 220, amp: 0.32 },   // fundamental
+      { freq: 330, amp: 0.18 },   // perfect fifth
+      { freq: 440, amp: 0.12 },   // octave
+      { freq: 660, amp: 0.06 },   // 2nd fifth, sparkle
+    ];
+    partials.forEach(({ freq, amp }) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = f;
-      g.gain.value = i === 0 ? 0.30 : i === 1 ? 0.18 : 0.10;
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      g.gain.value = 0;
+      // Soft 1s attack so it doesn't pop in.
+      g.gain.linearRampToValueAtTime(amp, ctx.currentTime + 1.0);
       osc.connect(g).connect(master);
       osc.start();
       oscs.push(osc);
+      gains.push(g);
     });
-    // Slow shimmer: an LFO modulates each oscillator's detune.
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.15;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 6;
-    lfo.connect(lfoGain);
-    oscs.forEach((o) => lfoGain.connect((o as any).detune));
-    lfo.start();
+    // Slow shimmer detune (cents). Different LFO speed per partial
+    // so they breathe independently.
+    const lfos: OscillatorNode[] = [];
+    oscs.forEach((o, i) => {
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.value = 0.10 + i * 0.07;
+      lfoGain.gain.value = 4 + i * 2;
+      lfo.connect(lfoGain).connect((o as any).detune);
+      lfo.start();
+      lfos.push(lfo);
+    });
     cleanup.push(() => {
-      oscs.forEach((o) => { try { o.stop(); } catch {} });
-      try { lfo.stop(); } catch {}
+      gains.forEach((g) => {
+        try {
+          const t = ctx.currentTime;
+          g.gain.cancelScheduledValues(t);
+          g.gain.linearRampToValueAtTime(0, t + 0.4);
+        } catch {}
+      });
+      window.setTimeout(() => {
+        oscs.forEach((o) => { try { o.stop(); } catch {} });
+        lfos.forEach((o) => { try { o.stop(); } catch {} });
+      }, 450);
     });
   }
 

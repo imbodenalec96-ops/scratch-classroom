@@ -43,15 +43,16 @@ export const MUSIC_PRESETS: MusicPreset[] = [
   { id: "tibetan",    label: "Healing Bowls",     videoId: "UgHKb_7884o", emoji: "🔔", mood: "instrumental", price: 20 },
   { id: "lofi-study", label: "Lo-Fi Study Beats", videoId: "jfKfPfyJRdk", emoji: "📚", mood: "lofi",         price: 10 },
 
-  // Synth — guaranteed to work, generated on device
-  { id: "synth-rain",      label: "Synth Rain",       synth: "rain",         emoji: "💧", mood: "synth", price: 5  },
-  { id: "synth-waves",     label: "Synth Ocean",      synth: "waves",        emoji: "🌊", mood: "synth", price: 5  },
-  { id: "synth-fan",       label: "Soft Fan Hum",     synth: "fan",          emoji: "🌀", mood: "synth", price: 5  },
-  { id: "synth-pink",      label: "Pink Noise",       synth: "pink-noise",   emoji: "🟣", mood: "synth", price: 5  },
-  { id: "synth-brown",     label: "Brown Noise",      synth: "brown-noise",  emoji: "🟤", mood: "synth", price: 5  },
-  { id: "synth-white",     label: "White Noise",      synth: "white-noise",  emoji: "⚪", mood: "synth", price: 5  },
-  { id: "synth-bowl",      label: "Singing Bowl",     synth: "bowl",         emoji: "🔔", mood: "synth", price: 8  },
-  { id: "synth-heartbeat", label: "Slow Heartbeat",   synth: "heartbeat",    emoji: "❤️", mood: "synth", price: 8  },
+  // Synth — generated on device, guaranteed to work, no internet.
+  // White-noise dropped — too harsh on classroom speakers. Pink and
+  // brown stay (warmer + better for sensory regulation).
+  { id: "synth-rain",      label: "Calm Rain",        synth: "rain",         emoji: "💧", mood: "synth", price: 5 },
+  { id: "synth-waves",     label: "Slow Ocean Waves", synth: "waves",        emoji: "🌊", mood: "synth", price: 5 },
+  { id: "synth-fan",       label: "Box Fan Hum",      synth: "fan",          emoji: "🌀", mood: "synth", price: 5 },
+  { id: "synth-pink",      label: "Pink Noise",       synth: "pink-noise",   emoji: "🟣", mood: "synth", price: 5 },
+  { id: "synth-brown",     label: "Deep Brown Noise", synth: "brown-noise",  emoji: "🟤", mood: "synth", price: 5 },
+  { id: "synth-bowl",      label: "Singing Bowl",     synth: "bowl",         emoji: "🔔", mood: "synth", price: 8 },
+  { id: "synth-heartbeat", label: "Resting Heartbeat", synth: "heartbeat",   emoji: "❤️", mood: "synth", price: 8 },
 ];
 
 export const MOOD_LABELS: Record<MusicMood, string> = {
