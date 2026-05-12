@@ -10,7 +10,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { api } from "../../lib/api.ts";
 import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
-import BehaviorScanModal from "./BehaviorScanModal.tsx";
+import BehaviorScanModal, { openIncidentPrintWindow } from "./BehaviorScanModal.tsx";
 
 interface Props {
   studentId: string;
@@ -82,6 +82,11 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId, logTick]);
+
+  // Behavior history range — defaults to "week" so the teacher
+  // walking up with this kid's folder sees the past 7 days right
+  // away. "All" reads every entry on file for the kid.
+  const [historyRange, setHistoryRange] = useState<"today" | "week" | "month" | "all">("week");
 
   // Quick-log time picker — defaults to "now" but the teacher can
   // backdate via a -5m / -10m / -15m chip when she's logging an
@@ -451,6 +456,157 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
             </div>
           )}
         </Section>
+
+        {/* BEHAVIOR HISTORY — every prior log entry for this kid in
+            the chosen range, grouped by date, each row reopens the
+            official incident print on tap of 🖨. This is what the
+            teacher pulls up when an admin / parent meeting starts and
+            she needs to walk through what happened. */}
+        {(() => {
+          const allForKid = StarStore.getBehaviorLog()
+            .filter((e) => e.studentId === studentId)
+            .sort((a, b) => b.ts.localeCompare(a.ts));
+          // logTick is referenced to force re-read after a quick log.
+          void logTick;
+          const startISO = (() => {
+            if (historyRange === "all") return "";
+            const d = new Date(Date.now() - 7 * 3600_000);
+            if (historyRange === "today") return d.toISOString().slice(0, 10);
+            if (historyRange === "week")  { d.setUTCDate(d.getUTCDate() - 6);  return d.toISOString().slice(0, 10); }
+            d.setUTCDate(d.getUTCDate() - 29); return d.toISOString().slice(0, 10);
+          })();
+          const filtered = startISO ? allForKid.filter((e) => e.date >= startISO) : allForKid;
+          return (
+            <Section title="📜 Behavior history" count={filtered.length}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                {(["today", "week", "month", "all"] as const).map((r) => {
+                  const label = r === "today" ? "Today" : r === "week" ? "7 days" : r === "month" ? "30 days" : "All";
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => setHistoryRange(r)}
+                      style={{
+                        padding: "5px 11px", borderRadius: 999,
+                        background: historyRange === r ? "rgba(168,85,247,0.30)" : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${historyRange === r ? "rgba(168,85,247,0.55)" : "rgba(255,255,255,0.10)"}`,
+                        color: historyRange === r ? "#f9a8d4" : "rgba(245,241,232,0.65)",
+                        fontSize: 11, fontWeight: 800, cursor: "pointer",
+                      }}
+                    >{label}</button>
+                  );
+                })}
+                <div style={{ marginLeft: "auto", fontSize: 10, color: "rgba(196,181,253,0.55)" }}>
+                  Tap 🖨 on a row to reopen the official report
+                </div>
+              </div>
+              {filtered.length === 0 ? (
+                <Empty>No behaviors logged in this range.</Empty>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
+                  {(() => {
+                    const nodes: React.ReactNode[] = [];
+                    let lastDate = "";
+                    for (const e of filtered) {
+                      const def = defs.find((d) => d.id === e.defId);
+                      if (!def) continue;
+                      if (e.date !== lastDate) {
+                        lastDate = e.date;
+                        const dLabel = new Date(`${e.date}T12:00:00Z`).toLocaleDateString("en-US", {
+                          weekday: "short", month: "short", day: "numeric", year: "numeric",
+                        });
+                        nodes.push(
+                          <div key={`hdr-${e.date}`} style={{
+                            fontSize: 10, fontWeight: 800, letterSpacing: "0.14em",
+                            textTransform: "uppercase", color: "#f9a8d4",
+                            padding: "10px 4px 4px",
+                            borderBottom: "1px solid rgba(168,85,247,0.18)",
+                            marginTop: nodes.length === 0 ? 0 : 6,
+                          }}>{dLabel}</div>,
+                        );
+                      }
+                      const c = def.tone === "positive" ? "#10b981" : def.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+                      const ts = new Date(e.ts);
+                      const isFullReport =
+                        !!(e.antecedent || e.behaviorDetail || e.response || e.outcome ||
+                           e.severity   || e.location       || e.durationMin || e.followUp ||
+                           e.witnesses  || e.photoDataUrl   || e.photoPath   || e.parentNotified);
+                      nodes.push(
+                        <div key={e.id} style={{
+                          display: "grid",
+                          gridTemplateColumns: "auto 1fr auto auto auto",
+                          gap: 8, alignItems: "center",
+                          padding: "8px 10px", borderRadius: 8,
+                          background: "rgba(0,0,0,0.22)", borderLeft: `3px solid ${c}`,
+                        }}>
+                          <span style={{ fontSize: 18 }}>{def.emoji}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, color: "#fce7f3", fontWeight: 800, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}>
+                                {def.label}
+                              </span>
+                              {isFullReport && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+                                  padding: "1px 6px", borderRadius: 4,
+                                  background: "rgba(30,58,138,0.45)", color: "#bfdbfe",
+                                  border: "1px solid rgba(96,165,250,0.45)",
+                                }}>📄 FULL</span>
+                              )}
+                              {e.severity ? (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 800,
+                                  padding: "1px 6px", borderRadius: 4,
+                                  background: e.severity >= 4 ? "rgba(239,68,68,0.30)" : "rgba(245,158,11,0.25)",
+                                  color: e.severity >= 4 ? "#fca5a5" : "#fde68a",
+                                  border: `1px solid ${e.severity >= 4 ? "rgba(239,68,68,0.55)" : "rgba(245,158,11,0.45)"}`,
+                                }}>Lvl {e.severity}</span>
+                              ) : null}
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(196,181,253,0.65)", marginTop: 2, lineHeight: 1.35 }}>
+                              {e.note ? <i>"{e.note}" · </i> : null}
+                              {e.location ? `${e.location} · ` : ""}
+                              {e.durationMin ? `${e.durationMin} min · ` : ""}
+                              {e.parentNotified ? "parent notified · " : ""}
+                              {e.antecedent ? "ABC notes" : ""}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", fontFamily: "Menlo, monospace", whiteSpace: "nowrap" }}>
+                            {ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </span>
+                          <button
+                            onClick={() => { if (student) openIncidentPrintWindow(student, def, e); }}
+                            title="Reopen the official incident report (print-ready)"
+                            style={{
+                              padding: "6px 10px", borderRadius: 6,
+                              background: "rgba(30,58,138,0.30)",
+                              border: "1px solid rgba(96,165,250,0.45)",
+                              color: "#bfdbfe", fontSize: 13, cursor: "pointer", fontWeight: 800,
+                            }}
+                          >🖨</button>
+                          <button
+                            onClick={() => {
+                              if (!window.confirm(`Delete this ${def.label} entry from ${ts.toLocaleString()}?`)) return;
+                              StarStore.removeBehaviorEvent(e.id);
+                              setLogTick((t) => t + 1);
+                            }}
+                            title="Delete this entry"
+                            style={{
+                              padding: "6px 8px", borderRadius: 6,
+                              background: "rgba(239,68,68,0.18)",
+                              border: "1px solid rgba(239,68,68,0.40)",
+                              color: "#fca5a5", fontSize: 12, cursor: "pointer", fontWeight: 800,
+                            }}
+                          >✕</button>
+                        </div>,
+                      );
+                    }
+                    return nodes;
+                  })()}
+                </div>
+              )}
+            </Section>
+          );
+        })()}
 
         {/* NOTE DIALOG */}
         {noteOpen && (
