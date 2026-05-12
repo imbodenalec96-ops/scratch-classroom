@@ -23,6 +23,11 @@ interface Props {
   /** Pre-pick a student (e.g. when the scan came from a folder label
    *  context). Omit to show the picker. */
   prePickedStudentId?: string;
+  /** Force the full report form regardless of the behavior's tone.
+   *  Used when the teacher explicitly clicks "Write a full report"
+   *  from the folder modal. Default false: only challenge-tone
+   *  behaviors open the form; positive/neutral auto-quick-log. */
+  forceFullReport?: boolean;
 }
 
 const TONE_COLOR: Record<BehaviorDef["tone"], string> = {
@@ -35,14 +40,25 @@ const LOCATIONS = ["Classroom", "Hallway", "Specials", "Cafeteria", "Recess", "B
 
 const DEFAULT_REPORTER_KEY = "star_behavior_reporter_name";
 
-export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }: Props) {
+export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, forceFullReport }: Props) {
   const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
   const [defs] = useState<BehaviorDef[]>(() => StarStore.getBehaviorDefs());
   const def = useMemo(() => defs.find((d) => d.id === defId), [defs, defId]);
 
-  // Pick step → form step
+  // The full ABC report only makes sense for "challenge" behaviors
+  // — that's when teachers need to document antecedent / response /
+  // outcome / severity etc. Positive + neutral behaviors auto-
+  // quick-log instead. Override with forceFullReport from the
+  // folder modal's "Write a full report" button.
+  const isReportable = forceFullReport || def?.tone === "challenge";
+
+  // Pick step → form step. If the behavior isn't reportable AND a
+  // student is already pre-picked, we'll quick-log + close in an
+  // effect below so the teacher doesn't get a useless empty form.
   const [studentId, setStudentId] = useState<string>(prePickedStudentId || (def?.scope === "student" && def.studentId ? def.studentId : ""));
-  const [stage, setStage] = useState<"pick" | "form">(studentId ? "form" : "pick");
+  const [stage, setStage] = useState<"pick" | "form">(
+    studentId && isReportable ? "form" : "pick"
+  );
 
   // Form fields
   const [whenLocal, setWhenLocal] = useState<string>(() => {
@@ -131,6 +147,19 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Auto-quick-log + close when a non-reportable behavior (positive
+  // / neutral) is opened with a kid already pre-picked. There's no
+  // form to fill in those cases — just log and dismiss.
+  useEffect(() => {
+    if (!def || isReportable) return;
+    if (!prePickedStudentId) return;
+    StarStore.recordBehavior(def.id, prePickedStudentId);
+    successBeep();
+    loggedBeep();
+    setTimeout(() => onClose(), 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Listen for STU-{id} barcode scans on the keyboard. Hand-scanners
   // type the code character-by-character then press Enter — same as
@@ -306,7 +335,9 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
             🔍 <b style={{ color: "#f9a8d4" }}>Scan a folder label</b> (the kid's STU- barcode) to pick that student instantly — fastest way. Or tap a tile below.
           </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
-            Pick a kid · single-tap = quick log · "+" = full report
+            {isReportable
+              ? `Pick a kid · single-tap = quick log · "+" = full ABC report`
+              : `Pick a kid · single-tap to log this ${def.tone} behavior`}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
             {eligible.map((s) => (
@@ -331,17 +362,19 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
                   }}>{(s.firstName || "?")[0].toUpperCase()}</div>
                   <div style={{ fontSize: 13, fontWeight: 800 }}>{s.firstName}</div>
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setStudentId(s.id); setStage("form"); }}
-                  style={{
-                    position: "absolute", top: 4, right: 4,
-                    width: 24, height: 24, borderRadius: 6,
-                    background: `${c}33`, border: `1px solid ${c}77`,
-                    color: c, fontSize: 13, fontWeight: 900, cursor: "pointer",
-                  }}
-                  aria-label="Open full report form"
-                  title="Write a full incident report"
-                >+</button>
+                {isReportable && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setStudentId(s.id); setStage("form"); }}
+                    style={{
+                      position: "absolute", top: 4, right: 4,
+                      width: 24, height: 24, borderRadius: 6,
+                      background: `${c}33`, border: `1px solid ${c}77`,
+                      color: c, fontSize: 13, fontWeight: 900, cursor: "pointer",
+                    }}
+                    aria-label="Open full report form"
+                    title="Write a full incident report"
+                  >+</button>
+                )}
               </div>
             ))}
           </div>

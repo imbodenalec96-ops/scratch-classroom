@@ -267,45 +267,66 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
           </div>
         </Section>
 
-        {/* WRITE A FULL INCIDENT REPORT — opens the BehaviorScanModal */}
-        <Section title="📝 Full incident report" count={0}>
+        {/* WRITE A FULL INCIDENT REPORT — opens the BehaviorScanModal.
+            Reports are reserved for "challenge" tone only — that's
+            when ABC documentation makes sense. Positive + neutral
+            quick-log via the chips below. */}
+        <Section title="📝 Full incident report (challenge behaviors only)" count={0}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <button
-              onClick={() => setPickReportBehavior(true)}
-              disabled={visibleDefs.length === 0}
-              style={{
-                padding: "12px 16px", borderRadius: 12,
-                background: visibleDefs.length === 0
-                  ? "rgba(168,85,247,0.15)"
-                  : "linear-gradient(135deg, rgba(245,158,11,0.30), rgba(239,68,68,0.20))",
-                border: `1.5px solid ${visibleDefs.length === 0 ? "rgba(168,85,247,0.30)" : "rgba(245,158,11,0.60)"}`,
-                color: visibleDefs.length === 0 ? "rgba(245,241,232,0.45)" : "#fde68a",
-                fontWeight: 800, fontSize: 14, cursor: visibleDefs.length === 0 ? "not-allowed" : "pointer",
-                textAlign: "left", display: "flex", alignItems: "center", gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 22 }}>📈</span>
-              <div style={{ flex: 1 }}>
-                <div>Write a full ABC incident report</div>
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.75, marginTop: 2 }}>
-                  {visibleDefs.length === 0 ? "No behaviors defined yet — open /star → 📈 Behavior" : "Antecedent · Behavior · Consequence + severity, points, parent notify, follow-up"}
+            {(() => {
+              const hasChallenge = visibleDefs.some((d) => d.tone === "challenge");
+              return (
+              <button
+                onClick={() => setPickReportBehavior(true)}
+                disabled={!hasChallenge}
+                style={{
+                  padding: "12px 16px", borderRadius: 12,
+                  background: !hasChallenge
+                    ? "rgba(168,85,247,0.15)"
+                    : "linear-gradient(135deg, rgba(245,158,11,0.30), rgba(239,68,68,0.20))",
+                  border: `1.5px solid ${!hasChallenge ? "rgba(168,85,247,0.30)" : "rgba(245,158,11,0.60)"}`,
+                  color: !hasChallenge ? "rgba(245,241,232,0.45)" : "#fde68a",
+                  fontWeight: 800, fontSize: 14, cursor: !hasChallenge ? "not-allowed" : "pointer",
+                  textAlign: "left", display: "flex", alignItems: "center", gap: 10,
+                }}
+              >
+                <span style={{ fontSize: 22 }}>📈</span>
+                <div style={{ flex: 1 }}>
+                  <div>Write a full ABC incident report</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.75, marginTop: 2 }}>
+                    {!hasChallenge
+                      ? "No challenge behaviors defined yet — open /star → 📈 Behavior"
+                      : "Antecedent · Behavior · Consequence + severity, points, parent notify, follow-up"}
+                  </div>
                 </div>
-              </div>
-              <span style={{ fontSize: 18, opacity: 0.65 }}>→</span>
-            </button>
+                <span style={{ fontSize: 18, opacity: 0.65 }}>→</span>
+              </button>
+              );
+            })()}
 
-            {pickReportBehavior && (
+            {pickReportBehavior && (() => {
+              const reportable = visibleDefs.filter((d) => d.tone === "challenge");
+              return (
               <div style={{
                 padding: 12, borderRadius: 12,
                 background: "rgba(0,0,0,0.30)",
                 border: "1px solid rgba(168,85,247,0.30)",
               }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
-                  Which behavior?
+                  Which challenge behavior? · only "challenge" tone shown
                 </div>
+                {reportable.length === 0 ? (
+                  <div style={{
+                    padding: 12, textAlign: "center",
+                    color: "rgba(196,181,253,0.55)", fontSize: 12,
+                    background: "rgba(168,85,247,0.06)", borderRadius: 8,
+                  }}>
+                    No challenge behaviors defined yet. Open /star → 📈 Behavior to add some.
+                  </div>
+                ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {visibleDefs.map((d) => {
-                    const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+                  {reportable.map((d) => {
+                    const c = "#f59e0b";
                     return (
                       <button
                         key={d.id}
@@ -323,6 +344,7 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
                     );
                   })}
                 </div>
+                )}
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <button onClick={() => setPickReportBehavior(false)} style={{
                     padding: "6px 12px", borderRadius: 8,
@@ -332,7 +354,8 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
                   }}>Cancel</button>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         </Section>
 
@@ -510,6 +533,7 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
         <BehaviorScanModal
           defId={reportForDefId}
           prePickedStudentId={studentId}
+          forceFullReport
           onClose={() => { setReportForDefId(null); setLogTick((t) => t + 1); }}
         />
       )}
