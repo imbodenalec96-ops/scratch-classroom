@@ -556,17 +556,40 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
     `;
   };
 
+  // Duplex printing was putting two different kids on opposite sides
+  // of the same sheet (Anna on the front, Jaida on the back). Since
+  // each kid's worksheet is one page, we insert a blank "back" page
+  // after every kid EXCEPT the last so each kid lands on their own
+  // physical sheet (worksheet on front, blank on back). The blank
+  // page carries a faint footer so the teacher can spot it's
+  // intentional rather than a printer misfeed.
+  const blankBack = (kidName: string) => `
+    <div class="page back">
+      <div style="height:100%;display:flex;align-items:flex-end;justify-content:center;">
+        <div style="font-size:9px;color:#cbd5e1;letter-spacing:0.2em;text-transform:uppercase;">
+          ${escapeHtml(kidName)} · back of duplex sheet · intentionally blank
+        </div>
+      </div>
+    </div>
+  `;
+
   const pages: string[] = [];
-  for (const p of pack) {
-    pages.push(renderOne(p));
+  for (let i = 0; i < pack.length; i++) {
+    pages.push(renderOne(pack[i]));
+    // Pad with a blank back-page after every kid except the last so
+    // the next kid starts on a fresh sheet under duplex printing.
+    if (i < pack.length - 1) {
+      pages.push(blankBack(pack[i].studentName));
+    }
   }
 
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(packLabel)}</title>
     <style>
       @media print { @page { size: letter; margin: 0.5in; } }
       body { font-family: -apple-system, sans-serif; color: #111; padding: 16px; }
-      .page { page-break-after: always; }
+      .page { page-break-after: always; min-height: 9.5in; }
       .page:last-child { page-break-after: auto; }
+      .page.back { background: white; }
     </style>
   </head><body>
     ${pages.join("")}
