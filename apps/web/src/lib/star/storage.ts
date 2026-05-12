@@ -294,6 +294,7 @@ const KEYS = {
   supplyLog: "star_supply_log",
   behaviorDefs: "star_behavior_defs",
   behaviorLog: "star_behavior_log",
+  behaviorTemplates: "star_behavior_templates",
 } as const;
 
 /**
@@ -422,6 +423,18 @@ export interface BehaviorEvent {
   followUp?: string;        // what's still owed / next step
   witnesses?: string;       // other staff present (free text)
   reporterName?: string;    // who wrote the report
+  photoDataUrl?: string;    // optional photo (refused work, calm-corner usage, etc.)
+}
+
+// Reusable text snippets the teacher can one-tap into the
+// behavior incident report form (antecedent + response fields).
+// Stored locally so each device has its own templates.
+export interface BehaviorTemplate {
+  id: string;
+  label: string;            // short button label
+  field: "antecedent" | "response" | "outcome";  // which field it fills
+  body: string;             // the text inserted
+  createdDate: string;
 }
 
 // LocalStorage with safe parse + default fallback
@@ -451,6 +464,26 @@ export const DEFAULT_TPLS = [
 // the API on first /star visit. (Earlier versions seeded STU-001..STU-008
 // placeholders; those get wiped the first time sync runs in replace mode.)
 export const DEFAULT_STUDENTS: StarStudent[] = [];
+
+// Reusable text snippets for the ABC report fields. The teacher
+// can edit/delete in the tracker UI and add new ones from the
+// behavior report form itself.
+export const DEFAULT_BEHAVIOR_TEMPLATES: BehaviorTemplate[] = [
+  // Antecedent
+  { id: "tpl-a-transition",  field: "antecedent", label: "Transition prompt", body: "Asked to put away current activity and transition to the next block.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-a-non-pref",    field: "antecedent", label: "Non-preferred task", body: "Given a non-preferred task (worksheet) after a preferred task (free time / iPad).", createdDate: new Date(0).toISOString() },
+  { id: "tpl-a-told-no",     field: "antecedent", label: "Told 'no'", body: "Told 'not right now' to a request (bathroom / iPad / leaving the room).", createdDate: new Date(0).toISOString() },
+  { id: "tpl-a-peer",        field: "antecedent", label: "Peer interaction", body: "Peer made an unexpected comment / took something / sat in their preferred spot.", createdDate: new Date(0).toISOString() },
+  // Response
+  { id: "tpl-r-2choices",    field: "response",   label: "2 choices + warning", body: "Gave a 5-minute warning, then offered 2 choices in a calm voice. Restated the expectation.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-r-break",       field: "response",   label: "Offered a break", body: "Offered a 5-minute sensory break in the calm corner. Set a visible timer.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-r-co-regulate", field: "response",   label: "Co-regulation",     body: "Sat next to the student, used slow breathing, named the feeling, no demands until calm.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-r-redirect",    field: "response",   label: "Redirect to task",  body: "Redirected to the assigned task using a 'first / then' visual.", createdDate: new Date(0).toISOString() },
+  // Outcome
+  { id: "tpl-o-back-on-task",field: "outcome",    label: "Back on task",      body: "Returned to the task within 10 minutes and completed most of it.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-o-partial",     field: "outcome",    label: "Partial completion", body: "Completed about half of the task with prompting.", createdDate: new Date(0).toISOString() },
+  { id: "tpl-o-no-completion",field: "outcome",   label: "No completion",     body: "Did not return to the task. Will retry tomorrow during the same block.", createdDate: new Date(0).toISOString() },
+];
 
 // Sensible starter set the teacher can edit/delete in the tracker UI.
 // All class-wide; per-kid behaviors are added through the UI.
@@ -633,6 +666,18 @@ export const StarStore = {
   removeBehaviorEvent: (id: string) => {
     const cur = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
     ls.set(KEYS.behaviorLog, cur.filter((e) => e.id !== id));
+  },
+  // Behavior templates (reusable antecedent/response/outcome snippets)
+  getBehaviorTemplates: (): BehaviorTemplate[] => ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES),
+  setBehaviorTemplates: (v: BehaviorTemplate[]) => ls.set(KEYS.behaviorTemplates, v),
+  addBehaviorTemplate: (t: BehaviorTemplate) => {
+    const cur = ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES);
+    cur.push(t);
+    ls.set(KEYS.behaviorTemplates, cur);
+  },
+  removeBehaviorTemplate: (id: string) => {
+    const cur = ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES);
+    ls.set(KEYS.behaviorTemplates, cur.filter((t) => t.id !== id));
   },
   // Record a full behavior incident report. All non-required fields
   // are optional; the form sends whatever the teacher filled in.

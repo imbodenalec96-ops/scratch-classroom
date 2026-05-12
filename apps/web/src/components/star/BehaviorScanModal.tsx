@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   StarStore,
-  type StarStudent, type BehaviorDef, type BehaviorEvent,
+  type StarStudent, type BehaviorDef, type BehaviorEvent, type BehaviorTemplate,
 } from "../../lib/star/storage.ts";
 import { api } from "../../lib/api.ts";
 import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
@@ -66,6 +66,60 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
   const [reporterName, setReporterName] = useState<string>(() => {
     try { return localStorage.getItem(DEFAULT_REPORTER_KEY) || ""; } catch { return ""; }
   });
+  const [photoDataUrl, setPhotoDataUrl] = useState<string>("");
+  const [templates, setTemplates] = useState<BehaviorTemplate[]>(() => StarStore.getBehaviorTemplates());
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Reads + downscales a photo for storage. Big files in localStorage
+  // crash localStorage quickly, so we cap to ~640px on the long side
+  // and convert to JPEG ~0.75 quality (~80–150 KB typical).
+  const onPhotoSelected = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 640;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, w, h);
+        setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const insertTemplate = (t: BehaviorTemplate) => {
+    const append = (cur: string) => (cur.trim() ? cur.trim() + " " + t.body : t.body);
+    if (t.field === "antecedent") setAntecedent((cur) => append(cur));
+    else if (t.field === "response") setResponse((cur) => append(cur));
+    else if (t.field === "outcome") setOutcome((cur) => append(cur));
+  };
+
+  const saveAsTemplate = (field: BehaviorTemplate["field"], body: string) => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    const label = window.prompt(`Short label for this ${field} template?`, trimmed.slice(0, 28));
+    if (!label) return;
+    const t: BehaviorTemplate = {
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      label: label.trim(), field, body: trimmed,
+      createdDate: new Date().toISOString(),
+    };
+    StarStore.addBehaviorTemplate(t);
+    setTemplates(StarStore.getBehaviorTemplates());
+  };
+
+  const removeTemplate = (id: string) => {
+    if (!window.confirm("Delete this template?")) return;
+    StarStore.removeBehaviorTemplate(id);
+    setTemplates(StarStore.getBehaviorTemplates());
+  };
 
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -192,6 +246,7 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
         followUp: followUp.trim() || undefined,
         witnesses: witnesses.trim() || undefined,
         reporterName: reporterName.trim() || undefined,
+        photoDataUrl: photoDataUrl || undefined,
       });
       // Persist reporter name for next time.
       try { if (reporterName.trim()) localStorage.setItem(DEFAULT_REPORTER_KEY, reporterName.trim()); } catch {}
@@ -353,18 +408,43 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
               </Field>
             </Row>
 
-            <Field label="A · Antecedent — what happened RIGHT BEFORE">
-              <textarea value={antecedent} onChange={(e) => setAntecedent(e.target.value)} rows={2} placeholder="e.g. Asked to put away iPad before transitioning to math" style={ta()} />
-            </Field>
+            <FieldWithTemplates
+              label="A · Antecedent — what happened RIGHT BEFORE"
+              field="antecedent"
+              value={antecedent}
+              onChange={setAntecedent}
+              placeholder="e.g. Asked to put away iPad before transitioning to math"
+              templates={templates.filter((t) => t.field === "antecedent")}
+              onTemplate={insertTemplate}
+              onSaveAsTemplate={() => saveAsTemplate("antecedent", antecedent)}
+              onRemoveTemplate={removeTemplate}
+            />
             <Field label="B · Behavior — what the kid actually did">
               <textarea value={behaviorDetail} onChange={(e) => setBehaviorDetail(e.target.value)} rows={3} placeholder="Describe the behavior in observable terms (what you'd write in an IEP — what you saw + heard, not what you guessed)" style={ta()} />
             </Field>
-            <Field label="C · Consequence — what I tried + how it ended">
-              <textarea value={response} onChange={(e) => setResponse(e.target.value)} rows={3} placeholder="Strategies you used. e.g. Offered a 5-min break, used calm voice, gave 2 choices…" style={ta()} />
-            </Field>
-            <Field label="Outcome / where the kid landed">
-              <textarea value={outcome} onChange={(e) => setOutcome(e.target.value)} rows={2} placeholder="e.g. Returned to math after 8 min, completed 3 of 5 problems" style={ta()} />
-            </Field>
+            <FieldWithTemplates
+              label="C · Consequence — what I tried + how it ended"
+              field="response"
+              value={response}
+              onChange={setResponse}
+              placeholder="Strategies you used. e.g. Offered a 5-min break, used calm voice, gave 2 choices…"
+              templates={templates.filter((t) => t.field === "response")}
+              onTemplate={insertTemplate}
+              onSaveAsTemplate={() => saveAsTemplate("response", response)}
+              onRemoveTemplate={removeTemplate}
+            />
+            <FieldWithTemplates
+              label="Outcome / where the kid landed"
+              field="outcome"
+              value={outcome}
+              onChange={setOutcome}
+              placeholder="e.g. Returned to math after 8 min, completed 3 of 5 problems"
+              templates={templates.filter((t) => t.field === "outcome")}
+              onTemplate={insertTemplate}
+              onSaveAsTemplate={() => saveAsTemplate("outcome", outcome)}
+              onRemoveTemplate={removeTemplate}
+              rows={2}
+            />
 
             {/* Severity 1-5 */}
             <Field label="Severity">
@@ -438,6 +518,50 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
                 <input value={reporterName} onChange={(e) => setReporterName(e.target.value)} placeholder="Mrs. Imboden" style={inp()} />
               </Field>
             </Row>
+
+            {/* Photo attachment — opens the camera on iPad / phone */}
+            <Field label="Photo (optional) — refused work / damaged item / calm-corner usage">
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onPhotoSelected(f);
+                    if (photoInputRef.current) photoInputRef.current.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  style={{
+                    padding: "9px 14px", borderRadius: 8,
+                    background: "rgba(168,85,247,0.15)",
+                    border: "1px solid rgba(168,85,247,0.40)",
+                    color: "#fce7f3", fontWeight: 800, fontSize: 13, cursor: "pointer",
+                    flex: 1, textAlign: "left",
+                  }}
+                >📷 {photoDataUrl ? "Replace photo" : "Add a photo"}</button>
+                {photoDataUrl && (
+                  <button
+                    onClick={() => setPhotoDataUrl("")}
+                    style={{
+                      padding: "9px 14px", borderRadius: 8,
+                      background: "rgba(239,68,68,0.15)",
+                      border: "1px solid rgba(239,68,68,0.45)",
+                      color: "#fca5a5", fontWeight: 800, fontSize: 13, cursor: "pointer",
+                    }}
+                  >✕ Remove</button>
+                )}
+              </div>
+              {photoDataUrl && (
+                <div style={{ marginTop: 8, padding: 6, borderRadius: 8, background: "rgba(0,0,0,0.30)", border: "1px solid rgba(168,85,247,0.30)" }}>
+                  <img src={photoDataUrl} alt="" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 4, display: "block", margin: "0 auto" }} />
+                </div>
+              )}
+            </Field>
 
             <div style={{
               display: "flex", justifyContent: "space-between", gap: 8, marginTop: 16,
@@ -605,6 +729,11 @@ function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, e: Beha
 
       ${e.witnesses ? `<h2>👀 Witnesses</h2><div class="field-body">${escapeHtml(e.witnesses)}</div>` : ""}
 
+      ${e.photoDataUrl ? `<h2>📷 Photo evidence</h2>
+        <div style="border: 1px solid #d8b4fe; border-radius: 8px; padding: 8px; background: #faf5ff; text-align: center;">
+          <img src="${e.photoDataUrl}" alt="" style="max-width: 100%; max-height: 320px; border-radius: 6px;" />
+        </div>` : ""}
+
       <div class="footer">
         <div>
           <div class="signlbl">Reporter signature</div>
@@ -697,6 +826,78 @@ function ta(): React.CSSProperties {
     fontFamily: "inherit",
     resize: "vertical",
   } as React.CSSProperties;
+}
+
+function FieldWithTemplates({ label, field, value, onChange, placeholder, templates, onTemplate, onSaveAsTemplate, onRemoveTemplate, rows = 3 }: {
+  label: string;
+  field: BehaviorTemplate["field"];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  templates: BehaviorTemplate[];
+  onTemplate: (t: BehaviorTemplate) => void;
+  onSaveAsTemplate: () => void;
+  onRemoveTemplate: (id: string) => void;
+  rows?: number;
+}) {
+  void field;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+          {label}
+        </div>
+        {value.trim().length > 8 && (
+          <button
+            onClick={onSaveAsTemplate}
+            title="Save the current text as a reusable template"
+            style={{
+              padding: "3px 8px", borderRadius: 6,
+              background: "rgba(168,85,247,0.10)",
+              border: "1px solid rgba(168,85,247,0.30)",
+              color: "#f9a8d4", fontSize: 10, fontWeight: 800, cursor: "pointer",
+              letterSpacing: "0.06em", textTransform: "uppercase",
+            }}
+          >+ Save as template</button>
+        )}
+      </div>
+      {templates.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+          {templates.map((t) => (
+            <span key={t.id} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "4px 4px 4px 10px", borderRadius: 999,
+              background: "rgba(168,85,247,0.10)",
+              border: "1px solid rgba(168,85,247,0.30)",
+              fontSize: 11, fontWeight: 700, color: "#fce7f3",
+            }}>
+              <button
+                onClick={() => onTemplate(t)}
+                title={t.body}
+                style={{
+                  background: "transparent", border: "none", color: "inherit",
+                  font: "inherit", cursor: "pointer", padding: 0,
+                }}
+              >📋 {t.label}</button>
+              <button
+                onClick={() => onRemoveTemplate(t.id)}
+                title="Delete this template"
+                style={{
+                  width: 18, height: 18, borderRadius: 4,
+                  background: "rgba(239,68,68,0.10)",
+                  border: "1px solid rgba(239,68,68,0.30)",
+                  color: "#fca5a5", fontSize: 10, fontWeight: 800,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  marginLeft: 2,
+                }}
+              >✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={rows} placeholder={placeholder} style={ta()} />
+    </div>
+  );
 }
 
 function Row({ children }: { children: React.ReactNode }) {
