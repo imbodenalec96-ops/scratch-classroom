@@ -292,6 +292,8 @@ const KEYS = {
   movementLog: "star_movement_log",
   supplyCheckouts: "star_supply_checkouts",
   supplyLog: "star_supply_log",
+  behaviorDefs: "star_behavior_defs",
+  behaviorLog: "star_behavior_log",
 } as const;
 
 /**
@@ -380,6 +382,32 @@ export interface IepLogEntry {
   loggedAt: string;       // ISO timestamp
 }
 
+// ── Custom behavior tracker ─────────────────────────────────────
+// Teacher defines a list of behaviors (class-wide or per-kid). Each
+// instance is a single tap with optional note. Reports aggregate
+// frequency per kid per day for IEP meetings.
+export interface BehaviorDef {
+  id: string;
+  label: string;            // "Calling out" / "On task" / etc.
+  emoji: string;            // visible chip face
+  // "positive" = green, "neutral" = blue, "challenge" = amber/red.
+  // Only affects display color; reports use the raw counts.
+  tone: "positive" | "neutral" | "challenge";
+  scope: "class" | "student";
+  studentId?: string;       // required when scope === "student"
+  createdDate: string;
+  archived?: boolean;
+}
+
+export interface BehaviorEvent {
+  id: string;
+  defId: string;
+  studentId: string;
+  ts: string;               // ISO
+  date: string;             // YYYY-MM-DD (Pacific) for fast filtering
+  note?: string;
+}
+
 // LocalStorage with safe parse + default fallback
 const ls = {
   get<T>(key: string, fallback: T): T {
@@ -407,6 +435,19 @@ export const DEFAULT_TPLS = [
 // the API on first /star visit. (Earlier versions seeded STU-001..STU-008
 // placeholders; those get wiped the first time sync runs in replace mode.)
 export const DEFAULT_STUDENTS: StarStudent[] = [];
+
+// Sensible starter set the teacher can edit/delete in the tracker UI.
+// All class-wide; per-kid behaviors are added through the UI.
+export const DEFAULT_BEHAVIOR_DEFS: BehaviorDef[] = [
+  { id: "bd-on-task",       label: "On task",          emoji: "🎯", tone: "positive",  scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-kind-act",      label: "Kind act",         emoji: "💖", tone: "positive",  scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-self-advocate", label: "Self-advocated",   emoji: "🙋", tone: "positive",  scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-transition",    label: "Smooth transition",emoji: "🚪", tone: "positive",  scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-redirect",      label: "Redirected",       emoji: "↩️", tone: "neutral",   scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-call-out",      label: "Calling out",      emoji: "📢", tone: "challenge", scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-out-of-seat",   label: "Out of seat",      emoji: "🪑", tone: "challenge", scope: "class", createdDate: new Date(0).toISOString() },
+  { id: "bd-disruption",    label: "Disruption",       emoji: "💥", tone: "challenge", scope: "class", createdDate: new Date(0).toISOString() },
+];
 
 // All 7 keys read/written through these helpers.
 export const StarStore = {
@@ -545,6 +586,38 @@ export const StarStore = {
     return log;
   },
   getSupplyLog: () => ls.get<SupplyLogEntry[]>(KEYS.supplyLog, []),
+
+  // ── Behavior tracker ────────────────────────────────────────
+  getBehaviorDefs: (): BehaviorDef[] => ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS),
+  setBehaviorDefs: (v: BehaviorDef[]) => ls.set(KEYS.behaviorDefs, v),
+  addBehaviorDef: (def: BehaviorDef) => {
+    const cur = ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS);
+    cur.push(def);
+    ls.set(KEYS.behaviorDefs, cur);
+  },
+  removeBehaviorDef: (id: string) => {
+    const cur = ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS);
+    ls.set(KEYS.behaviorDefs, cur.filter((d) => d.id !== id));
+  },
+  getBehaviorLog: (): BehaviorEvent[] => ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []),
+  recordBehavior: (defId: string, studentId: string, note?: string) => {
+    const log = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
+    const now = new Date();
+    const d = new Date(now.getTime() - 7 * 3600_000); // Pacific date
+    const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    log.push({
+      id: `bh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      defId, studentId, note,
+      ts: now.toISOString(),
+      date,
+    });
+    ls.set(KEYS.behaviorLog, log);
+    return log;
+  },
+  removeBehaviorEvent: (id: string) => {
+    const cur = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
+    ls.set(KEYS.behaviorLog, cur.filter((e) => e.id !== id));
+  },
 
   getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
   setActivePasses: (v: ActivePass[]) => ls.set(KEYS.activePasses, v),

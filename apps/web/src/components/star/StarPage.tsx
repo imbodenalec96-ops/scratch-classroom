@@ -27,6 +27,7 @@ import IepPacketGenerator from "./IepPacketGenerator.tsx";
 import KudosCertificate from "./KudosCertificate.tsx";
 import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
 import PecsBuilder from "./PecsBuilder.tsx";
+import BehaviorTracker from "./BehaviorTracker.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -37,7 +38,7 @@ import StarDataView from "./StarDataView.tsx";
 import { tokens as T } from "../../lib/star/theme.ts";
 import { Button } from "./ui.tsx";
 
-type Tab = "home" | "gradebook" | "create" | "iep" | "reports" | "data" | "settings";
+type Tab = "home" | "gradebook" | "create" | "iep" | "behavior" | "reports" | "data" | "settings";
 
 const SUBJECTS: Subject[] = ["Math","Reading","Writing","Science","Social Studies","PE","Art","Library","Music"];
 const GRADES = ["K","1st","2nd","3rd","4th","5th"];
@@ -84,6 +85,7 @@ export default function StarPage() {
     { id: "gradebook" as Tab, icon: "📚", label: "Gradebook" },
     { id: "create"    as Tab, icon: "✨", label: "Create" },
     { id: "iep"       as Tab, icon: "🎯", label: "IEP" },
+    { id: "behavior"  as Tab, icon: "📈", label: "Behavior" },
     { id: "reports"   as Tab, icon: "📊", label: "Reports" },
     { id: "data"      as Tab, icon: "💾", label: "Data" },
     { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
@@ -369,6 +371,17 @@ export default function StarPage() {
             subtitle="Tap Met / Partial / Not yet per kid each day. Set goals in Settings → IEP Goals. Print a SEIF report for your IEP meetings — per kid or whole class."
           />
           <IepTracker />
+        </>
+      )}
+
+      {tab === "behavior" && (
+        <>
+          <PageHeader
+            kicker="📈 Behavior"
+            title="Custom behavior tracker"
+            subtitle="Tap a chip on a kid to log a behavior. Long-press to add a note. Frequency chart + IEP-printable report at the bottom."
+          />
+          <BehaviorTracker />
         </>
       )}
 
