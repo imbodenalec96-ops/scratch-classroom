@@ -6,22 +6,22 @@ import {
   CalendarDays, Plus, Trash2, ExternalLink, Printer, Users,
   ChevronDown, ChevronUp,
 } from "lucide-react";
+import { MUSIC_PRESETS as ALL_MUSIC, MOOD_LABELS, type MusicMood } from "../lib/musicPresets.ts";
 
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
+// Includes a "No music" sentinel + every preset from the shared
+// library, so adding a track in lib/musicPresets.ts shows up here
+// automatically.
 const MUSIC_PRESETS = [
-  { id: "",         label: "No music" },
-  { id: "forest",   label: "Forest" },
-  { id: "ocean",    label: "Ocean" },
-  { id: "rain",     label: "Rain" },
-  { id: "piano",    label: "Piano" },
-  { id: "campfire", label: "Campfire" },
+  { id: "", label: "No music", mood: "nature" as MusicMood, emoji: "🔇" },
+  ...ALL_MUSIC.map((p) => ({ id: p.id, label: p.label, mood: p.mood, emoji: p.emoji })),
 ];
 
-const MUSIC_ICONS: Record<string, string> = {
-  forest: "🌲", ocean: "🌊", rain: "🌧", piano: "🎹", campfire: "🔥",
-};
+const MUSIC_ICONS: Record<string, string> = Object.fromEntries(
+  ALL_MUSIC.map((p) => [p.id, p.emoji])
+);
 
 const LEVEL_COLORS: Record<number, { bg: string; text: string; border: string }> = {
   1: { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.25)" },

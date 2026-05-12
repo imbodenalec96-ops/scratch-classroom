@@ -14,6 +14,7 @@ import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
 import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
+import { MUSIC_PRESETS } from "../lib/musicPresets.ts";
 import StudentWallet from "./StudentWallet.tsx";
 import MorningSlide from "./MorningSlide.tsx";
 
@@ -28,50 +29,10 @@ function extractYouTubeId(url: string): string | null {
 const DAY_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const GRADES = [3, 4, 5] as const;
 
-// Curated calming-music library. Categories so the picker can group
-// them. videoId fields point to long, ad-light YouTube tracks/streams
-// known to be widely available; if a track 404s, the picker shows the
-// next one in the list and the teacher can disable that preset in
-// /board → Settings.
-//
-// Mood tag drives the chip colors + emoji. Adding new tracks is a
-// matter of pushing to this array (no schema change). Items here are
-// also seeded into the classroom store as redeemable rewards via the
-// "Seed music in store" action in /star → Store.
-type MusicMood = "nature" | "instrumental" | "lofi" | "focus" | "kids";
-const MUSIC_PRESETS: { id: string; label: string; videoId: string; emoji: string; mood: MusicMood; price?: number }[] = [
-  // Nature (existing four — known-good stations)
-  { id: "forest",     label: "Forest Spa",          videoId: "xNN7iTA57jM", emoji: "🌿", mood: "nature", price: 15 },
-  { id: "ocean",      label: "Ocean Waves",         videoId: "MIr3RsUWrdo", emoji: "🌊", mood: "nature", price: 15 },
-  { id: "rain",       label: "Gentle Rain",         videoId: "mPZkdNFkNps", emoji: "🌧", mood: "nature", price: 15 },
-  { id: "rain-window",label: "Rain on a Window",    videoId: "q76bMs-NwRk", emoji: "💧", mood: "nature", price: 15 },
-  { id: "thunder",    label: "Distant Thunder",     videoId: "nDqvhilTrI8", emoji: "⛈",  mood: "nature", price: 20 },
-  { id: "creek",      label: "Forest Creek",        videoId: "ABO9aRtPbCY", emoji: "🍃", mood: "nature", price: 15 },
-  { id: "fire",       label: "Crackling Fireplace", videoId: "L_LUpnjgPso", emoji: "🔥", mood: "nature", price: 15 },
-  { id: "snow",       label: "Soft Snowfall",       videoId: "NF6L4FXBmbY", emoji: "❄️", mood: "nature", price: 15 },
-  { id: "birds",      label: "Birds in the Garden", videoId: "DOgkM_p2EpE", emoji: "🐦", mood: "nature", price: 15 },
-
-  // Instrumental
-  { id: "piano",      label: "Spa Piano",           videoId: "4xDzrJKXOOY", emoji: "🎹", mood: "instrumental", price: 15 },
-  { id: "tibetan",    label: "Healing Bowls",       videoId: "UgHKb_7884o", emoji: "🔔", mood: "instrumental", price: 20 },
-  { id: "guitar",     label: "Soft Acoustic",       videoId: "EBlPlrxsZzs", emoji: "🎸", mood: "instrumental", price: 15 },
-  { id: "harp",       label: "Floating Harp",       videoId: "fjfwQOLPnPE", emoji: "🪕", mood: "instrumental", price: 20 },
-  { id: "celtic",     label: "Celtic Calm",         videoId: "9KGv9TmFqi0", emoji: "🍀", mood: "instrumental", price: 20 },
-  { id: "classical",  label: "Classical for Focus", videoId: "VgRYPNX1uHM", emoji: "🎼", mood: "instrumental", price: 20 },
-
-  // Lo-fi (kid-safe instrumental beats)
-  { id: "lofi-study", label: "Lo-Fi Study Beats",   videoId: "jfKfPfyJRdk", emoji: "📚", mood: "lofi", price: 10 },
-  { id: "lofi-chill", label: "Chill Lo-Fi",         videoId: "rUxyKA_-grg", emoji: "🌙", mood: "lofi", price: 10 },
-  { id: "lofi-jazz",  label: "Lo-Fi Jazz",          videoId: "Dx5qFachd3A", emoji: "🎷", mood: "lofi", price: 10 },
-
-  // Focus / brain
-  { id: "alpha",      label: "Alpha Focus Waves",   videoId: "WPni755-Krg", emoji: "🧠", mood: "focus", price: 25 },
-  { id: "study-deep", label: "Deep Focus",          videoId: "5qap5aO4i9A", emoji: "🎯", mood: "focus", price: 20 },
-
-  // Kids — gentle children's tunes
-  { id: "lullaby",    label: "Storybook Lullabies", videoId: "GVZP-CtxgVM", emoji: "🧸", mood: "kids", price: 10 },
-  { id: "music-box",  label: "Music Box",           videoId: "GS3i6OdrCpw", emoji: "🎵", mood: "kids", price: 10 },
-];
+// Music library now lives in lib/musicPresets.ts so the picker
+// (TeacherBoardSettings), the store seeder (TeacherStore), and the
+// player (here) all stay in sync. Adding a track only requires
+// editing musicPresets.ts.
 
 // Editorial palette: each grade is a distinct tradition, not a tint of purple
 //   3rd — deep teal (study / library green)

@@ -176,34 +176,13 @@ export default function TeacherStore() {
   };
 
   // One-tap: seed every calming-music preset as a redeemable store
-  // item. Names are tagged "🎵 Music · <Track Label>" so the board's
-  // music-redemption listener can match them. Skips presets that
-  // already have a matching item (idempotent — safe to run twice).
+  // item. Pulls from the shared library so adding a track in
+  // lib/musicPresets.ts automatically becomes seedable here. Names are
+  // tagged "🎵 Music · <Track Label>" so the board's music-redemption
+  // listener can match them. Skips presets that already have a
+  // matching item (idempotent — safe to run twice).
   const seedMusicItems = async () => {
-    const MUSIC_PRESETS = [
-      { label: "Forest Spa", emoji: "🌿", price: 15 },
-      { label: "Ocean Waves", emoji: "🌊", price: 15 },
-      { label: "Gentle Rain", emoji: "🌧", price: 15 },
-      { label: "Rain on a Window", emoji: "💧", price: 15 },
-      { label: "Distant Thunder", emoji: "⛈", price: 20 },
-      { label: "Forest Creek", emoji: "🍃", price: 15 },
-      { label: "Crackling Fireplace", emoji: "🔥", price: 15 },
-      { label: "Soft Snowfall", emoji: "❄️", price: 15 },
-      { label: "Birds in the Garden", emoji: "🐦", price: 15 },
-      { label: "Spa Piano", emoji: "🎹", price: 15 },
-      { label: "Healing Bowls", emoji: "🔔", price: 20 },
-      { label: "Soft Acoustic", emoji: "🎸", price: 15 },
-      { label: "Floating Harp", emoji: "🪕", price: 20 },
-      { label: "Celtic Calm", emoji: "🍀", price: 20 },
-      { label: "Classical for Focus", emoji: "🎼", price: 20 },
-      { label: "Lo-Fi Study Beats", emoji: "📚", price: 10 },
-      { label: "Chill Lo-Fi", emoji: "🌙", price: 10 },
-      { label: "Lo-Fi Jazz", emoji: "🎷", price: 10 },
-      { label: "Alpha Focus Waves", emoji: "🧠", price: 25 },
-      { label: "Deep Focus", emoji: "🎯", price: 20 },
-      { label: "Storybook Lullabies", emoji: "🧸", price: 10 },
-      { label: "Music Box", emoji: "🎵", price: 10 },
-    ];
+    const { MUSIC_PRESETS } = await import("../lib/musicPresets.ts");
     setBulkBusy(true);
     try {
       const existingNames = new Set(items.map((it) => it.name.toLowerCase()));
