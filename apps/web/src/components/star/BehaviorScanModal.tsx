@@ -102,14 +102,20 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
     return base.toISOString();
   };
 
-  // Reads + downscales a photo for storage. Big files in localStorage
-  // crash localStorage quickly, so we cap to ~640px on the long side
-  // and convert to JPEG ~0.75 quality (~80–150 KB typical).
+  const [photoPath, setPhotoPath] = useState<string>("");
+  const [photoUploading, setPhotoUploading] = useState(false);
+
+  // Reads + downscales a photo, then uploads to Supabase Storage so
+  // it lives outside localStorage (which previously filled up and
+  // silently dropped saves). We keep a downsized preview as a data
+  // URL just for the modal's local preview, but persistence on the
+  // event uses `photoPath` (the bucket path) — readers convert it
+  // back to a public URL on demand.
   const onPhotoSelected = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const max = 640;
         const scale = Math.min(1, max / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
@@ -119,7 +125,25 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, w, h);
-        setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.75));
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        setPhotoDataUrl(dataUrl); // local preview only
+        setPhotoPath("");
+        setPhotoUploading(true);
+        try {
+          const { uploadPhotoFromDataUrl } = await import("../../lib/star/supabase.ts");
+          const result = await uploadPhotoFromDataUrl(dataUrl, `bh-${Date.now()}`);
+          if (result) {
+            setPhotoPath(result.path);
+            // Replace local preview with the bucket URL so the
+            // saved event references the small remote URL instead
+            // of carrying the full base64 around.
+            setPhotoDataUrl(result.publicUrl);
+          }
+        } catch (e: any) {
+          console.warn("[behavior photo upload]", e?.message || e);
+        } finally {
+          setPhotoUploading(false);
+        }
       };
       img.src = String(reader.result || "");
     };
@@ -294,7 +318,14 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
         followUp: followUp.trim() || undefined,
         witnesses: witnesses.trim() || undefined,
         reporterName: reporterName.trim() || undefined,
-        photoDataUrl: photoDataUrl || undefined,
+        // Prefer the bucket path — keeps localStorage small. The
+        // public URL is reconstructed at read time via Supabase
+        // Storage.getPublicUrl().
+        photoPath: photoPath || undefined,
+        // Only persist the raw data URL when the upload failed, so
+        // the photo isn't lost. The sync layer skips this field —
+        // local-only fallback.
+        photoDataUrl: photoPath ? undefined : (photoDataUrl || undefined),
       });
       // Persist reporter name for next time.
       try { if (reporterName.trim()) localStorage.setItem(DEFAULT_REPORTER_KEY, reporterName.trim()); } catch {}
@@ -644,10 +675,10 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
                     color: "#fce7f3", fontWeight: 800, fontSize: 13, cursor: "pointer",
                     flex: 1, textAlign: "left",
                   }}
-                >📷 {photoDataUrl ? "Replace photo" : "Add a photo"}</button>
+                >📷 {photoUploading ? "Uploading…" : photoDataUrl ? "Replace photo" : "Add a photo"}</button>
                 {photoDataUrl && (
                   <button
-                    onClick={() => setPhotoDataUrl("")}
+                    onClick={() => { setPhotoDataUrl(""); setPhotoPath(""); }}
                     style={{
                       padding: "9px 14px", borderRadius: 8,
                       background: "rgba(239,68,68,0.15)",

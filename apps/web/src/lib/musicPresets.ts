@@ -97,7 +97,23 @@ export function setCustomMusicPresets(list: MusicPreset[]): void {
       price: typeof p.price === "number" ? p.price : 15,
       isCustom: true,
     }));
+    // Compute the diff vs prior local list so we know which rows to
+    // upsert and which were deleted — keeps Supabase in sync with
+    // delete operations from the settings panel.
+    let prior: MusicPreset[] = [];
+    try { prior = JSON.parse(localStorage.getItem(CUSTOM_KEY) || "[]") as MusicPreset[]; } catch {}
+    const nextIds = new Set(safe.map((p) => p.id));
+    const removedIds = prior.filter((p) => !nextIds.has(p.id)).map((p) => p.id);
     localStorage.setItem(CUSTOM_KEY, JSON.stringify(safe));
+    if (typeof window !== "undefined") {
+      import("./star/supabaseSync.ts").then((m) => {
+        for (const p of safe) {
+          if (!p.videoId) continue;
+          m.pushCustomMusic({ id: p.id, label: p.label, videoId: p.videoId, emoji: p.emoji || "🎵", price: p.price || 15 });
+        }
+        for (const id of removedIds) m.deleteCustomMusicRemote(id);
+      }).catch(() => {});
+    }
   } catch {}
 }
 

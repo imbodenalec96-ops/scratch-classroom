@@ -199,6 +199,35 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+  // STAR Supabase sync: pull every behavior, daily note, IEP goal,
+  // log entry, template, and custom music track from Supabase into
+  // localStorage on boot, then re-pull every 60s so changes from
+  // other devices appear without a refresh. Writes are pushed
+  // automatically by the storage helpers (see _syncPush in
+  // lib/star/storage.ts). Failure is non-fatal — local data keeps
+  // working offline.
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        const { fullStarPull, fullStarPush } = await import("./lib/star/supabaseSync.ts");
+        await fullStarPull();
+        // Push anything created offline so other devices see it.
+        await fullStarPush();
+      } catch (e) {
+        console.warn("[STAR sync boot]", e);
+      }
+    })();
+    const iv = setInterval(async () => {
+      if (stop) return;
+      try {
+        const { fullStarPull } = await import("./lib/star/supabaseSync.ts");
+        await fullStarPull();
+      } catch {}
+    }, 60_000);
+    return () => { stop = true; clearInterval(iv); };
+  }, []);
+
   return (
     <ThemeProvider>
     <AuthProvider>

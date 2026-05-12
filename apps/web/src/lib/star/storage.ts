@@ -425,6 +425,7 @@ export interface BehaviorEvent {
   witnesses?: string;       // other staff present (free text)
   reporterName?: string;    // who wrote the report
   photoDataUrl?: string;    // optional photo (refused work, calm-corner usage, etc.)
+  photoPath?: string;       // Supabase Storage bucket path (preferred over data URL)
 }
 
 // Reusable text snippets the teacher can one-tap into the
@@ -589,6 +590,32 @@ export const DEFAULT_BEHAVIOR_DEFS: BehaviorDef[] = [
   { id: "bd-disruption",    label: "Disruption",       emoji: "💥", tone: "challenge", scope: "class", createdDate: new Date(0).toISOString() },
 ];
 
+// Fire-and-forget Supabase mirror. Dynamically imports the sync
+// module so this file stays free of a hard dependency on
+// @supabase/supabase-js — if the sync layer breaks, local STAR data
+// keeps working. Each writer below calls _syncPush after a successful
+// localStorage write; the network round-trip happens off the hot path.
+function _syncPush(kind: string, payload: any): void {
+  // Skip in non-browser contexts (SSR / tests).
+  if (typeof window === "undefined") return;
+  import("./supabaseSync.ts").then((m) => {
+    try {
+      switch (kind) {
+        case "behaviorDef":      return void m.pushBehaviorDef(payload);
+        case "behaviorDef.del":  return void m.deleteBehaviorDefRemote(payload);
+        case "behaviorEvent":    return void m.pushBehaviorEvent(payload);
+        case "behaviorEvent.del":return void m.deleteBehaviorEventRemote(payload);
+        case "behaviorTemplate": return void m.pushBehaviorTemplate(payload);
+        case "behaviorTemplate.del": return void m.deleteBehaviorTemplateRemote(payload);
+        case "dailyNote":        return void m.pushDailyNote(payload);
+        case "iepGoal":          return void m.pushIepGoal(payload);
+        case "iepGoal.del":      return void m.deleteIepGoalRemote(payload);
+        case "iepLog":           return void m.pushIepLogEntry(payload);
+      }
+    } catch { /* swallow — local write already succeeded */ }
+  }).catch(() => {});
+}
+
 // All 7 keys read/written through these helpers.
 export const StarStore = {
   getStudents:   () => ls.get<StarStudent[]>(KEYS.s, DEFAULT_STUDENTS),
@@ -729,15 +756,20 @@ export const StarStore = {
 
   // ── Behavior tracker ────────────────────────────────────────
   getBehaviorDefs: (): BehaviorDef[] => ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS),
-  setBehaviorDefs: (v: BehaviorDef[]) => ls.set(KEYS.behaviorDefs, v),
+  setBehaviorDefs: (v: BehaviorDef[]) => {
+    ls.set(KEYS.behaviorDefs, v);
+    for (const d of v) _syncPush("behaviorDef", d);
+  },
   addBehaviorDef: (def: BehaviorDef) => {
     const cur = ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS);
     cur.push(def);
     ls.set(KEYS.behaviorDefs, cur);
+    _syncPush("behaviorDef", def);
   },
   removeBehaviorDef: (id: string) => {
     const cur = ls.get<BehaviorDef[]>(KEYS.behaviorDefs, DEFAULT_BEHAVIOR_DEFS);
     ls.set(KEYS.behaviorDefs, cur.filter((d) => d.id !== id));
+    _syncPush("behaviorDef.del", id);
   },
   getBehaviorLog: (): BehaviorEvent[] => ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []),
   // recordBehavior — now accepts an optional `ts` so quick-logs can
@@ -751,30 +783,38 @@ export const StarStore = {
     const eventDate = new Date(eventTs);
     const pacific = new Date(eventDate.getTime() - 7 * 3600_000);
     const date = `${pacific.getUTCFullYear()}-${String(pacific.getUTCMonth() + 1).padStart(2, "0")}-${String(pacific.getUTCDate()).padStart(2, "0")}`;
-    log.push({
+    const event: BehaviorEvent = {
       id: `bh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       defId, studentId, note,
       ts: eventTs,
       date,
-    });
+    };
+    log.push(event);
     ls.set(KEYS.behaviorLog, log);
+    _syncPush("behaviorEvent", event);
     return log;
   },
   removeBehaviorEvent: (id: string) => {
     const cur = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
     ls.set(KEYS.behaviorLog, cur.filter((e) => e.id !== id));
+    _syncPush("behaviorEvent.del", id);
   },
   // Behavior templates (reusable antecedent/response/outcome snippets)
   getBehaviorTemplates: (): BehaviorTemplate[] => ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES),
-  setBehaviorTemplates: (v: BehaviorTemplate[]) => ls.set(KEYS.behaviorTemplates, v),
+  setBehaviorTemplates: (v: BehaviorTemplate[]) => {
+    ls.set(KEYS.behaviorTemplates, v);
+    for (const t of v) _syncPush("behaviorTemplate", t);
+  },
   addBehaviorTemplate: (t: BehaviorTemplate) => {
     const cur = ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES);
     cur.push(t);
     ls.set(KEYS.behaviorTemplates, cur);
+    _syncPush("behaviorTemplate", t);
   },
   removeBehaviorTemplate: (id: string) => {
     const cur = ls.get<BehaviorTemplate[]>(KEYS.behaviorTemplates, DEFAULT_BEHAVIOR_TEMPLATES);
     ls.set(KEYS.behaviorTemplates, cur.filter((t) => t.id !== id));
+    _syncPush("behaviorTemplate.del", id);
   },
   // Daily notes — narratives written per kid (and one class-wide)
   // for the end-of-day report. Keyed by `${date}::${studentId}` so
@@ -786,8 +826,10 @@ export const StarStore = {
   },
   upsertDailyNote: (note: DailyNote) => {
     const all = ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {});
-    all[`${note.date}::${note.studentId}`] = { ...note, updatedAt: new Date().toISOString() };
+    const next = { ...note, updatedAt: new Date().toISOString() };
+    all[`${note.date}::${note.studentId}`] = next;
     ls.set(KEYS.dailyNotes, all);
+    _syncPush("dailyNote", next);
   },
   clearDailyNote: (date: string, studentId: string) => {
     const all = ls.get<Record<string, DailyNote>>(KEYS.dailyNotes, {});
@@ -809,6 +851,7 @@ export const StarStore = {
     };
     log.push(event);
     ls.set(KEYS.behaviorLog, log);
+    _syncPush("behaviorEvent", event);
     return { log, event };
   },
 
@@ -860,7 +903,10 @@ export const StarStore = {
     }
     return [];
   },
-  setIepGoals: (v: IepGoal[]) => ls.set(KEYS.iepGoals, v),
+  setIepGoals: (v: IepGoal[]) => {
+    ls.set(KEYS.iepGoals, v);
+    for (const g of v) _syncPush("iepGoal", g);
+  },
   goalsForStudent: (sid: string): IepGoal[] => {
     const all = ls.get<IepGoal[]>(KEYS.iepGoals, []);
     return Array.isArray(all) ? all.filter((g) => g.studentId === sid) : [];
@@ -878,6 +924,7 @@ export const StarStore = {
     };
     all.push(goal);
     ls.set(KEYS.iepGoals, all);
+    _syncPush("iepGoal", goal);
     return goal;
   },
   updateIepGoal: (id: string, patch: { goalText?: string; area?: string; metThreshold?: number | null; partialThreshold?: number | null }) => {
@@ -899,10 +946,12 @@ export const StarStore = {
       updatedDate: new Date().toISOString(),
     };
     ls.set(KEYS.iepGoals, all);
+    _syncPush("iepGoal", all[idx]);
   },
   deleteIepGoal: (id: string) => {
     const all = ls.get<IepGoal[]>(KEYS.iepGoals, []).filter((g) => g.id !== id);
     ls.set(KEYS.iepGoals, all);
+    _syncPush("iepGoal.del", id);
   },
   // Bulk replace for a single student — used by the "Load my class
   // goals" import. Removes existing goals for that kid then adds the
@@ -929,6 +978,7 @@ export const StarStore = {
       });
     }
     ls.set(KEYS.iepGoals, kept);
+    for (const g of kept) if (g.studentId === studentId) _syncPush("iepGoal", g);
   },
 
   // ── IEP grading thresholds (global defaults) ─────────────────────
@@ -938,7 +988,10 @@ export const StarStore = {
   setIepDefaultPartialThreshold: (v: number) => ls.set(KEYS.iepDefaultPartial, Math.max(0, Math.min(100, Math.round(v)))),
 
   getIepLog: () => ls.get<IepLogEntry[]>(KEYS.iepLog, []),
-  setIepLog: (v: IepLogEntry[]) => ls.set(KEYS.iepLog, v),
+  setIepLog: (v: IepLogEntry[]) => {
+    ls.set(KEYS.iepLog, v);
+    for (const e of v) _syncPush("iepLog", e);
+  },
   // Upsert by (studentId + date) — typing a status replaces the prior
   // entry for the same day. Returns the saved entry.
   logIep: (studentId: string, date: string, status: IepStatus, note?: string): IepLogEntry => {
@@ -951,6 +1004,7 @@ export const StarStore = {
     };
     if (idx >= 0) all[idx] = entry; else all.push(entry);
     ls.set(KEYS.iepLog, all);
+    _syncPush("iepLog", entry);
     return entry;
   },
   clearIepLogEntry: (studentId: string, date: string) => {
