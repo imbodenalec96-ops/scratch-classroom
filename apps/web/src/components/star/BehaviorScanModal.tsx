@@ -128,9 +128,23 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
         else stuBufRef.current = "";
       }, 100);
     };
+    // Paste handler — Cmd+V'd STU-{id} also picks the kid.
+    function onPaste(e: ClipboardEvent) {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
+      const text = (e.clipboardData?.getData("text") || "").trim().toUpperCase();
+      const m = /^STU-(.+)$/.exec(text);
+      if (!m) return;
+      e.preventDefault();
+      stuBufRef.current = text;
+      flush();
+    }
+
     window.addEventListener("keypress", onKey);
+    window.addEventListener("paste", onPaste);
     return () => {
       window.removeEventListener("keypress", onKey);
+      window.removeEventListener("paste", onPaste);
       if (stuTimerRef.current) window.clearTimeout(stuTimerRef.current);
     };
   }, [def, students]);

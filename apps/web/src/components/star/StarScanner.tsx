@@ -269,9 +269,27 @@ export default function StarScanner() {
       }
     }
 
+    // Paste handler — when the teacher Cmd+V's a barcode like
+    // STU-{id} or PASS-BATHROOM, route it through handleScan the
+    // same way a hand-scanner would. Skips when pasted INTO an
+    // input/textarea so we don't hijack normal text pasting.
+    function onPaste(e: ClipboardEvent) {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
+      const text = e.clipboardData?.getData("text") || "";
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.length < 3) return;
+      // Looks like a barcode? (Letters, digits, dashes, no spaces.)
+      if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) return;
+      e.preventDefault();
+      handleScan(trimmed.toUpperCase());
+    }
+
     window.addEventListener("keypress", onKey);
+    window.addEventListener("paste", onPaste);
     return () => {
       window.removeEventListener("keypress", onKey);
+      window.removeEventListener("paste", onPaste);
       if (tmrRef.current) window.clearTimeout(tmrRef.current);
     };
   }, []);
