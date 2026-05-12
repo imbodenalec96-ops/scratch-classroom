@@ -26,6 +26,7 @@ import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
 import IepPacketGenerator from "./IepPacketGenerator.tsx";
 import KudosCertificate from "./KudosCertificate.tsx";
 import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
+import StudentReferenceSheet from "./StudentReferenceSheet.tsx";
 import PecsBuilder from "./PecsBuilder.tsx";
 import BehaviorTracker from "./BehaviorTracker.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
@@ -315,6 +316,9 @@ export default function StarPage() {
               </SectionWrapper>
               <SectionWrapper icon="📌" title="Folder labels" description="Avery 5160 sheet with each kid's name + photo + a scannable STAR barcode. Scan the label on the iPad to pull up the kid's pending assignments and recent grades.">
                 <FolderLabelsGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="📋" title="Student reference sheet" description="Clipboard / desk reference with every kid's photo + big scannable barcode. Tally-grid layout adds 8 hand-tracking columns for the day.">
+                <StudentReferenceSheet />
               </SectionWrapper>
               <SectionWrapper icon="🟦" title="PECS card builder" description="Build a printable set of 2&quot; picture symbols for sentence boards, AAC, or first/then. 74 bundled symbols + custom cards.">
                 <PecsBuilder />
