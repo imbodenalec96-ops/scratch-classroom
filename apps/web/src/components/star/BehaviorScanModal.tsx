@@ -85,6 +85,22 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
   const [photoDataUrl, setPhotoDataUrl] = useState<string>("");
   const [templates, setTemplates] = useState<BehaviorTemplate[]>(() => StarStore.getBehaviorTemplates());
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  // Quick-log time picker — defaults to "now" but can be back-
+  // dated. Used by the pick-stage tile-tap so the actual incident
+  // time is recorded, not the time the teacher got around to
+  // tapping the chip. Synced with the form's whenLocal so going
+  // pick → form preserves the chosen time.
+  const [quickWhenLocal, setQuickWhenLocal] = useState<string>(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [quickShiftMin, setQuickShiftMin] = useState<number>(0);  // for the -5/-10/-15 quick-shift chips
+  const computeQuickTs = () => {
+    const base = quickWhenLocal ? new Date(quickWhenLocal) : new Date();
+    if (quickShiftMin) base.setMinutes(base.getMinutes() - quickShiftMin);
+    return base.toISOString();
+  };
 
   // Reads + downscales a photo for storage. Big files in localStorage
   // crash localStorage quickly, so we cap to ~640px on the long side
@@ -149,8 +165,8 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
   }, [onClose]);
 
   // Auto-quick-log + close when a non-reportable behavior (positive
-  // / neutral) is opened with a kid already pre-picked. There's no
-  // form to fill in those cases — just log and dismiss.
+  // / neutral) is opened with a kid already pre-picked. Uses "now"
+  // since there's no chance to set the time when auto-logging.
   useEffect(() => {
     if (!def || isReportable) return;
     if (!prePickedStudentId) return;
@@ -242,11 +258,13 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
 
   const quickLog = (sid: string) => {
     if (!def) return;
-    StarStore.recordBehavior(def.id, sid);
+    const ts = computeQuickTs();
+    StarStore.recordBehavior(def.id, sid, undefined, ts);
     loggedBeep();
     successBeep();
     const stu = students.find((s) => s.id === sid);
-    showFlash("ok", `Quick log saved · ${def.emoji} ${def.label} for ${stu?.firstName || "kid"}`);
+    const tShort = new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    showFlash("ok", `Logged at ${tShort} · ${def.emoji} ${def.label} for ${stu?.firstName || "kid"}`);
     setTimeout(() => onClose(), 700);
   };
 
@@ -334,6 +352,55 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId, 
           }}>
             🔍 <b style={{ color: "#f9a8d4" }}>Scan a folder label</b> (the kid's STU- barcode) to pick that student instantly — fastest way. Or tap a tile below.
           </div>
+          {/* When-did-this-happen picker — applies to quick-log
+              taps. Defaults to now; the chips quickly back-date by
+              5/10/15 minutes for the common "I'm logging this a
+              few minutes after it happened" case. */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center",
+            padding: "8px 12px", borderRadius: 10, marginBottom: 10,
+            background: "rgba(168,85,247,0.06)",
+            border: "1px solid rgba(168,85,247,0.30)",
+          }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 4 }}>
+                ⏰ When did this happen?
+              </div>
+              <input
+                type="datetime-local"
+                value={quickWhenLocal}
+                onChange={(e) => { setQuickWhenLocal(e.target.value); setQuickShiftMin(0); }}
+                style={{
+                  padding: "7px 10px", borderRadius: 8,
+                  background: "rgba(0,0,0,0.30)", color: "white",
+                  border: "1px solid rgba(168,85,247,0.25)",
+                  fontSize: 13, outline: "none", fontFamily: "Menlo, monospace",
+                  width: "100%", maxWidth: 260, boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+                Backdate
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {[0, 5, 10, 15].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setQuickShiftMin(m)}
+                    style={{
+                      padding: "5px 8px", borderRadius: 6,
+                      background: quickShiftMin === m ? "rgba(168,85,247,0.30)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${quickShiftMin === m ? "rgba(168,85,247,0.55)" : "rgba(255,255,255,0.10)"}`,
+                      color: quickShiftMin === m ? "#f9a8d4" : "rgba(245,241,232,0.65)",
+                      fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "Menlo, monospace",
+                    }}
+                  >{m === 0 ? "now" : `−${m}m`}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
             {isReportable
               ? `Pick a kid · single-tap = quick log · "+" = full ABC report`

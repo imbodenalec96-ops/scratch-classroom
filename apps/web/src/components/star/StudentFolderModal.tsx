@@ -83,12 +83,24 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId, logTick]);
 
+  // Quick-log time picker — defaults to "now" but the teacher can
+  // backdate via a -5m / -10m / -15m chip when she's logging an
+  // incident from a few minutes ago.
+  const [quickShiftMin, setQuickShiftMin] = useState<number>(0);
+  const computeQuickTs = () => {
+    const d = new Date();
+    if (quickShiftMin) d.setMinutes(d.getMinutes() - quickShiftMin);
+    return d.toISOString();
+  };
+
   const recordBehavior = (defId: string, note?: string) => {
-    StarStore.recordBehavior(defId, studentId, note);
+    const ts = computeQuickTs();
+    StarStore.recordBehavior(defId, studentId, note, ts);
     setLogTick((t) => t + 1);
     successBeep();
     const def = defs.find((d) => d.id === defId);
-    showFlash("ok", `Logged · ${def?.emoji || ""} ${def?.label || ""}${note ? " (with note)" : ""}`);
+    const tShort = new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    showFlash("ok", `Logged at ${tShort} · ${def?.emoji || ""} ${def?.label || ""}${note ? " (with note)" : ""}`);
   };
 
   const openNoteDialog = (defId: string) => {
@@ -361,6 +373,37 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
 
         {/* QUICK BEHAVIOR LOG */}
         <Section title="📈 Quick log a behavior" count={visibleDefs.length}>
+          {visibleDefs.length > 0 && (
+            <div style={{
+              display: "flex", gap: 6, alignItems: "center", marginBottom: 8,
+              padding: "6px 10px", borderRadius: 8,
+              background: "rgba(168,85,247,0.06)",
+              border: "1px solid rgba(168,85,247,0.30)",
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+                ⏰ When:
+              </span>
+              {[0, 5, 10, 15].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setQuickShiftMin(m)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 6,
+                    background: quickShiftMin === m ? "rgba(168,85,247,0.30)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${quickShiftMin === m ? "rgba(168,85,247,0.55)" : "rgba(255,255,255,0.10)"}`,
+                    color: quickShiftMin === m ? "#f9a8d4" : "rgba(245,241,232,0.65)",
+                    fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "Menlo, monospace",
+                  }}
+                >{m === 0 ? "now" : `−${m}m`}</button>
+              ))}
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(196,181,253,0.55)", fontFamily: "Menlo, monospace" }}>
+                {(() => {
+                  const d = new Date(); d.setMinutes(d.getMinutes() - quickShiftMin);
+                  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                })()}
+              </span>
+            </div>
+          )}
           {visibleDefs.length === 0 ? (
             <Empty>No behaviors defined yet. Open /star → 📈 Behavior to add some.</Empty>
           ) : (

@@ -27,6 +27,13 @@ export default function BehaviorTracker() {
   const [pendingNoteFor, setPendingNoteFor] = useState<{ defId: string; studentId: string } | null>(null);
   const [pendingNote, setPendingNote] = useState("");
   const [reportRange, setReportRange] = useState<"today" | "week" | "month">("today");
+  // Backdate quick-logs (teacher logging an event from a few min ago)
+  const [quickShiftMin, setQuickShiftMin] = useState<number>(0);
+  const computeQuickTs = () => {
+    const d = new Date();
+    if (quickShiftMin) d.setMinutes(d.getMinutes() - quickShiftMin);
+    return d.toISOString();
+  };
 
   // Filter the chip palette by scope: show class-wide + this kid's own.
   const visibleDefs = useMemo(() => {
@@ -35,7 +42,8 @@ export default function BehaviorTracker() {
 
   const recordInstance = (defId: string, opts?: { note?: string }) => {
     if (!studentId) return;
-    const next = StarStore.recordBehavior(defId, studentId, opts?.note);
+    const ts = computeQuickTs();
+    const next = StarStore.recordBehavior(defId, studentId, opts?.note, ts);
     setLog(next);
     loggedBeep();
   };
@@ -156,6 +164,37 @@ export default function BehaviorTracker() {
       {/* Chip palette — tap to record */}
       {studentId ? (
         <>
+          {/* Time picker — backdate quick-logs */}
+          <div style={{
+            display: "flex", gap: 6, alignItems: "center", marginBottom: 10,
+            padding: "8px 12px", borderRadius: 10,
+            background: "rgba(168,85,247,0.06)",
+            border: "1px solid rgba(168,85,247,0.30)",
+            flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+              ⏰ When:
+            </span>
+            {[0, 5, 10, 15, 30].map((m) => (
+              <button
+                key={m}
+                onClick={() => setQuickShiftMin(m)}
+                style={{
+                  padding: "4px 10px", borderRadius: 6,
+                  background: quickShiftMin === m ? "rgba(168,85,247,0.30)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${quickShiftMin === m ? "rgba(168,85,247,0.55)" : "rgba(255,255,255,0.10)"}`,
+                  color: quickShiftMin === m ? "#f9a8d4" : "rgba(245,241,232,0.65)",
+                  fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "Menlo, monospace",
+                }}
+              >{m === 0 ? "now" : `−${m}m`}</button>
+            ))}
+            <span style={{ marginLeft: "auto", fontSize: 12, color: "#f9a8d4", fontFamily: "Menlo, monospace", fontWeight: 800 }}>
+              {(() => {
+                const d = new Date(); d.setMinutes(d.getMinutes() - quickShiftMin);
+                return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+              })()}
+            </span>
+          </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
             Tap a chip to record · long-press to add a note
           </div>

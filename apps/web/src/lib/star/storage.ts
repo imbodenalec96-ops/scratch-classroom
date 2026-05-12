@@ -670,15 +670,21 @@ export const StarStore = {
     ls.set(KEYS.behaviorDefs, cur.filter((d) => d.id !== id));
   },
   getBehaviorLog: (): BehaviorEvent[] => ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []),
-  recordBehavior: (defId: string, studentId: string, note?: string) => {
+  // recordBehavior — now accepts an optional `ts` so quick-logs can
+  // be backdated to when the incident actually happened (the teacher
+  // is often logging 5–30 min after the moment). `date` is derived
+  // from `ts` so reports filter correctly. Falls back to "now"
+  // when ts is omitted.
+  recordBehavior: (defId: string, studentId: string, note?: string, ts?: string) => {
     const log = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
-    const now = new Date();
-    const d = new Date(now.getTime() - 7 * 3600_000); // Pacific date
-    const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const eventTs = ts || new Date().toISOString();
+    const eventDate = new Date(eventTs);
+    const pacific = new Date(eventDate.getTime() - 7 * 3600_000);
+    const date = `${pacific.getUTCFullYear()}-${String(pacific.getUTCMonth() + 1).padStart(2, "0")}-${String(pacific.getUTCDate()).padStart(2, "0")}`;
     log.push({
       id: `bh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       defId, studentId, note,
-      ts: now.toISOString(),
+      ts: eventTs,
       date,
     });
     ls.set(KEYS.behaviorLog, log);
