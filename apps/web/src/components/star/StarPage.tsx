@@ -24,6 +24,8 @@ import QuizGenerator, { QuizPackGenerator } from "./QuizGenerator.tsx";
 import IepTracker from "./IepTracker.tsx";
 import IepAssignmentGenerator from "./IepAssignmentGenerator.tsx";
 import IepPacketGenerator from "./IepPacketGenerator.tsx";
+import KudosCertificate from "./KudosCertificate.tsx";
+import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -304,6 +306,12 @@ export default function StarPage() {
               </SectionWrapper>
               <SectionWrapper icon="📋" title="Sub plans packet" description="Schedule + roster + IEP cliff notes + your emergency procedures, all in one PDF.">
                 <SubPlansGenerator />
+              </SectionWrapper>
+              <SectionWrapper icon="🏆" title="Kudos certificate" description="One-tap fun certificate on cardstock — kid's name, photo, and a kudos barcode for the fridge.">
+                <KudosCertificate />
+              </SectionWrapper>
+              <SectionWrapper icon="📌" title="Folder labels" description="Avery 5160 sheet with each kid's name + photo + a scannable STAR barcode.">
+                <FolderLabelsGenerator />
               </SectionWrapper>
             </div>
           </CreateGroup>
