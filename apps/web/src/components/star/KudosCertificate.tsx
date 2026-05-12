@@ -112,7 +112,10 @@ function openKudosWindow(args: {
   date: string; avatarUrl?: string; avatarEmoji?: string;
 }) {
   const w = window.open("", "_blank", "width=1100,height=900");
-  if (!w) return;
+  if (!w) {
+    alert("Pop-up blocked. Allow pop-ups for this site so the kudos certificate can open in a new window, then tap Print Kudos again.");
+    return;
+  }
   const { student, reason, teacherName, date, avatarUrl, avatarEmoji } = args;
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -144,11 +147,29 @@ function openKudosWindow(args: {
 
   w.document.write(`<!doctype html><html><head><title>Kudos — ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</title>
     <style>
+      /* Preserve every gold gradient, color, and shadow when sent to
+         the printer / Print to PDF. Without these flags Chrome and
+         Safari strip the gold borders and the ribbon banner during
+         print so the certificate comes out plain white. */
+      *, *::before, *::after {
+        -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+      }
+      html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
       @media print {
-        @page { size: letter landscape; margin: 0.35in; }
+        @page { size: letter landscape; margin: 0.3in; }
         .no-print { display: none !important; }
-        body { background: white !important; }
-        .cert { box-shadow: none !important; }
+        body { background: white !important; margin: 0 !important; }
+        .cert {
+          box-shadow: none !important;
+          margin: 0 auto !important;
+          width: 10.4in !important;
+          height: 7.9in !important;
+          aspect-ratio: auto !important;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
       }
 
       :root {
@@ -203,18 +224,12 @@ function openKudosWindow(args: {
         pointer-events: none;
       }
       .border-inner {
-        position: absolute; inset: 28px; border-radius: 0;
-        border: 6px solid transparent;
-        background:
-          linear-gradient(var(--cream), var(--cream)) padding-box,
-          linear-gradient(135deg,
-            var(--gold-1) 0%,
-            var(--gold-3) 25%,
-            var(--gold-light) 50%,
-            var(--gold-3) 75%,
-            var(--gold-1) 100%) border-box;
-        -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor; mask-composite: exclude;
+        /* Solid-color thick gold band. The previous masked-gradient
+           border rendered as a transparent line in Chrome's PDF
+           engine — solid border is print-safe. */
+        position: absolute; inset: 28px;
+        border: 6px solid var(--gold-2);
+        box-shadow: inset 0 0 0 1px var(--gold-light), inset 0 0 0 2px var(--gold-1);
         pointer-events: none;
       }
       /* Dotted rule between the gold band and the content */
@@ -275,8 +290,10 @@ function openKudosWindow(args: {
       h1.title {
         text-align: center; margin: 8px 0 4px; font-style: italic;
         font-size: 56px; line-height: 1; letter-spacing: 0.01em;
-        background: linear-gradient(180deg, var(--gold-1) 0%, var(--gold-2) 60%, #8a3f0a 100%);
-        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        /* Solid color — gradient-text via background-clip is unreliable
+           in print engines (renders as transparent on Chrome PDF). */
+        color: var(--gold-1);
+        text-shadow: 0 1px 0 var(--gold-light), 0 2px 1px rgba(120,53,15,0.18);
       }
       .subtitle {
         text-align: center;
@@ -305,15 +322,11 @@ function openKudosWindow(args: {
         flex-shrink: 0;
       }
       .medallion .ring-outer {
+        /* Layered radial gradient instead of conic — print-safe and
+           still gives the brushed-gold effect. */
         position: absolute; inset: 0; border-radius: 50%;
         background:
-          conic-gradient(from 220deg,
-            var(--gold-1) 0deg,
-            var(--gold-3) 60deg,
-            var(--gold-light) 130deg,
-            var(--gold-3) 200deg,
-            var(--gold-1) 280deg,
-            var(--gold-2) 360deg);
+          radial-gradient(circle at 35% 30%, var(--gold-light) 0%, var(--gold-3) 35%, var(--gold-2) 70%, var(--gold-1) 100%);
         box-shadow:
           0 0 0 3px var(--gold-1),
           0 14px 36px -10px rgba(120, 53, 15, 0.55),
@@ -485,7 +498,30 @@ function openKudosWindow(args: {
         </div>
       </div>
     </div>
-    <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),300))</script>
+    <script>
+      // Wait until every image (the avatar especially) has actually
+      // finished loading before opening the print dialog. The old
+      // setTimeout-300 fired while the avatar was still loading on
+      // slow networks so the printed page came out without it.
+      (function () {
+        function go() { try { window.focus(); window.print(); } catch (e) {} }
+        function ready() {
+          var imgs = Array.prototype.slice.call(document.images);
+          if (imgs.length === 0) { setTimeout(go, 250); return; }
+          var pending = imgs.filter(function (i) { return !i.complete; });
+          if (pending.length === 0) { setTimeout(go, 250); return; }
+          var left = pending.length;
+          pending.forEach(function (img) {
+            img.addEventListener("load",  function () { if (--left <= 0) setTimeout(go, 200); });
+            img.addEventListener("error", function () { if (--left <= 0) setTimeout(go, 200); });
+          });
+          // Hard fallback in case a load event never fires (CDN slow):
+          setTimeout(go, 4000);
+        }
+        if (document.readyState === "complete") ready();
+        else window.addEventListener("load", ready);
+      })();
+    </script>
   </body></html>`);
   w.document.close();
   successBeep();
