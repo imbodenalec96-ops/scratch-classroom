@@ -30,6 +30,7 @@ import StudentReferenceSheet from "./StudentReferenceSheet.tsx";
 import PecsBuilder from "./PecsBuilder.tsx";
 import BehaviorTracker from "./BehaviorTracker.tsx";
 import EndOfDayReport from "./EndOfDayReport.tsx";
+import StarBackupPanel from "./StarBackupPanel.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
 import SubPlansGenerator from "./SubPlansGenerator.tsx";
 import StarReports from "./StarReports.tsx";
@@ -426,6 +427,11 @@ export default function StarPage() {
             subtitle="OpenRouter AI key, points-per-completion, quick note templates, and your student roster."
           />
           <SettingsPanel />
+          <div style={{ marginTop: T.space["2xl"] }}>
+            <SectionWrapper icon="💾" title="Cross-device backup & restore" description="Carry behaviors / IEP goals / daily notes / custom music / templates between your MacBook, iPad, and Chromebook. The roster + assignments sync automatically through the server, but local-only settings need this.">
+              <StarBackupPanel />
+            </SectionWrapper>
+          </div>
         </>
       )}
 
