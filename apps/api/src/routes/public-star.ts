@@ -73,6 +73,47 @@ router.get("/board/classes/:classId/data", async (req: Request, res: Response) =
   }
 });
 
+// Public list of STAR submissions for a class — used by the
+// projector board (which runs unauthed) to show each kid's grade
+// average. Same shape as the authed endpoint.
+let publicSubmissionsReady = false;
+async function ensurePublicSubmissions() {
+  if (publicSubmissionsReady) return;
+  try {
+    // Same idempotent schema as the authed route; both paths can
+    // call this without conflict.
+    await db.exec(`CREATE TABLE IF NOT EXISTS star_submissions (
+      class_id TEXT NOT NULL,
+      barcode TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      student_name TEXT,
+      pct INTEGER NOT NULL DEFAULT 0,
+      letter_grade TEXT,
+      status TEXT,
+      score INTEGER,
+      max_score INTEGER,
+      completed_date TEXT,
+      logged_at TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (class_id, barcode, student_id)
+    )`);
+    publicSubmissionsReady = true;
+  } catch { publicSubmissionsReady = true; }
+}
+
+router.get("/classes/:classId/star-submissions", async (req: Request, res: Response) => {
+  await ensurePublicSubmissions();
+  try {
+    const rows: any[] = await db.prepare(
+      `SELECT class_id, barcode, student_id, student_name, pct, letter_grade, status, score, max_score, completed_date, logged_at
+       FROM star_submissions WHERE class_id = ? ORDER BY logged_at DESC LIMIT 5000`
+    ).all(req.params.classId);
+    res.json({ submissions: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "fetch failed" });
+  }
+});
+
 // Public list of classes — just id + name so the projector / iPad
 // can pick a class without logging in. No member-level info.
 router.get("/classes", async (_req: Request, res: Response) => {

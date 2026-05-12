@@ -1662,6 +1662,92 @@ router.get("/:classId/star-barcodes/:barcode", async (req: AuthRequest, res: Res
   }
 });
 
+/* ── STAR submissions (grades) ─────────────────────────────────────
+ * Mirrors the local star_asntrack submissions so the board on any
+ * device — not just the teacher's MacBook — can show grades. The
+ * teacher's GradebookModal POSTs here on save; the public read
+ * endpoint (in public-star.ts) lets the projector / iPad fetch
+ * them without logging in.
+ */
+let starSubmissionsReady = false;
+async function ensureStarSubmissions() {
+  if (starSubmissionsReady) return;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS star_submissions (
+      class_id TEXT NOT NULL,
+      barcode TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      student_name TEXT,
+      pct INTEGER NOT NULL DEFAULT 0,
+      letter_grade TEXT,
+      status TEXT,
+      score INTEGER,
+      max_score INTEGER,
+      completed_date TEXT,
+      logged_at TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (class_id, barcode, student_id)
+    )`);
+    starSubmissionsReady = true;
+  } catch { starSubmissionsReady = true; }
+}
+
+// Upsert a submission. Same kid + same assignment overwrites — that
+// matches the local behavior where re-grading replaces the entry.
+router.post("/:classId/star-submissions", requireRole("teacher", "admin"), async (req: AuthRequest, res: Response) => {
+  await ensureStarSubmissions();
+  const classId = req.params.classId;
+  const b = req.body || {};
+  const barcode = String(b.barcode || "").trim().toUpperCase();
+  const studentId = String(b.studentId || "").trim();
+  if (!barcode || !studentId) return res.status(400).json({ error: "barcode + studentId required" });
+  try {
+    await db.prepare(
+      `INSERT INTO star_submissions (class_id, barcode, student_id, student_name, pct, letter_grade, status, score, max_score, completed_date, logged_at, payload)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (class_id, barcode, student_id) DO UPDATE SET
+         student_name = EXCLUDED.student_name,
+         pct = EXCLUDED.pct,
+         letter_grade = EXCLUDED.letter_grade,
+         status = EXCLUDED.status,
+         score = EXCLUDED.score,
+         max_score = EXCLUDED.max_score,
+         completed_date = EXCLUDED.completed_date,
+         logged_at = EXCLUDED.logged_at,
+         payload = EXCLUDED.payload`
+    ).run(
+      classId, barcode, studentId,
+      b.studentName || null,
+      Number.isFinite(b.pct) ? Math.round(b.pct) : 0,
+      String(b.letterGrade || ""),
+      String(b.status || "completed"),
+      Number.isFinite(b.score) ? b.score : null,
+      Number.isFinite(b.maxScore) ? b.maxScore : null,
+      String(b.completedDate || ""),
+      b.loggedAt || new Date().toISOString(),
+      JSON.stringify(b),
+    );
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "save failed" });
+  }
+});
+
+// Authed list — returns every submission for this class so a fresh
+// device (e.g. teacher's iPad opening /star for the first time)
+// can hydrate the local asnTrack mirror.
+router.get("/:classId/star-submissions", async (req: AuthRequest, res: Response) => {
+  await ensureStarSubmissions();
+  try {
+    const rows: any[] = await db.prepare(
+      `SELECT * FROM star_submissions WHERE class_id = ? ORDER BY logged_at DESC LIMIT 5000`
+    ).all(req.params.classId);
+    res.json({ submissions: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "fetch failed" });
+  }
+});
+
 router.post("/:classId/help", async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "auth required" });
   const classId = req.params.classId;

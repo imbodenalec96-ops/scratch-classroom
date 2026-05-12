@@ -142,6 +142,29 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     saveAll({ asnTracker: allTrack, bcDB });
     setTracker(trk);
 
+    // Push to the server so the board on any device picks it up
+    // (the board polls /public/star-submissions on mount). Fire and
+    // forget — we don't want a flaky network blocking the save.
+    (async () => {
+      try {
+        const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
+        const classId = getActiveClassId();
+        if (!classId) return;
+        await api.starSubmissionPost(classId, {
+          barcode: entry.id,
+          studentId: s.id,
+          studentName: sub.studentName,
+          pct: sub.pct,
+          letterGrade: sub.letterGrade,
+          status: sub.status,
+          score: sub.score,
+          maxScore: sub.maxScore,
+          completedDate: sub.completedDate,
+          loggedAt: sub.loggedAt,
+        });
+      } catch {}
+    })();
+
     // Award class-store points for a completed assignment. We try the API
     // call regardless of how the student id looks — if it's not a real DB
     // user, the call fails and we surface that to the teacher so they

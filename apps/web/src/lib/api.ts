@@ -71,6 +71,16 @@ export const api = {
     request<{ barcode: string; payload: any; class_id: string; created_at: string }>(
       `/public/star-barcodes/${encodeURIComponent(barcode)}`,
     ),
+  // STAR submission relay — same purpose as star-barcodes but for
+  // grades. Teacher posts on save; board / iPad pulls on hydrate.
+  starSubmissionPost: (classId: string, payload: any) =>
+    request<{ ok: boolean }>(`/classes/${classId}/star-submissions`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  starSubmissionsList: (classId: string) =>
+    request<{ submissions: any[] }>(`/classes/${classId}/star-submissions`),
+  starSubmissionsPublic: (classId: string) =>
+    request<{ submissions: any[] }>(`/public/classes/${classId}/star-submissions`),
   getClasses: () => request<any[]>("/classes"),
   createClass: (name: string) => request<any>("/classes", { method: "POST", body: JSON.stringify({ name }) }),
   getClass: (id: string) => request<any>(`/classes/${id}`),
