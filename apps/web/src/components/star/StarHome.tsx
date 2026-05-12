@@ -125,6 +125,7 @@ export default function StarHome({ onTab }: { onTab: (tab: "create" | "gradebook
         <ActionTile icon="🚨" title="Refusal Form" subtitle="Print a fresh form" onClick={() => onTab("create")} />
         <ActionTile icon="🚻" title="Pass Sheet" subtitle="Print pass barcodes" onClick={() => onTab("create")} />
         <ActionTile icon="📚" title="Gradebook" subtitle="Student grades" onClick={() => onTab("gradebook")} />
+        <ActionTile icon="🗣" title="AAC Quick Board" subtitle="Tablet speak-on-tap" onClick={() => { window.location.href = "/star/aac"; }} />
       </div>
 
       {/* Recent activity */}

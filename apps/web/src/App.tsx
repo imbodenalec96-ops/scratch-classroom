@@ -69,6 +69,7 @@ const StudentVideoPage = lazy(() => import("./components/StudentVideoPage.tsx"))
 const PrintAssignment = lazy(() => import("./components/PrintAssignment.tsx"));
 const StarPage = lazy(() => import("./components/star/StarPage.tsx"));
 const StarPhonePage = lazy(() => import("./components/star/StarPhonePage.tsx"));
+const AacQuickBoard = lazy(() => import("./components/star/AacQuickBoard.tsx"));
 import StarScanner from "./components/star/StarScanner.tsx";
 import StarBoardOverlay from "./components/star/StarBoardOverlay.tsx";
 import UpdateChecker from "./components/UpdateChecker.tsx";
@@ -242,6 +243,7 @@ export default function App() {
             <Route path="teacher/assignment-schedule" element={<AssignmentSchedulePage />} />
             <Route path="star" element={<StarPage />} />
             <Route path="star/phone" element={<StarPhonePage />} />
+            <Route path="star/aac" element={<AacQuickBoard />} />
 
             {/* Schedule block routes — placeholder pages auto-nav'd to by useBlockAutoNav */}
             <Route path="daily-news" element={<DailyNewsViewer />} />
