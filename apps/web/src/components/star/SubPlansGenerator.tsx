@@ -1,17 +1,21 @@
 // "I'm out tomorrow" packet — one-tap printable substitute teacher
-// pack. Pulls the schedule + roster + IEP cliff notes + each kid's
-// triggers/strategies (subNotes), formats it for a sub who's never
-// seen the room before.
+// pack. Pulls the schedule + roster + each kid's triggers/strategies
+// (subNotes), formats it for a sub who's never seen the room before.
+//
+// IEP goals are intentionally NOT included — they're confidential and
+// don't belong in a sub packet. Use the SEIF report (in /star → IEP)
+// for IEP-team distribution instead.
 //
 // Optional fields the teacher fills here (saved locally):
 //   - Day note (e.g. "Math is at 11 today, not the usual 10")
+//   - Custom sections (anything else: lunch count routine, log-in
+//     codes, where the bathroom keys live, etc.)
 //   - Emergency contacts (custodian, principal, nurse)
-//   - "Special things to know"
 
 import { useEffect, useMemo, useState } from "react";
 import {
   StarStore,
-  type StarStudent, type IepGoal,
+  type StarStudent,
 } from "../../lib/star/storage.ts";
 import { api } from "../../lib/api.ts";
 import { successBeep, loggedBeep } from "../../lib/star/sounds.ts";
@@ -28,7 +32,15 @@ const KEYS = {
   emergency: "star_subplans_emergency",
   notes: "star_subplans_day_notes",
   teacher: "star_subplans_teacher",
+  customSections: "star_subplans_custom_sections",
+  manualSchedule: "star_subplans_manual_schedule",
 };
+
+interface CustomSection {
+  id: string;
+  title: string;
+  body: string;
+}
 
 function todayPacific(): string {
   const d = new Date(Date.now() - 7 * 3600_000);
@@ -37,7 +49,6 @@ function todayPacific(): string {
 
 export default function SubPlansGenerator() {
   const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
-  const [goals] = useState<IepGoal[]>(() => StarStore.getIepGoals());
   const [schedule, setSchedule] = useState<ScheduleBlock[]>([]);
   const [scheduleErr, setScheduleErr] = useState<string | null>(null);
   const [date, setDate] = useState<string>(() => {
@@ -47,6 +58,13 @@ export default function SubPlansGenerator() {
   const [teacherName, setTeacherName] = useState<string>(() => loadStr(KEYS.teacher, ""));
   const [emergencyText, setEmergencyText] = useState<string>(() => loadStr(KEYS.emergency, defaultEmergencyText()));
   const [dayNote, setDayNote] = useState<string>(() => loadStr(KEYS.notes, ""));
+  // Manual schedule rows for when the API doesn't have one (or when
+  // the teacher wants to override). Saved locally per device.
+  const [manualSchedule, setManualSchedule] = useState<ScheduleBlock[]>(() => loadJson<ScheduleBlock[]>(KEYS.manualSchedule, []));
+  const [showSchedEditor, setShowSchedEditor] = useState(false);
+  // Custom sections — anything else the sub needs (lunch count
+  // routine, where the bathroom key lives, computer login info, etc.)
+  const [customSections, setCustomSections] = useState<CustomSection[]>(() => loadJson<CustomSection[]>(KEYS.customSections, []));
 
   // Load the class schedule from the API once mounted.
   useEffect(() => {
@@ -73,23 +91,50 @@ export default function SubPlansGenerator() {
     return () => { cancelled = true; };
   }, []);
 
-  const goalsByStudent = useMemo(() => {
-    const m: Record<string, IepGoal[]> = {};
-    for (const g of goals) (m[g.studentId] ||= []).push(g);
-    return m;
-  }, [goals]);
+  // Effective schedule: manual rows always win when present (lets the
+  // teacher fix a bad API response or fill one in entirely manually).
+  const effectiveSchedule = manualSchedule.length > 0 ? manualSchedule : schedule;
 
   const print = () => {
     saveStr(KEYS.teacher, teacherName);
     saveStr(KEYS.emergency, emergencyText);
     saveStr(KEYS.notes, dayNote);
+    saveJson(KEYS.manualSchedule, manualSchedule);
+    saveJson(KEYS.customSections, customSections);
     openSubPacketWindow({
-      students, goalsByStudent, schedule, date,
+      students, schedule: effectiveSchedule, date,
       teacherName: teacherName.trim(),
       emergencyText: emergencyText.trim(),
       dayNote: dayNote.trim(),
+      customSections: customSections.filter((c) => c.title.trim() || c.body.trim()),
     });
     loggedBeep();
+  };
+
+  // Schedule editor handlers
+  const addScheduleRow = () => setManualSchedule((rows) => [...rows, { start_time: "", end_time: "", label: "", subject: "" }]);
+  const updateScheduleRow = (i: number, patch: Partial<ScheduleBlock>) => {
+    setManualSchedule((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  };
+  const removeScheduleRow = (i: number) => setManualSchedule((rows) => rows.filter((_, idx) => idx !== i));
+  const seedScheduleFromApi = () => {
+    if (schedule.length === 0) return;
+    setManualSchedule(schedule.map((b) => ({ ...b })));
+  };
+  const clearManualSchedule = () => {
+    if (!window.confirm("Drop manual schedule and use the API one?")) return;
+    setManualSchedule([]);
+  };
+
+  // Custom-section handlers
+  const addCustomSection = () => {
+    setCustomSections((s) => [...s, { id: `cs-${Date.now()}`, title: "", body: "" }]);
+  };
+  const updateCustomSection = (id: string, patch: Partial<CustomSection>) => {
+    setCustomSections((s) => s.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  };
+  const removeCustomSection = (id: string) => {
+    setCustomSections((s) => s.filter((c) => c.id !== id));
   };
 
   return (
@@ -131,15 +176,105 @@ export default function SubPlansGenerator() {
         />
       </Field>
 
+      {/* Schedule editor — collapsed by default, expand to override */}
+      <div style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+            Schedule for the day · {effectiveSchedule.length} block{effectiveSchedule.length === 1 ? "" : "s"}
+            {manualSchedule.length > 0 && <span style={{ marginLeft: 8, color: "#f9a8d4" }}>· edited manually</span>}
+          </div>
+          <button onClick={() => setShowSchedEditor((v) => !v)} style={ghostBtn()}>
+            {showSchedEditor ? "✕ Close editor" : "✏️ Edit schedule"}
+          </button>
+        </div>
+        {showSchedEditor && (
+          <div style={{
+            padding: 12, borderRadius: 12, marginBottom: 8,
+            background: "rgba(168,85,247,0.06)",
+            border: "1px solid rgba(168,85,247,0.30)",
+          }}>
+            <div style={{ fontSize: 11, color: "rgba(196,181,253,0.75)", marginBottom: 8 }}>
+              Schedule loads automatically from <b>/board</b> (the Teacher Board Settings → Schedule).
+              Override it here just for this packet — manual rows always win when present.
+            </div>
+            {manualSchedule.length === 0 ? (
+              <div style={{ fontSize: 12, color: "rgba(196,181,253,0.55)", padding: 8, textAlign: "center", borderRadius: 8, background: "rgba(0,0,0,0.20)", marginBottom: 8 }}>
+                No manual rows yet. {schedule.length > 0 ? `${schedule.length} blocks loaded from the board API.` : "Nothing loaded from the board either."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                {manualSchedule.map((b, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 90px 1fr 1fr auto", gap: 6, alignItems: "center" }}>
+                    <input type="time" value={b.start_time || ""} onChange={(e) => updateScheduleRow(i, { start_time: e.target.value })} style={smallInp()} />
+                    <input type="time" value={b.end_time || ""} onChange={(e) => updateScheduleRow(i, { end_time: e.target.value })} style={smallInp()} />
+                    <input value={b.label || ""} onChange={(e) => updateScheduleRow(i, { label: e.target.value })} placeholder="Block name (e.g. Reading)" style={smallInp()} />
+                    <input value={b.subject || ""} onChange={(e) => updateScheduleRow(i, { subject: e.target.value })} placeholder="Notes (room #, page, etc.)" style={smallInp()} />
+                    <button onClick={() => removeScheduleRow(i)} style={miniDanger()}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              {schedule.length > 0 && manualSchedule.length === 0 && (
+                <button onClick={seedScheduleFromApi} style={ghostBtn()}>📥 Copy {schedule.length} from board</button>
+              )}
+              {manualSchedule.length > 0 && (
+                <button onClick={clearManualSchedule} style={ghostBtn()}>↺ Reset to board</button>
+              )}
+              <button onClick={addScheduleRow} style={primaryBtn(false)}>+ Add row</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Custom sections — anything else the sub needs */}
+      <div style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)" }}>
+            Extra sections · {customSections.length}
+          </div>
+          <button onClick={addCustomSection} style={ghostBtn()}>+ Add section</button>
+        </div>
+        {customSections.length === 0 ? (
+          <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", padding: 8, textAlign: "center", borderRadius: 8, background: "rgba(0,0,0,0.20)" }}>
+            Add anything else the sub needs — lunch count routine, where the bathroom keys live, computer login info, attendance instructions, fire drill spot, etc.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {customSections.map((c) => (
+              <div key={c.id} style={{
+                padding: 10, borderRadius: 10,
+                background: "rgba(168,85,247,0.04)",
+                border: "1px solid rgba(168,85,247,0.20)",
+              }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6, marginBottom: 6 }}>
+                  <input value={c.title} onChange={(e) => updateCustomSection(c.id, { title: e.target.value })} placeholder="Section title (e.g. 'Lunch count routine')" style={inp()} />
+                  <button onClick={() => removeCustomSection(c.id)} style={miniDanger()}>✕</button>
+                </div>
+                <textarea
+                  value={c.body}
+                  onChange={(e) => updateCustomSection(c.id, { body: e.target.value })}
+                  rows={3}
+                  placeholder="Tell the sub what to do, in any order. Each line prints as a separate line in the packet."
+                  style={{ ...inp(), resize: "vertical", fontFamily: "inherit" }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{
-        marginTop: 12, padding: "10px 14px", borderRadius: 12,
+        marginTop: 14, padding: "10px 14px", borderRadius: 12,
         background: "rgba(168,85,247,0.06)",
         border: "1px solid rgba(168,85,247,0.20)",
         fontSize: 12, color: "rgba(196,181,253,0.80)", fontWeight: 600, lineHeight: 1.5,
       }}>
-        Packet includes: today's schedule ({schedule.length || "—"} blocks), <b style={{ color: "#fce7f3" }}>{students.length}</b> students with IEP cliff notes,
-        per-kid triggers + calming strategies (set in Settings → Sub Notes), and your emergency procedures.
-        {scheduleErr && <div style={{ marginTop: 4, color: "#fca5a5" }}>⚠ {scheduleErr} — packet will print without the schedule grid.</div>}
+        Packet includes: schedule ({effectiveSchedule.length || "—"} blocks), <b style={{ color: "#fce7f3" }}>{students.length}</b> students with per-kid triggers + calming strategies (set in Settings → Sub Notes), {customSections.length > 0 ? `${customSections.length} custom section${customSections.length === 1 ? "" : "s"}, ` : ""}and your emergency procedures.
+        <div style={{ marginTop: 4, fontSize: 11, color: "rgba(196,181,253,0.65)" }}>
+          🔒 IEP goals are intentionally NOT included — they're confidential. Use /star → 🎯 IEP for IEP-team distribution.
+        </div>
+        {scheduleErr && manualSchedule.length === 0 && <div style={{ marginTop: 4, color: "#fca5a5" }}>⚠ {scheduleErr} — fix in /board → Settings → Schedule, or add manual rows above.</div>}
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
@@ -155,16 +290,16 @@ export default function SubPlansGenerator() {
 
 function openSubPacketWindow(args: {
   students: StarStudent[];
-  goalsByStudent: Record<string, IepGoal[]>;
   schedule: ScheduleBlock[];
   date: string;
   teacherName: string;
   emergencyText: string;
   dayNote: string;
+  customSections: CustomSection[];
 }) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
-  const { students, goalsByStudent, schedule, date, teacherName, emergencyText, dayNote } = args;
+  const { students, schedule, date, teacherName, emergencyText, dayNote, customSections } = args;
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
@@ -181,15 +316,10 @@ function openSubPacketWindow(args: {
         </tr>`).join("")}</tbody>
       </table>`;
 
-  // Per-kid sections
+  // Per-kid sections — IEP goals intentionally omitted (confidential).
+  // Sub gets the disability label (already public-roster info) and the
+  // teacher's hand-written triggers/strategies from subNotes.
   const kidPages = students.map((s) => {
-    const goals = goalsByStudent[s.id] || [];
-    const goalsHtml = goals.length === 0
-      ? `<div class="empty">No IEP goals on file.</div>`
-      : `<ul class="goals">${goals.map((g, i) => `<li>
-          <span class="num">${i + 1}</span>
-          ${g.area ? `<b>${escapeHtml(g.area)}:</b> ` : ""}${escapeHtml(g.goalText)}
-        </li>`).join("")}</ul>`;
     return `
       <div class="kid">
         <div class="kid-head">
@@ -203,15 +333,12 @@ function openSubPacketWindow(args: {
           </div>
         </div>
 
-        <div class="kid-section">
-          <div class="kid-label">🎯 IEP goals (${goals.length})</div>
-          ${goalsHtml}
-        </div>
-
         ${s.subNotes ? `<div class="kid-section sub-notes">
           <div class="kid-label">⚠ Triggers · what works · what doesn't</div>
           <div class="sub-notes-text">${escapeHtml(s.subNotes).replace(/\n/g, "<br>")}</div>
-        </div>` : ""}
+        </div>` : `<div class="kid-section empty">
+          No sub notes on file. Add triggers/strategies in /star → Settings → Sub Notes for ${escapeHtml(s.firstName)}.
+        </div>`}
 
         ${s.parentName || s.parentEmail || s.phone ? `<div class="kid-contact">
           <span class="lbl">Family contact:</span>
@@ -222,6 +349,14 @@ function openSubPacketWindow(args: {
       </div>
     `;
   }).join("");
+
+  // Custom sections (anything else the teacher added)
+  const customHtml = customSections.length === 0 ? "" : customSections.map((c) => `
+    <section class="custom-block">
+      <h2>📌 ${escapeHtml(c.title || "Note")}</h2>
+      <div class="custom-body">${escapeHtml(c.body).replace(/\n/g, "<br>")}</div>
+    </section>
+  `).join("");
 
   const html = `<!doctype html><html><head><title>Sub Plans — ${escapeHtml(dateLabel)}</title>
     <style>${SUB_CSS}</style></head>
@@ -256,8 +391,11 @@ function openSubPacketWindow(args: {
 
       <section class="page">
         <h2>👥 Roster — ${students.length} students</h2>
+        <p class="roster-note">Each kid's triggers + calming strategies are pulled from <b>Settings → Sub Notes</b>. <b>IEP goals are intentionally not printed</b> — they're confidential.</p>
         <div class="roster">${kidPages}</div>
       </section>
+
+      ${customHtml ? `<section class="page">${customHtml}</section>` : ""}
 
       <div class="footer">
         Generated by STAR · ${escapeHtml(dateLabel)}${teacherName ? ` · for ${escapeHtml(teacherName)}` : ""}
@@ -318,6 +456,11 @@ const SUB_CSS = `
   .kid-contact .lbl { color: #6d28d9; font-weight: 800; margin-right: 4px; }
 
   .footer { padding: 14px 24px; font-size: 10px; color: #888; text-align: center; border-top: 1px solid #ede9fe; }
+  .roster-note { font-size: 11px; color: #6b21a8; background: #faf5ff; border: 1px dashed #d8b4fe; padding: 8px 10px; border-radius: 8px; margin: 0 0 12px; }
+  .custom-block { background: #faf5ff; border: 1px solid #d8b4fe; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; page-break-inside: avoid; }
+  .custom-block h2 { font-size: 14px; margin: 0 0 8px; color: #4c1d95; border: none; padding: 0; }
+  .custom-body { font-size: 13px; color: #1f1235; line-height: 1.55; white-space: pre-wrap; }
+  .kid-section.empty { font-size: 11px; color: #6b7280; font-style: italic; padding: 8px 10px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 6px; }
 `;
 
 /* ── helpers ─────────────────────────────────────────────────────── */
@@ -340,6 +483,37 @@ function loadStr(key: string, fallback: string): string {
 }
 function saveStr(key: string, v: string) {
   try { localStorage.setItem(key, v); } catch {}
+}
+function loadJson<T>(key: string, fallback: T): T {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+}
+function saveJson<T>(key: string, v: T) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
+}
+function smallInp(): React.CSSProperties {
+  return {
+    width: "100%", padding: "6px 8px", borderRadius: 6,
+    background: "rgba(0,0,0,0.30)", color: "#fce7f3",
+    border: "1px solid rgba(168,85,247,0.25)",
+    fontSize: 12, outline: "none", boxSizing: "border-box",
+  };
+}
+function miniDanger(): React.CSSProperties {
+  return {
+    width: 28, height: 28, borderRadius: 6,
+    background: "rgba(239,68,68,0.20)",
+    border: "1px solid rgba(239,68,68,0.45)",
+    color: "#fca5a5", fontWeight: 800, fontSize: 12,
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  };
+}
+function ghostBtn(): React.CSSProperties {
+  return {
+    padding: "6px 12px", borderRadius: 8,
+    background: "rgba(255,255,255,0.05)", color: "#fce7f3",
+    border: "1px solid rgba(168,85,247,0.30)",
+    fontWeight: 700, cursor: "pointer", fontSize: 12,
+  };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
