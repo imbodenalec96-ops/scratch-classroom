@@ -6,8 +6,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   StarStore, countsTowardGrade, letterGradeColor,
-  type StarStudent, type StarTrackerEntry,
+  type StarStudent, type StarTrackerEntry, type BehaviorDef,
 } from "../../lib/star/storage.ts";
+import { api } from "../../lib/api.ts";
+import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
 
 interface Props {
   studentId: string;
@@ -37,12 +39,91 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
     return all.find((s) => s.id === studentId) || null;
   });
 
+  // Behavior + points state — refreshed when actions land so chip
+  // counts update live.
+  const [defs, setDefs] = useState<BehaviorDef[]>(() => StarStore.getBehaviorDefs());
+  const [logTick, setLogTick] = useState(0);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteDefId, setNoteDefId] = useState<string>("");
+  const [pointsBusy, setPointsBusy] = useState(false);
+  const [pointsCustom, setPointsCustom] = useState("");
+  const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const showFlash = (kind: "ok" | "err", text: string) => {
+    setFlash({ kind, text });
+    setTimeout(() => setFlash(null), 2400);
+  };
+
+  const visibleDefs = useMemo(() => {
+    return defs.filter((d) => !d.archived && (d.scope === "class" || d.studentId === studentId));
+  }, [defs, studentId]);
+
+  const todayCounts = useMemo(() => {
+    const log = StarStore.getBehaviorLog();
+    const today = (() => {
+      const d = new Date(Date.now() - 7 * 3600_000);
+      return d.toISOString().slice(0, 10);
+    })();
+    const counts: Record<string, number> = {};
+    for (const e of log) {
+      if (e.studentId !== studentId || e.date !== today) continue;
+      counts[e.defId] = (counts[e.defId] || 0) + 1;
+    }
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, logTick]);
+
+  const recordBehavior = (defId: string, note?: string) => {
+    StarStore.recordBehavior(defId, studentId, note);
+    setLogTick((t) => t + 1);
+    successBeep();
+    const def = defs.find((d) => d.id === defId);
+    showFlash("ok", `Logged · ${def?.emoji || ""} ${def?.label || ""}${note ? " (with note)" : ""}`);
+  };
+
+  const openNoteDialog = (defId: string) => {
+    setNoteDefId(defId);
+    setNoteText("");
+    setNoteOpen(true);
+  };
+  const submitNote = () => {
+    if (!noteDefId) return;
+    recordBehavior(noteDefId, noteText.trim() || undefined);
+    setNoteOpen(false);
+    setNoteDefId("");
+    setNoteText("");
+  };
+
+  const givePoints = async (delta: number) => {
+    if (!delta) return;
+    setPointsBusy(true);
+    try {
+      await api.addPoints(studentId, delta);
+      loggedBeep();
+      showFlash("ok", `${delta > 0 ? "+" : ""}${delta} points awarded`);
+      setPointsCustom("");
+    } catch (e: any) {
+      errorBeep();
+      showFlash("err", `Failed: ${e?.message || "couldn't reach server"}`);
+    } finally {
+      setPointsBusy(false);
+    }
+  };
+
   // Esc to close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Defs may change in another tab — refresh on focus.
+  useEffect(() => {
+    const refresh = () => setDefs(StarStore.getBehaviorDefs());
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
 
   const { pending, graded, overallLetter, overallPct } = useMemo(() => {
     const tracker = StarStore.getAsnTrack();
@@ -132,6 +213,155 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
           <Stat label="Graded" value={graded.length} accent="#a855f7" />
           <Stat label="Overall" value={graded.filter((g) => g.counted).length ? `${overallLetter} · ${overallPct}%` : "—"} accent={graded.filter((g) => g.counted).length ? letterGradeColor(overallLetter) : "#94a3b8"} />
         </div>
+
+        {/* FLASH */}
+        {flash && (
+          <div role="status" aria-live="polite" style={{
+            padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+            background: flash.kind === "ok" ? "rgba(16,185,129,0.20)" : "rgba(239,68,68,0.20)",
+            border: `1px solid ${flash.kind === "ok" ? "rgba(16,185,129,0.45)" : "rgba(239,68,68,0.45)"}`,
+            color: flash.kind === "ok" ? "#bbf7d0" : "#fca5a5",
+            fontWeight: 800, fontSize: 13, textAlign: "center",
+          }}>{flash.text}</div>
+        )}
+
+        {/* QUICK POINTS — fast cash-out style */}
+        <Section title="🪙 Give points" count={0}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {[1, 2, 5, 10].map((n) => (
+              <button key={`+${n}`} onClick={() => givePoints(n)} disabled={pointsBusy} style={ptsBtn(false)}>
+                +{n}
+              </button>
+            ))}
+            {[-1, -5].map((n) => (
+              <button key={n} onClick={() => givePoints(n)} disabled={pointsBusy} style={ptsBtn(true)}>
+                {n}
+              </button>
+            ))}
+            <input
+              type="number"
+              value={pointsCustom}
+              onChange={(e) => setPointsCustom(e.target.value)}
+              placeholder="Custom"
+              style={{
+                width: 80, padding: "10px 12px", borderRadius: 10,
+                background: "rgba(0,0,0,0.30)", color: "white",
+                border: "1px solid rgba(168,85,247,0.25)",
+                fontSize: 13, outline: "none",
+              }}
+            />
+            <button
+              onClick={() => { const n = Number(pointsCustom); if (Number.isFinite(n) && n !== 0) givePoints(n); }}
+              disabled={pointsBusy || !pointsCustom.trim() || !Number.isFinite(Number(pointsCustom)) || Number(pointsCustom) === 0}
+              style={primary(pointsBusy || !pointsCustom.trim())}
+            >Give</button>
+          </div>
+        </Section>
+
+        {/* QUICK BEHAVIOR LOG */}
+        <Section title="📈 Log a behavior" count={visibleDefs.length}>
+          {visibleDefs.length === 0 ? (
+            <Empty>No behaviors defined yet. Open /star → 📈 Behavior to add some.</Empty>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {visibleDefs.map((d) => {
+                const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+                const todayN = todayCounts[d.id] || 0;
+                let pressTimer: number | null = null;
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => recordBehavior(d.id)}
+                    onMouseDown={() => { pressTimer = window.setTimeout(() => openNoteDialog(d.id), 600); }}
+                    onMouseUp={() => { if (pressTimer) window.clearTimeout(pressTimer); }}
+                    onMouseLeave={() => { if (pressTimer) window.clearTimeout(pressTimer); }}
+                    onTouchStart={() => { pressTimer = window.setTimeout(() => openNoteDialog(d.id), 600); }}
+                    onTouchEnd={() => { if (pressTimer) window.clearTimeout(pressTimer); }}
+                    onContextMenu={(e) => { e.preventDefault(); openNoteDialog(d.id); }}
+                    title="Tap to log · long-press for a note"
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 7,
+                      padding: "10px 14px", borderRadius: 999,
+                      background: `${c}1a`,
+                      border: `1.5px solid ${c}77`,
+                      color: "#fce7f3",
+                      cursor: "pointer", fontSize: 14, fontWeight: 800,
+                      touchAction: "manipulation",
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{d.emoji}</span>
+                    <span>{d.label}</span>
+                    {todayN > 0 && (
+                      <span style={{ marginLeft: 4, padding: "2px 8px", borderRadius: 999, background: c, color: "white", fontSize: 11, fontWeight: 900 }}>{todayN}</span>
+                    )}
+                  </button>
+                );
+              })}
+              <button onClick={() => openNoteDialog("")} style={{
+                padding: "10px 14px", borderRadius: 999,
+                background: "linear-gradient(135deg, rgba(168,85,247,0.18), rgba(99,102,241,0.10))",
+                border: "1.5px solid rgba(168,85,247,0.45)",
+                color: "#fce7f3",
+                cursor: "pointer", fontSize: 13, fontWeight: 800,
+              }}>📝 Free-text note</button>
+            </div>
+          )}
+        </Section>
+
+        {/* NOTE DIALOG */}
+        {noteOpen && (
+          <div style={{
+            padding: 12, marginBottom: 14, borderRadius: 12,
+            background: "rgba(245,158,11,0.10)",
+            border: "1.5px solid rgba(245,158,11,0.45)",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#fde68a", marginBottom: 6 }}>
+              {noteDefId
+                ? `Add a note for: ${defs.find((d) => d.id === noteDefId)?.emoji} ${defs.find((d) => d.id === noteDefId)?.label}`
+                : "Write a behavior log entry"}
+            </div>
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              rows={4}
+              placeholder="What happened? What you tried? Use the kid's exact words if possible…"
+              autoFocus
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 10,
+                background: "rgba(0,0,0,0.30)", color: "white",
+                border: "1px solid rgba(168,85,247,0.25)",
+                fontSize: 13, outline: "none", boxSizing: "border-box",
+                resize: "vertical", fontFamily: "inherit", marginBottom: 8,
+              }}
+            />
+            {!noteDefId && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 6 }}>
+                  Pick the behavior:
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {visibleDefs.map((d) => {
+                    const sel = noteDefId === d.id;
+                    const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+                    return (
+                      <button key={d.id} onClick={() => setNoteDefId(d.id)} style={{
+                        padding: "5px 10px", borderRadius: 999, fontSize: 12, fontWeight: 800,
+                        background: sel ? `${c}30` : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${sel ? c + "88" : "rgba(255,255,255,0.10)"}`,
+                        color: sel ? c : "rgba(245,241,232,0.65)",
+                        cursor: "pointer",
+                      }}>{d.emoji} {d.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+              <button onClick={() => { setNoteOpen(false); setNoteText(""); setNoteDefId(""); }} style={ghost()}>Cancel</button>
+              <button onClick={submitNote} disabled={!noteDefId} style={primary(!noteDefId)}>Save log</button>
+            </div>
+          </div>
+        )}
 
         {/* PENDING ASSIGNMENTS */}
         <Section title="📥 To do" count={pending.length}>
@@ -273,6 +503,27 @@ function primary(disabled: boolean): React.CSSProperties {
     color: "white", border: "none", fontWeight: 800,
     cursor: disabled ? "not-allowed" : "pointer",
     fontSize: 14,
+    opacity: disabled ? 0.55 : 1,
+  };
+}
+function ghost(): React.CSSProperties {
+  return {
+    padding: "8px 12px", borderRadius: 8,
+    background: "rgba(255,255,255,0.05)", color: "white",
+    border: "1px solid rgba(255,255,255,0.15)",
+    fontWeight: 700, cursor: "pointer", fontSize: 12,
+  };
+}
+function ptsBtn(negative: boolean): React.CSSProperties {
+  return {
+    padding: "10px 16px", borderRadius: 10, minWidth: 56,
+    background: negative
+      ? "linear-gradient(135deg, rgba(239,68,68,0.30), rgba(239,68,68,0.10))"
+      : "linear-gradient(135deg, rgba(16,185,129,0.30), rgba(16,185,129,0.10))",
+    border: `1.5px solid ${negative ? "rgba(239,68,68,0.55)" : "rgba(16,185,129,0.55)"}`,
+    color: negative ? "#fca5a5" : "#bbf7d0",
+    fontWeight: 900, fontSize: 14, cursor: "pointer",
+    fontFamily: "Menlo, monospace",
   };
 }
 
