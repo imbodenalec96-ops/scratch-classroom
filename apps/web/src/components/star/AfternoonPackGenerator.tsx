@@ -563,57 +563,25 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
   // the printer doesn't "skip blank pages" and collapse it. Same
   // neutral page used for every kid so no one sees "AIDEN" on the
   // back of someone else's work.
-  const blankBack = () => `
-    <div class="page back">
-      <div class="back-frame">
-        <div class="back-foot">— Back of sheet —</div>
-      </div>
-    </div>
-  `;
-
+  // Simple: one page per kid in order. No back-of-sheet padding.
+  // If the teacher wants every kid on their own physical sheet
+  // under duplex printing, she picks "Single-sided" in the print
+  // dialog. Forcing blank backs from the app was generating real
+  // printed "Back of sheet" pages.
   const pages: string[] = [];
-  for (let i = 0; i < pack.length; i++) {
-    // Force every kid (except the first) to start on a fresh sheet
-    // via break-before: page directly on the worksheet div.
-    pages.push(renderOne(pack[i]).replace('<div class="page">', `<div class="page${i > 0 ? " kid-start" : ""}">`));
-    // Pad with a blank back-page after every kid except the last so
-    // the next kid is guaranteed to land on the front of a new
-    // duplex sheet — protects against printers that override
-    // break-before with "skip blank pages" anyway.
-    if (i < pack.length - 1) {
-      pages.push(blankBack());
-    }
+  for (const p of pack) {
+    pages.push(renderOne(p));
   }
 
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(packLabel)}</title>
     <style>
       @media print {
         @page { size: letter; margin: 0.5in; }
-        /* Modern + legacy break props for max printer compatibility */
-        .page         { page-break-after: always; break-after: page; }
-        .kid-start    { page-break-before: always; break-before: page; }
+        .page { page-break-after: always; break-after: page; }
         .page:last-child { page-break-after: auto; break-after: auto; }
       }
       body { font-family: -apple-system, sans-serif; color: #111; padding: 16px; }
-      .page { min-height: 9.5in; box-sizing: border-box; }
-      /* Back-of-sheet visual — substantial ink so drivers don't
-         "skip blank pages". A large faded watermark + visible
-         border guarantees the printer registers a non-empty page. */
-      .page.back { padding: 0; }
-      .back-frame {
-        height: 9.5in;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: flex-end;
-        text-align: center;
-        position: relative;
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
-      .back-foot {
-        margin-bottom: 24px;
-        font-size: 11px; color: #94a3b8;
-        letter-spacing: 0.12em; text-transform: uppercase;
-      }
+      .page { box-sizing: border-box; }
     </style>
   </head><body>
     ${pages.join("")}
