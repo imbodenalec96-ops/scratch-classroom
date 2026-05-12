@@ -777,108 +777,198 @@ function Flash({ flash }: { flash: { kind: "ok" | "err"; text: string } }) {
 
 /* ── single-incident print template ─────────────────────────────── */
 
+// Mirrors the layout of a standard district behavior incident form so
+// it can be dropped into a kid's working folder or attached to an FBA
+// without looking like a classroom printout. Serif type, plain B&W
+// with a single navy accent, tabular fact sheet, FERPA confidentiality
+// footer, and three signature lines (reporter, administrator, parent
+// acknowledgment).
 function openIncidentPrintWindow(student: StarStudent, def: BehaviorDef, e: BehaviorEvent) {
   const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) return;
   const dt = new Date(e.ts);
-  const dateLabel = dt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const timeLabel = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const tone = def.tone === "positive" ? "#10b981" : def.tone === "challenge" ? "#f59e0b" : "#3b82f6";
-  const sevLabel = (n?: number) => n
-    ? ["", "Mild reminder", "Brief", "Moderate", "Disruptive", "Crisis"][n]
-    : "—";
+  const reportTs = new Date();
+  const dateLabel  = dt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const dowLabel   = dt.toLocaleDateString("en-US", { weekday: "long" });
+  const timeLabel  = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const reportDate = reportTs.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const reportTime = reportTs.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-  const html = `<!doctype html><html><head><title>Behavior Incident — ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)} — ${dateLabel}</title>
+  // Stable, human-readable case number that's reproducible from the
+  // entry id (so duplicate prints reference the same case).
+  const caseNo = (e.id || "").replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase().padStart(8, "0");
+  const caseLabel = `BIR-${dt.getUTCFullYear()}-${caseNo}`;
+
+  const sevLabel = (n?: number) =>
+    !n ? "—" : ["", "Level 1 — Minor (verbal redirection)", "Level 2 — Brief disruption", "Level 3 — Moderate disruption", "Level 4 — Significant disruption", "Level 5 — Crisis / safety risk"][n];
+  const toneLabel = def.tone === "positive" ? "Positive recognition" : def.tone === "challenge" ? "Challenging behavior" : "Neutral observation";
+  const yn = (v?: boolean) => (v ? "Yes" : "No");
+  const orDash = (s?: string) => (s && s.trim() ? escapeHtml(s) : `<span class="empty">Not recorded</span>`);
+  const factRow = (label: string, value: string) => `
+    <tr><th>${escapeHtml(label)}</th><td>${value}</td></tr>`;
+
+  const html = `<!doctype html><html><head><title>Behavior Incident Report — ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)} — ${dateLabel}</title>
     <style>
-      @media print { @page { size: letter; margin: 0.55in; } .no-print { display: none; } }
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111; padding: 0; margin: 0; line-height: 1.55; background: white; }
-      .toolbar { padding: 12px 24px; background: #faf5ff; border-bottom: 1px solid #d8b4fe; display: flex; justify-content: space-between; align-items: center; font-weight: 800; color: #4c1d95; }
-      .toolbar button { padding: 8px 14px; border-radius: 8px; border: 1px solid #6d28d9; background: #6d28d9; color: white; font-weight: 700; cursor: pointer; }
-      .page { padding: 26px 32px; max-width: 720px; margin: 0 auto; }
-      h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.02em; }
-      .meta { font-size: 12px; color: #555; margin-bottom: 18px; }
-      .hero { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, #faf5ff, #fdf2f8); border: 1.5px solid ${tone}; margin-bottom: 18px; }
-      .hero .emoji { font-size: 38px; line-height: 1; }
-      .hero .label { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: ${tone}; }
-      .hero .name { font-size: 22px; font-weight: 900; color: #1f1235; margin-top: 2px; }
-      h2 { font-size: 12px; margin: 18px 0 6px; letter-spacing: 0.10em; text-transform: uppercase; color: #4c1d95; border-bottom: 2px solid #ede9fe; padding-bottom: 4px; }
-      .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-      .stat { padding: 8px 10px; border-radius: 8px; background: #faf5ff; border: 1px solid #d8b4fe; text-align: center; }
-      .stat .n { font-size: 14px; font-weight: 900; color: #6d28d9; }
-      .stat .l { font-size: 9px; font-weight: 800; color: #6d28d9; opacity: 0.75; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; }
-      .field { margin-bottom: 12px; }
-      .field-label { font-size: 10px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: #6d28d9; margin-bottom: 4px; }
-      .field-body { font-size: 13px; color: #1f1235; padding: 8px 10px; background: white; border: 1px solid #ede9fe; border-radius: 6px; min-height: 24px; white-space: pre-wrap; }
-      .field-body.empty { color: #9ca3af; font-style: italic; }
-      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .footer { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-      .signlbl { font-size: 9px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: #555; }
-      .signline { border-bottom: 1.5px solid #444; height: 30px; margin-top: 4px; }
-      .footnote { margin-top: 14px; font-size: 9px; text-align: center; color: #888; }
+      @media print {
+        @page { size: letter; margin: 0.7in 0.6in 0.65in 0.6in; }
+        .no-print { display: none !important; }
+        body { background: white !important; }
+      }
+      :root { --ink: #111; --rule: #222; --accent: #1e3a8a; --muted: #555; --soft: #f6f7fa; }
+      * { box-sizing: border-box; }
+      body { font-family: "Georgia", "Times New Roman", Times, serif; color: var(--ink); margin: 0; padding: 0; line-height: 1.45; background: #e9ecef; }
+      .toolbar { padding: 10px 24px; background: #1e3a8a; color: white; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; font-size: 13px; }
+      .toolbar button { padding: 7px 14px; border-radius: 4px; border: 1px solid #ffffff; background: white; color: #1e3a8a; font-weight: 700; cursor: pointer; font-size: 12px; }
+      .sheet { background: white; max-width: 7.4in; margin: 18px auto; padding: 0.4in 0.5in; border: 1px solid #cbd5e1; }
+      @media print { .sheet { margin: 0; max-width: none; border: none; padding: 0; } }
+
+      /* ── Letterhead ────────────────────────────────────────── */
+      .letterhead { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: flex-end; border-bottom: 3px double var(--accent); padding-bottom: 10px; margin-bottom: 14px; }
+      .lh-school { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.16em; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 700; }
+      .lh-title { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; margin-top: 4px; }
+      .lh-sub { font-size: 11px; color: var(--muted); margin-top: 3px; font-style: italic; }
+      .lh-meta { text-align: right; font-size: 10.5px; color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      .lh-meta div + div { margin-top: 2px; }
+      .lh-meta b { color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; font-size: 9.5px; display: block; margin-bottom: 1px; }
+
+      /* ── Section headings ──────────────────────────────────── */
+      h2.sec { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--rule); padding: 10px 0 4px; margin: 14px 0 8px; }
+      h2.sec .roman { font-family: "Georgia", serif; font-weight: 700; letter-spacing: 0.04em; margin-right: 8px; }
+
+      /* ── Fact table ────────────────────────────────────────── */
+      table.facts { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+      table.facts th, table.facts td { border: 1px solid var(--rule); padding: 5px 8px; text-align: left; vertical-align: top; }
+      table.facts th { background: var(--soft); width: 28%; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 700; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+      table.facts td { font-family: "Georgia", serif; }
+
+      /* ── ABC narrative ─────────────────────────────────────── */
+      .abc-block { border: 1px solid var(--rule); padding: 10px 12px; margin-bottom: 8px; background: white; page-break-inside: avoid; }
+      .abc-label { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+      .abc-body { font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; min-height: 32px; }
+      .empty { color: #9aa0a6; font-style: italic; }
+
+      /* ── Signature block ───────────────────────────────────── */
+      .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 32px; margin-top: 12px; }
+      .sign-cell { border-top: 1.5px solid var(--rule); padding-top: 4px; }
+      .sign-label { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .sign-printed { font-size: 11.5px; margin-top: 1px; color: var(--ink); min-height: 18px; }
+      .sign-date { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+      /* ── Photo evidence ────────────────────────────────────── */
+      .photo-frame { border: 1px solid var(--rule); padding: 8px; background: white; text-align: center; }
+      .photo-frame img { max-width: 100%; max-height: 2.6in; display: block; margin: 0 auto; }
+      .photo-cap { font-size: 9.5px; color: var(--muted); margin-top: 4px; font-style: italic; }
+
+      /* ── Footer / confidentiality ──────────────────────────── */
+      .footnote { margin-top: 18px; padding-top: 8px; border-top: 1px solid #aaa; font-size: 8.5px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.55; }
+      .footnote b { color: var(--accent); }
     </style></head><body>
     <div class="toolbar no-print">
-      <div>📈 Behavior Incident Report — ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</div>
-      <button onclick="window.print()">🖨 Print</button>
+      <div>Behavior Incident Report · Case ${escapeHtml(caseLabel)}</div>
+      <button onclick="window.print()">Print</button>
     </div>
-    <section class="page">
-      <h1>📈 Behavior Incident Report</h1>
-      <div class="meta">${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)}${e.location ? ` · ${escapeHtml(e.location)}` : ""}</div>
+    <section class="sheet">
 
-      <div class="hero">
-        <div class="emoji">${escapeHtml(def.emoji)}</div>
-        <div style="flex:1">
-          <div class="label">${escapeHtml(def.tone.toUpperCase())} · ${escapeHtml(def.label)}</div>
-          <div class="name">${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}${student.grade ? ` · Grade ${escapeHtml(student.grade)}` : ""}</div>
+      <header class="letterhead">
+        <div>
+          <div class="lh-school">Special Education Services</div>
+          <div class="lh-title">Behavior Incident Report</div>
+          <div class="lh-sub">Confidential student record — for school use only</div>
         </div>
+        <div class="lh-meta">
+          <div><b>Case No.</b>${escapeHtml(caseLabel)}</div>
+          <div><b>Report Generated</b>${escapeHtml(reportDate)} · ${escapeHtml(reportTime)}</div>
+        </div>
+      </header>
+
+      <h2 class="sec"><span class="roman">I.</span>Student Information</h2>
+      <table class="facts">
+        ${factRow("Student name", `${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}`)}
+        ${factRow("Grade level", student.grade ? `Grade ${escapeHtml(student.grade)}` : "—")}
+        ${factRow("Classroom", "Mrs. Imboden — Special Education")}
+        ${factRow("IEP / 504 on file", student.iep ? "Yes (IEP)" : "—")}
+      </table>
+
+      <h2 class="sec"><span class="roman">II.</span>Incident Summary</h2>
+      <table class="facts">
+        ${factRow("Date of incident", `${escapeHtml(dowLabel)}, ${escapeHtml(dateLabel)}`)}
+        ${factRow("Time of incident", escapeHtml(timeLabel))}
+        ${factRow("Location", e.location ? escapeHtml(e.location) : "—")}
+        ${factRow("Duration", e.durationMin ? `${e.durationMin} minute${e.durationMin === 1 ? "" : "s"}` : "—")}
+        ${factRow("Behavior category", `${escapeHtml(toneLabel)} · ${escapeHtml(def.label)}`)}
+        ${factRow("Severity rating", escapeHtml(sevLabel(e.severity)))}
+        ${factRow("Behavior points adjustment", typeof e.pointsDelta === "number" ? (e.pointsDelta > 0 ? `+${e.pointsDelta}` : String(e.pointsDelta)) : "—")}
+        ${factRow("Witnesses present", e.witnesses ? escapeHtml(e.witnesses) : "None reported")}
+      </table>
+
+      <h2 class="sec"><span class="roman">III.</span>Antecedent — Behavior — Consequence (ABC) Analysis</h2>
+      <div class="abc-block">
+        <div class="abc-label">A · Antecedent — Conditions and events immediately preceding the behavior</div>
+        <div class="abc-body">${orDash(e.antecedent)}</div>
+      </div>
+      <div class="abc-block">
+        <div class="abc-label">B · Behavior — Observable actions of the student</div>
+        <div class="abc-body">${orDash(e.behaviorDetail)}</div>
+      </div>
+      <div class="abc-block">
+        <div class="abc-label">C · Consequence / Staff response — Intervention used and student's response</div>
+        <div class="abc-body">${orDash(e.response)}</div>
+      </div>
+      <div class="abc-block">
+        <div class="abc-label">Outcome / Resolution — How the incident concluded; student's location and state at close</div>
+        <div class="abc-body">${orDash(e.outcome)}</div>
       </div>
 
-      <div class="stat-row">
-        <div class="stat"><div class="n">${e.severity ? sevLabel(e.severity) : "—"}</div><div class="l">Severity</div></div>
-        <div class="stat"><div class="n">${e.durationMin ? `${e.durationMin} min` : "—"}</div><div class="l">Duration</div></div>
-        <div class="stat"><div class="n">${typeof e.pointsDelta === "number" ? (e.pointsDelta > 0 ? `+${e.pointsDelta}` : e.pointsDelta) : "—"}</div><div class="l">Points</div></div>
-        <div class="stat"><div class="n">${e.parentNotified ? "Yes" : "No"}</div><div class="l">Parent notified</div></div>
+      <h2 class="sec"><span class="roman">IV.</span>Parent / Guardian Notification</h2>
+      <table class="facts">
+        ${factRow("Parent contacted", yn(!!e.parentNotified))}
+        ${factRow("Method of contact", e.parentNotified && e.parentNotifyMethod ? escapeHtml(String(e.parentNotifyMethod)) : "—")}
+        ${factRow("Date of contact", e.parentNotified ? `${escapeHtml(dateLabel)}` : "—")}
+      </table>
+
+      <h2 class="sec"><span class="roman">V.</span>Follow-Up Plan</h2>
+      <div class="abc-block">
+        <div class="abc-body">${orDash(e.followUp)}</div>
       </div>
 
-      <h2>📍 ABC analysis</h2>
-      <div class="field"><div class="field-label">Antecedent — what happened right before</div>
-        <div class="field-body${e.antecedent ? "" : " empty"}">${e.antecedent ? escapeHtml(e.antecedent) : "Not recorded."}</div>
-      </div>
-      <div class="field"><div class="field-label">Behavior — what the student did</div>
-        <div class="field-body${e.behaviorDetail ? "" : " empty"}">${e.behaviorDetail ? escapeHtml(e.behaviorDetail) : "Not recorded."}</div>
-      </div>
-      <div class="field"><div class="field-label">Consequence — what staff did + how it ended</div>
-        <div class="field-body${e.response ? "" : " empty"}">${e.response ? escapeHtml(e.response) : "Not recorded."}</div>
-      </div>
-      <div class="field"><div class="field-label">Outcome / where the kid landed</div>
-        <div class="field-body${e.outcome ? "" : " empty"}">${e.outcome ? escapeHtml(e.outcome) : "Not recorded."}</div>
-      </div>
-
-      ${e.parentNotified ? `<h2>📞 Parent contact</h2>
-        <div class="field-body">Notified${e.parentNotifyMethod ? ` via <b>${escapeHtml(e.parentNotifyMethod)}</b>` : ""} on ${escapeHtml(dateLabel)}.</div>` : ""}
-
-      ${e.followUp ? `<h2>🧭 Follow-up</h2>
-        <div class="field-body">${escapeHtml(e.followUp)}</div>` : ""}
-
-      ${e.witnesses ? `<h2>👀 Witnesses</h2><div class="field-body">${escapeHtml(e.witnesses)}</div>` : ""}
-
-      ${e.photoDataUrl ? `<h2>📷 Photo evidence</h2>
-        <div style="border: 1px solid #d8b4fe; border-radius: 8px; padding: 8px; background: #faf5ff; text-align: center;">
-          <img src="${e.photoDataUrl}" alt="" style="max-width: 100%; max-height: 320px; border-radius: 6px;" />
+      ${(e.photoDataUrl || (e as any).photoPath) ? `<h2 class="sec"><span class="roman">VI.</span>Photographic Evidence</h2>
+        <div class="photo-frame">
+          <img src="${escapeHtml(e.photoDataUrl || "")}" alt="Photographic evidence attached to case ${escapeHtml(caseLabel)}" />
+          <div class="photo-cap">Attached to Case ${escapeHtml(caseLabel)} · ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)}</div>
         </div>` : ""}
 
-      <div class="footer">
-        <div>
-          <div class="signlbl">Reporter signature</div>
-          <div class="signline"></div>
-          ${e.reporterName ? `<div class="signlbl" style="margin-top:4px;color:#1f1235">${escapeHtml(e.reporterName)}</div>` : ""}
+      <h2 class="sec"><span class="roman">${(e.photoDataUrl || (e as any).photoPath) ? "VII." : "VI."}</span>Signatures</h2>
+      <div class="sign-grid">
+        <div class="sign-cell">
+          <div class="sign-label">Reporting staff member</div>
+          <div class="sign-printed">${e.reporterName ? escapeHtml(e.reporterName) : "&nbsp;"}</div>
+          <div class="sign-date">Signature / Date: ____________________________</div>
         </div>
-        <div>
-          <div class="signlbl">Admin / case manager signature</div>
-          <div class="signline"></div>
+        <div class="sign-cell">
+          <div class="sign-label">Building administrator / Case manager</div>
+          <div class="sign-printed">&nbsp;</div>
+          <div class="sign-date">Signature / Date: ____________________________</div>
+        </div>
+        <div class="sign-cell">
+          <div class="sign-label">Parent / Guardian — acknowledgment of receipt</div>
+          <div class="sign-printed">&nbsp;</div>
+          <div class="sign-date">Signature / Date: ____________________________</div>
+        </div>
+        <div class="sign-cell">
+          <div class="sign-label">Special education team lead (if applicable)</div>
+          <div class="sign-printed">&nbsp;</div>
+          <div class="sign-date">Signature / Date: ____________________________</div>
         </div>
       </div>
 
-      <div class="footnote">Generated by STAR · single-incident report · entry id ${escapeHtml(e.id)}</div>
+      <div class="footnote">
+        <b>CONFIDENTIAL — STUDENT EDUCATION RECORD.</b> This document contains personally identifiable
+        information protected under the Family Educational Rights and Privacy Act (FERPA, 20 U.S.C.
+        § 1232g) and applicable state student-records law. Distribution is limited to school personnel
+        with a legitimate educational interest and to the student's parent or legal guardian.
+        Unauthorized disclosure is prohibited.
+        &nbsp;·&nbsp; Case ${escapeHtml(caseLabel)} &nbsp;·&nbsp; Record id ${escapeHtml(e.id)}
+      </div>
     </section>
     <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250))</script>
   </body></html>`;
