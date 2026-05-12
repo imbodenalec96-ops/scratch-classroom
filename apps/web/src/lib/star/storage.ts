@@ -405,7 +405,23 @@ export interface BehaviorEvent {
   studentId: string;
   ts: string;               // ISO
   date: string;             // YYYY-MM-DD (Pacific) for fast filtering
-  note?: string;
+  note?: string;            // legacy free-text note (used by quick-log)
+  // ── Full-report fields (all optional; populated when teacher
+  //    fills out the incident-report form on the scan modal). Old
+  //    quick-log entries leave these blank — reports just hide them.
+  location?: string;        // "Classroom" / "Hallway" / "Specials" / etc.
+  durationMin?: number;     // how long the incident lasted (minutes)
+  antecedent?: string;      // what happened right before
+  behaviorDetail?: string;  // what the kid actually did
+  response?: string;        // what the teacher tried
+  outcome?: string;         // how it ended / where the kid landed
+  severity?: 1 | 2 | 3 | 4 | 5;  // 1 = mild reminder, 5 = crisis
+  pointsDelta?: number;     // +/- points awarded for this incident
+  parentNotified?: boolean;
+  parentNotifyMethod?: "phone" | "email" | "classdojo" | "in-person" | "none";
+  followUp?: string;        // what's still owed / next step
+  witnesses?: string;       // other staff present (free text)
+  reporterName?: string;    // who wrote the report
 }
 
 // LocalStorage with safe parse + default fallback
@@ -617,6 +633,23 @@ export const StarStore = {
   removeBehaviorEvent: (id: string) => {
     const cur = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
     ls.set(KEYS.behaviorLog, cur.filter((e) => e.id !== id));
+  },
+  // Record a full behavior incident report. All non-required fields
+  // are optional; the form sends whatever the teacher filled in.
+  recordBehaviorReport: (input: Partial<BehaviorEvent> & { defId: string; studentId: string }) => {
+    const log = ls.get<BehaviorEvent[]>(KEYS.behaviorLog, []);
+    const now = new Date();
+    const d = new Date(now.getTime() - 7 * 3600_000);
+    const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const event: BehaviorEvent = {
+      id: `bh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      ts: now.toISOString(),
+      date,
+      ...input,
+    };
+    log.push(event);
+    ls.set(KEYS.behaviorLog, log);
+    return { log, event };
   },
 
   getActivePasses: () => ls.get<ActivePass[]>(KEYS.activePasses, []),
