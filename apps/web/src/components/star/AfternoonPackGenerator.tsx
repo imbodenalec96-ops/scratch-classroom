@@ -556,23 +556,17 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
     `;
   };
 
-  // Duplex printing was putting two different kids on opposite sides
-  // of the same sheet (Anna on the front, Jaida on the back). The
-  // first fix added a faint back page — but most printer drivers
-  // detect very-low-ink pages and silently SKIP them ("save paper"
-  // mode). So we now make the back page UNAMBIGUOUSLY non-blank
-  // with a real watermark + border + multi-line content so the
-  // printer can't collapse it.
-  //
-  // Belt-and-suspenders: every actual worksheet also gets a
-  // `break-before: page` so each kid forces a new sheet boundary
-  // regardless of what the printer does with the back page.
-  const blankBack = (kidName: string) => `
+  // Duplex printing puts two pages per sheet automatically. To keep
+  // each kid on their own sheet (worksheet on front, blank-ish on
+  // back), we insert one padding page between kids. The padding
+  // page has NO kid-specific branding — just enough neutral ink so
+  // the printer doesn't "skip blank pages" and collapse it. Same
+  // neutral page used for every kid so no one sees "AIDEN" on the
+  // back of someone else's work.
+  const blankBack = () => `
     <div class="page back">
       <div class="back-frame">
-        <div class="back-title">↩ Back of ${escapeHtml(kidName)}'s sheet</div>
-        <div class="back-watermark">${escapeHtml(kidName.toUpperCase())}</div>
-        <div class="back-foot">This side is intentionally left blank — keep with the worksheet on the other side.</div>
+        <div class="back-foot">— Back of sheet —</div>
       </div>
     </div>
   `;
@@ -587,7 +581,7 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
     // duplex sheet — protects against printers that override
     // break-before with "skip blank pages" anyway.
     if (i < pack.length - 1) {
-      pages.push(blankBack(pack[i].studentName));
+      pages.push(blankBack());
     }
   }
 
@@ -608,32 +602,17 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
       .page.back { padding: 0; }
       .back-frame {
         height: 9.5in;
-        border: 3px dashed #94a3b8;
-        border-radius: 12px;
         display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
+        align-items: center; justify-content: flex-end;
         text-align: center;
         position: relative;
         page-break-inside: avoid;
         break-inside: avoid;
       }
-      .back-title {
-        position: absolute; top: 24px; left: 0; right: 0;
-        font-size: 14px; font-weight: 800; color: #475569;
-        letter-spacing: 0.16em; text-transform: uppercase;
-      }
-      .back-watermark {
-        font-size: 96px; font-weight: 900;
-        color: #e2e8f0;
-        letter-spacing: 0.08em;
-        line-height: 1;
-        transform: rotate(-12deg);
-        user-select: none;
-      }
       .back-foot {
-        position: absolute; bottom: 24px; left: 0; right: 0;
-        font-size: 11px; color: #64748b;
-        padding: 0 24px;
+        margin-bottom: 24px;
+        font-size: 11px; color: #94a3b8;
+        letter-spacing: 0.12em; text-transform: uppercase;
       }
     </style>
   </head><body>
