@@ -209,7 +209,7 @@ function openSheetWindow(students: StarStudent[], layout: Layout, date: string, 
             <div class="sub">${gradePill}<span class="code">${escapeHtml(code)}</span></div>
           </div>
         </div>
-        <div class="bar">${bc128svg(code, 0, 90, true, 2.6)}</div>
+        <div class="bar">${bc128svg(code, 0, 50, false, 1.3)}</div>
       </div>`;
     }
 
@@ -221,7 +221,7 @@ function openSheetWindow(students: StarStudent[], layout: Layout, date: string, 
           <div class="name">${escapeHtml(s.firstName || "")} ${escapeHtml(s.lastName || "")}</div>
           <div class="sub">${gradePill}</div>
         </td>
-        <td class="bar-cell">${bc128svg(code, 0, 50, false, 1.3)}</td>
+        <td class="bar-cell">${bc128svg(code, 0, 32, false, 0.85)}</td>
         ${cells}
       </tr>`;
     }
@@ -233,7 +233,7 @@ function openSheetWindow(students: StarStudent[], layout: Layout, date: string, 
         <div class="name">${escapeHtml(s.firstName || "")} ${escapeHtml(s.lastName || "")}</div>
         <div class="sub">${gradePill}<span class="code">${escapeHtml(code)}</span></div>
       </td>
-      <td class="bar-cell">${bc128svg(code, 0, 60, true, 1.6)}</td>
+      <td class="bar-cell">${bc128svg(code, 0, 36, false, 1.0)}</td>
     </tr>`;
   };
 
@@ -282,8 +282,9 @@ function openSheetWindow(students: StarStudent[], layout: Layout, date: string, 
       .sub { margin-top: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
       .grade { display: inline-block; padding: 1px 7px; border-radius: 999px; color: white; font-size: 9px; font-weight: 900; letter-spacing: 0.08em; }
       .code { font-family: Menlo, monospace; font-size: 10px; color: #6d28d9; opacity: 0.85; }
-      .bar-head { width: 200px; }
+      .bar-head { width: 140px; }
       .bar-cell { white-space: nowrap; padding-right: 6px; }
+      .bar-cell svg { display: block; }
       .tally { width: 1.05in; height: 0.85in; border: 1px solid #d8b4fe; background: #faf5ff; }
       .tally-head { width: 1.05in; text-align: center; }
 
