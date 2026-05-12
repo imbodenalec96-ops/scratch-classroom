@@ -495,7 +495,21 @@ export const api = {
     request<any>(`/ai-tasks/task-config/${subject}`, { method: 'PUT', body: JSON.stringify({ base_count }) }),
 
   // ── Classroom Board (central control) ──
-  getBoardData: (classId: string) => request<any>(`/board/classes/${classId}/data`),
+  getBoardData: async (classId: string) => {
+    // Try the authed endpoint first (gives the teacher fresh data
+    // with edit permissions). If it 401s (iPad / projector / sub
+    // device not logged in), fall back to the public read-only
+    // mirror so the board still loads on every device.
+    try {
+      return await request<any>(`/board/classes/${classId}/data`);
+    } catch (e: any) {
+      if (e?.status === 401 || /token|auth/i.test(String(e?.message || ""))) {
+        return await request<any>(`/public/board/classes/${classId}/data`);
+      }
+      throw e;
+    }
+  },
+  getPublicClasses: () => request<Array<{ id: string; name: string }>>("/public/classes"),
   getBoardLiveProgress: (classId: string) =>
     request<{
       pct: number;

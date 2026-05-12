@@ -273,8 +273,14 @@ export default function App() {
           {/* Student kiosk — no login required */}
           <Route path="/kiosk" element={<StudentKiosk />} />
 
-          {/* Classroom board — TV/projector kiosk view */}
-          <Route path="/board" element={<ProtectedRoute><ClassroomBoard /></ProtectedRoute>} />
+          {/* Classroom board — TV/projector kiosk view. PUBLIC: any
+              device in the room can pull it up without logging in,
+              including the iPad teachers use as a roaming controller.
+              All data the board reads is already public-projection
+              (kid names, behavior stars, schedule) and is served by
+              the public /api/public/board endpoint when no auth
+              token is present. */}
+          <Route path="/board" element={<ClassroomBoard />} />
 
           {/* Printable assignment — auto-triggers print dialog */}
           <Route path="/print/assignment/:id" element={<PrintAssignment />} />

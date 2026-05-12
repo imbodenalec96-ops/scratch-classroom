@@ -797,7 +797,20 @@ export default function ClassroomBoard() {
 
   useEffect(() => {
     let done = false;
-    api.getClasses().then((cs: any[]) => {
+    // Try the authed classes endpoint first. If it 401s (the board
+    // is up on a device that hasn't logged in — projector / iPad
+    // sub / Chromebook), fall back to the public read-only list so
+    // the board still loads.
+    const loadClasses = async (): Promise<any[]> => {
+      try { return await api.getClasses(); }
+      catch (e: any) {
+        if (e?.status === 401 || /token|auth/i.test(String(e?.message || ""))) {
+          try { return await api.getPublicClasses(); } catch { return []; }
+        }
+        throw e;
+      }
+    };
+    loadClasses().then((cs: any[]) => {
       if (done) return;
       if (!cs?.length) { setError("No classes available"); return; }
       const picked = cs.find(c => c.id === classParam) || cs.find(c => String(c.name).toLowerCase() === classParam) || cs[0];
