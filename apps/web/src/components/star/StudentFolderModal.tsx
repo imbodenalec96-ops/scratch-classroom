@@ -10,6 +10,7 @@ import {
 } from "../../lib/star/storage.ts";
 import { api } from "../../lib/api.ts";
 import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
+import BehaviorScanModal from "./BehaviorScanModal.tsx";
 
 interface Props {
   studentId: string;
@@ -49,6 +50,10 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
   const [pointsBusy, setPointsBusy] = useState(false);
   const [pointsCustom, setPointsCustom] = useState("");
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Pop the full ABC report form (BehaviorScanModal) for a chosen
+  // behavior, with this student already pre-picked.
+  const [reportForDefId, setReportForDefId] = useState<string | null>(null);
+  const [pickReportBehavior, setPickReportBehavior] = useState(false);
 
   const showFlash = (kind: "ok" | "err", text: string) => {
     setFlash({ kind, text });
@@ -258,8 +263,77 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
           </div>
         </Section>
 
+        {/* WRITE A FULL INCIDENT REPORT — opens the BehaviorScanModal */}
+        <Section title="📝 Full incident report" count={0}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button
+              onClick={() => setPickReportBehavior(true)}
+              disabled={visibleDefs.length === 0}
+              style={{
+                padding: "12px 16px", borderRadius: 12,
+                background: visibleDefs.length === 0
+                  ? "rgba(168,85,247,0.15)"
+                  : "linear-gradient(135deg, rgba(245,158,11,0.30), rgba(239,68,68,0.20))",
+                border: `1.5px solid ${visibleDefs.length === 0 ? "rgba(168,85,247,0.30)" : "rgba(245,158,11,0.60)"}`,
+                color: visibleDefs.length === 0 ? "rgba(245,241,232,0.45)" : "#fde68a",
+                fontWeight: 800, fontSize: 14, cursor: visibleDefs.length === 0 ? "not-allowed" : "pointer",
+                textAlign: "left", display: "flex", alignItems: "center", gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 22 }}>📈</span>
+              <div style={{ flex: 1 }}>
+                <div>Write a full ABC incident report</div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.75, marginTop: 2 }}>
+                  {visibleDefs.length === 0 ? "No behaviors defined yet — open /star → 📈 Behavior" : "Antecedent · Behavior · Consequence + severity, points, parent notify, follow-up"}
+                </div>
+              </div>
+              <span style={{ fontSize: 18, opacity: 0.65 }}>→</span>
+            </button>
+
+            {pickReportBehavior && (
+              <div style={{
+                padding: 12, borderRadius: 12,
+                background: "rgba(0,0,0,0.30)",
+                border: "1px solid rgba(168,85,247,0.30)",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
+                  Which behavior?
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {visibleDefs.map((d) => {
+                    const c = d.tone === "positive" ? "#10b981" : d.tone === "challenge" ? "#f59e0b" : "#3b82f6";
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => { setReportForDefId(d.id); setPickReportBehavior(false); }}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                          padding: "8px 12px", borderRadius: 999,
+                          background: `${c}1a`, border: `1.5px solid ${c}77`,
+                          color: "#fce7f3", cursor: "pointer", fontSize: 13, fontWeight: 800,
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>{d.emoji}</span>
+                        <span>{d.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 8, textAlign: "right" }}>
+                  <button onClick={() => setPickReportBehavior(false)} style={{
+                    padding: "6px 12px", borderRadius: 8,
+                    background: "rgba(255,255,255,0.05)", color: "white",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    fontWeight: 700, cursor: "pointer", fontSize: 12,
+                  }}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+
         {/* QUICK BEHAVIOR LOG */}
-        <Section title="📈 Log a behavior" count={visibleDefs.length}>
+        <Section title="📈 Quick log a behavior" count={visibleDefs.length}>
           {visibleDefs.length === 0 ? (
             <Empty>No behaviors defined yet. Open /star → 📈 Behavior to add some.</Empty>
           ) : (
@@ -427,6 +501,14 @@ export default function StudentFolderModal({ studentId, onClose }: Props) {
           Pulled from local STAR data · {studentId}
         </div>
       </div>
+
+      {reportForDefId && (
+        <BehaviorScanModal
+          defId={reportForDefId}
+          prePickedStudentId={studentId}
+          onClose={() => { setReportForDefId(null); setLogTick((t) => t + 1); }}
+        />
+      )}
     </Backdrop>
   );
 }

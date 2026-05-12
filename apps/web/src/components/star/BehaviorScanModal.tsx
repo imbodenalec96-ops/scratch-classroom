@@ -9,7 +9,7 @@
 //   • "Save full report" — saves all fields. Print button generates
 //     a single-incident PDF for IEP team / admin documentation.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   StarStore,
   type StarStudent, type BehaviorDef, type BehaviorEvent,
@@ -77,6 +77,63 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Listen for STU-{id} barcode scans on the keyboard. Hand-scanners
+  // type the code character-by-character then press Enter — same as
+  // the global scanner. We capture STU- specifically so the teacher
+  // can scan a folder label here to pick the kid without tapping.
+  // Active in BOTH stages: pick stage advances to the form, form
+  // stage swaps the picked kid to the scanned one.
+  const stuBufRef = useRef<string>("");
+  const stuTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    const flush = () => {
+      const v = stuBufRef.current.toUpperCase();
+      stuBufRef.current = "";
+      const m = /^STU-(.+)$/.exec(v);
+      if (!m) return;
+      const sid = m[1];
+      if (!students.some((s) => s.id === sid)) {
+        showFlash("err", "Scanned student isn't on the roster");
+        return;
+      }
+      // Per-kid behaviors: only allow scanning that one student.
+      if (def?.scope === "student" && def.studentId && def.studentId !== sid) {
+        showFlash("err", "This behavior is locked to a different student");
+        return;
+      }
+      setStudentId(sid);
+      setStage("form");
+      successBeep();
+      const stu = students.find((s) => s.id === sid);
+      showFlash("ok", `Picked ${stu?.firstName || "kid"} via scan`);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Don't hijack typing in form fields.
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
+      if (e.key === "Enter") {
+        if (stuBufRef.current.length > 2) {
+          if (stuTimerRef.current) { window.clearTimeout(stuTimerRef.current); stuTimerRef.current = null; }
+          flush();
+        }
+        return;
+      }
+      // Ignore non-character keys
+      if (e.key.length !== 1) return;
+      stuBufRef.current += e.key;
+      if (stuTimerRef.current) window.clearTimeout(stuTimerRef.current);
+      stuTimerRef.current = window.setTimeout(() => {
+        if (stuBufRef.current.length > 2) flush();
+        else stuBufRef.current = "";
+      }, 100);
+    };
+    window.addEventListener("keypress", onKey);
+    return () => {
+      window.removeEventListener("keypress", onKey);
+      if (stuTimerRef.current) window.clearTimeout(stuTimerRef.current);
+    };
+  }, [def, students]);
 
   const showFlash = (kind: "ok" | "err", text: string, ms = 2200) => {
     setFlash({ kind, text });
@@ -170,6 +227,14 @@ export default function BehaviorScanModal({ defId, onClose, prePickedStudentId }
         <div style={panel()}>
           <Header def={def} onClose={onClose} />
           {flash && <Flash flash={flash} />}
+          <div style={{
+            padding: "10px 14px", borderRadius: 10, marginBottom: 12,
+            background: "linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.05))",
+            border: "1.5px dashed rgba(168,85,247,0.45)",
+            fontSize: 12, color: "#fce7f3", fontWeight: 700, lineHeight: 1.5,
+          }}>
+            🔍 <b style={{ color: "#f9a8d4" }}>Scan a folder label</b> (the kid's STU- barcode) to pick that student instantly — fastest way. Or tap a tile below.
+          </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(196,181,253,0.65)", marginBottom: 8 }}>
             Pick a kid · single-tap = quick log · "+" = full report
           </div>
