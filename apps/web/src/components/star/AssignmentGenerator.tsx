@@ -2164,6 +2164,9 @@ interface GradeMath {
   ops: Array<"+" | "-" | "×" | "÷">;
   // Per-op number bounds: [maxA, maxB]
   range: Partial<Record<"+" | "-" | "×" | "÷", [number, number]>>;
+  // Lesson variant — multiple per grade so two kids in the same
+  // packet at the same grade get a DIFFERENT story / approach.
+  title: string;
   intro: string;
   body: string;
   keyPoints: string[];
@@ -2181,55 +2184,175 @@ function gradeKey(grade: string): "K" | "1" | "2" | "3" | "4" | "5" {
   return "5";
 }
 
-const GRADE_MATH: Record<"K" | "1" | "2" | "3" | "4" | "5", GradeMath> = {
-  K: {
-    ops: ["+"],
-    range: { "+": [5, 5] },
-    intro: "Today we are adding small numbers. We add when we put things together.",
-    body: "When we ADD, we put two groups together to find how many in all. The symbol + means add. Example: 2 + 3. We can count: 1, 2 … then keep going 3, 4, 5. So 2 + 3 = 5. Try counting on your fingers if you need help.",
-    keyPoints: ["+ means add", "Count to find the total", "You can use your fingers"],
-    workedExample: { problem: "2 + 3 = ?", solution: "5" },
-  },
-  "1": {
-    ops: ["+", "-"],
-    range: { "+": [10, 10], "-": [10, 5] },
-    intro: "Today we are adding and subtracting up to 20.",
-    body: "When we ADD (+), we put two numbers together. Example: 6 + 4 = 10. When we SUBTRACT (−), we take one number away. Example: 8 − 3 = 5. We can count up for adding and count back for subtracting.",
-    keyPoints: ["+ means put together", "− means take away", "Add by counting up, subtract by counting back"],
-    workedExample: { problem: "6 + 4 = ?", solution: "10" },
-  },
-  "2": {
-    ops: ["+", "-"],
-    range: { "+": [50, 50], "-": [50, 30] },
-    intro: "Today we are adding and subtracting numbers up to 100. (No multiplication yet — that starts in 3rd grade.)",
-    body: "When we ADD (+), we put numbers together. Example: 23 + 14 = 37. When we SUBTRACT (−), we take one number from another. Example: 50 − 18 = 32. For 2-digit numbers, line up the ones place and the tens place. Add or subtract the ones first, then the tens.",
-    keyPoints: ["Line up the ones and tens", "Ones place first, then tens", "+ adds, − takes away"],
-    workedExample: { problem: "23 + 14 = ?", solution: "37" },
-  },
-  "3": {
-    ops: ["+", "-", "×"],
-    range: { "+": [100, 100], "-": [100, 50], "×": [10, 10] },
-    intro: "Today we are practicing addition, subtraction, and beginning multiplication facts (×0 to ×10).",
-    body: "When we MULTIPLY (×), we add a number to itself in equal groups. Example: 4 × 3 means 3 groups of 4, or 4 + 4 + 4 = 12. When we ADD (+), we put numbers together: 45 + 27 = 72. When we SUBTRACT (−), we take one away: 80 − 35 = 45. The × symbol means \"groups of\" or \"times.\"",
-    keyPoints: ["× means groups of", "3 × 4 = 4 + 4 + 4 = 12", "Multiplication is fast adding"],
-    workedExample: { problem: "4 × 3 = ?", solution: "12" },
-  },
-  "4": {
-    ops: ["+", "-", "×", "÷"],
-    range: { "+": [500, 500], "-": [500, 200], "×": [12, 9], "÷": [99, 9] },
-    intro: "Today we are practicing addition, subtraction, multiplication facts, and beginning division.",
-    body: "When we MULTIPLY (×), we count equal groups: 7 × 8 = 56. When we DIVIDE (÷), we split into equal groups: 56 ÷ 8 = 7. Multiplication and division are opposite operations — if 7 × 8 = 56, then 56 ÷ 8 = 7. We also keep practicing larger addition and subtraction.",
-    keyPoints: ["× and ÷ are opposites", "If 7×8=56 then 56÷8=7", "Bigger numbers — line them up"],
-    workedExample: { problem: "56 ÷ 8 = ?", solution: "7" },
-  },
-  "5": {
-    ops: ["+", "-", "×", "÷"],
-    range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
-    intro: "Today we are practicing all four operations with larger numbers.",
-    body: "All four operations are tools for solving problems. ADDITION (+) puts amounts together. SUBTRACTION (−) finds the difference. MULTIPLICATION (×) is fast adding of equal groups. DIVISION (÷) splits into equal groups. Multiplication and division are opposites — and so are addition and subtraction. Read carefully and pick the right operation.",
-    keyPoints: ["+ and − are opposites", "× and ÷ are opposites", "Pick the right operation"],
-    workedExample: { problem: "12 × 11 = ?", solution: "132" },
-  },
+// Multiple lesson variants per grade. The number ranges + operations
+// stay locked to grade scope, but the title/intro/body/example differ
+// so kids in the same packet at the same grade get DIFFERENT lessons
+// (the packet generator passes excludeTitles to skip used variants).
+const GRADE_MATH_VARIANTS: Record<"K" | "1" | "2" | "3" | "4" | "5", GradeMath[]> = {
+  K: [
+    {
+      ops: ["+"], range: { "+": [5, 5] },
+      title: "Math — K · Adding to Make a Group",
+      intro: "Today we are adding small numbers. We add when we put things together.",
+      body: "When we ADD, we put two groups together to find how many in all. The symbol + means add. Example: 2 + 3. We can count: 1, 2 … then keep going 3, 4, 5. So 2 + 3 = 5. Try counting on your fingers if you need help.",
+      keyPoints: ["+ means add", "Count to find the total", "You can use your fingers"],
+      workedExample: { problem: "2 + 3 = ?", solution: "5" },
+    },
+    {
+      ops: ["+"], range: { "+": [5, 5] },
+      title: "Math — K · Counting On From a Number",
+      intro: "Today we will COUNT ON from a starting number to add.",
+      body: "Counting on is a fast way to add. Pick the BIGGER number and start there. Then count up by the smaller number. Example: 3 + 2. Start at 3. Count up two: 4, 5. The answer is 5. This is faster than starting from 1 every time. Try it: 4 + 1. Start at 4. Count up one: 5. So 4 + 1 = 5.",
+      keyPoints: ["Start with the bigger number", "Count up by the smaller number", "Faster than counting from 1"],
+      workedExample: { problem: "3 + 2 = ?", solution: "5" },
+    },
+    {
+      ops: ["+"], range: { "+": [5, 5] },
+      title: "Math — K · Pictures of Adding",
+      intro: "Today we will use PICTURES to help us add.",
+      body: "We can DRAW pictures to help us add. If you have 2 stars and you get 1 more star, draw 2 stars then draw 1 more. Now count all the stars: ★ ★ ★. There are 3 stars. So 2 + 1 = 3. Drawing pictures helps us SEE the math. You can use circles, squares, or even just dots — anything that helps you count.",
+      keyPoints: ["Draw the first number", "Draw more for the second number", "Count the total"],
+      workedExample: { problem: "2 + 1 = ?", solution: "3" },
+    },
+  ],
+  "1": [
+    {
+      ops: ["+", "-"], range: { "+": [10, 10], "-": [10, 5] },
+      title: "Math — 1st · Add Together, Take Away",
+      intro: "Today we are adding and subtracting up to 20.",
+      body: "When we ADD (+), we put two numbers together. Example: 6 + 4 = 10. When we SUBTRACT (−), we take one number away. Example: 8 − 3 = 5. We can count up for adding and count back for subtracting.",
+      keyPoints: ["+ means put together", "− means take away", "Add by counting up, subtract by counting back"],
+      workedExample: { problem: "6 + 4 = ?", solution: "10" },
+    },
+    {
+      ops: ["+", "-"], range: { "+": [10, 10], "-": [10, 5] },
+      title: "Math — 1st · Number Bonds (Part-Part-Whole)",
+      intro: "Today we will use NUMBER BONDS to add and subtract.",
+      body: "A NUMBER BOND has three parts: two PARTS and one WHOLE. Example: 7 has parts 3 and 4. We say 3 + 4 = 7. We can also say 7 − 3 = 4 or 7 − 4 = 3 because we just take away one PART to find the other. If you know one number bond, you know FOUR math facts. Try it: 9 has parts 5 and 4. So 5 + 4 = 9, 4 + 5 = 9, 9 − 5 = 4, and 9 − 4 = 5.",
+      keyPoints: ["Two parts and one whole", "Knowing one bond gives you 4 facts", "Take away a part to find the other"],
+      workedExample: { problem: "Parts of 8: 3 + ? = 8", solution: "5" },
+    },
+    {
+      ops: ["+", "-"], range: { "+": [10, 10], "-": [10, 5] },
+      title: "Math — 1st · Tens Frames Help You See",
+      intro: "Today we use a TENS FRAME — a box with 10 spots — to add and subtract.",
+      body: "A TENS FRAME has 10 spots in 2 rows of 5. We fill it with dots to show numbers. To add 8 + 3, fill 8 spots in one frame, then add 3 more. Two of the new dots fill the frame to make 10, and 1 dot starts a new frame. So 8 + 3 = 11. Tens frames help your brain see numbers as groups of 10, which makes adding easier.",
+      keyPoints: ["10 spots in 2 rows of 5", "Fill to 10 first", "Helps you see groups of 10"],
+      workedExample: { problem: "9 + 4 = ?", solution: "13" },
+    },
+  ],
+  "2": [
+    {
+      ops: ["+", "-"], range: { "+": [50, 50], "-": [50, 30] },
+      title: "Math — 2nd · Lining Up Tens and Ones",
+      intro: "Today we are adding and subtracting numbers up to 100. (No multiplication yet — that starts in 3rd grade.)",
+      body: "When we ADD (+), we put numbers together. Example: 23 + 14 = 37. When we SUBTRACT (−), we take one number from another. Example: 50 − 18 = 32. For 2-digit numbers, line up the ones place and the tens place. Add or subtract the ones first, then the tens.",
+      keyPoints: ["Line up the ones and tens", "Ones place first, then tens", "+ adds, − takes away"],
+      workedExample: { problem: "23 + 14 = ?", solution: "37" },
+    },
+    {
+      ops: ["+", "-"], range: { "+": [50, 50], "-": [50, 30] },
+      title: "Math — 2nd · Regrouping (Carrying and Borrowing)",
+      intro: "Today we will REGROUP — sometimes called carrying and borrowing.",
+      body: "Sometimes when we add, the ones place adds up to MORE than 9. We REGROUP by carrying a 10 to the tens place. Example: 27 + 15. Add the ones: 7 + 5 = 12. That's 1 ten and 2 ones. Write the 2, CARRY the 1 over to the tens. Now the tens: 1 + 2 + 1 = 4. Answer: 42. For subtraction we BORROW. Example: 32 − 17. Ones: 2 − 7 doesn't work. Borrow 1 ten from the 3 (the 3 becomes 2). Now the ones are 12 − 7 = 5. Tens: 2 − 1 = 1. Answer: 15.",
+      keyPoints: ["Ones over 9 → carry a 10", "Top ones too small → borrow from tens", "Always start with the ones place"],
+      workedExample: { problem: "27 + 15 = ?", solution: "42" },
+    },
+    {
+      ops: ["+", "-"], range: { "+": [50, 50], "-": [50, 30] },
+      title: "Math — 2nd · Skip Counting and Doubles",
+      intro: "Today we use SKIP COUNTING and DOUBLES to add faster.",
+      body: "SKIP COUNTING means counting by 2s, 5s, or 10s instead of 1s. Counting by 2s: 2, 4, 6, 8, 10, 12. Counting by 5s: 5, 10, 15, 20. Counting by 10s: 10, 20, 30, 40. DOUBLES are facts where you add a number to itself: 4 + 4 = 8, 6 + 6 = 12, 7 + 7 = 14. If you know your doubles, you can use 'doubles plus 1' for tricky facts: 6 + 7 is just 6 + 6 + 1 = 13. Memorizing doubles makes everything else faster.",
+      keyPoints: ["Count by 2s, 5s, 10s", "Doubles: 4+4, 5+5, 6+6 …", "Doubles + 1 = tricky facts solved"],
+      workedExample: { problem: "6 + 7 = (using doubles + 1)", solution: "13" },
+    },
+  ],
+  "3": [
+    {
+      ops: ["+", "-", "×"], range: { "+": [100, 100], "-": [100, 50], "×": [10, 10] },
+      title: "Math — 3rd · Multiplication is Fast Adding",
+      intro: "Today we are practicing addition, subtraction, and beginning multiplication facts (×0 to ×10).",
+      body: "When we MULTIPLY (×), we add a number to itself in equal groups. Example: 4 × 3 means 3 groups of 4, or 4 + 4 + 4 = 12. When we ADD (+), we put numbers together: 45 + 27 = 72. When we SUBTRACT (−), we take one away: 80 − 35 = 45. The × symbol means \"groups of\" or \"times.\"",
+      keyPoints: ["× means groups of", "3 × 4 = 4 + 4 + 4 = 12", "Multiplication is fast adding"],
+      workedExample: { problem: "4 × 3 = ?", solution: "12" },
+    },
+    {
+      ops: ["+", "-", "×"], range: { "+": [100, 100], "-": [100, 50], "×": [10, 10] },
+      title: "Math — 3rd · Times Tables (Memorizing Facts)",
+      intro: "Today we keep building MEMORIZED multiplication facts (×0 to ×10).",
+      body: "Memorizing your TIMES TABLES means you don't have to count groups every time — you just KNOW the answer. Some easy starting tricks: ×0 always equals 0 (anything times zero is zero). ×1 always equals the number itself (5 × 1 = 5). ×2 is doubles: 6 × 2 = 12. ×5 always ends in 0 or 5 and counts by fives. ×10 just adds a zero: 7 × 10 = 70. Once you know ×0, ×1, ×2, ×5, and ×10, you only have a few hard facts left.",
+      keyPoints: ["×0 = 0, always", "×1 = the number itself", "×10 just adds a zero"],
+      workedExample: { problem: "7 × 5 = ?", solution: "35" },
+    },
+    {
+      ops: ["+", "-", "×"], range: { "+": [100, 100], "-": [100, 50], "×": [10, 10] },
+      title: "Math — 3rd · Arrays — Rows and Columns",
+      intro: "Today we will use ARRAYS to see multiplication.",
+      body: "An ARRAY is a rectangle of objects in equal ROWS and COLUMNS. Each array shows a multiplication fact. Example: 3 rows of 4 dots: ●●●● ●●●● ●●●●. That's 3 × 4 = 12. The same dots can also be read as 4 columns of 3, which is 4 × 3 = 12. So 3 × 4 and 4 × 3 give the same answer — that's the COMMUTATIVE property of multiplication. Try it: 5 × 2 makes 5 rows of 2 dots = 10 dots. So does 2 × 5.",
+      keyPoints: ["Rows × columns = total", "3 × 4 = 4 × 3 (same answer)", "Arrays make multiplication visual"],
+      workedExample: { problem: "5 × 2 (5 rows of 2)", solution: "10" },
+    },
+  ],
+  "4": [
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [500, 500], "-": [500, 200], "×": [12, 9], "÷": [99, 9] },
+      title: "Math — 4th · Multiplication and Division Together",
+      intro: "Today we are practicing addition, subtraction, multiplication facts, and beginning division.",
+      body: "When we MULTIPLY (×), we count equal groups: 7 × 8 = 56. When we DIVIDE (÷), we split into equal groups: 56 ÷ 8 = 7. Multiplication and division are opposite operations — if 7 × 8 = 56, then 56 ÷ 8 = 7. We also keep practicing larger addition and subtraction.",
+      keyPoints: ["× and ÷ are opposites", "If 7×8=56 then 56÷8=7", "Bigger numbers — line them up"],
+      workedExample: { problem: "56 ÷ 8 = ?", solution: "7" },
+    },
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [500, 500], "-": [500, 200], "×": [12, 9], "÷": [99, 9] },
+      title: "Math — 4th · Multi-Digit Multiplication Step by Step",
+      intro: "Today we will multiply 2-digit by 1-digit numbers using the standard algorithm.",
+      body: "To multiply a 2-digit number by a 1-digit number: STEP 1, multiply the ones place. STEP 2, multiply the tens place. STEP 3, add the results. Example: 23 × 4. Ones: 3 × 4 = 12. Write the 2, carry the 1. Tens: 2 × 4 = 8. Add the carried 1: 8 + 1 = 9. Answer: 92. Check by estimation: 23 is about 25, and 25 × 4 = 100. Our answer of 92 is close to 100 — looks right.",
+      keyPoints: ["Multiply the ones first", "Carry tens to the next column", "Always estimate to check"],
+      workedExample: { problem: "23 × 4 = ?", solution: "92" },
+    },
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [500, 500], "-": [500, 200], "×": [12, 9], "÷": [99, 9] },
+      title: "Math — 4th · Beginning Long Division",
+      intro: "Today we practice DIVIDING by 1-digit divisors with a clean answer (no remainder).",
+      body: "Division splits a number into equal groups. Example: 84 ÷ 4. Think: how many 4s fit into 8? Two. So tens place = 2. Now how many 4s fit into 4? One. So ones place = 1. Answer: 21. Check by multiplying: 21 × 4 = 84. ✓ Long division works one digit at a time, left to right. If a digit doesn't fit, you bring down the next digit and try again. Memorizing your multiplication facts makes division way faster — they're opposites.",
+      keyPoints: ["Divide left to right, one digit at a time", "Multiply to check", "Knowing × facts speeds up ÷"],
+      workedExample: { problem: "84 ÷ 4 = ?", solution: "21" },
+    },
+  ],
+  "5": [
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
+      title: "Math — 5th · All Four Operations",
+      intro: "Today we are practicing all four operations with larger numbers.",
+      body: "All four operations are tools for solving problems. ADDITION (+) puts amounts together. SUBTRACTION (−) finds the difference. MULTIPLICATION (×) is fast adding of equal groups. DIVISION (÷) splits into equal groups. Multiplication and division are opposites — and so are addition and subtraction. Read carefully and pick the right operation.",
+      keyPoints: ["+ and − are opposites", "× and ÷ are opposites", "Pick the right operation"],
+      workedExample: { problem: "12 × 11 = ?", solution: "132" },
+    },
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
+      title: "Math — 5th · Multi-Digit Multiplication",
+      intro: "Today we practice multiplying 2-digit by 2-digit numbers.",
+      body: "To multiply two 2-digit numbers, do TWO multiplications and ADD them. Example: 23 × 14. STEP 1, multiply 23 × 4 (the ones digit of 14): 23 × 4 = 92. STEP 2, multiply 23 × 10 (the tens digit). 23 × 10 = 230. Always remember to put a 0 in the ones place because we're multiplying by 10, not 1. STEP 3, add: 92 + 230 = 322. Answer: 23 × 14 = 322. Estimate to check: 23 is close to 20, 14 is close to 15, and 20 × 15 = 300. Our 322 is close — looks right.",
+      keyPoints: ["Multiply by ones first, then by tens", "When multiplying by tens, put a 0 in the ones place", "Add the two products"],
+      workedExample: { problem: "23 × 14 = ?", solution: "322" },
+    },
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
+      title: "Math — 5th · Long Division with Larger Numbers",
+      intro: "Today we practice LONG DIVISION with bigger dividends.",
+      body: "Long division uses the steps: DIVIDE, MULTIPLY, SUBTRACT, BRING DOWN. Repeat until done. Example: 156 ÷ 12. STEP 1: 12 doesn't go into 1. So look at 15. 12 goes into 15 one time. Write 1. Multiply: 1 × 12 = 12. Subtract: 15 − 12 = 3. Bring down the 6 to make 36. STEP 2: 12 goes into 36 three times. Write 3. Multiply: 3 × 12 = 36. Subtract: 36 − 36 = 0. Done. Answer: 13. Always check with multiplication: 13 × 12 = 156. ✓",
+      keyPoints: ["Divide, Multiply, Subtract, Bring down", "Repeat until no digits left", "Check by multiplying back"],
+      workedExample: { problem: "156 ÷ 12 = ?", solution: "13" },
+    },
+    {
+      ops: ["+", "-", "×", "÷"], range: { "+": [1000, 1000], "-": [1000, 500], "×": [25, 12], "÷": [144, 12] },
+      title: "Math — 5th · Order of Operations",
+      intro: "Today we use the ORDER OF OPERATIONS to solve problems with more than one step.",
+      body: "When a math problem has more than one operation, the ORDER OF OPERATIONS tells us which one to do first. The order is: PARENTHESES first, then MULTIPLICATION and DIVISION (left to right), then ADDITION and SUBTRACTION (left to right). Some kids remember this with PEMDAS or 'Please Excuse My Dear Aunt Sally.' Example: 2 + 3 × 4. Multiplication first: 3 × 4 = 12. Then add: 2 + 12 = 14. Without the order rule, you might do 2 + 3 first and get the wrong answer (5 × 4 = 20). The right answer is 14.",
+      keyPoints: ["Parentheses first, then × ÷, then + −", "PEMDAS: Please Excuse My Dear Aunt Sally", "Multiplication before addition"],
+      workedExample: { problem: "2 + 3 × 4 = ?", solution: "14" },
+    },
+  ],
 };
 
 // Random helpers — keep word problems feeling fresh from one generation
@@ -2281,9 +2404,18 @@ const WORD_DIV: WordBuilder[] = [
   (a, b) => ({ text: `A baker bakes ${a} cookies and packs them into bags of ${b}. How many bags can be filled?`, answer: String(a / b) }),
 ];
 
-function buildMathLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string }): { questions: StarQuestion[]; lesson: Lesson } {
+function buildMathLesson(opts: { subject: Subject; grade: string; count: number; difficulty: string; goal: string; excludeTitles?: Set<string> }): { questions: StarQuestion[]; lesson: Lesson; topicTitle?: string } {
   const g = gradeKey(opts.grade);
-  const cfg = GRADE_MATH[g];
+  // Pick a variant whose title isn't already used in this packet.
+  // If every variant is exhausted, fall back to the full list so we
+  // never crash a 30-kid packet with only 3 variants.
+  const variants = GRADE_MATH_VARIANTS[g];
+  let pool = variants;
+  if (opts.excludeTitles && opts.excludeTitles.size > 0) {
+    const fresh = variants.filter((v) => !opts.excludeTitles!.has(v.title));
+    if (fresh.length > 0) pool = fresh;
+  }
+  const cfg = pool[Math.floor(Math.random() * pool.length)];
 
   // Honor difficulty by scaling up or down WITHIN the grade band — never
   // crossing into operations the student hasn't learned yet.
@@ -2330,13 +2462,14 @@ function buildMathLesson(opts: { subject: Subject; grade: string; count: number;
   return {
     questions,
     lesson: {
-      title: `Math — ${opts.grade} Grade`,
+      title: cfg.title,
       intro: opts.goal ? `Today we're practicing ${opts.goal}.` : cfg.intro,
       body: cfg.body,
       keyPoints: cfg.keyPoints,
       workedExample: cfg.workedExample,
       vocab: MATH_VOCAB,
     },
+    topicTitle: cfg.title,
   };
 }
 
@@ -2387,7 +2520,7 @@ export function buildLocalLesson(opts: { subject: Subject; grade: string; count:
   // past 10. Multiplication starts in 3rd; multi-digit multiplication and
   // long division in 4th–5th.
   if (subject === "Math") {
-    return buildMathLesson(opts);
+    return buildMathLesson(opts);  // opts already carries excludeTitles
   }
 
   const bank: LocalTopic[] =
