@@ -29,30 +29,38 @@ export interface MusicPreset {
   isCustom?: boolean;
 }
 
-// Verified bundled set. Two flavors:
-//   YouTube tracks — long-form streams that have been live for years.
-//   Synth tracks   — generated client-side via Web Audio. CANNOT 404
-//                    since they're produced on the device. Loop forever,
-//                    work offline, no copyright risk.
+// Verified bundled set — only YouTube tracks that have been
+// confirmed to play. Synthesized presets removed in May 2026 because
+// the teacher reported they sounded poor on classroom speakers.
+//
+// To add more music: open /board → Settings → Music chip "+ Add
+// YouTube track". Paste any 24/7 ambient stream URL. The SUGGESTED
+// SEARCHES below give the teacher a few good starting points.
 export const MUSIC_PRESETS: MusicPreset[] = [
-  // YouTube tracks
   { id: "forest",     label: "Forest Spa",        videoId: "xNN7iTA57jM", emoji: "🌿", mood: "nature",       price: 15 },
   { id: "ocean",      label: "Ocean Waves",       videoId: "MIr3RsUWrdo", emoji: "🌊", mood: "nature",       price: 15 },
   { id: "rain",       label: "Gentle Rain",       videoId: "mPZkdNFkNps", emoji: "🌧", mood: "nature",       price: 15 },
   { id: "piano",      label: "Spa Piano",         videoId: "4xDzrJKXOOY", emoji: "🎹", mood: "instrumental", price: 15 },
   { id: "tibetan",    label: "Healing Bowls",     videoId: "UgHKb_7884o", emoji: "🔔", mood: "instrumental", price: 20 },
   { id: "lofi-study", label: "Lo-Fi Study Beats", videoId: "jfKfPfyJRdk", emoji: "📚", mood: "lofi",         price: 10 },
+];
 
-  // Synth — generated on device, guaranteed to work, no internet.
-  // White-noise dropped — too harsh on classroom speakers. Pink and
-  // brown stay (warmer + better for sensory regulation).
-  { id: "synth-rain",      label: "Calm Rain",        synth: "rain",         emoji: "💧", mood: "synth", price: 5 },
-  { id: "synth-waves",     label: "Slow Ocean Waves", synth: "waves",        emoji: "🌊", mood: "synth", price: 5 },
-  { id: "synth-fan",       label: "Box Fan Hum",      synth: "fan",          emoji: "🌀", mood: "synth", price: 5 },
-  { id: "synth-pink",      label: "Pink Noise",       synth: "pink-noise",   emoji: "🟣", mood: "synth", price: 5 },
-  { id: "synth-brown",     label: "Deep Brown Noise", synth: "brown-noise",  emoji: "🟤", mood: "synth", price: 5 },
-  { id: "synth-bowl",      label: "Singing Bowl",     synth: "bowl",         emoji: "🔔", mood: "synth", price: 8 },
-  { id: "synth-heartbeat", label: "Resting Heartbeat", synth: "heartbeat",   emoji: "❤️", mood: "synth", price: 8 },
+// Suggested YouTube search queries shown to the teacher in the
+// "+ Add YouTube track" picker. She picks one, the picker opens
+// YouTube in a new tab pre-filled with the search.
+export const SUGGESTED_SEARCHES: Array<{ label: string; query: string; emoji: string }> = [
+  { emoji: "📚", label: "Lo-fi hip hop radio (24/7 stream)", query: "lofi hip hop radio beats to study to live" },
+  { emoji: "☕", label: "Coffee shop ambience (8 hour)",      query: "coffee shop ambience 8 hour" },
+  { emoji: "🌧", label: "Rain on a roof (10 hour)",            query: "rain on a roof 10 hour no thunder" },
+  { emoji: "🌊", label: "Ocean waves (10 hour)",                query: "ocean waves 10 hour no music for sleep" },
+  { emoji: "🌲", label: "Forest sounds with birds",            query: "forest sounds with birds 8 hour" },
+  { emoji: "🔥", label: "Crackling fireplace (10 hour)",       query: "crackling fireplace 10 hour no music" },
+  { emoji: "🎹", label: "Calm piano for studying",             query: "calm piano music for studying 3 hour" },
+  { emoji: "🎼", label: "Classical for focus (3 hour)",        query: "classical music for focus and concentration 3 hour" },
+  { emoji: "🎷", label: "Smooth jazz cafe",                    query: "smooth jazz cafe music 3 hour" },
+  { emoji: "🧘", label: "Meditation music (no voice)",         query: "meditation music no voice 3 hour" },
+  { emoji: "✨", label: "Studio Ghibli piano",                  query: "studio ghibli piano playlist relaxing" },
+  { emoji: "🌌", label: "Synthwave for studying",              query: "chillsynth radio synthwave to chill to" },
 ];
 
 export const MOOD_LABELS: Record<MusicMood, string> = {

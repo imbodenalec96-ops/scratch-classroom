@@ -9,6 +9,7 @@ import {
 import {
   MUSIC_PRESETS as BUNDLED_MUSIC,
   getCustomMusicPresets, setCustomMusicPresets, parseYouTubeId,
+  SUGGESTED_SEARCHES,
   type MusicPreset, type MusicMood,
 } from "../lib/musicPresets.ts";
 
@@ -289,42 +290,78 @@ export default function TeacherBoardSettings() {
 
             {showAddMusic && (
               <div
-                className="p-3 rounded-xl border space-y-2"
+                className="p-3 rounded-xl border space-y-3"
                 style={{ background: "rgba(168,85,247,0.06)", borderColor: "rgba(168,85,247,0.30)" }}
               >
-                <input
-                  value={newMusic.url}
-                  onChange={(e) => setNewMusic((m) => ({ ...m, url: e.target.value }))}
-                  placeholder="Paste any YouTube URL (or just the 11-char video ID)"
-                  className="input text-sm w-full"
-                />
-                <div className="grid grid-cols-[60px_1fr] gap-2">
+                {/* Suggested searches — one tap opens YouTube pre-filled */}
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--t3)" }}>
+                    🔎 Find a track on YouTube · pick a category
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {SUGGESTED_SEARCHES.map((s) => (
+                      <button
+                        key={s.label}
+                        onClick={() => {
+                          window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(s.query)}`, "_blank", "noopener");
+                          setNewMusic((m) => ({ ...m, label: s.label.replace(/\s*\(.*\)$/, ""), emoji: s.emoji }));
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border text-left transition-all"
+                        style={{
+                          background: "rgba(255,255,255,0.03)",
+                          borderColor: "rgba(168,85,247,0.20)",
+                          color: "var(--t2)",
+                        }}
+                        title={`Search YouTube for: ${s.query}`}
+                      >
+                        <span>{s.emoji}</span>
+                        <span className="truncate">{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[10px] mt-1.5" style={{ color: "var(--t3)" }}>
+                    Tap a category → YouTube opens in a new tab. Pick a video, copy its URL, paste below.
+                  </div>
+                </div>
+
+                <div className="border-t pt-3" style={{ borderColor: "rgba(168,85,247,0.20)" }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--t3)" }}>
+                    📋 Paste the YouTube URL here
+                  </div>
                   <input
-                    value={newMusic.emoji}
-                    onChange={(e) => setNewMusic((m) => ({ ...m, emoji: e.target.value }))}
-                    placeholder="🎵"
-                    maxLength={4}
-                    className="input text-sm text-center"
-                  />
-                  <input
-                    value={newMusic.label}
-                    onChange={(e) => setNewMusic((m) => ({ ...m, label: e.target.value }))}
-                    placeholder="Track name (e.g. 'Ghibli piano')"
+                    value={newMusic.url}
+                    onChange={(e) => setNewMusic((m) => ({ ...m, url: e.target.value }))}
+                    placeholder="https://youtube.com/watch?v=..."
                     className="input text-sm w-full"
                   />
-                </div>
-                {addMusicErr && <div className="text-[11px] font-bold" style={{ color: "#fca5a5" }}>{addMusicErr}</div>}
-                <button
-                  onClick={addCustomMusic}
-                  disabled={!newMusic.url.trim()}
-                  className="px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                  style={{
-                    background: "linear-gradient(135deg, #db2777, #a855f7)",
-                    color: "white",
-                  }}
-                >+ Save track</button>
-                <div className="text-[10px]" style={{ color: "var(--t3)" }}>
-                  💡 Test the YouTube link works in a browser first. Long-form ambient streams ("10 hour" or "live radio") work best — short videos will end and replay from start.
+                  <div className="grid grid-cols-[60px_1fr] gap-2 mt-2">
+                    <input
+                      value={newMusic.emoji}
+                      onChange={(e) => setNewMusic((m) => ({ ...m, emoji: e.target.value }))}
+                      placeholder="🎵"
+                      maxLength={4}
+                      className="input text-sm text-center"
+                    />
+                    <input
+                      value={newMusic.label}
+                      onChange={(e) => setNewMusic((m) => ({ ...m, label: e.target.value }))}
+                      placeholder="Track name"
+                      className="input text-sm w-full"
+                    />
+                  </div>
+                  {addMusicErr && <div className="text-[11px] font-bold mt-2" style={{ color: "#fca5a5" }}>{addMusicErr}</div>}
+                  <button
+                    onClick={addCustomMusic}
+                    disabled={!newMusic.url.trim()}
+                    className="mt-2 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                    style={{
+                      background: "linear-gradient(135deg, #db2777, #a855f7)",
+                      color: "white",
+                    }}
+                  >+ Save track</button>
+                  <div className="text-[10px] mt-1.5" style={{ color: "var(--t3)" }}>
+                    💡 Pick long-form streams ("10 hour" / "8 hour" / "live radio") — short videos end and restart.
+                  </div>
                 </div>
               </div>
             )}
