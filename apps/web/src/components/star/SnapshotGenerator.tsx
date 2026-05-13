@@ -442,6 +442,13 @@ export default function SnapshotGenerator() {
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 8, flexWrap: "wrap" }}>
+        {sel && (
+          <button
+            onClick={() => diagnoseSubmissions(sel, start, end)}
+            title="Print a per-submission diagnostic to a popup window — shows exactly why grades are being filtered out of the snapshot."
+            style={ghostBtn(false)}
+          >🔍 Diagnose</button>
+        )}
         {variant === "parent" && (
           <button
             onClick={emailToParent}
@@ -458,6 +465,116 @@ export default function SnapshotGenerator() {
       </div>
     </div>
   );
+}
+
+/* ── Diagnostic ──────────────────────────────────────────────────── */
+
+// Opens a popup that lists EVERY submission attached to this kid
+// across the whole tracker, with completedDate / loggedAt / studentId
+// / studentName, and explains why each one is or isn't included in
+// the snapshot's date range. Plain HTML so we can copy-paste rows.
+function diagnoseSubmissions(s: StarStudent, start: string, end: string) {
+  const tracker = StarStore.getAsnTrack();
+  const studentIdLower = String(s.id || "").toLowerCase();
+  const firstLower = String(s.firstName || "").trim().toLowerCase();
+  const rows: Array<{
+    barcode: string; trackerName: string;
+    studentId: string; studentName: string;
+    completedDate: string; loggedAt: string;
+    pct: number; status: string;
+    matchKind: string;
+    inRange: boolean;
+  }> = [];
+  for (const id in tracker) {
+    const t = tracker[id];
+    for (const sub of (t.submissions || [])) {
+      const subSidLower = String(sub.studentId || "").toLowerCase();
+      const subSnLower = String(sub.studentName || "").trim().toLowerCase();
+      const firstSn = subSnLower.split(/\s+/)[0] || "";
+      let matchKind = "—";
+      if (subSidLower && subSidLower === studentIdLower) matchKind = "id (case-insens)";
+      else if (firstSn && firstSn === firstLower) matchKind = "first-name";
+      else continue;
+      const cd = String(sub.completedDate || "");
+      rows.push({
+        barcode: id,
+        trackerName: t.name || "(no name)",
+        studentId: String(sub.studentId || "(blank)"),
+        studentName: String(sub.studentName || "(blank)"),
+        completedDate: cd,
+        loggedAt: String(sub.loggedAt || ""),
+        pct: sub.pct ?? 0,
+        status: String(sub.status || ""),
+        matchKind,
+        inRange: !!cd && cd >= start && cd <= end,
+      });
+    }
+  }
+  rows.sort((a, b) => (b.loggedAt || "").localeCompare(a.loggedAt || ""));
+
+  // localStorage usage
+  let bytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)!;
+    bytes += (k.length + (localStorage.getItem(k) || "").length) * 2; // UTF-16 bytes
+  }
+  const usedKB = Math.round(bytes / 1024);
+  const usedPct = Math.round((bytes / (5 * 1024 * 1024)) * 100);
+
+  const w = window.open("", "_blank", "width=1100,height=900");
+  if (!w) { alert("Pop-up blocked — allow pop-ups for this site, then tap Diagnose again."); return; }
+  const esc = (x: any) => String(x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  const inRangeCount = rows.filter((r) => r.inRange).length;
+  const trs = rows.map((r) => `
+    <tr style="background:${r.inRange ? "#e6fff4" : "#fff5f5"}">
+      <td>${r.inRange ? "✅ in range" : "❌ <b>filtered</b>"}</td>
+      <td><code>${esc(r.completedDate)}</code></td>
+      <td>${esc(r.matchKind)}</td>
+      <td>${esc(r.trackerName)}<br><small><code>${esc(r.barcode)}</code></small></td>
+      <td><code>${esc(r.studentId)}</code></td>
+      <td>${esc(r.studentName)}</td>
+      <td>${r.pct}% · ${esc(r.status)}</td>
+      <td><small>${esc(r.loggedAt)}</small></td>
+    </tr>`).join("");
+  w.document.write(`<!doctype html><html><head><title>Diagnose · ${esc(s.firstName)}</title>
+    <style>
+      body { font-family: -apple-system, sans-serif; padding: 20px; color: #1f1235; }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      .meta { color: #666; font-size: 13px; margin-bottom: 18px; line-height: 1.55; }
+      .stat { display: inline-block; padding: 6px 12px; border-radius: 8px; background: #f3f4f6; margin-right: 8px; font-weight: 700; font-size: 13px; }
+      .stat.ok { background: #d1fae5; color: #065f46; }
+      .stat.bad { background: #fee2e2; color: #991b1b; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; }
+      th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; font-weight: 800; }
+      code { font-family: Menlo, monospace; font-size: 11px; background: rgba(0,0,0,0.05); padding: 1px 4px; border-radius: 3px; }
+      small { color: #666; }
+    </style></head><body>
+    <h1>🔍 Snapshot diagnostic — ${esc(s.firstName)} ${esc(s.lastName || "")}</h1>
+    <div class="meta">
+      <b>Snapshot date range:</b> <code>${esc(start)}</code> → <code>${esc(end)}</code>
+      &nbsp;·&nbsp; <b>Student id:</b> <code>${esc(s.id)}</code>
+      <br>
+      <span class="stat ok">${inRangeCount} grade${inRangeCount === 1 ? "" : "s"} included</span>
+      <span class="stat bad">${rows.length - inRangeCount} filtered out</span>
+      <span class="stat">${rows.length} total matched to ${esc(s.firstName)}</span>
+      <span class="stat">localStorage: ${usedKB} KB (${usedPct}% of ~5MB)</span>
+    </div>
+    ${rows.length === 0
+      ? `<p style="font-size:14px;color:#991b1b">⚠️ No submissions in localStorage matched ${esc(s.firstName)} by id OR first name. Either grades aren't saving locally at all, or they're being attributed to a different student id/name.</p>`
+      : `<table>
+          <thead>
+            <tr>
+              <th>Status</th><th>completedDate</th><th>match</th>
+              <th>Assignment</th><th>studentId on sub</th><th>studentName</th>
+              <th>Grade</th><th>loggedAt</th>
+            </tr>
+          </thead>
+          <tbody>${trs}</tbody>
+        </table>`
+    }
+  </body></html>`);
+  w.document.close();
 }
 
 /* ── Print template ──────────────────────────────────────────────── */
