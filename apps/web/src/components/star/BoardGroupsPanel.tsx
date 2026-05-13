@@ -8,7 +8,14 @@
 import { useEffect, useState } from "react";
 import { StarStore, type StarStudent, type StudentGroup } from "../../lib/star/storage.ts";
 import { api } from "../../lib/api.ts";
+import { getActiveClassId } from "../../lib/star/boardEvents.ts";
 import { tokens as T } from "../../lib/star/theme.ts";
+
+// Single resolved avatar entry — same shape the projector tiles use.
+// We try multiple sources in order: getBoardData (the board's actual
+// tile avatars), listStudentAccounts (the auth-students fallback),
+// and finally the student's own first initial.
+type AvatarInfo = { url: string | null; emoji: string | null };
 
 // External handle so the ClassroomBoard header renders the toggle.
 let _setOpen: ((v: boolean) => void) | null = null;
@@ -56,23 +63,52 @@ export default function BoardGroupsPanel() {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<StudentGroup[]>(() => StarStore.getGroups());
   const [students, setStudents] = useState<StarStudent[]>(() => StarStore.getStudents());
-  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
+  const [avatars, setAvatars] = useState<Record<string, AvatarInfo>>({});
   _setOpen = setOpen;
   _getOpen = () => open;
 
-  // Hydrate avatars once when the panel opens — keeps the bundle
-  // small for the projector when nobody's looking at groups.
+  // Hydrate avatars from the SAME source the board's tile grid uses
+  // (api.getBoardData) so the projector group cards show the kid's
+  // current board portrait — not a stale or missing /auth/students
+  // entry. Falls back to listStudentAccounts for any kid the board
+  // doesn't cover. Both lookups are case-insensitive on student id.
   useEffect(() => {
     if (!open) return;
     setGroups(StarStore.getGroups());
     setStudents(StarStore.getStudents());
     (async () => {
+      const map: Record<string, AvatarInfo> = {};
+      const upsert = (rawId: any, url: string | null, emoji: string | null) => {
+        const id = String(rawId || "").toLowerCase();
+        if (!id) return;
+        const prior = map[id] || { url: null, emoji: null };
+        map[id] = {
+          url:   prior.url   || url   || null,
+          emoji: prior.emoji || emoji || null,
+        };
+      };
+
+      // 1) Board tile data (preferred — matches the projector exactly).
+      try {
+        const classId = getActiveClassId();
+        if (classId) {
+          const d: any = await api.getBoardData(classId);
+          for (const s of (d?.students || []) as any[]) {
+            upsert(s.id, s.avatar_url || null, s.avatar_emoji || null);
+          }
+        }
+      } catch {}
+
+      // 2) /auth/students fallback for anyone the board data missed
+      //    (e.g. kids without a board tile but still on the roster).
       try {
         const accts = await api.listStudentAccounts();
-        const map: Record<string, string | null> = {};
-        for (const a of accts || []) map[a.id] = a.avatarUrl;
-        setAvatars(map);
+        for (const a of accts || []) {
+          upsert(a.id, a.avatarUrl || null, null);
+        }
       } catch {}
+
+      setAvatars(map);
     })();
   }, [open]);
 
@@ -191,7 +227,7 @@ function gridTemplateForCount(n: number): string {
 function GroupBoardCard({ group, students, avatars }: {
   group: StudentGroup;
   students: StarStudent[];
-  avatars: Record<string, string | null>;
+  avatars: Record<string, AvatarInfo>;
 }) {
   const c = group.color;
   const members = group.studentIds
@@ -288,7 +324,9 @@ function GroupBoardCard({ group, students, avatars }: {
           gap: 10, position: "relative",
         }}>
           {members.map((s) => {
-            const avatarUrl = avatars[s.id] || null;
+            const av = avatars[s.id.toLowerCase()] || { url: null, emoji: null };
+            const avatarUrl = av.url;
+            const avatarEmoji = av.emoji;
             const initial = (s.firstName || "?")[0].toUpperCase();
             return (
               <div key={s.id} style={{
@@ -301,6 +339,15 @@ function GroupBoardCard({ group, students, avatars }: {
                     width: 72, height: 72, borderRadius: "50%", objectFit: "cover",
                     boxShadow: `0 6px 16px -4px ${c}88`,
                   }} />
+                ) : avatarEmoji ? (
+                  <div style={{
+                    width: 72, height: 72, borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${c}33, ${c}11)`,
+                    border: `1.5px solid ${c}88`,
+                    fontSize: 40, lineHeight: 1,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 6px 16px -4px ${c}88`,
+                  }}>{avatarEmoji}</div>
                 ) : (
                   <div style={{
                     width: 72, height: 72, borderRadius: "50%",
