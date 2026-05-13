@@ -85,10 +85,22 @@ function gatherData(s: StarStudent, start: string, end: string): DayData {
   const passLog = StarStore.getPassLog();
   const refusalLog = StarStore.getLog();
   const first = (s.firstName || "").trim().toLowerCase();
+  const sIdLower = String(s.id || "").toLowerCase();
+  // Match a submission to THIS student through multiple paths because
+  // the scanner uppercases STU- payloads, the gradebook stores
+  // lowercase, and CSV imports leave studentId blank. Without all
+  // three paths, kids like Kaleb lose work to silent id-case
+  // mismatches and the snapshot underreports.
   const matchesStudent = (sid: string | undefined, sname: string | undefined): boolean => {
-    if (sid && sid === s.id) return true;
-    if (!sid && sname) {
-      return (sname || "").trim().toLowerCase().split(/\s+/)[0] === first;
+    // 1) Case-insensitive id match — the most common path.
+    if (sid && String(sid).toLowerCase() === sIdLower) return true;
+    // 2) Name fallback — runs even when sid is set (legacy data may
+    //    carry a stale uuid that no longer maps to this kid). Match
+    //    on first name lowercase, ignoring punctuation.
+    if (sname) {
+      const sn = String(sname).trim().toLowerCase().replace(/[^a-z0-9 ]/g, " ");
+      const firstSn = sn.split(/\s+/)[0] || "";
+      if (firstSn && firstSn === first) return true;
     }
     return false;
   };
