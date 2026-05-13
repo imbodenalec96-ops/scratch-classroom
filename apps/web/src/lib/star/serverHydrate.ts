@@ -90,10 +90,24 @@ export async function hydrateStarSubmissions(classId: string): Promise<{ pulled:
   }
   try {
     StarStore.setAsnTrack(track);
-  } catch {
-    // Quota — caller's storage is full. The data is already on the
-    // server, so this is a soft failure. StarBackupPanel has the
-    // "Free up storage" button as the manual remedy.
+  } catch (e: any) {
+    if (e?.quota) {
+      // The OTHER device's localStorage is full so the merged grades
+      // can't persist — which is exactly why "the other computer
+      // shows yesterday's data and the Mac shows today's". Self-heal
+      // the same way the gradebook save does: strip heavy fields,
+      // prune old assignments, retry. Re-import storage helpers
+      // dynamically to avoid a circular dependency.
+      try {
+        const { stripOldHeavyFields, pruneOldAssignments, clearBehaviorPhotos } = await import("./storage.ts");
+        clearBehaviorPhotos();
+        for (const days of [3, 7, 14]) {
+          stripOldHeavyFields(days);
+          pruneOldAssignments(days);
+          try { StarStore.setAsnTrack(track); break; } catch {}
+        }
+      } catch {}
+    }
   }
   return { pulled };
 }
