@@ -1206,6 +1206,48 @@ export function dedupAsnTrackSubmissions(): { changed: boolean; before: number; 
   }
 }
 
+// More aggressive than pruneOldAssignments: strip the heavy `lesson`
+// and `questions` fields from bcDB entries older than `daysToKeepFull`
+// while preserving the lightweight metadata (id, name, subject, etc).
+// The full payload still lives on the server's star_barcodes table —
+// GradebookModal re-fetches it via lookupBarcodeOnServer when the
+// teacher opens an old assignment for grading. Cuts bcDB size by ~90%.
+export function stripOldHeavyFields(daysToKeepFull = 3): { stripped: number } {
+  try {
+    const cutoffMs = Date.now() - daysToKeepFull * 86_400_000;
+    const cutoffDate = new Date(cutoffMs - 7 * 3600_000);
+    const cutoffYmd = `${cutoffDate.getUTCFullYear()}-${String(cutoffDate.getUTCMonth() + 1).padStart(2, "0")}-${String(cutoffDate.getUTCDate()).padStart(2, "0")}`;
+    const dateFromBarcode = (bc: string): string | null => {
+      const m = /^[A-Z]{2,3}-(\d{2})(\d{2})(\d{2})-/.exec(bc);
+      if (!m) return null;
+      return `20${m[1]}-${m[2]}-${m[3]}`;
+    };
+    const bcDB = StarStore.getBcDB();
+    let stripped = 0;
+    for (const id in bcDB) {
+      const t = bcDB[id] as any;
+      const d = dateFromBarcode(id) || (t?.createdDate || "").slice(0, 10);
+      if (!d || d >= cutoffYmd) continue;
+      // Already stripped? skip.
+      if (!t.lesson && (!t.questions || t.questions.length === 0)) continue;
+      bcDB[id] = {
+        ...t,
+        lesson: undefined,
+        questions: [],
+        // Mark so the GradebookModal knows to re-fetch.
+        _stripped: true,
+      };
+      stripped += 1;
+    }
+    if (stripped > 0) {
+      try { StarStore.setBcDB(bcDB); } catch { /* if even this throws we'll fall back to full prune */ }
+    }
+    return { stripped };
+  } catch {
+    return { stripped: 0 };
+  }
+}
+
 // Free up localStorage by pruning STAR assignments + their tracker
 // entries that are older than `maxAgeDays`. The bcDB stores the full
 // lesson + question text per assignment (10-50 KB each), and the

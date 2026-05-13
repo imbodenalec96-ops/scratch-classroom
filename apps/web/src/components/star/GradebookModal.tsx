@@ -44,12 +44,32 @@ export default function GradebookModal({ barcode, onClose }: Props) {
   const [savedFlash, setSavedFlash] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Load entry + tracker on mount
+  // Load entry + tracker on mount. If the local entry was stripped
+  // by the storage cleanup (heavy `lesson` + `questions` removed to
+  // free space), re-fetch the full payload from the server so the
+  // teacher sees the questions to grade against.
   useEffect(() => {
-    const bc = StarStore.getBcDB()[barcode];
+    let bc = StarStore.getBcDB()[barcode] as any;
     if (!bc || bc.type !== "assignment") {
       errorBeep();
       return;
+    }
+    const bcAny = bc as any;
+    const isStripped = bcAny._stripped || (!bcAny.questions || bcAny.questions.length === 0);
+    if (isStripped) {
+      // Async re-fetch — show what we have meanwhile, then upgrade.
+      (async () => {
+        try {
+          const { lookupBarcodeOnServer } = await import("../../lib/star/barcodeRelay.ts");
+          const fresh = await lookupBarcodeOnServer(barcode);
+          const freshAny = fresh as any;
+          if (fresh && fresh.id === bc.id && freshAny.questions?.length) {
+            setEntry(fresh);
+            const t = StarStore.getAsnTrack()[fresh.id];
+            if (t) setTracker({ ...t, questions: freshAny.questions, lesson: freshAny.lesson });
+          }
+        } catch {}
+      })();
     }
     setEntry(bc);
     const trk = StarStore.getAsnTrack()[bc.id];

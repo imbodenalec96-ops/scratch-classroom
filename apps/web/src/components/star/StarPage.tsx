@@ -83,10 +83,16 @@ export default function StarPage() {
     // doesn't balloon past the browser's ~10 MB cap, which causes
     // new grades to be silently rejected by the browser.
     (async () => {
-      const { dedupAsnTrackSubmissions, fixUtcCompletedDates, pruneOldAssignments } = await import("../../lib/star/storage.ts");
+      const { dedupAsnTrackSubmissions, fixUtcCompletedDates, pruneOldAssignments, stripOldHeavyFields } = await import("../../lib/star/storage.ts");
       dedupAsnTrackSubmissions();
       fixUtcCompletedDates();
-      pruneOldAssignments(30);
+      // Strip heavy lesson/question text from anything > 3 days old
+      // (still kept locally for display, just no full payload — the
+      // GradebookModal re-fetches from server when needed).
+      stripOldHeavyFields(3);
+      // Then full prune of anything > 14 days. Both the metadata and
+      // any orphan tracker rows go away.
+      pruneOldAssignments(14);
     })();
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.
