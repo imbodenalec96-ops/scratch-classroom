@@ -73,6 +73,13 @@ export default function StarPage() {
 
   useEffect(() => {
     rehydrateBcDB();
+    // Clean up legacy duplicate submissions from before the save path
+    // was fixed — see dedupAsnTrackSubmissions in storage.ts. Without
+    // this, snapshots + gradebook averages still factor in old grades.
+    (async () => {
+      const { dedupAsnTrackSubmissions } = await import("../../lib/star/storage.ts");
+      dedupAsnTrackSubmissions();
+    })();
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.
     runSync();

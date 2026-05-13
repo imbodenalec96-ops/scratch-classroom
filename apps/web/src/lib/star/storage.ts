@@ -1163,6 +1163,49 @@ const STUDENT_GRADE_MAP: Record<string, string> = {
 };
 const STUDENT_GRADE_MAP_VERSION = "v3-2026-05-11";
 
+// One-shot cleanup of legacy duplicate submissions in asnTrack.
+// Before the GradebookModal save path was fixed, every re-grade
+// PREPENDED a new submission row instead of replacing the prior one,
+// so a kid re-graded N times had N entries averaging against each
+// other. This walks every tracker and keeps only the LATEST
+// submission per student. Idempotent — the version sentinel makes
+// it a no-op after the first successful pass.
+const ASNTRACK_DEDUP_VERSION = "v1-2026-05-13";
+export function dedupAsnTrackSubmissions(): { changed: boolean; before: number; after: number } {
+  try {
+    const applied = localStorage.getItem("star_asntrack_dedup_version");
+    if (applied === ASNTRACK_DEDUP_VERSION) return { changed: false, before: 0, after: 0 };
+    const all = StarStore.getAsnTrack();
+    let before = 0, after = 0;
+    let dirty = false;
+    for (const id in all) {
+      const t = all[id];
+      const subs = t.submissions || [];
+      before += subs.length;
+      const latestByStudent: Record<string, any> = {};
+      let anonIdx = 0;
+      for (const sub of subs) {
+        const key = String(sub.studentId || `__anon-${anonIdx++}`);
+        const ts = Date.parse(sub.loggedAt || sub.completedDate || "") || 0;
+        const prior = latestByStudent[key];
+        const priorTs = prior ? (Date.parse(prior.loggedAt || prior.completedDate || "") || 0) : -1;
+        if (!prior || ts >= priorTs) latestByStudent[key] = sub;
+      }
+      const next = Object.values(latestByStudent);
+      after += next.length;
+      if (next.length !== subs.length) {
+        all[id] = { ...t, submissions: next as any };
+        dirty = true;
+      }
+    }
+    if (dirty) StarStore.setAsnTrack(all);
+    localStorage.setItem("star_asntrack_dedup_version", ASNTRACK_DEDUP_VERSION);
+    return { changed: dirty, before, after };
+  } catch {
+    return { changed: false, before: 0, after: 0 };
+  }
+}
+
 export function backfillStudentGrades(): void {
   try {
     const appliedVersion = localStorage.getItem("star_grade_map_version");

@@ -13,7 +13,7 @@ import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardGroupsPanel, { toggleGroupsPanel } from "./star/BoardGroupsPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
-import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
+import { StarStore, countsTowardGrade, backfillStudentGrades, dedupAsnTrackSubmissions, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
 import { getAllMusicPresets } from "../lib/musicPresets.ts";
 import { startSynth, type SynthHandle } from "../lib/musicSynth.ts";
@@ -297,7 +297,12 @@ export default function ClassroomBoard() {
   // for fast per-tile lookups during render.
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [presenceByStudent, setPresenceByStudent] = useState<Record<string, { last_seen: string; activity: string; isOnline: boolean }>>({});
-  useEffect(() => { backfillStudentGrades(); }, []);
+  useEffect(() => {
+    backfillStudentGrades();
+    // One-shot cleanup of legacy duplicate submissions — see comment
+    // in storage.ts. After this runs, re-grades override cleanly.
+    dedupAsnTrackSubmissions();
+  }, []);
 
   // Seed StarStore.students from board.students if it's empty. Without
   // this, devices that never had a teacher log into /star (iPad,

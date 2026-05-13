@@ -94,30 +94,44 @@ function gatherData(s: StarStudent, start: string, end: string): DayData {
   };
 
   // ── Grades + per-grade question count + vocab harvest ────────
+  // We DEDUPE to most-recent submission per (assignment, student)
+  // so a re-grade overrides the old grade rather than being averaged
+  // with it. Older localStorage data carries duplicate rows from
+  // before the GradebookModal save path was fixed — this guards the
+  // snapshot from showing stale numbers that never refresh.
   const grades: DayData["grades"] = [];
   const vocabSeen = new Set<string>();
   const vocab: Array<{ term: string; definition: string }> = [];
-  for (const t of Object.values(tracker) as StarTrackerEntry[]) {
-    for (const sub of t.submissions || []) {
-      if (!inRange(sub.completedDate, start, end)) continue;
+  const pickLatestForStudent = (subs: any[]) => {
+    let pick: any = null;
+    let pickTs = -1;
+    for (const sub of subs || []) {
       if (!matchesStudent(sub.studentId, sub.studentName)) continue;
-      const qCount = (typeof sub.maxScore === "number" && sub.maxScore > 0)
-        ? sub.maxScore
-        : Array.isArray(t.questions) ? t.questions.length : 0;
-      grades.push({
-        name: t.name, subject: t.subject || "Other",
-        pct: sub.pct, letter: sub.letterGrade,
-        counted: countsTowardGrade(sub),
-        date: sub.completedDate || "",
-        questionCount: qCount,
-      });
-      // Harvest vocab from the lesson the kid actually completed.
-      const v = (t.lesson as any)?.vocab as Array<{ term: string; definition: string }> | undefined;
-      if (Array.isArray(v)) {
-        for (const w of v) {
-          const k = (w?.term || "").trim().toLowerCase();
-          if (k && !vocabSeen.has(k)) { vocabSeen.add(k); vocab.push({ term: w.term, definition: w.definition }); }
-        }
+      const ts = Date.parse(sub.loggedAt || sub.completedDate || "") || 0;
+      if (ts > pickTs) { pick = sub; pickTs = ts; }
+    }
+    return pick;
+  };
+  for (const t of Object.values(tracker) as StarTrackerEntry[]) {
+    const sub = pickLatestForStudent(t.submissions || []);
+    if (!sub) continue;
+    if (!inRange(sub.completedDate, start, end)) continue;
+    const qCount = (typeof sub.maxScore === "number" && sub.maxScore > 0)
+      ? sub.maxScore
+      : Array.isArray(t.questions) ? t.questions.length : 0;
+    grades.push({
+      name: t.name, subject: t.subject || "Other",
+      pct: sub.pct, letter: sub.letterGrade,
+      counted: countsTowardGrade(sub),
+      date: sub.completedDate || "",
+      questionCount: qCount,
+    });
+    // Harvest vocab from the lesson the kid actually completed.
+    const v = (t.lesson as any)?.vocab as Array<{ term: string; definition: string }> | undefined;
+    if (Array.isArray(v)) {
+      for (const w of v) {
+        const k = (w?.term || "").trim().toLowerCase();
+        if (k && !vocabSeen.has(k)) { vocabSeen.add(k); vocab.push({ term: w.term, definition: w.definition }); }
       }
     }
   }
@@ -199,15 +213,16 @@ function gatherData(s: StarStudent, start: string, end: string): DayData {
   const priorStart = addDays(priorEnd, -(len - 1));
   const priorGrades: Array<{ subject: string; pct: number; counted: boolean }> = [];
   for (const t of Object.values(tracker) as StarTrackerEntry[]) {
-    for (const sub of t.submissions || []) {
-      if (!inRange(sub.completedDate, priorStart, priorEnd)) continue;
-      if (!matchesStudent(sub.studentId, sub.studentName)) continue;
-      priorGrades.push({
-        subject: t.subject || "Other",
-        pct: sub.pct,
-        counted: countsTowardGrade(sub),
-      });
-    }
+    // Same dedupe — only the latest submission per (assignment, student)
+    // contributes to the prior-period average.
+    const sub = pickLatestForStudent(t.submissions || []);
+    if (!sub) continue;
+    if (!inRange(sub.completedDate, priorStart, priorEnd)) continue;
+    priorGrades.push({
+      subject: t.subject || "Other",
+      pct: sub.pct,
+      counted: countsTowardGrade(sub),
+    });
   }
   const priorCounted = priorGrades.filter((g) => g.counted);
   const prior = priorCounted.length === 0
