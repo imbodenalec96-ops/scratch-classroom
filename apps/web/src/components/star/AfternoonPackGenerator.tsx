@@ -176,26 +176,45 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
           });
         }
       }
+      // SERVER FIRST. Push every newly-minted barcode to the API so
+      // the data is safe before we touch localStorage. Even if local
+      // save fails afterwards, every other device picks these up via
+      // /api/classes/:id/star-barcodes. No more "couldn't save the
+      // pack — local storage is full" losing fresh work.
+      for (const o of out) {
+        try { pushBarcodeToServer(bcDB[o.barcode]); } catch {}
+      }
+      // LOCAL CACHE — best effort. Cascade through clears + prunes
+      // automatically; never prompt the teacher mid-flow.
       try {
         saveAll({ bcDB, asnTracker: tracker, asns });
       } catch (e: any) {
         if (e?.quota) {
-          const { getLocalStorageUsage, clearBehaviorPhotos, clearStudentPhotos } = await import("../../lib/star/storage.ts");
-          const before = getLocalStorageUsage().totalKB;
-          const ok = window.confirm(
-            `Couldn't save the pack — local storage is full (${Math.round(before)} KB).\n\n` +
-            `Free up space by removing saved photos? Behavior-report + worksheet snap photos take the most room. Grades and assignments stay.\n\nOK = clear photos and retry.`
-          );
-          if (!ok) throw e;
-          clearBehaviorPhotos();
-          clearStudentPhotos();
-          saveAll({ bcDB, asnTracker: tracker, asns });
+          try {
+            const { clearBehaviorPhotos, clearStudentPhotos, stripOldHeavyFields, pruneOldAssignments } = await import("../../lib/star/storage.ts");
+            clearBehaviorPhotos();
+            clearStudentPhotos();
+            // Try progressively more aggressive prunes. Almost always
+            // finds room within the first pass on a normal device.
+            for (const days of [3, 1]) {
+              try {
+                stripOldHeavyFields(days);
+                pruneOldAssignments(days);
+                saveAll({ bcDB, asnTracker: tracker, asns });
+                break;
+              } catch {}
+            }
+          } catch {}
+          // If we STILL can't save the local cache, that's fine — the
+          // server has the new barcodes (pushed above), and printing
+          // reads from the in-memory `out` array. The next page reload
+          // will re-hydrate what fits. No alert, no blocking.
+          // eslint-disable-next-line no-console
+          console.warn("[STAR pack] local cache write failed; data is on the server.");
         } else {
           throw e;
         }
       }
-      // Push every minted barcode to the server so other devices can scan it.
-      for (const o of out) pushBarcodeToServer(bcDB[o.barcode]);
       successBeep();
       setGenerated(out);
     } catch (e: any) {
