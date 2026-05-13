@@ -21,6 +21,7 @@ import { useRef, useState } from "react";
 import { StarStore } from "../../lib/star/storage.ts";
 import { successBeep, loggedBeep, errorBeep } from "../../lib/star/sounds.ts";
 import { pushAllLocalBarcodes } from "../../lib/star/barcodeRelay.ts";
+import { api } from "../../lib/api.ts";
 
 // Keys included in the backup. NEW LOCAL KEYS GO HERE so future
 // teacher-customizable data still rides across devices.
@@ -278,6 +279,73 @@ export default function StarBackupPanel() {
             cursor: "pointer", fontSize: 13,
           }}
         >☁️ Push all STAR data to Supabase</button>
+      </div>
+
+      {/* GRADES → SERVER. Re-POSTs every local STAR grade row to
+          /classes/:id/star-submissions so the board on every device
+          can compute letter grades correctly. The original save's
+          POST is fire-and-forget; if it ever failed silently (network
+          blip, no active class id yet) those grades stayed local-only.
+          This button is the safety net. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(59,130,246,0.08)",
+        border: "1px solid rgba(59,130,246,0.30)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#bfdbfe", marginBottom: 6 }}>
+          📊 Grades → Server (board fix)
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Re-uploads every grade you've ever saved on this device to the server. Use this when the projector
+          board is showing wrong / missing grades for a kid — usually means their submissions never made
+          it to the database. Safe to run repeatedly.
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
+              const classId = getActiveClassId();
+              if (!classId) {
+                showFlash("err", "No active class — open /board first then come back.");
+                return;
+              }
+              const tracker = StarStore.getAsnTrack();
+              let posted = 0, failed = 0;
+              for (const bc in tracker) {
+                const t = tracker[bc];
+                for (const sub of (t.submissions || [])) {
+                  if (!sub.studentId) continue;
+                  try {
+                    await api.starSubmissionPost(classId, {
+                      barcode: bc,
+                      studentId: sub.studentId,
+                      studentName: sub.studentName || "",
+                      pct: sub.pct ?? 0,
+                      letterGrade: sub.letterGrade || "",
+                      status: sub.status || "completed",
+                      score: sub.score ?? 0,
+                      maxScore: sub.maxScore ?? 0,
+                      completedDate: sub.completedDate || "",
+                      loggedAt: sub.loggedAt || new Date().toISOString(),
+                    });
+                    posted += 1;
+                  } catch { failed += 1; }
+                }
+              }
+              successBeep();
+              showFlash(failed > 0 ? "err" : "ok", `Pushed ${posted} grade${posted === 1 ? "" : "s"} to server${failed ? `, ${failed} failed` : ""}.`, 5000);
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Push failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >📊 Push all grades to the server</button>
       </div>
 
       {/* BACKUP */}

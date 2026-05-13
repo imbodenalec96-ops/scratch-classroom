@@ -298,6 +298,33 @@ export default function ClassroomBoard() {
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [presenceByStudent, setPresenceByStudent] = useState<Record<string, { last_seen: string; activity: string; isOnline: boolean }>>({});
   useEffect(() => { backfillStudentGrades(); }, []);
+
+  // Seed StarStore.students from board.students if it's empty. Without
+  // this, devices that never had a teacher log into /star (iPad,
+  // projector, Chromebook) end up with an empty STAR roster, which
+  // means the board's grade labels (1st/2nd/5th) and progress bars
+  // never render — they look up kids by id/firstName in StarStore
+  // and find nothing. After seeding, backfillStudentGrades fills in
+  // the per-kid grade level by first-name match.
+  useEffect(() => {
+    if (!board.students?.length) return;
+    const existing = StarStore.getStudents();
+    if (existing.length > 0) return;
+    const seeded = board.students.map((bs: any) => {
+      const full = String(bs.name || "").trim();
+      const sp = full.split(/\s+/);
+      return {
+        id: String(bs.id),
+        firstName: sp[0] || "",
+        lastName: sp.slice(1).join(" "),
+      };
+    });
+    StarStore.setStudents(seeded);
+    // Force the grade-level map to re-apply on this device by
+    // clearing the version sentinel before re-running the backfill.
+    try { localStorage.removeItem("star_grade_map_version"); } catch {}
+    backfillStudentGrades();
+  }, [board.students]);
   useEffect(() => {
     if (!cls?.id) return;
     let cancelled = false;
