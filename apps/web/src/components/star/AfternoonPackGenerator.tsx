@@ -49,9 +49,24 @@ interface BulkPackProps {
   defaultSubject?: Subject;
 }
 
+// Standard order of subjects within a kid's daily pack — matches the
+// order of the school day so when the teacher hands the kid the
+// stack, it reads top-to-bottom in the same order they're taught.
+const SUBJECT_ORDER: Subject[] = ["Reading", "Writing", "Spelling", "Math", "Science", "Social Studies", "SEL"];
+
 export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", defaultSubject = "Math" }: BulkPackProps = {}) {
   const [students] = useState<StarStudent[]>(() => StarStore.getStudents());
+  // Multi-subject pack — pick which subjects every kid gets a worksheet
+  // for. Default keeps the original single-subject behavior; teacher
+  // can tap more subject chips to mint the full daily stack in one go.
   const [subject, setSubject] = useState<Subject>(defaultSubject);
+  const [subjects, setSubjects] = useState<Set<Subject>>(() => new Set([defaultSubject]));
+  const toggleSubject = (s: Subject) => setSubjects((cur) => {
+    const next = new Set(cur);
+    if (next.has(s)) { if (next.size > 1) next.delete(s); }
+    else next.add(s);
+    return next;
+  });
   const [count, setCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<typeof DIFFICULTIES[number]>("Medium");
   const [packLabel, setPackLabel] = useState<string>(() => {
@@ -99,58 +114,67 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
       let seq = 1;
       while (bcDB[`${subjPrefix}-${datePart}-${String(seq).padStart(3, "0")}`]) seq++;
 
-      // Track topics used so each kid in this pack gets a DIFFERENT
-      // story+questions even if they share a grade level. Keyed by
-      // subject because "Maya's Garden" (Reading) shouldn't block
-      // "Maya's Garden" if it ever appeared in another bank.
+      // Track topics used so each kid gets a DIFFERENT story per
+      // subject. Keyed by subject — same kid in the same subject
+      // never gets a duplicate, AND different kids in the same
+      // subject also don't double up.
       const usedTitlesBySubject: Record<string, Set<string>> = {};
       const out: PackEntry[] = [];
+      // OUTER loop = students; INNER loop = subjects. So `out` is
+      // already grouped by kid: Aiden Reading → Aiden Math → Aiden
+      // Writing → ... → Ameer Reading → Ameer Math → ... — exactly
+      // the print order the teacher wants.
       for (const s of students) {
         if (!picked.has(s.id)) continue;
         const ov = overrides[s.id] || {};
         const studentName = `${s.firstName} ${s.lastName}`.trim();
-        // Per-student overrides win > pack default > roster grade > "3rd".
-        const kidSubject: Subject = ov.subject || subject;
         const kidGrade = ov.grade || ((autoMatchGrade && s.grade) ? s.grade : (s.grade || "3rd"));
         const kidDifficulty = ov.difficulty || difficulty;
         const kidCount = ov.count || count;
-        const exclude = (usedTitlesBySubject[kidSubject] ||= new Set<string>());
-        const built = buildLocalLesson({
-          subject: kidSubject, grade: kidGrade, count: kidCount,
-          difficulty: kidDifficulty, goal: "",
-          excludeTitles: exclude,
-        });
-        if (built.topicTitle) exclude.add(built.topicTitle);
-        if (mcqMode) built.questions = synthesizeChoicesForAll(built.questions);
-        // Keep the per-kid prefix consistent so different subjects in the
-        // same pack don't collide on barcode IDs.
-        const kidPrefix = kidSubject.slice(0, 2).toUpperCase();
-        let barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`;
-        while (bcDB[barcode]) { seq++; barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`; }
-        seq++;
-        const name = `${packLabel} · ${kidSubject} · ${s.firstName}`;
-        const entry: BcEntry = {
-          id: barcode, type: "assignment", name,
-          subject: kidSubject, gradeLevel: kidGrade,
-          studentName, studentId: s.id,
-          week: undefined, day: undefined, goal: undefined,
-          questions: built.questions, lesson: built.lesson,
-          createdDate: now.toISOString(),
-        };
-        bcDB[barcode] = entry;
-        const trk: StarTrackerEntry = {
-          id: barcode, name, subject: kidSubject, gradeLevel: kidGrade,
-          studentName, studentId: s.id,
-          questions: built.questions, lesson: built.lesson,
-          createdDate: now.toISOString(),
-          status: "assigned", submissions: [],
-        };
-        tracker[barcode] = trk;
-        asns.unshift({ id: barcode, name, subject: kidSubject, type: "Assignment", grade: kidGrade });
-        out.push({
-          barcode, studentId: s.id, studentName, grade: kidGrade,
-          questions: built.questions, lesson: built.lesson, name, subject: kidSubject,
-        });
+        // Per-kid override of subject still works — but it now means
+        // "ONLY mint this subject for this kid", regardless of the
+        // pack-level multi-select. Lets the teacher e.g. give Zoey
+        // just Reading on a day everyone else gets a full pack.
+        const kidSubjectList: Subject[] = ov.subject
+          ? [ov.subject]
+          : SUBJECT_ORDER.filter((sj) => subjects.has(sj));
+        for (const kidSubject of kidSubjectList) {
+          const exclude = (usedTitlesBySubject[kidSubject] ||= new Set<string>());
+          const built = buildLocalLesson({
+            subject: kidSubject, grade: kidGrade, count: kidCount,
+            difficulty: kidDifficulty, goal: "",
+            excludeTitles: exclude,
+          });
+          if (built.topicTitle) exclude.add(built.topicTitle);
+          if (mcqMode) built.questions = synthesizeChoicesForAll(built.questions);
+          const kidPrefix = kidSubject.slice(0, 2).toUpperCase();
+          let barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`;
+          while (bcDB[barcode]) { seq++; barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`; }
+          seq++;
+          const name = `${packLabel} · ${kidSubject} · ${s.firstName}`;
+          const entry: BcEntry = {
+            id: barcode, type: "assignment", name,
+            subject: kidSubject, gradeLevel: kidGrade,
+            studentName, studentId: s.id,
+            week: undefined, day: undefined, goal: undefined,
+            questions: built.questions, lesson: built.lesson,
+            createdDate: now.toISOString(),
+          };
+          bcDB[barcode] = entry;
+          const trk: StarTrackerEntry = {
+            id: barcode, name, subject: kidSubject, gradeLevel: kidGrade,
+            studentName, studentId: s.id,
+            questions: built.questions, lesson: built.lesson,
+            createdDate: now.toISOString(),
+            status: "assigned", submissions: [],
+          };
+          tracker[barcode] = trk;
+          asns.unshift({ id: barcode, name, subject: kidSubject, type: "Assignment", grade: kidGrade });
+          out.push({
+            barcode, studentId: s.id, studentName, grade: kidGrade,
+            questions: built.questions, lesson: built.lesson, name, subject: kidSubject,
+          });
+        }
       }
       try {
         saveAll({ bcDB, asnTracker: tracker, asns });
@@ -196,11 +220,6 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
         <Field label="Pack label">
           <input value={packLabel} onChange={(e) => setPackLabel(e.target.value)} style={inp()} />
         </Field>
-        <Field label="Subject">
-          <select value={subject} onChange={(e) => setSubject(e.target.value as Subject)} style={inp()}>
-            {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Field>
         <Field label="Questions each">
           <select value={count} onChange={(e) => setCount(Number(e.target.value))} style={inp()}>
             {Q_COUNTS.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -212,6 +231,42 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
           </select>
         </Field>
       </div>
+
+      {/* Subject multi-select — pack mints ONE worksheet per kid per
+          chosen subject. Print groups everything by kid, so Aiden's
+          full stack of subjects comes out together, then Ameer's,
+          and so on. */}
+      <Field label={`Subjects in pack (${subjects.size} of ${SUBJECTS.length})`}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+          {SUBJECT_ORDER.map((sj) => {
+            const on = subjects.has(sj);
+            return (
+              <button
+                key={sj}
+                onClick={() => toggleSubject(sj)}
+                style={{
+                  padding: "6px 12px", borderRadius: 999,
+                  background: on ? "linear-gradient(135deg, rgba(99,102,241,0.40), rgba(168,85,247,0.30))" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${on ? "rgba(168,85,247,0.65)" : "rgba(255,255,255,0.10)"}`,
+                  color: on ? "#fce7f3" : "rgba(245,241,232,0.70)",
+                  fontWeight: 800, fontSize: 12, cursor: "pointer",
+                }}
+              >{on ? "✓ " : ""}{sj}</button>
+            );
+          })}
+          <button
+            onClick={() => setSubjects(new Set(SUBJECT_ORDER))}
+            style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(16,185,129,0.18)", border: "1px solid rgba(16,185,129,0.45)", color: "#bbf7d0", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          >All</button>
+          <button
+            onClick={() => setSubjects(new Set([defaultSubject]))}
+            style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(245,241,232,0.65)", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
+          >Just {defaultSubject}</button>
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(196,181,253,0.55)", lineHeight: 1.5 }}>
+          Each kid gets one worksheet per subject. Picking 7 subjects × 7 kids = 49 worksheets, kept grouped per kid in the print. <span style={{ opacity: 0.65 }}>(Per-kid subject override below still wins — e.g. give Zoey just Reading.)</span>
+        </div>
+      </Field>
 
       <div style={{ display: "flex", gap: 14, fontSize: 12, opacity: 0.85, marginBottom: 12, flexWrap: "wrap" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
@@ -296,8 +351,10 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button onClick={generatePack} disabled={busy || picked.size === 0} style={primary()}>
-          {busy ? "Generating…" : `✨ Generate Pack (${picked.size})`}
+        <button onClick={generatePack} disabled={busy || picked.size === 0 || subjects.size === 0} style={primary()}>
+          {busy
+            ? "Generating…"
+            : `✨ Generate Pack (${picked.size} kid${picked.size === 1 ? "" : "s"} × ${subjects.size} subject${subjects.size === 1 ? "" : "s"} = ${picked.size * subjects.size} sheets)`}
         </button>
       </div>
 
