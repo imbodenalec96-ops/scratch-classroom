@@ -570,6 +570,24 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
         ${lessonHtml}
         ${qHtml}
       </div>
+      <div class="page back-page">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;border-bottom:2px solid #1B5EA8;padding-bottom:10px">
+          <div>
+            <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#555">📝 Show your work · Back of ${escapeHtml(p.name)}</div>
+            <div style="font-size:18px;font-weight:800;margin-top:2px">${escapeHtml(p.studentName)}</div>
+            <div style="font-size:12px;color:#555;margin-top:2px">${escapeHtml(p.name)}</div>
+          </div>
+          <div style="font-size:11px;color:#555;text-align:right">
+            Use this side for scratch work,<br>full-sentence answers, or notes.
+          </div>
+        </div>
+        ${Array.from({ length: 22 }).map(() =>
+          `<div style="border-bottom:1px solid #cbd5e1;height:24px;margin-bottom:6px"></div>`
+        ).join("")}
+        <div style="margin-top:12px;font-size:10px;color:#888;text-align:center;letter-spacing:0.04em">
+          ${escapeHtml(p.studentName)} · ${escapeHtml(p.name)} · barcode ${escapeHtml(p.barcode)}
+        </div>
+      </div>
     `;
   };
 
