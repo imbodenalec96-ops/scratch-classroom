@@ -185,17 +185,18 @@ function openKudosWindow(args: {
       }
 
       body { font-family: "Georgia", "Times New Roman", serif; margin: 0; padding: 0; color: var(--ink); background: #e6dfc7; }
-      .toolbar { padding: 12px 24px; background: linear-gradient(90deg, #fef3c7, #fed7aa); border-bottom: 1px solid #fbbf24; display: flex; justify-content: space-between; align-items: center; font-weight: 800; color: #78350f; font-family: -apple-system, sans-serif; }
-      .toolbar button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--gold-1); background: var(--gold-1); color: white; font-weight: 700; cursor: pointer; }
+      .toolbar { padding: 16px 28px; background: linear-gradient(90deg, #fef3c7, #fed7aa); border-bottom: 2px solid #fbbf24; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-weight: 800; color: #78350f; font-family: -apple-system, sans-serif; position: sticky; top: 0; z-index: 10; }
+      .toolbar .label { font-size: 14px; }
+      .toolbar button { padding: 14px 28px; border-radius: 10px; border: 2px solid var(--gold-1); background: var(--gold-1); color: white; font-weight: 900; font-size: 16px; cursor: pointer; box-shadow: 0 6px 14px -4px rgba(120,53,15,0.5); letter-spacing: 0.06em; }
+      .toolbar button:hover { background: #92400e; }
 
       /* ─── The certificate sheet ─────────────────────────────── */
       .cert {
-        margin: 22px auto; max-width: 10.2in; aspect-ratio: 11 / 8.5;
+        margin: 22px auto; width: 10.2in; min-height: 7.6in;
         background:
           radial-gradient(ellipse at center, var(--cream) 0%, var(--parchment) 100%);
         box-shadow: 0 30px 80px -16px rgba(120, 53, 15, 0.45);
         position: relative;
-        overflow: hidden;
       }
 
       /* Faint paper noise — soft randomized dots so the parchment
@@ -432,8 +433,8 @@ function openKudosWindow(args: {
 
     </style></head><body>
     <div class="toolbar no-print">
-      <div>🏆 Kudos certificate · prints on letter landscape</div>
-      <button onclick="window.print()">🖨 Print</button>
+      <div class="label">🏆 Kudos certificate ready · prints on letter landscape</div>
+      <button onclick="try{window.focus();window.print();}catch(e){}">🖨 Print Kudos Certificate</button>
     </div>
 
     <div class="cert">
@@ -499,28 +500,14 @@ function openKudosWindow(args: {
       </div>
     </div>
     <script>
-      // Wait until every image (the avatar especially) has actually
-      // finished loading before opening the print dialog. The old
-      // setTimeout-300 fired while the avatar was still loading on
-      // slow networks so the printed page came out without it.
-      (function () {
-        function go() { try { window.focus(); window.print(); } catch (e) {} }
-        function ready() {
-          var imgs = Array.prototype.slice.call(document.images);
-          if (imgs.length === 0) { setTimeout(go, 250); return; }
-          var pending = imgs.filter(function (i) { return !i.complete; });
-          if (pending.length === 0) { setTimeout(go, 250); return; }
-          var left = pending.length;
-          pending.forEach(function (img) {
-            img.addEventListener("load",  function () { if (--left <= 0) setTimeout(go, 200); });
-            img.addEventListener("error", function () { if (--left <= 0) setTimeout(go, 200); });
-          });
-          // Hard fallback in case a load event never fires (CDN slow):
-          setTimeout(go, 4000);
-        }
-        if (document.readyState === "complete") ready();
-        else window.addEventListener("load", ready);
-      })();
+      // Fire the print dialog 1.2s after the page is interactive so
+      // the avatar image + barcode SVG have time to lay out. If the
+      // browser blocks the auto-print (Safari sometimes does on a
+      // freshly-opened popup) the giant gold "Print Kudos Certificate"
+      // button at the top is the manual fallback.
+      setTimeout(function () {
+        try { window.focus(); window.print(); } catch (e) { /* manual button */ }
+      }, 1200);
     </script>
   </body></html>`);
   w.document.close();
