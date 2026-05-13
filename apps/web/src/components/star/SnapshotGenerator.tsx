@@ -18,7 +18,8 @@
 //   - Sign-and-return QR (needs backend ack endpoint)
 //   - Whole-family combined snapshot (separate flow)
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { onStarBoardEvent } from "../../lib/star/boardEvents.ts";
 import {
   StarStore, countsTowardGrade, letterGradeColor,
   type StarStudent,
@@ -294,7 +295,24 @@ export default function SnapshotGenerator() {
   const { start, end } = useMemo(() => {
     return period === "month" ? monthBoundsPacific(date) : { start: date, end: date };
   }, [period, date]);
-  const data = useMemo(() => sel ? gatherData(sel, start, end) : null, [sel, start, end]);
+
+  // Bump this whenever a grade saves so the snapshot data re-reads
+  // fresh from localStorage. Without this, the useMemo below caches
+  // its result and the snapshot keeps showing the count from when
+  // the page first loaded — even after grading more kids.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    // Any time the gradebook modal saves a completion (or a refusal
+    // is filed), recompute. Also poll every 10s as a belt-and-
+    // suspenders fallback for cross-tab edits.
+    const off = onStarBoardEvent(() => setRefreshKey((k) => k + 1));
+    const iv = window.setInterval(() => setRefreshKey((k) => k + 1), 10_000);
+    return () => { off(); window.clearInterval(iv); };
+  }, []);
+  const data = useMemo(
+    () => sel ? gatherData(sel, start, end) : null,
+    [sel, start, end, refreshKey],
+  );
 
   const print = () => {
     if (!sel || !data) return;
