@@ -43,16 +43,32 @@ export default function StarGradebookView() {
   const students = useMemo(() => StarStore.getStudents(), [refreshKey]);
   const tracker = useMemo(() => StarStore.getAsnTrack(), [refreshKey]);
 
-  // Build per-student summaries by walking each assignment's submissions
-  // and grouping by submission's studentId.
+  // Build per-student summaries by walking each assignment's
+  // submissions and grouping by submission's studentId. We DEDUPE to
+  // most-recent per (assignment × student) so a re-grade overrides
+  // the old grade instead of being averaged with it. Pre-existing
+  // localStorage data may still have stale duplicates from before
+  // the save path was fixed — this guards the display.
   const summaries = useMemo<StudentSummary[]>(() => {
     const map = new Map<string, StudentSummary>();
     for (const s of students) {
       map.set(s.id, { student: s, bySubject: {} });
     }
     for (const trk of Object.values(tracker)) {
+      // Latest submission per student for THIS assignment.
+      const latestByStudent: Record<string, any> = {};
       for (const sub of trk.submissions || []) {
-        const summary = map.get(sub.studentId);
+        const sid = sub.studentId;
+        if (!sid) continue;
+        const ts = Date.parse(sub.loggedAt || sub.completedDate || "") || 0;
+        const prior = latestByStudent[sid];
+        if (!prior || ts >= (Date.parse(prior.loggedAt || prior.completedDate || "") || 0)) {
+          latestByStudent[sid] = sub;
+        }
+      }
+      for (const sid in latestByStudent) {
+        const sub = latestByStudent[sid];
+        const summary = map.get(sid);
         if (!summary) continue;
         const subj = trk.subject || "Other";
         if (!summary.bySubject[subj]) summary.bySubject[subj] = [];

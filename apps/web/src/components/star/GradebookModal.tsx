@@ -127,9 +127,16 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       qMarks: Object.fromEntries(Object.entries(qMarks).map(([k, v]) => [String(k), v])),
       loggedAt: new Date().toISOString(),
     };
+    // REPLACE this student's prior submission for this assignment
+    // rather than appending. Prepending was the cause of "the grade
+    // won't update": the gradebook view averages every submission
+    // for the (kid, assignment) pair, so a re-grade just shifted the
+    // mean instead of overwriting it. Server-side already upserts on
+    // (class_id, barcode, student_id), so this now mirrors that.
+    const priorSubs = (tracker.submissions || []).filter((p: any) => p.studentId !== s.id);
     const trk: StarTrackerEntry = {
       ...tracker,
-      submissions: [sub, ...(tracker.submissions || [])],
+      submissions: [sub, ...priorSubs],
       status: status === "completed" ? "completed" : status,
     };
     const allTrack = StarStore.getAsnTrack();
