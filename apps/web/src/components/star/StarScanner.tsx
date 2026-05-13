@@ -573,7 +573,10 @@ function UnknownBarcodeOverlay({ barcode, onClose, onForceRefusal, onRetry }: {
   // prefix followed by YYMMDD-NNN counts as a STAR-minted code.
   // (Previously only QZ/AS/WR/SP/MA/MO matched, which missed SE-,
   // SO-, SC-, RE-, etc. and showed the wrong "wiped" copy.)
-  const isLocallyMinted = /^[A-Z]{2,3}-\d{6}-\d{2,4}$/i.test(barcode);
+  // Match both legacy "MA-260513-005" and student-tagged
+  // "MA-AID-260513-005" formats so either resolves locally before
+  // the server-rescue path.
+  const isLocallyMinted = /^[A-Z]{2,3}(-[A-Z]{2,5})?-\d{6}-\d{2,4}$/i.test(barcode);
   const [retrying, setRetrying] = useState(false);
   const [retried, setRetried] = useState(false);
   const handleRetry = async () => {

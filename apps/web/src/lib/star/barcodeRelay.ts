@@ -17,7 +17,11 @@ import { getActiveClassId } from "./boardEvents.ts";
 // so SEL ("SE"), Social Studies ("SO"), Science ("SC"), Reading
 // ("RE"), and Math ("MA") barcodes silently skipped the server push —
 // the iPad / projector then couldn't find them.
-const PREFIXES_TO_PUSH = /^[A-Z]{2,3}-\d{6}-\d{2,4}$/i;
+// Matches both the legacy short format (e.g. "MA-260513-005") and the
+// new student-tagged format that includes a 2-5 letter kid abbreviation
+// in the second segment (e.g. "MA-AID-260513-005"). Either gets pushed
+// to the relay so cross-device scans resolve.
+const PREFIXES_TO_PUSH = /^[A-Z]{2,3}(-[A-Z]{2,5})?-\d{6}-\d{2,4}$/i;
 
 /** Push a freshly-minted barcode to the server so other devices can
  *  scan it. Silent on error — scanning still works on the local

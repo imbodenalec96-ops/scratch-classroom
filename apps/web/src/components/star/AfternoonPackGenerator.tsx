@@ -110,6 +110,14 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
       const dd = String(now.getDate()).padStart(2, "0");
       const datePart = `${yy}${mm}${dd}`;
       const subjPrefix = subject.slice(0, 2).toUpperCase();
+      // Per-kid 3-letter tag so barcodes read like "MA-AID-260513-005"
+      // — the teacher can tell at a glance whose worksheet a barcode
+      // belongs to without scanning. Lowercased into the alphanumeric-
+      // only ascii to keep Code 128 scans clean.
+      const kidTag = (s: StarStudent): string => {
+        const base = (s.firstName || "").toUpperCase().replace(/[^A-Z]/g, "");
+        return base.slice(0, 3) || "STU";
+      };
       // Find next free sequence so back-to-back packs don't collide.
       let seq = 1;
       while (bcDB[`${subjPrefix}-${datePart}-${String(seq).padStart(3, "0")}`]) seq++;
@@ -148,8 +156,12 @@ export default function AfternoonPackGenerator({ defaultLabel = "Afternoon", def
           if (built.topicTitle) exclude.add(built.topicTitle);
           if (mcqMode) built.questions = synthesizeChoicesForAll(built.questions);
           const kidPrefix = kidSubject.slice(0, 2).toUpperCase();
-          let barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`;
-          while (bcDB[barcode]) { seq++; barcode = `${kidPrefix}-${datePart}-${String(seq).padStart(3, "0")}`; }
+          const tag = kidTag(s);
+          // Format: SUBJ-NAME-YYMMDD-SEQ. Reads as "MA-AID-260513-005"
+          // → at-a-glance kid + subject without scanning. Stays inside
+          // the bcDB-uniqueness loop so concurrent mints can't collide.
+          let barcode = `${kidPrefix}-${tag}-${datePart}-${String(seq).padStart(3, "0")}`;
+          while (bcDB[barcode]) { seq++; barcode = `${kidPrefix}-${tag}-${datePart}-${String(seq).padStart(3, "0")}`; }
           seq++;
           const name = `${packLabel} · ${kidSubject} · ${s.firstName}`;
           const entry: BcEntry = {
