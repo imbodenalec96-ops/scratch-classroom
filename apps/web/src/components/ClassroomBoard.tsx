@@ -11,6 +11,7 @@ import FlashLeaderboard from "./FlashLeaderboard.tsx";
 import ReactionRain from "./ReactionRain.tsx";
 import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
+import BoardGroupsPanel, { toggleGroupsPanel } from "./star/BoardGroupsPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
 import { StarStore, countsTowardGrade, backfillStudentGrades, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
@@ -1581,6 +1582,7 @@ export default function ClassroomBoard() {
               <ToolIcon emoji="💼" title="Wallet — students unlock with PIN"   tint="rgba(124,58,237,0.65)" onClick={() => setShowWallet(true)} />
               <ToolIcon emoji="🔒" title="Tools — teacher console (PIN)"        tint={`${blockAccent}aa`} onClick={() => { setConsolePin(""); setConsolePinError(""); setConsolePinModal(true); }} />
               <ToolIcon emoji="⭐" title="STAR — gradebook + completion"        tint="rgba(251,191,36,0.65)" onClick={() => { toggleStarPanel(); }} />
+              <ToolIcon emoji="👥" title="Groups — STAR Room roster"            tint="rgba(168,85,247,0.65)" onClick={() => { toggleGroupsPanel(); }} />
               <ToolIcon emoji="🎲" title="Random pick — fair caller spinner"    tint="rgba(99,102,241,0.65)" onClick={() => fireRandomPicker()} />
               <ToolIcon emoji="👀" title="EYES ON ME — projector takeover"      tint="rgba(239,68,68,0.65)"  onClick={() => fireEyesOnMe()} />
             </>
@@ -2947,6 +2949,10 @@ export default function ClassroomBoard() {
     {/* STAR live class view — toggle button top-right opens a slide-over
         with today's completion tracker + grades matrix for the projector. */}
     <BoardStarPanel />
+
+    {/* Group roster slide-over — toggle from the 👥 icon in the header.
+        Read-only view of the STAR Room groups for the projector. */}
+    <BoardGroupsPanel />
 
     {/* Random picker overlay + EYES ON ME overlay + activity feed. */}
     <BoardClassroomTools students={(board?.students || []) as any} />
