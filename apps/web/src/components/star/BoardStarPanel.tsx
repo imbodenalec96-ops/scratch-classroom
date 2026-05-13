@@ -32,6 +32,32 @@ export default function BoardStarPanel() {
   _setOpen = setOpen;
   _getOpen = () => open;
 
+  // SERVER PULL whenever the panel opens AND every 30s while it's
+  // open. Without this, the panel's child components (CompletionView,
+  // GradesMatrixView) only see whatever's in local cache — which on
+  // the projector/iPad is whoever last visited the page. With it, the
+  // matrix reflects every device's saves within ~30 seconds.
+  useEffect(() => {
+    if (!open) return;
+    const pull = async () => {
+      try {
+        const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
+        const { hydrateStarSubmissions } = await import("../../lib/star/serverHydrate.ts");
+        const cid = getActiveClassId();
+        if (cid) await hydrateStarSubmissions(cid);
+        // Also clean up stale local junk so the assignment count
+        // doesn't read 2,000+ from accumulated cruft.
+        const { pruneOldAssignments, stripOldHeavyFields, dedupAsnTrackSubmissions } = await import("../../lib/star/storage.ts");
+        dedupAsnTrackSubmissions();
+        stripOldHeavyFields(3);
+        pruneOldAssignments(14);
+      } catch {}
+    };
+    pull();
+    const iv = window.setInterval(pull, 30_000);
+    return () => window.clearInterval(iv);
+  }, [open]);
+
   return (
     <>
       {/* Toggle button is rendered by ClassroomBoard inside its top header
@@ -271,17 +297,53 @@ function GradesMatrixView() {
   const data = useMemo(() => {
     const students = StarStore.getStudents();
     const tracker = StarStore.getAsnTrack();
+    // Pre-compute case-insensitive matchers + first-name fallback so
+    // a submission's studentId casing or a missing-id studentName row
+    // both resolve to the right roster student. This was the root
+    // cause of "Aiden has no grades" earlier — strict-equal id match.
+    const firstByLower = new Map<string, string>();
+    const fullByLower = new Map<string, string>();
+    const idByLower = new Map<string, string>();
+    for (const stu of students) {
+      idByLower.set(stu.id.toLowerCase(), stu.id);
+      const full = `${stu.firstName} ${stu.lastName}`.trim().toLowerCase();
+      if (full) fullByLower.set(full, stu.id);
+      const first = stu.firstName.trim().toLowerCase();
+      if (first) firstByLower.set(first, stu.id);
+    }
+    const norm = (s: string) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const resolveSubmissionTo = (stuId: string, sub: any): boolean => {
+      // 1) case-insensitive id match
+      if (sub.studentId) {
+        const matched = idByLower.get(String(sub.studentId).toLowerCase());
+        if (matched === stuId) return true;
+      }
+      // 2) first-name fallback (covers id mismatches)
+      if (sub.studentName) {
+        const sn = norm(sub.studentName);
+        const sid = fullByLower.get(sn) || firstByLower.get(sn.split(/\s+/)[0]);
+        if (sid === stuId) return true;
+      }
+      return false;
+    };
     const rows = students.map((stu) => {
       const bySubj: Record<string, { pct: number; letter: string; count: number }> = {};
       for (const t of Object.values(tracker)) {
-        const subs = (t.submissions || [])
-          .filter((s) => s.studentId === stu.id)
-          .filter(countsTowardGrade); // skip absent / skipped / excused / makeup
-        if (subs.length === 0) continue;
-        const totalPct = subs.reduce((a, b) => a + b.pct, 0);
+        // Latest submission per student per assignment so a re-grade
+        // overrides the original instead of being averaged with it.
+        const matchingSubs = (t.submissions || [])
+          .filter((s) => resolveSubmissionTo(stu.id, s))
+          .filter(countsTowardGrade);
+        if (matchingSubs.length === 0) continue;
+        let pick = matchingSubs[0];
+        let pickTs = -1;
+        for (const sub of matchingSubs) {
+          const ts = Date.parse(sub.loggedAt || sub.completedDate || "") || 0;
+          if (ts > pickTs) { pick = sub; pickTs = ts; }
+        }
         const cur = bySubj[t.subject] || { pct: 0, letter: "F", count: 0 };
-        cur.pct = (cur.pct * cur.count + totalPct) / (cur.count + subs.length);
-        cur.count += subs.length;
+        cur.pct = (cur.pct * cur.count + pick.pct) / (cur.count + 1);
+        cur.count += 1;
         cur.letter = letterFromPct(Math.round(cur.pct));
         bySubj[t.subject] = cur;
       }
