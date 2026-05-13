@@ -139,17 +139,17 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     const bcDB = StarStore.getBcDB();
     if (!bcDB[entry.id]) bcDB[entry.id] = entry;
 
-    saveAll({ asnTracker: allTrack, bcDB });
-    setTracker(trk);
-
-    // Push to the server so the board on any device picks it up
-    // (the board polls /public/star-submissions on mount). Fire and
-    // forget — we don't want a flaky network blocking the save.
-    (async () => {
-      try {
-        const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
-        const classId = getActiveClassId();
-        if (!classId) return;
+    // SERVER FIRST: post the grade to the API before touching local
+    // storage so the source-of-truth save isn't blocked by a full
+    // localStorage. If this fails, we still try the local save and
+    // surface the error — the teacher gets a chance to retry rather
+    // than thinking the grade silently saved.
+    let serverPosted = false;
+    let serverError: string | null = null;
+    try {
+      const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
+      const classId = getActiveClassId();
+      if (classId) {
         await api.starSubmissionPost(classId, {
           barcode: entry.id,
           studentId: s.id,
@@ -162,8 +162,60 @@ export default function GradebookModal({ barcode, onClose }: Props) {
           completedDate: sub.completedDate,
           loggedAt: sub.loggedAt,
         });
-      } catch {}
-    })();
+        serverPosted = true;
+      } else {
+        serverError = "no active class id";
+      }
+    } catch (e: any) {
+      serverError = e?.message || String(e);
+      console.warn("[STAR] grade server POST failed:", serverError);
+    }
+
+    // LOCAL: cache to localStorage so the modal/list updates instantly.
+    // If localStorage is full (e.g. photos crowded out everything),
+    // try the save twice — once normally, once after pruning behavior
+    // photos which are the usual culprit. Either way the server
+    // already has the grade, so we can recover.
+    let localSaved = false;
+    let localError: string | null = null;
+    try {
+      saveAll({ asnTracker: allTrack, bcDB });
+      localSaved = true;
+    } catch (e: any) {
+      if (e?.quota) {
+        try {
+          const { clearBehaviorPhotos } = await import("../../lib/star/storage.ts");
+          clearBehaviorPhotos();
+        } catch {}
+        try {
+          saveAll({ asnTracker: allTrack, bcDB });
+          localSaved = true;
+        } catch (e2: any) { localError = e2?.message || String(e2); }
+      } else {
+        localError = e?.message || String(e);
+      }
+    }
+    if (localSaved) setTracker(trk);
+
+    if (!serverPosted && !localSaved) {
+      // BOTH failed — surface the error so the teacher can retry
+      // instead of thinking the grade was saved.
+      errorBeep();
+      setSaving(false);
+      window.alert(
+        `Couldn't save the grade.\n\n` +
+        `Server: ${serverError || "unknown"}\n` +
+        `Local:  ${localError || "unknown"}\n\n` +
+        `Try again, or check your internet + free up storage.`
+      );
+      return;
+    }
+    if (!serverPosted) {
+      console.warn("[STAR] grade saved locally only — server POST failed:", serverError);
+    }
+    if (!localSaved) {
+      console.warn("[STAR] grade saved to server only — local cache failed:", localError);
+    }
 
     // Award class-store points for a completed assignment. We try the API
     // call regardless of how the student id looks — if it's not a real DB
