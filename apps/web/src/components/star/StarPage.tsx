@@ -99,10 +99,20 @@ export default function StarPage() {
     // fixes "I made it today but the iPad can't find it".
     api.getClasses().then(async (cs) => {
       if (Array.isArray(cs) && cs[0]?.id) {
-        setActiveClassId(cs[0].id);
+        const classId = cs[0].id;
+        setActiveClassId(classId);
         try {
           const { pushAllLocalBarcodes } = await import("../../lib/star/barcodeRelay.ts");
           await pushAllLocalBarcodes();
+        } catch {}
+        // PULL grades from the server so /star sees what was saved
+        // on any other device. Then poll every 30s. The snapshot,
+        // gradebook, and reports all read asnTrack — server pull
+        // keeps every device showing the same numbers.
+        try {
+          const { hydrateStarSubmissions } = await import("../../lib/star/serverHydrate.ts");
+          await hydrateStarSubmissions(classId);
+          window.setInterval(() => { hydrateStarSubmissions(classId).catch(() => {}); }, 30_000);
         } catch {}
       }
     }).catch(() => {});

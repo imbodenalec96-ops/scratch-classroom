@@ -308,11 +308,23 @@ export default function SnapshotGenerator() {
   // the page first loaded — even after grading more kids.
   const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
-    // Any time the gradebook modal saves a completion (or a refusal
-    // is filed), recompute. Also poll every 10s as a belt-and-
-    // suspenders fallback for cross-tab edits.
-    const off = onStarBoardEvent(() => setRefreshKey((k) => k + 1));
-    const iv = window.setInterval(() => setRefreshKey((k) => k + 1), 10_000);
+    // SERVER PULL on mount + every 30s. The server is the source of
+    // truth — pulling here means the snapshot reflects grades saved
+    // on ANY device, not just this one. Then bump refreshKey to
+    // re-render. Also subscribes to the in-tab grade-saved event
+    // for instant local updates.
+    const pullAndRefresh = async () => {
+      try {
+        const { getActiveClassId } = await import("../../lib/star/boardEvents.ts");
+        const { hydrateStarSubmissions } = await import("../../lib/star/serverHydrate.ts");
+        const cid = getActiveClassId();
+        if (cid) await hydrateStarSubmissions(cid);
+      } catch {}
+      setRefreshKey((k) => k + 1);
+    };
+    pullAndRefresh();
+    const off = onStarBoardEvent(() => pullAndRefresh());
+    const iv = window.setInterval(() => pullAndRefresh(), 30_000);
     return () => { off(); window.clearInterval(iv); };
   }, []);
   const data = useMemo(

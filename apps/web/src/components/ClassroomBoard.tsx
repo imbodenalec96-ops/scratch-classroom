@@ -36,72 +36,9 @@ const GRADES = [3, 4, 5] as const;
 // player (here) all stay in sync. Adding a track only requires
 // editing musicPresets.ts.
 
-// Pull every STAR submission for a class from the server and
-// merge into the local asnTrack store. Tries the authed endpoint
-// first (full data + write permission context), falls back to the
-// public read-only mirror so the iPad / projector / Chromebook
-// hydrate grades even without a login. Idempotent — safe to poll.
-async function hydrateStarSubmissions(classId: string) {
-  let list: any[] | null = null;
-  try {
-    const r = await api.starSubmissionsList(classId);
-    list = r?.submissions || [];
-  } catch (e: any) {
-    if (e?.status === 401 || /token|auth/i.test(String(e?.message || ""))) {
-      try {
-        const r = await api.starSubmissionsPublic(classId);
-        list = r?.submissions || [];
-      } catch {}
-    }
-  }
-  if (!list) return;
-  const track = StarStore.getAsnTrack();
-  // Group server rows by barcode (one tracker entry per assignment,
-  // multiple submissions inside).
-  const byBarcode: Record<string, any[]> = {};
-  for (const row of list) {
-    const k = String(row.barcode || "").toUpperCase();
-    if (!k) continue;
-    (byBarcode[k] ||= []).push(row);
-  }
-  for (const barcode in byBarcode) {
-    const rows = byBarcode[barcode];
-    if (!track[barcode]) {
-      // Synthesize a minimal tracker entry so existing grade logic
-      // can read submissions out of it. The board doesn't actually
-      // need the questions array to compute averages.
-      track[barcode] = {
-        id: barcode,
-        name: barcode,
-        subject: "Other" as any,
-        gradeLevel: "",
-        questions: [],
-        createdDate: new Date().toISOString(),
-        status: "assigned",
-        submissions: [],
-      };
-    }
-    const localSubs = track[barcode].submissions || [];
-    const seenKey = new Set(localSubs.map((s: any) => `${s.studentId}::${s.loggedAt || ""}`));
-    for (const row of rows) {
-      const key = `${row.student_id}::${row.logged_at || ""}`;
-      if (seenKey.has(key)) continue;
-      localSubs.unshift({
-        studentId: row.student_id,
-        studentName: row.student_name || "",
-        completedDate: row.completed_date || "",
-        score: row.score ?? 0,
-        maxScore: row.max_score ?? 0,
-        pct: row.pct ?? 0,
-        letterGrade: row.letter_grade || "",
-        status: row.status || "completed",
-        loggedAt: row.logged_at || new Date().toISOString(),
-      });
-    }
-    track[barcode].submissions = localSubs;
-  }
-  StarStore.setAsnTrack(track);
-}
+// Server-hydrate moved to lib/star/serverHydrate.ts so /star can
+// share the same code path. The board's mount + 60s poll below
+// imports it dynamically.
 
 // Editorial palette: each grade is a distinct tradition, not a tint of purple
 //   3rd — deep teal (study / library green)
@@ -934,7 +871,9 @@ export default function ClassroomBoard() {
       // compute grade letters on any device — not just the Mac
       // where they were originally entered. Tries the authed
       // endpoint first, falls back to the public read-only mirror.
-      if (picked?.id) hydrateStarSubmissions(picked.id);
+      if (picked?.id) {
+        import("../lib/star/serverHydrate.ts").then((m) => m.hydrateStarSubmissions(picked.id)).catch(() => {});
+      }
     }).catch(() => { if (!done) setError("Couldn't load classes"); });
     return () => { done = true; };
   }, [classParam]);
@@ -947,7 +886,13 @@ export default function ClassroomBoard() {
   useEffect(() => {
     if (!cls?.id) return;
     let cancelled = false;
-    const tick = () => { if (!cancelled) hydrateStarSubmissions(cls.id); };
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const { hydrateStarSubmissions } = await import("../lib/star/serverHydrate.ts");
+        await hydrateStarSubmissions(cls.id);
+      } catch {}
+    };
     tick();
     const iv = window.setInterval(tick, 60_000);
     return () => { cancelled = true; window.clearInterval(iv); };
