@@ -196,9 +196,16 @@ function computeStarProgressByStudent(
       if (first) idByFirstName.set(first.toLowerCase(), sid);
     }
 
+    // Case-insensitive id index — STAR sometimes stores lowercase ids
+    // while the board has the original mixed-case UUID, so strict
+    // equality misses kids like Aiden whose id casing diverged.
+    const idByLowerId = new Map<string, string>();
+    for (const bs of boardStudents) idByLowerId.set(String(bs.id).toLowerCase(), String(bs.id));
+
     const resolveBoardId = (t: { studentId?: string; studentName?: string }): string | null => {
       if (t.studentId) {
-        if (boardStudents.some((b) => String(b.id) === t.studentId)) return t.studentId;
+        const matched = idByLowerId.get(String(t.studentId).toLowerCase());
+        if (matched) return matched;
       }
       if (t.studentName) {
         const tName = String(t.studentName).trim().toLowerCase();
@@ -1920,22 +1927,37 @@ export default function ClassroomBoard() {
               green:  { bg: "rgba(16,185,129,0.20)", border: "rgba(16,185,129,0.55)", color: "#bbf7d0" },
             };
             // Per-student overall letter grade — average percentage across
-            // every STAR submission credited to this kid. Same name+id
-            // matching pattern as the progress bar so CSV imports + new
-            // entries both contribute. Hidden when no submissions exist.
+            // every STAR assignment credited to this kid, taking the
+            // MOST RECENT submission per (assignment, student) so a
+            // re-grade doesn't get averaged with the original. Name
+            // matching is now case-insensitive on student id too, so
+            // STAR's lowercase ids resolve against the board's mixed-
+            // case UUIDs (this is why Aiden was missing a grade —
+            // his submissions stored a lowercase id that strict-equal
+            // never matched the board's "Aiden K…" UUID).
             const starLetterById: Record<string, { letter: string; pct: number }> = {};
             (() => {
               const tracker = StarStore.getAsnTrack();
               const idByFirstName = new Map<string, string>();
               const idByFullName  = new Map<string, string>();
+              const idByLowerId   = new Map<string, string>();
+              const normName = (s: string) => s
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[̀-ͯ]/g, "")        // strip diacritics
+                .replace(/[^a-z0-9 ]/g, " ")            // strip punctuation
+                .replace(/\s+/g, " ").trim();
               for (const bs of board.students) {
                 const sid = String(bs.id);
-                const full = String(bs.name || "").trim().toLowerCase();
+                idByLowerId.set(sid.toLowerCase(), sid);
+                const full = normName(String(bs.name || ""));
                 if (full) idByFullName.set(full, sid);
                 const first = full.split(/\s+/)[0];
                 if (first) idByFirstName.set(first, sid);
               }
-              const totalsBySid: Record<string, { sum: number; n: number }> = {};
+              // Group submissions by (board student id × assignment) so
+              // we can keep only the latest grade per cell.
+              const latestPctByCell: Record<string, { pct: number; ts: number }> = {};
               for (const t of Object.values(tracker)) {
                 const subs = t.submissions || [];
                 if (subs.length === 0) continue;
@@ -1944,21 +1966,38 @@ export default function ClassroomBoard() {
                   // / makeup) so they don't drag the average down.
                   if (!countsTowardGrade(sub)) continue;
                   // Resolve which board student this submission is for.
+                  // Try direct id match (case-insensitive), then name
+                  // matches with diacritics + punctuation stripped.
                   let sid: string | null = null;
-                  if (board.students.some((b) => String(b.id) === sub.studentId)) sid = sub.studentId;
-                  else if (sub.studentName) {
-                    const sn = String(sub.studentName).trim().toLowerCase();
+                  if (sub.studentId) {
+                    const subIdLower = String(sub.studentId).toLowerCase();
+                    sid = idByLowerId.get(subIdLower) || null;
+                  }
+                  if (!sid && sub.studentName) {
+                    const sn = normName(String(sub.studentName));
                     sid = idByFullName.get(sn) || idByFirstName.get(sn.split(/\s+/)[0]) || null;
-                  } else if (t.studentName) {
-                    const tn = String(t.studentName).trim().toLowerCase();
+                  }
+                  if (!sid && t.studentName) {
+                    const tn = normName(String(t.studentName));
                     sid = idByFullName.get(tn) || idByFirstName.get(tn.split(/\s+/)[0]) || null;
                   }
                   if (!sid) continue;
-                  const cur = totalsBySid[sid] || { sum: 0, n: 0 };
-                  cur.sum += sub.pct || 0;
-                  cur.n += 1;
-                  totalsBySid[sid] = cur;
+                  const cellKey = `${sid}::${t.id || ""}`;
+                  const ts = Date.parse(sub.loggedAt || sub.completedDate || "") || 0;
+                  const prior = latestPctByCell[cellKey];
+                  if (!prior || ts >= prior.ts) {
+                    latestPctByCell[cellKey] = { pct: sub.pct || 0, ts };
+                  }
                 }
+              }
+              const totalsBySid: Record<string, { sum: number; n: number }> = {};
+              for (const key in latestPctByCell) {
+                const [sid] = key.split("::");
+                const { pct } = latestPctByCell[key];
+                const cur = totalsBySid[sid] || { sum: 0, n: 0 };
+                cur.sum += pct;
+                cur.n += 1;
+                totalsBySid[sid] = cur;
               }
               for (const sid in totalsBySid) {
                 const { sum, n } = totalsBySid[sid];
