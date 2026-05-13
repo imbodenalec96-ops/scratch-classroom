@@ -86,13 +86,15 @@ export default function StarPage() {
       const { dedupAsnTrackSubmissions, fixUtcCompletedDates, pruneOldAssignments, stripOldHeavyFields } = await import("../../lib/star/storage.ts");
       dedupAsnTrackSubmissions();
       fixUtcCompletedDates();
-      // Strip heavy lesson/question text from anything > 3 days old
-      // (still kept locally for display, just no full payload — the
-      // GradebookModal re-fetches from server when needed).
-      stripOldHeavyFields(3);
-      // Then full prune of anything > 14 days. Both the metadata and
-      // any orphan tracker rows go away.
-      pruneOldAssignments(14);
+      // CACHE-AS-DISPOSABLE policy: local storage holds at most TODAY +
+      // YESTERDAY of full assignment payloads. Anything older keeps
+      // just lightweight metadata (so kid names + assignment titles
+      // still render in lists), and anything > 3 days is removed
+      // entirely. The server's star_barcodes table is the source of
+      // truth — when the teacher needs an old assignment, GradebookModal
+      // re-fetches the full payload via lookupBarcodeOnServer.
+      stripOldHeavyFields(1);
+      pruneOldAssignments(3);
     })();
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.

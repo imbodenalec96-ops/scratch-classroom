@@ -390,6 +390,62 @@ export default function StarBackupPanel() {
         >🧹 Free up storage now</button>
       </div>
 
+      {/* HARD RESET — wipe every STAR localStorage key on this device
+          and re-pull from the server. Use when this device is clearly
+          out of sync with the others (different grades, missing kids,
+          stuck on yesterday). The server has every grade, every barcode,
+          every behavior — local is just a cache. Wiping it forces a
+          clean re-hydrate on the next page load. Safe by definition;
+          you can't lose anything that wasn't already on the server. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(239,68,68,0.10)",
+        border: "2px solid rgba(239,68,68,0.50)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
+          💥 Hard reset this device's cache
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Wipes every local STAR cache on this device and pulls everything fresh from the server.
+          Use when this browser shows different numbers than your Mac (different grade counts,
+          missing students, stuck on yesterday). Server data is untouched — you can't lose
+          anything that's already saved. Page reloads automatically after.
+        </div>
+        <button
+          onClick={async () => {
+            if (!window.confirm(
+              "WIPE this device's STAR cache and pull fresh from the server?\n\n" +
+              "Everything on the server (grades, barcodes, behaviors) stays safe — " +
+              "only the local cache is cleared. The page will reload."
+            )) return;
+            try {
+              const STAR_KEYS_PREFIX = "star_";
+              const removed: string[] = [];
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(STAR_KEYS_PREFIX)) {
+                  localStorage.removeItem(k);
+                  removed.push(k);
+                }
+              }
+              successBeep();
+              showFlash("ok", `Cleared ${removed.length} cache key${removed.length === 1 ? "" : "s"}. Reloading…`, 2500);
+              setTimeout(() => window.location.reload(), 1500);
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Reset failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "13px 20px", borderRadius: 10,
+            background: "linear-gradient(135deg, #dc2626, #991b1b)",
+            color: "white", border: "2px solid rgba(255,255,255,0.18)", fontWeight: 900,
+            cursor: "pointer", fontSize: 14, letterSpacing: "0.04em",
+            boxShadow: "0 8px 22px -6px rgba(220,38,38,0.55)",
+          }}
+        >💥 Hard reset cache + reload</button>
+      </div>
+
       {/* BACKUP */}
       <div style={{
         padding: 14, borderRadius: 12, marginBottom: 14,
