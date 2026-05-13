@@ -202,11 +202,10 @@ export default function StudentWallet({ students, classId: _classId, onClose }: 
     }
     setBusyItemId(item.id);
     try {
-      // boardRedeem still requires a pin parameter on the server. Pass the
-      // kid's stored pin if their roster row carries one (most don't), else
-      // empty string and let the server reject — wallet UI is read-mostly.
-      // The teacher's "Open store" override removes the pin requirement on
-      // the server side for cashout periods.
+      // PIN is intentionally empty — the server's /board-redeem now
+      // skips the PIN check when the store is open (cashout block or
+      // teacher override). Keeps wallet redemption PIN-less while
+      // the BoardConsole kiosk flow still validates the typed PIN.
       const r = await api.boardRedeem(picked.id, "", item.id);
       setData((d) => d ? { ...d, dojo_points: r.dojo_points } : d);
       showFlash("ok", `🎉 Got ${r.item_name}! Show your teacher.`);

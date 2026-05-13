@@ -491,7 +491,7 @@ router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Resp
       const parsed = typeof row.cashout_times === "string" ? JSON.parse(row.cashout_times || "[]") : row.cashout_times;
       if (Array.isArray(parsed)) cashoutTimes = parsed.map((s) => String(s));
     } catch {}
-    let notices: Array<{ title: string; names: string[] }> = [];
+    let notices: Array<{ title: string; names: string[]; enabled: boolean }> = [];
     try {
       const parsed = typeof row.notices === "string" ? JSON.parse(row.notices || "[]") : row.notices;
       if (Array.isArray(parsed)) {
@@ -500,6 +500,8 @@ router.get("/classes/:classId/morning-slide", async (req: AuthRequest, res: Resp
           .map((n: any) => ({
             title: String(n.title),
             names: Array.isArray(n.names) ? n.names.map((s: any) => String(s)) : [],
+            // Default enabled=true for legacy rows that don't have the field yet
+            enabled: typeof n.enabled === "boolean" ? n.enabled : true,
           }));
       }
     } catch {}
@@ -536,6 +538,7 @@ router.put("/classes/:classId/morning-slide", requireRole("teacher", "admin"), a
         .map((n: any) => ({
           title: String(n.title).slice(0, 100),
           names: Array.isArray(n.names) ? n.names.map((s: any) => String(s).slice(0, 60)).filter(Boolean) : [],
+          enabled: typeof n.enabled === "boolean" ? n.enabled : true,
         }))
         .slice(0, 8)
     : [];
@@ -773,28 +776,17 @@ router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
   const studentId = String(req.body?.studentId || "").trim();
   const pin = String(req.body?.pin || "").trim();
   const itemId = String(req.body?.itemId || "").trim();
-  if (!studentId || !pin || !itemId) {
-    return res.status(400).json({ error: "studentId, pin, and itemId required" });
+  if (!studentId || !itemId) {
+    return res.status(400).json({ error: "studentId and itemId required" });
   }
   try {
     await ensurePinSchema();
-    // Verify the kid's kiosk PIN. We try kiosk_pin first; for kids who
-    // haven't been assigned one yet, fall back to the legacy bcrypt
-    // password_hash so the system keeps working until every PIN is set.
     const bcrypt = await import("bcrypt");
     const userRow: any = await db.prepare(
       "SELECT id::text AS id, name, password_hash, role, kiosk_pin FROM users WHERE id::text = ?"
     ).get(studentId);
     if (!userRow) return res.status(404).json({ error: "Student not found" });
     if (userRow.role !== "student") return res.status(400).json({ error: "Not a student" });
-    let valid = false;
-    if (userRow.kiosk_pin) {
-      valid = String(userRow.kiosk_pin) === pin;
-    } else {
-      // No kiosk PIN set yet → accept the login password as a stop-gap
-      try { valid = await bcrypt.default.compare(pin, userRow.password_hash); } catch { valid = false; }
-    }
-    if (!valid) return res.status(401).json({ error: "Wrong PIN" });
 
     // Store-open gate. Even though the teacher initiates board-redeem,
     // we still enforce that the store is officially open (override or
@@ -803,6 +795,24 @@ router.post("/board-redeem", async (req: AuthRequest, res: Response) => {
     const openCheck = await checkStoreOpenForStudent(studentId);
     if (!openCheck.open) {
       return res.status(423).json({ error: "Store is closed. Open it from Tools → 🛒 Store or wait for the cashout block." });
+    }
+
+    // PIN check is OPTIONAL now. The teacher already had to authenticate
+    // (this route requires teacher/admin role) and the store-open gate
+    // above means kids can only redeem during cashout or while the
+    // teacher has explicitly opened the store. Asking for a PIN on top
+    // of those two gates was redundant and broke the wallet flow for
+    // kids who never had a PIN set. We still validate a PIN if one is
+    // provided — that keeps the BoardConsole's "type your PIN" kiosk
+    // flow working unchanged.
+    if (pin) {
+      let valid = false;
+      if (userRow.kiosk_pin) {
+        valid = String(userRow.kiosk_pin) === pin;
+      } else {
+        try { valid = await bcrypt.default.compare(pin, userRow.password_hash); } catch { valid = false; }
+      }
+      if (!valid) return res.status(401).json({ error: "Wrong PIN" });
     }
 
     // Pull the item + balance, then run the same redemption flow as
