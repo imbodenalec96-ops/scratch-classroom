@@ -13,7 +13,7 @@ import ActivePassesStrip from "./star/ActivePassesStrip.tsx";
 import BoardStarPanel, { toggleStarPanel } from "./star/BoardStarPanel.tsx";
 import BoardGroupsPanel, { toggleGroupsPanel } from "./star/BoardGroupsPanel.tsx";
 import BoardClassroomTools, { fireRandomPicker, fireEyesOnMe } from "./star/BoardClassroomTools.tsx";
-import { StarStore, countsTowardGrade, backfillStudentGrades, dedupAsnTrackSubmissions, type ActivePass } from "../lib/star/storage.ts";
+import { StarStore, countsTowardGrade, backfillStudentGrades, dedupAsnTrackSubmissions, fixUtcCompletedDates, type ActivePass } from "../lib/star/storage.ts";
 import { setActiveClassId, fireStarBoardEvent } from "../lib/star/boardEvents.ts";
 import { getAllMusicPresets } from "../lib/musicPresets.ts";
 import { startSynth, type SynthHandle } from "../lib/musicSynth.ts";
@@ -302,6 +302,10 @@ export default function ClassroomBoard() {
     // One-shot cleanup of legacy duplicate submissions — see comment
     // in storage.ts. After this runs, re-grades override cleanly.
     dedupAsnTrackSubmissions();
+    // Re-stamp completedDate from loggedAt in Pacific time. Fixes
+    // grades that were saved after 5 PM Pacific and got pushed into
+    // tomorrow's UTC date, making them disappear from today's snapshot.
+    fixUtcCompletedDates();
   }, []);
 
   // Seed StarStore.students from board.students if it's empty. Without

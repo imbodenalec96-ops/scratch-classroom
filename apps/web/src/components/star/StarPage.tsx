@@ -76,9 +76,13 @@ export default function StarPage() {
     // Clean up legacy duplicate submissions from before the save path
     // was fixed — see dedupAsnTrackSubmissions in storage.ts. Without
     // this, snapshots + gradebook averages still factor in old grades.
+    // Also re-stamp completedDate from loggedAt in Pacific time
+    // (UTC-stamped grades from after 5 PM Pacific were pushed into
+    // tomorrow's date and silently dropped from today's snapshot).
     (async () => {
-      const { dedupAsnTrackSubmissions } = await import("../../lib/star/storage.ts");
+      const { dedupAsnTrackSubmissions, fixUtcCompletedDates } = await import("../../lib/star/storage.ts");
       dedupAsnTrackSubmissions();
+      fixUtcCompletedDates();
     })();
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.

@@ -25,7 +25,15 @@ export default function GradebookModal({ barcode, onClose }: Props) {
 
   // Form state
   const [studentId, setStudentId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  // Default to today's PACIFIC date — not UTC. After 5 PM Pacific the
+  // UTC date flips to tomorrow, so toISOString().slice(0,10) used to
+  // stamp grades with tomorrow's date and the snapshot (which filters
+  // by Pacific date) silently dropped them. Now the date matches what
+  // the snapshot + end-of-day report look for.
+  const [date, setDate] = useState(() => {
+    const d = new Date(Date.now() - 7 * 3600_000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  });
   const [time, setTime] = useState("");
   const [status, setStatus] = useState<"completed" | "in-progress" | "absent" | "skipped" | "excused" | "makeup">("completed");
   const [feedback, setFeedback] = useState("");

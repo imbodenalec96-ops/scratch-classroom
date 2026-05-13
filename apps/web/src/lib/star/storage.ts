@@ -1206,6 +1206,45 @@ export function dedupAsnTrackSubmissions(): { changed: boolean; before: number; 
   }
 }
 
+// Fix submissions whose completedDate was stamped in UTC instead of
+// Pacific. After 5 PM Pacific the UTC date is "tomorrow", so grades
+// saved in the afternoon/evening got pushed into the next day and
+// disappeared from today's snapshot. We re-derive completedDate from
+// loggedAt in Pacific time. Idempotent via version sentinel.
+const COMPLETEDDATE_FIX_VERSION = "v1-2026-05-13";
+export function fixUtcCompletedDates(): { changed: number } {
+  try {
+    const applied = localStorage.getItem("star_completed_date_fix_version");
+    if (applied === COMPLETEDDATE_FIX_VERSION) return { changed: 0 };
+    const all = StarStore.getAsnTrack();
+    let changed = 0;
+    for (const id in all) {
+      const t = all[id];
+      const subs = t.submissions || [];
+      let dirty = false;
+      for (const sub of subs) {
+        if (!sub.loggedAt) continue;
+        // Compute the Pacific date from loggedAt's full ISO timestamp.
+        const ms = Date.parse(sub.loggedAt);
+        if (!Number.isFinite(ms)) continue;
+        const pac = new Date(ms - 7 * 3600_000);
+        const pacDate = `${pac.getUTCFullYear()}-${String(pac.getUTCMonth() + 1).padStart(2, "0")}-${String(pac.getUTCDate()).padStart(2, "0")}`;
+        if (sub.completedDate !== pacDate) {
+          sub.completedDate = pacDate;
+          dirty = true;
+          changed += 1;
+        }
+      }
+      if (dirty) all[id] = { ...t, submissions: subs };
+    }
+    if (changed > 0) StarStore.setAsnTrack(all);
+    localStorage.setItem("star_completed_date_fix_version", COMPLETEDDATE_FIX_VERSION);
+    return { changed };
+  } catch {
+    return { changed: 0 };
+  }
+}
+
 export function backfillStudentGrades(): void {
   try {
     const appliedVersion = localStorage.getItem("star_grade_map_version");
