@@ -150,6 +150,13 @@ export default function GradebookModal({ barcode, onClose }: Props) {
     const allTrack = StarStore.getAsnTrack();
     allTrack[entry.id] = trk;
 
+    // OPTIMISTIC UI UPDATE — refresh the Grade History panel
+    // immediately so the teacher sees the new row pop in even before
+    // the server POST + local save finish. The two persistence steps
+    // below can still throw an error and surface a retry alert; until
+    // they do, this is what the user expects.
+    setTracker(trk);
+
     // Make sure bcDB has the entry (for re-scanning)
     const bcDB = StarStore.getBcDB();
     if (!bcDB[entry.id]) bcDB[entry.id] = entry;
@@ -210,11 +217,16 @@ export default function GradebookModal({ barcode, onClose }: Props) {
         localError = e?.message || String(e);
       }
     }
-    if (localSaved) setTracker(trk);
+    // tracker state already updated optimistically above; no need to
+    // setTracker(trk) again here — keeping the UI consistent whether
+    // the local persistence path succeeded or fell back to server-only.
 
     if (!serverPosted && !localSaved) {
       // BOTH failed — surface the error so the teacher can retry
-      // instead of thinking the grade was saved.
+      // instead of thinking the grade was saved. Roll back the
+      // optimistic tracker update so the phantom grade doesn't
+      // linger in the Grade History panel.
+      setTracker(tracker);
       errorBeep();
       setSaving(false);
       window.alert(
