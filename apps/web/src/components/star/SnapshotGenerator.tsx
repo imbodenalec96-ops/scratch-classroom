@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { onStarBoardEvent } from "../../lib/star/boardEvents.ts";
 import {
-  StarStore, countsTowardGrade, letterGradeColor,
+  StarStore, countsTowardGrade, letterGradeColor, fixUtcCompletedDates,
   type StarStudent,
   type StarPhoto, type StarTrackerEntry,
 } from "../../lib/star/storage.ts";
@@ -81,6 +81,12 @@ function dayDiff(a: string, b: string): number {
 }
 
 function gatherData(s: StarStudent, start: string, end: string): DayData {
+  // Run the date fix EVERY time the snapshot reads. The function only
+  // touches submissions whose completedDate disagrees with their
+  // loggedAt-in-Pacific, so it's a no-op on data that's already right.
+  // This guarantees today's grades show up on today's snapshot even
+  // if they were stamped in UTC by an older bundle.
+  try { fixUtcCompletedDates(); } catch {}
   const tracker = StarStore.getAsnTrack();
   const photos = StarStore.getPhotos();
   const passLog = StarStore.getPassLog();
