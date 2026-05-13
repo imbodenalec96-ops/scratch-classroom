@@ -573,21 +573,24 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
     `;
   };
 
-  // Duplex printing puts two pages per sheet automatically. To keep
-  // each kid on their own sheet (worksheet on front, blank-ish on
-  // back), we insert one padding page between kids. The padding
-  // page has NO kid-specific branding — just enough neutral ink so
-  // the printer doesn't "skip blank pages" and collapse it. Same
-  // neutral page used for every kid so no one sees "AIDEN" on the
-  // back of someone else's work.
-  // Simple: one page per kid in order. No back-of-sheet padding.
-  // If the teacher wants every kid on their own physical sheet
-  // under duplex printing, she picks "Single-sided" in the print
-  // dialog. Forcing blank backs from the app was generating real
-  // printed "Back of sheet" pages.
+  // Duplex printing pairs every two pages onto one sheet — front +
+  // back. Without help, if Anna's worksheet is one page, Kaleb's
+  // worksheet front lands on Anna's back, and so on. Two CSS knobs
+  // keep each kid on their own physical sheet:
+  //
+  //   .page  { break-after: page }  — every page ends a paper page
+  //   .kid-1 { break-before: recto } — every kid AFTER the first
+  //                                    starts on a right-hand page
+  //
+  // "recto" = right-hand = front of a sheet under duplex. The print
+  // engine inserts a blank back if needed to push the next kid to a
+  // fresh sheet. Under simplex, recto is ignored and nothing extra
+  // is printed. Past attempts using a literal "BACK OF SHEET" filler
+  // page were fragile and showed unwanted text — recto solves it
+  // declaratively.
   const pages: string[] = [];
-  for (const p of pack) {
-    pages.push(renderOne(p));
+  for (let i = 0; i < pack.length; i++) {
+    pages.push(`<div class="kid-block${i > 0 ? " kid-after-first" : ""}">${renderOne(pack[i])}</div>`);
   }
 
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(packLabel)}</title>
@@ -596,6 +599,11 @@ function openBulkPrintWindow(pack: PackEntry[], packLabel: string) {
         @page { size: letter; margin: 0.5in; }
         .page { page-break-after: always; break-after: page; }
         .page:last-child { page-break-after: auto; break-after: auto; }
+        /* Duplex-aware: every kid after the first starts on a fresh
+           front-of-sheet page. The browser inserts a blank back of
+           the previous kid's last page when needed. Under single-
+           sided printing this is a no-op. */
+        .kid-after-first { break-before: recto; page-break-before: right; }
       }
       body { font-family: -apple-system, sans-serif; color: #111; padding: 16px; }
       .page { box-sizing: border-box; }
