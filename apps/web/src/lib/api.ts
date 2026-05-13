@@ -348,7 +348,20 @@ export const api = {
     request<any>("/assignments/parse-pdf", { method: "POST", body: JSON.stringify({ fileId }) }),
 
   // Class daily schedule (block-based day table; seeded for Star)
-  getClassSchedule: (classId: string) => request<any[]>(`/classes/${classId}/schedule`),
+  getClassSchedule: async (classId: string) => {
+    // The authed schedule endpoint 401s on devices that aren't logged
+    // in as a teacher (iPad / projector / Chromebook). Fall back to
+    // the public read-only mirror so the board's schedule strip is
+    // populated everywhere, not just on the teacher's Mac.
+    try {
+      return await request<any[]>(`/classes/${classId}/schedule`);
+    } catch (e: any) {
+      if (e?.status === 401 || /token|auth/i.test(String(e?.message || ""))) {
+        return await request<any[]>(`/public/classes/${classId}/schedule`);
+      }
+      throw e;
+    }
+  },
 
   // Class video
   getClassVideo: (classId: string) => request<any>(`/classes/${classId}/video`),

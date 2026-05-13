@@ -296,7 +296,37 @@ const KEYS = {
   behaviorLog: "star_behavior_log",
   behaviorTemplates: "star_behavior_templates",
   dailyNotes: "star_daily_notes",
+  groups: "star_groups",
 } as const;
+
+// Student groups — small reading / math / project groups the
+// teacher mixes the kids into for the day. Each kid can be in
+// multiple groups (e.g. reading group + math group). Visualized
+// on the /star → Groups tab and printable as a wall poster.
+export interface StudentGroup {
+  id: string;
+  name: string;
+  emoji: string;
+  // Soft accent (hex / rgba) — pulled from the board palette so the
+  // group cards visually match the rest of the room's identity.
+  color: string;
+  studentIds: string[];
+  // Optional sub-label that shows under the group name on the card
+  // — "Reading", "Math centers", "Science buddies", etc.
+  subject?: string;
+  createdDate: string;
+  updatedDate: string;
+}
+
+// Six starter groups using the violet/pink/indigo palette so they
+// match the projector board out of the box. Empty rosters — teacher
+// drags kids in from the unassigned strip.
+export const DEFAULT_GROUPS: StudentGroup[] = [
+  { id: "grp-stars",   name: "Stars",     emoji: "⭐", color: "#f59e0b", studentIds: [], subject: "Reading group",  createdDate: new Date(0).toISOString(), updatedDate: new Date(0).toISOString() },
+  { id: "grp-comets",  name: "Comets",    emoji: "☄️", color: "#ec4899", studentIds: [], subject: "Math centers",   createdDate: new Date(0).toISOString(), updatedDate: new Date(0).toISOString() },
+  { id: "grp-rockets", name: "Rockets",   emoji: "🚀", color: "#a855f7", studentIds: [], subject: "Writing buddies",createdDate: new Date(0).toISOString(), updatedDate: new Date(0).toISOString() },
+  { id: "grp-galaxies",name: "Galaxies",  emoji: "🌌", color: "#6366f1", studentIds: [], subject: "Science squad",  createdDate: new Date(0).toISOString(), updatedDate: new Date(0).toISOString() },
+];
 
 /**
  * Parse an explicit accuracy / mastery percentage out of an IEP goal
@@ -1011,6 +1041,36 @@ export const StarStore = {
     const all = ls.get<IepLogEntry[]>(KEYS.iepLog, [])
       .filter((e) => !(e.studentId === studentId && e.date === date));
     ls.set(KEYS.iepLog, all);
+  },
+
+  // ── Student groups (Reading group / Math centers / etc.) ──────
+  getGroups: (): StudentGroup[] => ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS),
+  setGroups: (v: StudentGroup[]) => ls.set(KEYS.groups, v),
+  upsertGroup: (group: StudentGroup) => {
+    const all = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS);
+    const idx = all.findIndex((g) => g.id === group.id);
+    const next: StudentGroup = { ...group, updatedDate: new Date().toISOString() };
+    if (idx >= 0) all[idx] = next; else all.push(next);
+    ls.set(KEYS.groups, all);
+    return next;
+  },
+  deleteGroup: (id: string) => {
+    const all = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS).filter((g) => g.id !== id);
+    ls.set(KEYS.groups, all);
+  },
+  // Toggle a student in or out of a single group. Returns the new
+  // membership list for that group. Keeps the group's updatedDate
+  // fresh so the boot pull / push knows it changed.
+  toggleStudentInGroup: (groupId: string, studentId: string) => {
+    const all = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS);
+    const idx = all.findIndex((g) => g.id === groupId);
+    if (idx < 0) return [] as string[];
+    const cur = all[idx].studentIds || [];
+    const has = cur.includes(studentId);
+    const nextMembers = has ? cur.filter((s) => s !== studentId) : [...cur, studentId];
+    all[idx] = { ...all[idx], studentIds: nextMembers, updatedDate: new Date().toISOString() };
+    ls.set(KEYS.groups, all);
+    return nextMembers;
   },
 };
 

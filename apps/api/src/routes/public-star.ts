@@ -114,6 +114,23 @@ router.get("/classes/:classId/star-submissions", async (req: Request, res: Respo
   }
 });
 
+// Public class schedule (period blocks) — the iPad / projector
+// needs this to render the "what's happening now" strip on the
+// board, but the authed /api/classes/:id/schedule endpoint 401s
+// without a teacher token, leaving the board's schedule strip
+// empty. Same shape as the authed version.
+router.get("/classes/:classId/schedule", async (req: Request, res: Response) => {
+  try {
+    const rows = await db.prepare(
+      "SELECT * FROM class_schedule WHERE class_id = ? ORDER BY block_number ASC"
+    ).all(req.params.classId);
+    res.json(rows);
+  } catch (e: any) {
+    console.error("public/schedule", e);
+    res.status(500).json({ error: e?.message || "schedule failed" });
+  }
+});
+
 // Public list of classes — just id + name so the projector / iPad
 // can pick a class without logging in. No member-level info.
 router.get("/classes", async (_req: Request, res: Response) => {

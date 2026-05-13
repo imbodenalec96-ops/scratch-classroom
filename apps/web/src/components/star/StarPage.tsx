@@ -29,6 +29,7 @@ import FolderLabelsGenerator from "./FolderLabelsGenerator.tsx";
 import StudentReferenceSheet from "./StudentReferenceSheet.tsx";
 import PecsBuilder from "./PecsBuilder.tsx";
 import BehaviorTracker from "./BehaviorTracker.tsx";
+import GroupsManager from "./GroupsManager.tsx";
 import EndOfDayReport from "./EndOfDayReport.tsx";
 import StarBackupPanel from "./StarBackupPanel.tsx";
 import SnapshotGenerator from "./SnapshotGenerator.tsx";
@@ -41,7 +42,7 @@ import StarDataView from "./StarDataView.tsx";
 import { tokens as T } from "../../lib/star/theme.ts";
 import { Button } from "./ui.tsx";
 
-type Tab = "home" | "gradebook" | "create" | "iep" | "behavior" | "reports" | "data" | "settings";
+type Tab = "home" | "gradebook" | "create" | "iep" | "behavior" | "groups" | "reports" | "data" | "settings";
 
 const SUBJECTS: Subject[] = ["Math","Reading","Writing","Science","Social Studies","PE","Art","Library","Music"];
 const GRADES = ["K","1st","2nd","3rd","4th","5th"];
@@ -99,6 +100,7 @@ export default function StarPage() {
     { id: "create"    as Tab, icon: "✨", label: "Create" },
     { id: "iep"       as Tab, icon: "🎯", label: "IEP" },
     { id: "behavior"  as Tab, icon: "📈", label: "Behavior" },
+    { id: "groups"    as Tab, icon: "👥", label: "Groups" },
     { id: "reports"   as Tab, icon: "📊", label: "Reports" },
     { id: "data"      as Tab, icon: "💾", label: "Data" },
     { id: "settings"  as Tab, icon: "⚙️", label: "Settings" },
@@ -404,6 +406,17 @@ export default function StarPage() {
             subtitle="Tap a chip on a kid to log a behavior. Long-press to add a note. Frequency chart + IEP-printable report at the bottom."
           />
           <BehaviorTracker />
+        </>
+      )}
+
+      {tab === "groups" && (
+        <>
+          <PageHeader
+            kicker="👥 Groups"
+            title="Group roster"
+            subtitle="Who's in whose group — pulled live from the roster, styled to match the board, and printable as a wall poster."
+          />
+          <GroupsManager />
         </>
       )}
 
