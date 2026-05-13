@@ -205,13 +205,27 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       localSaved = true;
     } catch (e: any) {
       if (e?.quota) {
+        // Quota cascade: photos → prune old assignments (>14 days)
+        // → prune even older (>7 days). The local cache balloons
+        // past the browser's ~10 MB cap after a few weeks of use,
+        // and silently rejected writes were the actual cause of
+        // "grades won't save" tonight.
         try {
-          const { clearBehaviorPhotos } = await import("../../lib/star/storage.ts");
+          const { clearBehaviorPhotos, pruneOldAssignments } = await import("../../lib/star/storage.ts");
           clearBehaviorPhotos();
-        } catch {}
-        try {
-          saveAll({ asnTracker: allTrack, bcDB });
-          localSaved = true;
+          let attempt = 0;
+          for (const days of [14, 7, 3]) {
+            try {
+              pruneOldAssignments(days);
+              saveAll({ asnTracker: allTrack, bcDB });
+              localSaved = true;
+              break;
+            } catch (e2: any) {
+              attempt += 1;
+              localError = e2?.message || String(e2);
+            }
+          }
+          void attempt;
         } catch (e2: any) { localError = e2?.message || String(e2); }
       } else {
         localError = e?.message || String(e);
@@ -241,7 +255,14 @@ export default function GradebookModal({ barcode, onClose }: Props) {
       console.warn("[STAR] grade saved locally only — server POST failed:", serverError);
     }
     if (!localSaved) {
+      // SURFACE this loudly. Server has the grade, but until the local
+      // cache has it too the snapshot + this device's gradebook view
+      // can't show it. Tells the teacher exactly what to do.
       console.warn("[STAR] grade saved to server only — local cache failed:", localError);
+      window.alert(
+        `Grade saved to the server, but your browser's local storage is FULL — so the snapshot + gradebook on THIS device won't show it yet.\n\n` +
+        `Open /star → 💾 Data → tap the new red "🧹 Free up storage" button to clear old assignments. The grade is safe on the server, the iPad and projector already see it.`
+      );
     }
 
     // Award class-store points for a completed assignment. We try the API

@@ -79,10 +79,14 @@ export default function StarPage() {
     // Also re-stamp completedDate from loggedAt in Pacific time
     // (UTC-stamped grades from after 5 PM Pacific were pushed into
     // tomorrow's date and silently dropped from today's snapshot).
+    // And auto-prune assignments older than 30 days so localStorage
+    // doesn't balloon past the browser's ~10 MB cap, which causes
+    // new grades to be silently rejected by the browser.
     (async () => {
-      const { dedupAsnTrackSubmissions, fixUtcCompletedDates } = await import("../../lib/star/storage.ts");
+      const { dedupAsnTrackSubmissions, fixUtcCompletedDates, pruneOldAssignments } = await import("../../lib/star/storage.ts");
       dedupAsnTrackSubmissions();
       fixUtcCompletedDates();
+      pruneOldAssignments(30);
     })();
     // Best-effort silent sync on first mount so the roster + assignment
     // barcodes are always fresh when a teacher opens the page.

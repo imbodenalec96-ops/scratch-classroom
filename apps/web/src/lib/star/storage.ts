@@ -1206,6 +1206,68 @@ export function dedupAsnTrackSubmissions(): { changed: boolean; before: number; 
   }
 }
 
+// Free up localStorage by pruning STAR assignments + their tracker
+// entries that are older than `maxAgeDays`. The bcDB stores the full
+// lesson + question text per assignment (10-50 KB each), and the
+// asnTrack stores submissions with feedback/notes. After a few weeks
+// of use they balloon past the browser's ~10 MB localStorage cap and
+// new saves start being silently rejected. This keeps the cache lean.
+//
+// Doesn't touch the server — those rows stay forever. Only removes
+// stale local cache; if a teacher needs to re-grade an old assignment,
+// it'll be re-fetched from the server via barcode lookup.
+export function pruneOldAssignments(maxAgeDays = 14): { bcDBRemoved: number; trackRemoved: number } {
+  try {
+    const cutoffMs = Date.now() - maxAgeDays * 86_400_000;
+    const cutoffDate = new Date(cutoffMs - 7 * 3600_000);
+    const cutoffYmd = `${cutoffDate.getUTCFullYear()}-${String(cutoffDate.getUTCMonth() + 1).padStart(2, "0")}-${String(cutoffDate.getUTCDate()).padStart(2, "0")}`;
+
+    const bcDB = StarStore.getBcDB();
+    const asnTrack = StarStore.getAsnTrack();
+
+    let bcDBRemoved = 0;
+    let trackRemoved = 0;
+
+    // Helper: derive the YYYY-MM-DD date from an assignment id like
+    // RE-260512-029 → "2026-05-12". Falls back to t.createdDate.
+    const dateFromBarcode = (bc: string): string | null => {
+      const m = /^[A-Z]{2,3}-(\d{2})(\d{2})(\d{2})-/.exec(bc);
+      if (!m) return null;
+      return `20${m[1]}-${m[2]}-${m[3]}`;
+    };
+
+    for (const id in bcDB) {
+      const t = bcDB[id];
+      const d = dateFromBarcode(id) || (t?.createdDate || "").slice(0, 10);
+      if (d && d < cutoffYmd) {
+        delete bcDB[id];
+        bcDBRemoved += 1;
+      }
+    }
+    for (const id in asnTrack) {
+      const t = asnTrack[id];
+      const d = dateFromBarcode(id) || (t?.createdDate || "").slice(0, 10);
+      // Keep if any submission still in range — we don't want to drop
+      // a tracker that has a recent submission attached.
+      const recentSub = (t.submissions || []).some((s: any) => {
+        const sd = String(s.completedDate || "").slice(0, 10);
+        return sd && sd >= cutoffYmd;
+      });
+      if (recentSub) continue;
+      if (d && d < cutoffYmd) {
+        delete asnTrack[id];
+        trackRemoved += 1;
+      }
+    }
+
+    if (bcDBRemoved > 0) StarStore.setBcDB(bcDB);
+    if (trackRemoved > 0) StarStore.setAsnTrack(asnTrack);
+    return { bcDBRemoved, trackRemoved };
+  } catch {
+    return { bcDBRemoved: 0, trackRemoved: 0 };
+  }
+}
+
 // Fix submissions whose completedDate was stamped in UTC instead of
 // Pacific. We re-derive completedDate from loggedAt in Pacific time.
 // Idempotent + cheap, so we just always run it instead of gating on

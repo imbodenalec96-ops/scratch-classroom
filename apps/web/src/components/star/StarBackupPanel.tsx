@@ -348,6 +348,48 @@ export default function StarBackupPanel() {
         >📊 Push all grades to the server</button>
       </div>
 
+      {/* FREE UP STORAGE — drops bcDB + asnTrack entries older than the
+          chosen window. The local cache balloons past the browser's
+          ~10 MB localStorage cap after a few weeks of daily use, and
+          new saves start being silently rejected. This is the manual
+          escape hatch when that happens. Server data is untouched. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(239,68,68,0.08)",
+        border: "1px solid rgba(239,68,68,0.30)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
+          🧹 Free up storage (last resort)
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Browser localStorage caps at ~10 MB. Once you cross it, new grades save to the server but the
+          snapshot + gradebook on this device stop updating. This drops local copies of assignments
+          older than 14 days. Server data is untouched — re-grading an old item still works (it'll
+          re-fetch from the server on scan).
+        </div>
+        <button
+          onClick={async () => {
+            if (!window.confirm("Drop local cache of assignments older than 14 days?\n\nGrades stay on the server. Only the on-device cache is cleared.")) return;
+            try {
+              const { pruneOldAssignments, clearBehaviorPhotos } = await import("../../lib/star/storage.ts");
+              clearBehaviorPhotos();
+              const r = pruneOldAssignments(14);
+              successBeep();
+              showFlash("ok", `Pruned ${r.bcDBRemoved} barcodes + ${r.trackRemoved} grade records. Your snapshot should now update on next save.`, 5000);
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Prune failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #ef4444, #b91c1c)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >🧹 Free up storage now</button>
+      </div>
+
       {/* BACKUP */}
       <div style={{
         padding: 14, borderRadius: 12, marginBottom: 14,
