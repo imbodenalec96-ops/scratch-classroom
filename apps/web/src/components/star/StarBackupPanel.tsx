@@ -348,6 +348,57 @@ export default function StarBackupPanel() {
         >📊 Push all grades to the server</button>
       </div>
 
+      {/* RE-TAG legacy barcodes that were minted before the student-name
+          tag landed. Walks every assignment in local bcDB whose id is
+          still in the old "SUBJ-YYMMDD-SEQ" format and renames it to
+          "SUBJ-NAMETAG-YYMMDD-SEQ". Same questions + lessons; only the
+          id changes. Pushes the new entries to the server so other
+          devices pick up the renamed records too. After running, re-
+          print the affected packs so the printed barcodes match. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(217,119,6,0.10)",
+        border: "1px solid rgba(217,119,6,0.40)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fde68a", marginBottom: 6 }}>
+          🏷️ Re-tag old barcodes with student names
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          Existing 5/14 packs (and any older assignments) still use the no-name format like
+          <code style={{ background: "rgba(0,0,0,0.30)", padding: "1px 5px", borderRadius: 4, marginLeft: 4, marginRight: 4 }}>RE-260514-005</code>.
+          Tap to rename them to <code style={{ background: "rgba(0,0,0,0.30)", padding: "1px 5px", borderRadius: 4 }}>RE-AID-260514-005</code>
+          format — same content, just the id changes. After this you'll want to reprint affected packs so the new barcode matches the new id.
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const { retagAssignmentBarcodes } = await import("../../lib/star/storage.ts");
+              const r = retagAssignmentBarcodes();
+              if (r.renamed.length === 0) {
+                showFlash("ok", "No legacy barcodes to re-tag — everything is already named.", 4000);
+                return;
+              }
+              // Push every renamed entry up so other devices see it.
+              const { pushBarcodeToServer } = await import("../../lib/star/barcodeRelay.ts");
+              for (const row of r.renamed) {
+                try { await pushBarcodeToServer(row.entry); } catch {}
+              }
+              successBeep();
+              showFlash("ok", `Re-tagged ${r.renamed.length} barcode${r.renamed.length === 1 ? "" : "s"}. Reprint the affected packs so the printed bars match.`, 5500);
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Re-tag failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #d97706, #b45309)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >🏷️ Re-tag old barcodes now</button>
+      </div>
+
       {/* FREE UP STORAGE — drops bcDB + asnTrack entries older than the
           chosen window. The local cache balloons past the browser's
           ~10 MB localStorage cap after a few weeks of daily use, and

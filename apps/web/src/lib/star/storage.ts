@@ -1206,6 +1206,57 @@ export function dedupAsnTrackSubmissions(): { changed: boolean; before: number; 
   }
 }
 
+// Re-tag every assignment barcode that's still in the legacy
+// "SUBJ-YYMMDD-SEQ" format with the new "SUBJ-NAMETAG-YYMMDD-SEQ"
+// format. Same content; only the id changes. Returns the rename
+// map so callers can push the new entries to the server. Idempotent
+// — barcodes already tagged are skipped.
+export function retagAssignmentBarcodes(): { renamed: Array<{ from: string; to: string; entry: any }> } {
+  const renamed: Array<{ from: string; to: string; entry: any }> = [];
+  try {
+    const legacyRe = /^([A-Z]{2,3})-(\d{6})-(\d{2,4})$/;
+    const bcDB = StarStore.getBcDB();
+    const tracker = StarStore.getAsnTrack();
+    const asns = StarStore.getAsns();
+    const tagFor = (name?: string) => {
+      const base = (name || "").trim().split(/\s+/)[0]?.toUpperCase().replace(/[^A-Z]/g, "") || "";
+      return base.slice(0, 3) || "STU";
+    };
+    for (const oldId in bcDB) {
+      const m = legacyRe.exec(oldId);
+      if (!m) continue; // already in new format or not an assignment
+      const entry: any = bcDB[oldId];
+      if (!entry || entry.type !== "assignment") continue;
+      const tag = tagFor(entry.studentName);
+      const [, prefix, date, seq] = m;
+      let newId = `${prefix}-${tag}-${date}-${seq}`;
+      // Avoid collisions if this exact tagged id already exists.
+      let bumpSeq = parseInt(seq, 10);
+      while (bcDB[newId]) {
+        bumpSeq += 1;
+        newId = `${prefix}-${tag}-${date}-${String(bumpSeq).padStart(3, "0")}`;
+      }
+      const updatedEntry = { ...entry, id: newId };
+      bcDB[newId] = updatedEntry;
+      delete bcDB[oldId];
+      const oldTracker = tracker[oldId];
+      if (oldTracker) {
+        tracker[newId] = { ...oldTracker, id: newId };
+        delete tracker[oldId];
+      }
+      const asnIdx = asns.findIndex((a: any) => a.id === oldId);
+      if (asnIdx >= 0) asns[asnIdx] = { ...asns[asnIdx], id: newId };
+      renamed.push({ from: oldId, to: newId, entry: updatedEntry });
+    }
+    if (renamed.length > 0) {
+      try { StarStore.setBcDB(bcDB); } catch {}
+      try { StarStore.setAsnTrack(tracker); } catch {}
+      try { StarStore.setAsns(asns); } catch {}
+    }
+  } catch {}
+  return { renamed };
+}
+
 // More aggressive than pruneOldAssignments: strip the heavy `lesson`
 // and `questions` fields from bcDB entries older than `daysToKeepFull`
 // while preserving the lightweight metadata (id, name, subject, etc).
