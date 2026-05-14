@@ -259,13 +259,12 @@ export async function buildRebuildBundle(): Promise<RebuildBundle> {
   };
 }
 
-/** Trigger a browser download of the bundle as a .json file with a
- *  README block at the very top so a human reader (or an LLM reading
- *  the file) immediately sees what each section is for. */
-export async function downloadRebuildBundle(): Promise<{ ok: boolean; bytes: number; error?: string }> {
-  try {
-    const bundle = await buildRebuildBundle();
-    const readme = `\
+/** Build the bundle's serialized text form (README header + JSON
+ *  body). Shared by download + clipboard so both paths produce
+ *  byte-identical output. */
+async function bundleToText(): Promise<{ text: string; bundle: RebuildBundle }> {
+  const bundle = await buildRebuildBundle();
+  const readme = `\
 ═══════════════════════════════════════════════════════════════════════════
   STAR / Scratch Classroom — Rebuild Data Bundle
   Generated: ${bundle.meta.generated_at}
@@ -337,9 +336,20 @@ export async function downloadRebuildBundle(): Promise<{ ok: boolean; bytes: num
 
 ═══════════════════════════════════════════════════════════════════════════
 `;
-    const json = JSON.stringify(bundle, null, 2);
-    const blob = new Blob([readme + "\n" + json], { type: "application/json;charset=utf-8" });
-    const filename = `star-rebuild-${bundle.meta.generated_at.slice(0, 10)}.json`;
+  const json = JSON.stringify(bundle, null, 2);
+  return { text: readme + "\n" + json, bundle };
+}
+
+/** Trigger a browser download of the bundle as a .txt file. Saved as
+ *  text (not .json) because most LLM chat uploads — including Claude's
+ *  own web UI — reject the .json MIME type but accept .txt. The
+ *  content is still valid JSON inside the file, just with the README
+ *  header at the top. */
+export async function downloadRebuildBundle(): Promise<{ ok: boolean; bytes: number; error?: string }> {
+  try {
+    const { text, bundle } = await bundleToText();
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const filename = `star-rebuild-${bundle.meta.generated_at.slice(0, 10)}.txt`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -350,6 +360,19 @@ export async function downloadRebuildBundle(): Promise<{ ok: boolean; bytes: num
     a.remove();
     URL.revokeObjectURL(url);
     return { ok: true, bytes: blob.size };
+  } catch (e: any) {
+    return { ok: false, bytes: 0, error: e?.message || String(e) };
+  }
+}
+
+/** Copy the full bundle text to the clipboard so the user can paste
+ *  it directly into a chat window. For when even .txt uploads aren't
+ *  accepted by the destination. */
+export async function copyRebuildBundleToClipboard(): Promise<{ ok: boolean; bytes: number; error?: string }> {
+  try {
+    const { text } = await bundleToText();
+    await navigator.clipboard.writeText(text);
+    return { ok: true, bytes: new Blob([text]).size };
   } catch (e: any) {
     return { ok: false, bytes: 0, error: e?.message || String(e) };
   }

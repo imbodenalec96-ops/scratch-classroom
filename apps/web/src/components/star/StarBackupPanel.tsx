@@ -362,37 +362,69 @@ export default function StarBackupPanel() {
           📦 Export everything for rebuild
         </div>
         <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
-          One-shot download of every piece of STAR data you own — assignments + payloads, grades,
+          One-shot dump of every piece of STAR data you own — assignments + payloads, grades,
           behavior events + templates, IEP goals + log, daily notes, groups, kudos, store rows,
           and per-kid <b>dojo points / behavior stars / level / McDonald's reward state</b>.
-          Hand the file to another Claude Code session with "seed the new STAR database from
-          this JSON" and it has everything it needs. README block at the top of the file
-          explains each section.
+          Hand it to another Claude Code session with "seed the new STAR database from this
+          dump." README block at the top of the file explains every section.
+          <br /><br />
+          <b style={{ color: "#bbf7d0" }}>Two ways to deliver:</b>
+          <br />
+          <b>📄 Download</b> saves as <code>.txt</code> (most chat upload pickers accept
+          .txt but reject .json — same content, friendlier extension).<br />
+          <b>📋 Copy</b> puts the whole bundle on your clipboard so you can paste it directly
+          into a chat window — use this if .txt uploads still don't go through.
         </div>
-        <button
-          onClick={async () => {
-            try {
-              const { downloadRebuildBundle } = await import("../../lib/star/rebuildExport.ts");
-              const r = await downloadRebuildBundle();
-              if (r.ok) {
-                successBeep();
-                showFlash("ok", `Downloaded star-rebuild bundle (${Math.round(r.bytes / 1024)} KB). Hand the file to the rebuild agent.`, 6000);
-              } else {
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={async () => {
+              try {
+                const { downloadRebuildBundle } = await import("../../lib/star/rebuildExport.ts");
+                const r = await downloadRebuildBundle();
+                if (r.ok) {
+                  successBeep();
+                  showFlash("ok", `Downloaded star-rebuild .txt (${Math.round(r.bytes / 1024)} KB).`, 6000);
+                } else {
+                  errorBeep();
+                  showFlash("err", `Export failed: ${r.error}`);
+                }
+              } catch (e: any) {
                 errorBeep();
-                showFlash("err", `Export failed: ${r.error}`);
+                showFlash("err", `Export failed: ${e?.message || e}`);
               }
-            } catch (e: any) {
-              errorBeep();
-              showFlash("err", `Export failed: ${e?.message || e}`);
-            }
-          }}
-          style={{
-            padding: "11px 16px", borderRadius: 10,
-            background: "linear-gradient(135deg, #22c55e, #16a34a)",
-            color: "white", border: "none", fontWeight: 800,
-            cursor: "pointer", fontSize: 13,
-          }}
-        >📦 Export everything as a single .json file</button>
+            }}
+            style={{
+              padding: "11px 16px", borderRadius: 10,
+              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+              color: "white", border: "none", fontWeight: 800,
+              cursor: "pointer", fontSize: 13,
+            }}
+          >📄 Download as .txt</button>
+          <button
+            onClick={async () => {
+              try {
+                const { copyRebuildBundleToClipboard } = await import("../../lib/star/rebuildExport.ts");
+                const r = await copyRebuildBundleToClipboard();
+                if (r.ok) {
+                  successBeep();
+                  showFlash("ok", `Copied ${Math.round(r.bytes / 1024)} KB to clipboard. Paste into your chat.`, 7000);
+                } else {
+                  errorBeep();
+                  showFlash("err", `Copy failed: ${r.error}`);
+                }
+              } catch (e: any) {
+                errorBeep();
+                showFlash("err", `Copy failed: ${e?.message || e}`);
+              }
+            }}
+            style={{
+              padding: "11px 16px", borderRadius: 10,
+              background: "linear-gradient(135deg, #14b8a6, #0891b2)",
+              color: "white", border: "none", fontWeight: 800,
+              cursor: "pointer", fontSize: 13,
+            }}
+          >📋 Copy to clipboard</button>
+        </div>
       </div>
 
       {/* RE-TAG legacy barcodes that were minted before the student-name
