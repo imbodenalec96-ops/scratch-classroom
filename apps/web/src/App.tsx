@@ -211,9 +211,13 @@ export default function App() {
     (async () => {
       try {
         const { fullStarPull, fullStarPush } = await import("./lib/star/supabaseSync.ts");
-        await fullStarPull();
-        // Push anything created offline so other devices see it.
+        // PUSH FIRST so any locally-edited rows that exist only on
+        // this device land on the server BEFORE the pull merges. The
+        // previous order (pull → push) could wipe local data when the
+        // server table was empty — pullGroups now guards against that
+        // specifically, but push-first is the safer policy regardless.
         await fullStarPush();
+        await fullStarPull();
       } catch (e) {
         console.warn("[STAR sync boot]", e);
       }

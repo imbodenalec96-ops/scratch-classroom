@@ -315,13 +315,39 @@ const rowToGroup = (r: GroupRow): StudentGroup => ({
 });
 export async function pullGroups(): Promise<number> {
   const { data, error } = await supa().from("star_groups").select("*");
-  if (error || !data) { warn("pullGroups", error); return 0; }
-  // Server is source of truth for groups — replace whatever's local
-  // entirely. Otherwise locally-deleted groups would re-spawn from
-  // a stale local copy. (Behaviors merge by id; groups don't need
-  // that nuance — the whole list is small + always edited together.)
-  StarStore.setGroups((data as GroupRow[]).map(rowToGroup));
-  return (data || []).length;
+  if (error) { warn("pullGroups", error); return 0; }
+  const serverRows = (data || []) as GroupRow[];
+  const local = StarStore.getGroups();
+
+  // SAFEGUARD #1: don't wipe local groups when the server is empty.
+  // This was the first-run bug — server table fresh + local had
+  // Stars/Comets with kids → pull replaced local with [] and the
+  // teacher lost the setup. Now if server is empty AND local has
+  // any rows, push local up instead.
+  if (serverRows.length === 0) {
+    if (local.length > 0) {
+      for (const g of local) await pushGroup(g);
+    }
+    return 0;
+  }
+
+  // MERGE by id, prefer the more recently updated row. Writing
+  // directly to localStorage so we don't loop through setGroups
+  // (which would re-fire _syncPush for every row).
+  const merged: Record<string, StudentGroup> = {};
+  for (const g of local) merged[g.id] = g;
+  for (const r of serverRows) {
+    const incoming = rowToGroup(r);
+    const existing = merged[r.id];
+    if (!existing) { merged[r.id] = incoming; continue; }
+    const localTs = Date.parse(existing.updatedDate || "") || 0;
+    const serverTs = Date.parse(incoming.updatedDate || "") || 0;
+    merged[r.id] = serverTs >= localTs ? incoming : existing;
+  }
+  try {
+    localStorage.setItem("star_groups", JSON.stringify(Object.values(merged)));
+  } catch {}
+  return serverRows.length;
 }
 export async function pushGroup(group: StudentGroup): Promise<void> {
   const { error } = await supa().from("star_groups").upsert(groupToRow(group));

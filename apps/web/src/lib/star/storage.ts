@@ -1048,14 +1048,13 @@ export const StarStore = {
   // ── Student groups (Reading group / Math centers / etc.) ──────
   getGroups: (): StudentGroup[] => ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS),
   setGroups: (v: StudentGroup[]) => {
+    // Read prior BEFORE writing the new value — otherwise the diff
+    // compares the new list against itself and no deletes ever fire.
+    let prior: StudentGroup[] = [];
+    try { prior = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS); } catch {}
     ls.set(KEYS.groups, v);
-    // Diff: rows that no longer exist in the new list need to be
-    // deleted server-side; everything else is upserted.
-    try {
-      const prior = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS);
-      const nextIds = new Set(v.map((g) => g.id));
-      for (const p of prior) if (!nextIds.has(p.id)) _syncPush("group.del", p.id);
-    } catch {}
+    const nextIds = new Set(v.map((g) => g.id));
+    for (const p of prior) if (!nextIds.has(p.id)) _syncPush("group.del", p.id);
     for (const g of v) _syncPush("group", g);
   },
   upsertGroup: (group: StudentGroup) => {
