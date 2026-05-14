@@ -348,6 +348,53 @@ export default function StarBackupPanel() {
         >📊 Push all grades to the server</button>
       </div>
 
+      {/* EXPORT FOR REBUILD — single-file dump of every assignment, grade,
+          behavior, IEP entry, daily note, group, kudos, store row, and per-
+          kid points/stars/level. Hand the file to a rebuild agent ("seed the
+          new STAR database from this JSON"). README block at the top of the
+          file explains every section + how to map it to SQL. */}
+      <div style={{
+        padding: 14, borderRadius: 12, marginBottom: 14,
+        background: "rgba(34,197,94,0.10)",
+        border: "1px solid rgba(34,197,94,0.40)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#bbf7d0", marginBottom: 6 }}>
+          📦 Export everything for rebuild
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(196,181,253,0.85)", marginBottom: 10, lineHeight: 1.5 }}>
+          One-shot download of every piece of STAR data you own — assignments + payloads, grades,
+          behavior events + templates, IEP goals + log, daily notes, groups, kudos, store rows,
+          and per-kid <b>dojo points / behavior stars / level / McDonald's reward state</b>.
+          Hand the file to another Claude Code session with "seed the new STAR database from
+          this JSON" and it has everything it needs. README block at the top of the file
+          explains each section.
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const { downloadRebuildBundle } = await import("../../lib/star/rebuildExport.ts");
+              const r = await downloadRebuildBundle();
+              if (r.ok) {
+                successBeep();
+                showFlash("ok", `Downloaded star-rebuild bundle (${Math.round(r.bytes / 1024)} KB). Hand the file to the rebuild agent.`, 6000);
+              } else {
+                errorBeep();
+                showFlash("err", `Export failed: ${r.error}`);
+              }
+            } catch (e: any) {
+              errorBeep();
+              showFlash("err", `Export failed: ${e?.message || e}`);
+            }
+          }}
+          style={{
+            padding: "11px 16px", borderRadius: 10,
+            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+            color: "white", border: "none", fontWeight: 800,
+            cursor: "pointer", fontSize: 13,
+          }}
+        >📦 Export everything as a single .json file</button>
+      </div>
+
       {/* RE-TAG legacy barcodes that were minted before the student-name
           tag landed. Walks every assignment in local bcDB whose id is
           still in the old "SUBJ-YYMMDD-SEQ" format and renames it to
