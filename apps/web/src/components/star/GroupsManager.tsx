@@ -79,6 +79,23 @@ export default function GroupsManager() {
     })();
   }, []);
 
+  // Pull groups from Supabase on mount + every 30s so a rename or
+  // membership change on one device shows up on every other device
+  // without anyone reloading. Group writes were already server-bound
+  // via _syncPush in storage.ts; reads were the missing piece.
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const { pullGroups } = await import("../../lib/star/supabaseSync.ts");
+        await pullGroups();
+        setGroups(StarStore.getGroups());
+      } catch {}
+    };
+    refresh();
+    const iv = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(iv);
+  }, []);
+
   // Build "studentId → groupId[]" map for the roster panel badges.
   const memberships = useMemo(() => {
     const m: Record<string, string[]> = {};

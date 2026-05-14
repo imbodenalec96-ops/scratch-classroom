@@ -74,8 +74,17 @@ export default function BoardGroupsPanel() {
   // doesn't cover. Both lookups are case-insensitive on student id.
   useEffect(() => {
     if (!open) return;
-    setGroups(StarStore.getGroups());
-    setStudents(StarStore.getStudents());
+    // Pull fresh groups from Supabase first so the projector sees the
+    // teacher's latest renames + memberships, not whatever was cached
+    // locally last time. Local was the silent reason groups didn't sync.
+    (async () => {
+      try {
+        const { pullGroups } = await import("../../lib/star/supabaseSync.ts");
+        await pullGroups();
+      } catch {}
+      setGroups(StarStore.getGroups());
+      setStudents(StarStore.getStudents());
+    })();
     (async () => {
       const map: Record<string, AvatarInfo> = {};
       const upsert = (rawId: any, url: string | null, emoji: string | null) => {
@@ -116,7 +125,13 @@ export default function BoardGroupsPanel() {
   // projector without anyone closing the panel.
   useEffect(() => {
     if (!open) return;
-    const iv = setInterval(() => setGroups(StarStore.getGroups()), 30_000);
+    const iv = setInterval(async () => {
+      try {
+        const { pullGroups } = await import("../../lib/star/supabaseSync.ts");
+        await pullGroups();
+      } catch {}
+      setGroups(StarStore.getGroups());
+    }, 30_000);
     return () => clearInterval(iv);
   }, [open]);
 

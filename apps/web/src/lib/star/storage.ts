@@ -641,6 +641,8 @@ function _syncPush(kind: string, payload: any): void {
         case "iepGoal":          return void m.pushIepGoal(payload);
         case "iepGoal.del":      return void m.deleteIepGoalRemote(payload);
         case "iepLog":           return void m.pushIepLogEntry(payload);
+        case "group":            return void m.pushGroup(payload);
+        case "group.del":        return void m.deleteGroupRemote(payload);
       }
     } catch { /* swallow — local write already succeeded */ }
   }).catch(() => {});
@@ -1045,18 +1047,30 @@ export const StarStore = {
 
   // ── Student groups (Reading group / Math centers / etc.) ──────
   getGroups: (): StudentGroup[] => ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS),
-  setGroups: (v: StudentGroup[]) => ls.set(KEYS.groups, v),
+  setGroups: (v: StudentGroup[]) => {
+    ls.set(KEYS.groups, v);
+    // Diff: rows that no longer exist in the new list need to be
+    // deleted server-side; everything else is upserted.
+    try {
+      const prior = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS);
+      const nextIds = new Set(v.map((g) => g.id));
+      for (const p of prior) if (!nextIds.has(p.id)) _syncPush("group.del", p.id);
+    } catch {}
+    for (const g of v) _syncPush("group", g);
+  },
   upsertGroup: (group: StudentGroup) => {
     const all = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS);
     const idx = all.findIndex((g) => g.id === group.id);
     const next: StudentGroup = { ...group, updatedDate: new Date().toISOString() };
     if (idx >= 0) all[idx] = next; else all.push(next);
     ls.set(KEYS.groups, all);
+    _syncPush("group", next);
     return next;
   },
   deleteGroup: (id: string) => {
     const all = ls.get<StudentGroup[]>(KEYS.groups, DEFAULT_GROUPS).filter((g) => g.id !== id);
     ls.set(KEYS.groups, all);
+    _syncPush("group.del", id);
   },
   // Toggle a student in or out of a single group. Returns the new
   // membership list for that group. Keeps the group's updatedDate
@@ -1070,6 +1084,7 @@ export const StarStore = {
     const nextMembers = has ? cur.filter((s) => s !== studentId) : [...cur, studentId];
     all[idx] = { ...all[idx], studentIds: nextMembers, updatedDate: new Date().toISOString() };
     ls.set(KEYS.groups, all);
+    _syncPush("group", all[idx]);
     return nextMembers;
   },
 };

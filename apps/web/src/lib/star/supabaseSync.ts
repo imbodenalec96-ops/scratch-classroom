@@ -23,7 +23,7 @@ import { supa } from "./supabase.ts";
 import {
   StarStore,
   type BehaviorDef, type BehaviorEvent, type BehaviorTemplate,
-  type DailyNote, type IepGoal, type IepLogEntry,
+  type DailyNote, type IepGoal, type IepLogEntry, type StudentGroup,
 } from "./storage.ts";
 
 // ── Behavior defs ───────────────────────────────────────────────
@@ -297,6 +297,41 @@ export async function deleteCustomMusicRemote(id: string): Promise<void> {
   if (error) warn("deleteCustomMusic", error);
 }
 
+// ── Student groups ─────────────────────────────────────────────
+type GroupRow = {
+  id: string; name: string; emoji: string; color: string;
+  subject: string | null; student_ids: string[];
+  created_at: string; updated_at: string;
+};
+const groupToRow = (g: StudentGroup): GroupRow => ({
+  id: g.id, name: g.name, emoji: g.emoji, color: g.color,
+  subject: g.subject ?? null, student_ids: g.studentIds || [],
+  created_at: g.createdDate, updated_at: g.updatedDate,
+});
+const rowToGroup = (r: GroupRow): StudentGroup => ({
+  id: r.id, name: r.name, emoji: r.emoji, color: r.color,
+  subject: r.subject || undefined, studentIds: r.student_ids || [],
+  createdDate: r.created_at, updatedDate: r.updated_at,
+});
+export async function pullGroups(): Promise<number> {
+  const { data, error } = await supa().from("star_groups").select("*");
+  if (error || !data) { warn("pullGroups", error); return 0; }
+  // Server is source of truth for groups — replace whatever's local
+  // entirely. Otherwise locally-deleted groups would re-spawn from
+  // a stale local copy. (Behaviors merge by id; groups don't need
+  // that nuance — the whole list is small + always edited together.)
+  StarStore.setGroups((data as GroupRow[]).map(rowToGroup));
+  return (data || []).length;
+}
+export async function pushGroup(group: StudentGroup): Promise<void> {
+  const { error } = await supa().from("star_groups").upsert(groupToRow(group));
+  if (error) warn("pushGroup", error);
+}
+export async function deleteGroupRemote(id: string): Promise<void> {
+  const { error } = await supa().from("star_groups").delete().eq("id", id);
+  if (error) warn("deleteGroup", error);
+}
+
 // ── Master sync ─────────────────────────────────────────────────
 
 /** Pull everything from Supabase into local storage. Runs on app
@@ -312,6 +347,7 @@ export async function fullStarPull(): Promise<{ ok: boolean; totalRows: number; 
     perTable.iep_goals           = await pullIepGoals();
     perTable.iep_log             = await pullIepLog();
     perTable.custom_music        = await pullCustomMusic();
+    perTable.groups              = await pullGroups();
   } catch (e: any) {
     console.warn("[fullStarPull]", e?.message || e);
     return { ok: false, totalRows: 0, perTable };
@@ -330,6 +366,7 @@ export async function fullStarPush(): Promise<{ pushed: number }> {
   for (const n of Object.values(StarStore.getDailyNotes())) { await pushDailyNote(n); pushed++; }
   for (const g of StarStore.getIepGoals())          { await pushIepGoal(g);          pushed++; }
   for (const l of StarStore.getIepLog())            { await pushIepLogEntry(l);      pushed++; }
+  for (const g of StarStore.getGroups())            { await pushGroup(g);            pushed++; }
   // Custom music — read from the local list and push individually
   try {
     const { getCustomMusicPresets } = await import("../musicPresets.ts");
